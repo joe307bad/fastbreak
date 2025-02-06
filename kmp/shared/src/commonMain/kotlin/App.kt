@@ -20,9 +20,10 @@ import org.jetbrains.compose.ui.tooling.preview.Preview
 fun App() {
     var authReady by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
+        val googleAuthServerId = BuildConfig.GOOGLE_AUTH_SERVER_ID // Read from BuildConfig
         GoogleAuthProvider.create(
             credentials = GoogleAuthCredentials(
-                serverId = "WEB_CLIENT_ID"
+                serverId = googleAuthServerId
             )
         )
         authReady = true

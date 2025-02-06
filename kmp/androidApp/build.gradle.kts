@@ -12,9 +12,15 @@ android {
         targetSdk = 34
         versionCode = 1
         versionName = "1.0"
+        buildConfigField(
+            "String",
+            "GOOGLE_AUTH_SERVER_ID",
+            "\"" + (project.findProperty("GOOGLE_AUTH_SERVER_ID") ?: "") + "\""
+        )
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
     composeOptions {
         kotlinCompilerExtensionVersion = libs.versions.compose.compiler.get()

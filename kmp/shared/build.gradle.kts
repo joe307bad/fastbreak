@@ -1,7 +1,12 @@
+import com.codingfeline.buildkonfig.compiler.FieldSpec.Type.STRING
+import org.jetbrains.kotlin.konan.properties.Properties
+
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
     alias(libs.plugins.androidLibrary)
-    id("org.jetbrains.compose") version "1.7.3"
+    alias(libs.plugins.jetbrainsCompose)
+    alias(libs.plugins.compose.compiler)
+    id("com.codingfeline.buildkonfig")
 }
 
 kotlin {
@@ -53,6 +58,19 @@ android {
         targetCompatibility = JavaVersion.VERSION_1_8
     }
 }
-dependencies {
-    implementation(libs.androidx.foundation.layout.android)
+
+buildkonfig {
+    val propertiesProj = Properties()
+    packageName = "com.joebad.fastbreak"
+
+    defaultConfigs {
+        propertiesProj.load(project.rootProject.file("local.properties").inputStream())
+        val apiKey: String = propertiesProj.getProperty("GOOGLE_AUTH_SERVER_ID")
+
+        require(apiKey.isNotEmpty()) {
+            "Register your GOOGLE_AUTH_SERVER_ID from developer and place it in local.properties as `GOOGLE_AUTH_SERVER_ID`"
+        }
+
+        buildConfigField(STRING, "GOOGLE_AUTH_SERVER_ID", apiKey)
+    }
 }

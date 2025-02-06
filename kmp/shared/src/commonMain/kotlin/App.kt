@@ -14,16 +14,17 @@ import com.mmk.kmpauth.google.GoogleAuthProvider
 import com.mmk.kmpauth.google.GoogleButtonUiContainer
 import com.mmk.kmpauth.uihelper.google.GoogleSignInButton
 import org.jetbrains.compose.ui.tooling.preview.Preview
+import com.joebad.fastbreak.BuildKonfig.GOOGLE_AUTH_SERVER_ID
 
 @Composable
 @Preview
 fun App() {
     var authReady by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
-        val googleAuthServerId = BuildConfig.GOOGLE_AUTH_SERVER_ID // Read from BuildConfig
+
         GoogleAuthProvider.create(
             credentials = GoogleAuthCredentials(
-                serverId = googleAuthServerId
+                serverId = GOOGLE_AUTH_SERVER_ID
             )
         )
         authReady = true

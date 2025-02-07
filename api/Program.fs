@@ -1,3 +1,7 @@
+open System
+open System.Linq.Expressions
+open Hangfire.Mongo.Migration.Strategies
+open MongoDB.Driver
 open Saturn
 open Saturn.Endpoint
 open api.Todos
@@ -5,6 +9,10 @@ open Google.Apis.Auth
 open Microsoft.AspNetCore.Http
 open System.Threading.Tasks
 open Giraffe
+open Microsoft.AspNetCore.Builder
+open Microsoft.Extensions.DependencyInjection
+open Hangfire
+open Hangfire.Mongo
 
 let validateGoogleToken (idToken: string) =
     task {
@@ -63,11 +71,58 @@ let defaultRouter =
         pipe_through googleAuthPipeline  
         get "/api/todos" Find
     }
+    
+// TOOD use an env var for mongo password, username, ip address, and db
+let mongoConnectionString = "mongodb://USER:PWORD@IP:27017/DB?directConnection=true&authSource=admin"
+let replicaSetName = "rs0"
+
+let configureMongoClientSettings () =
+    let clientSettings = MongoClientSettings.FromConnectionString(mongoConnectionString)
+    
+    // Set the replica set name and server selection timeout directly
+    clientSettings.ServerSelectionTimeout <- TimeSpan.FromSeconds(5.0)
+    clientSettings.ReplicaSetName <- replicaSetName
+
+    clientSettings
+
+let mongoClient = configureMongoClientSettings()
+let configureHangfire (services: IServiceCollection) =
+    let mongoStorage = MongoStorage(mongoClient, "fastbreak", MongoStorageOptions(
+        CheckConnection = false,
+        MigrationOptions = MongoMigrationOptions(
+            MigrationStrategy = DropMongoMigrationStrategy()
+        )
+    ))
+    services.AddHangfire(fun config -> 
+        config.UseStorage(mongoStorage) |> ignore
+    ) |> ignore
+    services.AddHangfireServer() |> ignore
+    services
+    
+type JobRunner =
+    static member LogJob() =
+        printfn "Job executed at %A" DateTime.UtcNow
+
+let scheduleJobs () =
+    let methodCall: Expression<Action<JobRunner>> = 
+        Expression.Lambda<Action<JobRunner>>(
+            Expression.Call(typeof<JobRunner>.GetMethod("LogJob")),
+            Expression.Parameter(typeof<JobRunner>, "x")  // Required parameter
+        )
+    
+    RecurringJob.AddOrUpdate("every-second-job-3", methodCall, "*/1 * * * *")
+
+let configureApp (app: IApplicationBuilder) =
+    app.UseHangfireDashboard() |> ignore
+    scheduleJobs ()  // ✅ Run jobs inside app configuration
+    app
 
 let app =
     application {
+        service_config configureHangfire
         use_developer_exceptions
         use_endpoint_router defaultRouter
+        app_config configureApp
     }
 
 run app

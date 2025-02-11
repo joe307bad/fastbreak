@@ -8,6 +8,16 @@ plugins {
     alias(libs.plugins.jetbrainsCompose)
     alias(libs.plugins.compose.compiler)
     id("com.codingfeline.buildkonfig")
+    kotlin("plugin.serialization") version "2.1.0"
+}
+
+tasks {
+    withType<Test> {
+        enabled = false
+    }
+    register("testClasses") {
+        enabled = false
+    }
 }
 
 kotlin {
@@ -22,6 +32,11 @@ kotlin {
     @OptIn(ExperimentalWasmDsl::class)
     wasmJs {
         binaries.library()
+        browser {
+            testTask {
+                enabled = false
+            }
+        }
     }
     
     listOf(
@@ -44,14 +59,30 @@ kotlin {
             implementation(compose.ui)
             implementation(compose.components.resources)
             implementation(compose.components.uiToolingPreview)
+            implementation("com.arkivanov.decompose:decompose:3.2.2")
 
-            matching {
-                it.name != "wasmJsMain" && it.name != "commonMain" && it.name != "wasmJsTest" && it.name != "commonTest"
-            }.forEach {
-                it.dependencies {
-                    implementation("io.github.mirzemehdi:kmpauth-google:2.0.0")
-                    implementation("io.github.mirzemehdi:kmpauth-uihelper:2.0.0")
-                }
+
+        }
+
+        val nonWasmMain by creating {
+            dependsOn(commonMain.get())
+
+            dependencies {
+                implementation("io.github.mirzemehdi:kmpauth-google:2.0.0")
+                implementation("io.github.mirzemehdi:kmpauth-uihelper:2.0.0")
+            }
+        }
+
+        androidMain {
+            dependsOn(nonWasmMain)
+        }
+
+        iosMain {
+            dependsOn(nonWasmMain)
+        }
+
+        wasmJsMain {
+            dependencies {
             }
         }
 

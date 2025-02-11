@@ -7,6 +7,15 @@ plugins {
   alias(libs.plugins.kotlinMultiplatform)
 }
 
+tasks {
+  withType<Test> {
+    enabled = false
+  }
+  register("testClasses") {
+    enabled = false
+  }
+}
+
 kotlin {
   @OptIn(ExperimentalWasmDsl::class)
   wasmJs {

@@ -29,6 +29,28 @@ kotlin {
         }
     }
 
+    iosX64 {
+        binaries.framework {
+            baseName = "shared"
+            isStatic = true
+            binaryOption("bundleId", "com.joebad.fastbreak.shared")  // Replace with your bundle ID
+        }
+    }
+    iosArm64 {
+        binaries.framework {
+            baseName = "shared"
+            isStatic = true
+            binaryOption("bundleId", "com.joebad.fastbreak.shared")  // Replace with your bundle ID
+        }
+    }
+    iosSimulatorArm64 {
+        binaries.framework {
+            baseName = "shared"
+            isStatic = true
+            binaryOption("bundleId", "com.joebad.fastbreak.shared")  // Replace with your bundle ID
+        }
+    }
+
     @OptIn(ExperimentalWasmDsl::class)
     wasmJs {
         binaries.library()
@@ -39,16 +61,16 @@ kotlin {
         }
     }
     
-    listOf(
-        iosX64(),
-        iosArm64(),
-        iosSimulatorArm64()
-    ).forEach {
-        it.binaries.framework {
-            baseName = "shared"
-            isStatic = true
-        }
-    }
+//    listOf(
+//        iosX64(),
+//        iosArm64(),
+//        iosSimulatorArm64()
+//    ).forEach {
+//        it.binaries.framework {
+//            baseName = "shared"
+//            isStatic = true
+//        }
+//    }
 
     sourceSets {
         commonMain.dependencies {

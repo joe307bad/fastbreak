@@ -1,9 +1,12 @@
 open System
 open System.Linq.Expressions
+open System.Text.Json
+open System.Text.Json.Serialization
 open Hangfire.Mongo.Migration.Strategies
+open MongoDB.Bson.Serialization
 open MongoDB.Driver
 open Saturn
-open Schedule
+open ScheduleController
 open Google.Apis.Auth
 open Microsoft.AspNetCore.Http
 open System.Threading.Tasks
@@ -14,9 +17,17 @@ open Hangfire
 open Hangfire.Mongo
 open DotNetEnv
 open Saturn.Endpoint
-open api.Todos 
+open SchedulePuller
+open api.Todos
 
-Env.Load()
+Env.Load() |> ignore
+
+let enablePullTomorrowsSchedule =
+    match Environment.GetEnvironmentVariable "ENABLE_PULL_TOMORROWS_SCHEDULE" with
+    | "1" -> true
+    | "0" -> false
+    | null -> false // Default value if env var is not set
+    | _ -> false
 
 let mongoUser = Environment.GetEnvironmentVariable "MONGO_USER"
 let mongoPass = Environment.GetEnvironmentVariable "MONGO_PASS"
@@ -56,9 +67,7 @@ let requireGoogleAuth: HttpFunc -> HttpContext -> Task<HttpContext option> =
 
 
 
-let api = pipeline {
-    set_header "x-pipeline-type" "API"
-}
+let api = pipeline { set_header "x-pipeline-type" "API" }
 
 let googleAuthPipeline =
     pipeline {
@@ -66,9 +75,11 @@ let googleAuthPipeline =
         set_header "x-pipeline-type" "API"
     }
 
+BsonClassMap.RegisterClassMap<ScheduleEntity.Event>(fun cm ->
+    cm.AutoMap()
+    cm.SetIgnoreExtraElements(true))
+|> ignore
 
-
-// TOOD use an env var for mongo password, username, ip address, and db
 let mongoConnectionString =
     $"mongodb://{mongoUser}:{mongoPass}@{mongoIp}:27017/{mongoDb}?directConnection=true&authSource=admin"
 
@@ -77,7 +88,6 @@ let replicaSetName = "rs0"
 let configureMongoClientSettings () =
     let clientSettings = MongoClientSettings.FromConnectionString(mongoConnectionString)
 
-    // Set the replica set name and server selection timeout directly
     clientSettings.ServerSelectionTimeout <- TimeSpan.FromSeconds(5.0)
     clientSettings.ReplicaSetName <- replicaSetName
 
@@ -94,7 +104,7 @@ let mongoStorage =
             MigrationOptions = MongoMigrationOptions(MigrationStrategy = DropMongoMigrationStrategy())
         )
     )
-    
+
 let database = mongoClient.GetDatabase("fastbreak")
 
 let configureHangfire (services: IServiceCollection) =
@@ -106,9 +116,13 @@ let configureHangfire (services: IServiceCollection) =
 
 type JobRunner =
     static member LogJob() =
-        // TODO implement disabling the daily job based on an env var
-        // pullTomorrowsSchedule(database) |> ignore;
-        printfn "Job executed at %A" DateTime.UtcNow
+        if enablePullTomorrowsSchedule then
+            pullTomorrowsSchedule (database)
+            printfn $"Tomorrows schedule pulled at %A{DateTime.UtcNow}"
+        else
+            printfn $"Disabled | Pulling tomorrows schedule | %A{DateTime.UtcNow}"
+
+        printfn $"Daily job executed at %A{DateTime.UtcNow}"
 
 let scheduleJobs () =
     let methodCall: Expression<Action<JobRunner>> =
@@ -119,42 +133,44 @@ let scheduleJobs () =
 
     RecurringJob.AddOrUpdate("every-second-job-3", methodCall, "*/1 * * * *")
 
-// let apiRouter = router {
-//     pipe_through api
-//     forward "/schedule" scheduleController
-// }
-
-
-
 let configureApp (app: IApplicationBuilder) =
     app.UseHangfireDashboard() |> ignore
     scheduleJobs ()
     app
 
-let endpointPipe = pipeline {
-    plug fetchSession
-    plug head
-    plug requestId
-}
+let endpointPipe =
+    pipeline {
+        plug fetchSession
+        plug head
+        plug requestId
+    }
 
-let scheduleController = router {
-    get "/" (text "Hey")
-}
-
-let defaultRouter = 
+let defaultRouter =
     router {
-        pipe_through api
-        get "/api/todos" Find
-        getf "/api/todos/%i" FindOne
-        post "/api/todos" Create
-        putf "/api/todos/%i" Update
-        deletef "/api/todos/%i" Delete
-        
-        pipe_through googleAuthPipeline  
-        get "/api/todos" Find
+        // Public API routes
+        forward
+            "/api"
+            (router {
+                pipe_through api
+                forward "/schedule" (scheduleController database)
+            })
+
+        // Protected routes
+        forward
+            "/api"
+            (router {
+                pipe_through googleAuthPipeline
+                get "/todos1" Find
+            })
     }
 
 let app =
+    JsonSerializerOptions(
+        PropertyNameCaseInsensitive = true,
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+    )
+    |> ignore
+
     application {
         use_endpoint_router defaultRouter
         service_config configureHangfire

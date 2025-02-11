@@ -4,29 +4,8 @@ open System
 open System.Net.Http
 open System.Text.Json
 open MongoDB.Driver
+open ScheduleEntity
 
-type Team =
-    { id: string
-      displayName: string
-      logo: string }
-
-type Competitor =
-    { id: string
-      homeAway: string
-      winner: bool
-      team: Team }
-
-type Competition = { competitors: Competitor[] }
-
-type Event =
-    { id: string
-      date: string
-      competitions: Competition[] }
-
-type Schedule =
-    { league: string
-      date: string
-      events: Event[] }
 
 let insertSchedule (schedule: Schedule, database: IMongoDatabase, league: string, date: string) =
     let collection = database.GetCollection<Schedule>("schedules")

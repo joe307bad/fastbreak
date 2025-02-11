@@ -1,4 +1,5 @@
 import com.codingfeline.buildkonfig.compiler.FieldSpec.Type.STRING
+import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 import org.jetbrains.kotlin.konan.properties.Properties
 
 plugins {
@@ -16,6 +17,11 @@ kotlin {
                 jvmTarget = "1.8"
             }
         }
+    }
+
+    @OptIn(ExperimentalWasmDsl::class)
+    wasmJs {
+        binaries.library()
     }
     
     listOf(
@@ -38,9 +44,17 @@ kotlin {
             implementation(compose.ui)
             implementation(compose.components.resources)
             implementation(compose.components.uiToolingPreview)
-            implementation("io.github.mirzemehdi:kmpauth-google:2.0.0")
-            implementation("io.github.mirzemehdi:kmpauth-uihelper:2.0.0")
+
+            matching {
+                it.name != "wasmJsMain" && it.name != "commonMain" && it.name != "wasmJsTest" && it.name != "commonTest"
+            }.forEach {
+                it.dependencies {
+                    implementation("io.github.mirzemehdi:kmpauth-google:2.0.0")
+                    implementation("io.github.mirzemehdi:kmpauth-uihelper:2.0.0")
+                }
+            }
         }
+
         commonTest.dependencies {
             implementation(libs.kotlin.test)
         }

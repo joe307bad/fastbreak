@@ -3,8 +3,10 @@
     <TargetFramework>net9.0</TargetFramework>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="Api/Schedule.fs" />
-    <Compile Include="DailyJob/SchedulePuller.fs" />
+    <Compile Include="Entities\ScheduleEntity.fs" />
+    <Compile Include="Controllers\ScheduleController.fs" />
+    <Compile Include="Controllers\PickController.fs" />
+    <Compile Include="DailyJob\SchedulePuller.fs" />
     <Compile Include="Todos.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>

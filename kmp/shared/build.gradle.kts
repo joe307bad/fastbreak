@@ -82,8 +82,7 @@ kotlin {
             implementation(compose.components.resources)
             implementation(compose.components.uiToolingPreview)
             implementation("com.arkivanov.decompose:decompose:3.2.2")
-
-
+            implementation("com.arkivanov.decompose:extensions-compose:3.2.2")
         }
 
         val nonWasmMain by creating {
@@ -97,6 +96,10 @@ kotlin {
 
         androidMain {
             dependsOn(nonWasmMain)
+
+            dependencies {
+                implementation("com.arkivanov.decompose:extensions-android:3.2.2")
+            }
         }
 
         iosMain {
@@ -124,6 +127,10 @@ android {
         sourceCompatibility = JavaVersion.VERSION_1_8
         targetCompatibility = JavaVersion.VERSION_1_8
     }
+}
+dependencies {
+    implementation(libs.androidx.appcompat)
+    implementation(libs.material)
 }
 
 buildkonfig {

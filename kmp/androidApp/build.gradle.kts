@@ -52,5 +52,10 @@ dependencies {
     implementation(libs.compose.ui.tooling.preview)
     implementation(libs.compose.material3)
     implementation(libs.androidx.activity.compose)
+    implementation(libs.androidx.appcompat)
     debugImplementation(libs.compose.ui.tooling)
+
+    implementation("com.arkivanov.decompose:decompose:3.2.2")
+    implementation("com.arkivanov.decompose:extensions-compose:3.2.2")
+    implementation("com.arkivanov.decompose:extensions-android:3.2.2")
 }

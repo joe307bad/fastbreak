@@ -94,6 +94,18 @@ kotlin {
             }
         }
 
+        // Create a new iosMain source set
+        val iosX64Main by getting
+        val iosArm64Main by getting
+        val iosSimulatorArm64Main by getting
+
+        create("iosMain") {
+            dependsOn(nonWasmMain)
+            iosX64Main.dependsOn(this)
+            iosArm64Main.dependsOn(this)
+            iosSimulatorArm64Main.dependsOn(this)
+        }
+
         androidMain {
             dependsOn(nonWasmMain)
 

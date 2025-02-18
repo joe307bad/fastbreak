@@ -2,15 +2,28 @@ import SwiftUI
 import shared
 
 struct ContentView: View {
-	let greet = Greeting().greet()
+    var body: some View {
+        VStack {
+            Text(Greeting().greet())
+            Spacer()
+            ComposeView() // Embed the Compose UI here
+                .frame(height: 200) // Adjust frame size if needed
+            Spacer()
+        }
+    }
+}
 
-	var body: some View {
-		Text(greet)
-	}
+// Bridge Kotlin's UIViewController to SwiftUI
+struct ComposeView: UIViewControllerRepresentable {
+    func makeUIViewController(context: Context) -> UIViewController {
+        return ThemeKt.CupertinoButtonViewController()
+    }
+
+    func updateUIViewController(_ uiViewController: UIViewController, context: Context) {}
 }
 
 struct ContentView_Previews: PreviewProvider {
-	static var previews: some View {
-		ContentView()
-	}
+    static var previews: some View {
+        ContentView()
+    }
 }

@@ -29,25 +29,17 @@ kotlin {
         }
     }
 
-    iosX64 {
-        binaries.framework {
+    iosArm64()
+    iosSimulatorArm64()
+
+    listOf(
+        iosArm64(),
+        iosSimulatorArm64()
+    ).forEach {
+        it.binaries.framework {
             baseName = "shared"
             isStatic = true
-            binaryOption("bundleId", "com.joebad.fastbreak.shared")  // Replace with your bundle ID
-        }
-    }
-    iosArm64 {
-        binaries.framework {
-            baseName = "shared"
-            isStatic = true
-            binaryOption("bundleId", "com.joebad.fastbreak.shared")  // Replace with your bundle ID
-        }
-    }
-    iosSimulatorArm64 {
-        binaries.framework {
-            baseName = "shared"
-            isStatic = true
-            binaryOption("bundleId", "com.joebad.fastbreak.shared")  // Replace with your bundle ID
+            binaryOption("bundleId", "com.joebad.fastbreak.shared")
         }
     }
 
@@ -60,17 +52,6 @@ kotlin {
             }
         }
     }
-    
-//    listOf(
-//        iosX64(),
-//        iosArm64(),
-//        iosSimulatorArm64()
-//    ).forEach {
-//        it.binaries.framework {
-//            baseName = "shared"
-//            isStatic = true
-//        }
-//    }
 
     sourceSets {
         commonMain.dependencies {
@@ -83,6 +64,8 @@ kotlin {
             implementation(compose.components.uiToolingPreview)
             implementation("com.arkivanov.decompose:decompose:3.2.2")
             implementation("com.arkivanov.decompose:extensions-compose:3.2.2")
+            implementation(libs.cupertino.adaptive)
+            implementation(libs.cupertino.iconsExtended)
         }
 
         val nonWasmMain by creating {
@@ -94,16 +77,18 @@ kotlin {
             }
         }
 
-        // Create a new iosMain source set
-        val iosX64Main by getting
         val iosArm64Main by getting
         val iosSimulatorArm64Main by getting
 
-        create("iosMain") {
-            dependsOn(nonWasmMain)
-            iosX64Main.dependsOn(this)
+        val iosMain by creating {
+            dependsOn(commonMain.get())
             iosArm64Main.dependsOn(this)
             iosSimulatorArm64Main.dependsOn(this)
+
+            dependencies {
+                implementation("org.jetbrains.compose.ui:ui:1.7.3")
+                implementation(compose.ui)
+            }
         }
 
         androidMain {
@@ -112,10 +97,6 @@ kotlin {
             dependencies {
                 implementation("com.arkivanov.decompose:extensions-android:3.2.2")
             }
-        }
-
-        iosMain {
-            dependsOn(nonWasmMain)
         }
 
         wasmJsMain {

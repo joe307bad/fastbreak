@@ -1,8 +1,21 @@
+
+import android.view.View
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.MaterialTheme
+import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import com.arkivanov.decompose.ComponentContext
 import com.arkivanov.decompose.ExperimentalDecomposeApi
+import com.arkivanov.decompose.extensions.android.ViewContext
+import com.arkivanov.decompose.extensions.android.layoutInflater
+import com.arkivanov.decompose.extensions.android.stack.StackRouterView
+import com.arkivanov.decompose.extensions.compose.stack.Children
+import com.arkivanov.decompose.extensions.compose.stack.animation.fade
+import com.arkivanov.decompose.extensions.compose.stack.animation.stackAnimation
+import com.arkivanov.decompose.extensions.compose.subscribeAsState
 import com.arkivanov.decompose.router.stack.ChildStack
 import com.arkivanov.decompose.router.stack.StackNavigation
 import com.arkivanov.decompose.router.stack.childStack
@@ -11,25 +24,12 @@ import com.arkivanov.decompose.router.stack.popTo
 import com.arkivanov.decompose.router.stack.push
 import com.arkivanov.decompose.value.MutableValue
 import com.arkivanov.decompose.value.Value
-import kotlinx.serialization.Serializable
-import android.view.View
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.lazy.LazyColumn
-import com.arkivanov.decompose.extensions.android.ViewContext
-import com.arkivanov.decompose.extensions.android.layoutInflater
-import com.arkivanov.decompose.extensions.android.stack.StackRouterView
-import com.arkivanov.decompose.extensions.compose.stack.Children
-import com.arkivanov.decompose.extensions.compose.stack.animation.fade
-import com.arkivanov.decompose.extensions.compose.stack.animation.stackAnimation
-import com.arkivanov.decompose.extensions.compose.subscribeAsState
 import com.arkivanov.decompose.value.subscribe
-import com.google.android.material.bottomnavigation.BottomNavigationView
-import com.joebad.fastbreak.R
-import androidx.compose.material.Text
-import androidx.compose.foundation.lazy.items
-import androidx.compose.runtime.getValue
 import com.arkivanov.sample.shared.FadeTransition
 import com.arkivanov.sample.shared.viewSwitcher
+import com.google.android.material.bottomnavigation.BottomNavigationView
+import com.joebad.fastbreak.R
+import kotlinx.serialization.Serializable
 
 interface ListComponent {
     val model: Value<Model>
@@ -85,7 +85,6 @@ fun ListContent(component: ListComponent, modifier: Modifier = Modifier) {
         items(items = model.items) { item ->
             Text(
                 text = item,
-                modifier = Modifier.clickable { component.onItemClicked(item = item) },
             )
         }
     }

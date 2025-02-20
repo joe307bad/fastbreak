@@ -1,5 +1,4 @@
 import com.codingfeline.buildkonfig.compiler.FieldSpec.Type.STRING
-import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 import org.jetbrains.kotlin.konan.properties.Properties
 
 plugins {
@@ -9,6 +8,7 @@ plugins {
     alias(libs.plugins.compose.compiler)
     id("com.codingfeline.buildkonfig")
     kotlin("plugin.serialization") version "2.1.0"
+    kotlin("native.cocoapods")
 }
 
 tasks {
@@ -29,27 +29,34 @@ kotlin {
         }
     }
 
+
+    cocoapods {
+        version = "1.0"
+        summary = "Kotbase Getting Started Compose Multiplatform"
+        homepage = "https://kotbase.dev/"
+        ios.deploymentTarget = "14.1"
+        podfile = project.file("../iosApp/Podfile")
+        pod("CouchbaseLite") {
+            version = libs.versions.couchbase.lite.c.get()
+            linkOnly = true
+        }
+    }
+
     iosArm64()
     iosSimulatorArm64()
 
     listOf(
+        iosX64(),
         iosArm64(),
         iosSimulatorArm64()
     ).forEach {
         it.binaries.framework {
             baseName = "shared"
-            isStatic = true
+            isStatic = false  // Try setting this to false if it's currently true
+            linkerOpts("-ObjC") // Ensure Obj-C symbols are linked
+            export(libs.kotbase)
             binaryOption("bundleId", "com.joebad.fastbreak.shared")
-        }
-    }
 
-    @OptIn(ExperimentalWasmDsl::class)
-    wasmJs {
-        binaries.library()
-        browser {
-            testTask {
-                enabled = false
-            }
         }
     }
 
@@ -66,15 +73,7 @@ kotlin {
             implementation("com.arkivanov.decompose:extensions-compose:3.2.2")
             implementation(libs.cupertino.adaptive)
             implementation(libs.cupertino.iconsExtended)
-        }
-
-        val nonWasmMain by creating {
-            dependsOn(commonMain.get())
-
-            dependencies {
-                implementation("io.github.mirzemehdi:kmpauth-google:2.0.0")
-                implementation("io.github.mirzemehdi:kmpauth-uihelper:2.0.0")
-            }
+            implementation(libs.kotbase)
         }
 
         val iosArm64Main by getting
@@ -92,15 +91,20 @@ kotlin {
         }
 
         androidMain {
-            dependsOn(nonWasmMain)
+            dependsOn(commonMain.get())
 
             dependencies {
+                implementation("io.github.mirzemehdi:kmpauth-google:2.0.0")
+                implementation("io.github.mirzemehdi:kmpauth-uihelper:2.0.0")
                 implementation("com.arkivanov.decompose:extensions-android:3.2.2")
             }
         }
 
-        wasmJsMain {
+        iosMain {
+            dependsOn(commonMain.get())
+
             dependencies {
+                api(libs.kotbase)
             }
         }
 

@@ -1,12 +1,12 @@
 [versions]
 agp = "8.3.0"
 kotlin = "2.0.21"
-compose = "1.5.4"
-compose-compiler = "1.5.4"
+compose = "1.7.1"
+compose-compiler = "1.7.1"
 compose-material3 = "1.1.2"
 androidx-activityCompose = "1.8.0"
 foundationLayoutAndroid = "1.7.7"
-compose-jb = "1.6.11"
+compose-jb = "1.7.1"
 appcompat = "1.7.0"
 material = "1.12.0"
 cupertino = "0.1.0-alpha04"
@@ -14,6 +14,9 @@ coreKtx = "1.15.0"
 junit = "4.13.2"
 junitVersion = "1.2.1"
 espressoCore = "3.6.1"
+couchbase-lite-c = "3.1.9"
+kmp-native-coroutines = "1.0.0-ALPHA-25"
+kotbase = "3.1.9-1.1.1"
 
 [libraries]
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
@@ -32,6 +35,7 @@ androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = 
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "junitVersion" }
 androidx-espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espressoCore" }
+kotbase = { module = "dev.kotbase:couchbase-lite-ktx", version.ref = "kotbase" }
 
 [plugins]
 androidApplication = { id = "com.android.application", version.ref = "agp" }

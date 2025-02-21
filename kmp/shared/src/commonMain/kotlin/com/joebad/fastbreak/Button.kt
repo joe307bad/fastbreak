@@ -50,6 +50,10 @@ fun IconButtonWithText() {
             .pointerInput(Unit) {
                 detectTapGestures(
                     onPress = {
+                        val db = FastBreakDatabase();
+                        db.run {
+                            db.createDb();
+                        }
                         isPressed = true
                         tryAwaitRelease()
                         isPressed = false

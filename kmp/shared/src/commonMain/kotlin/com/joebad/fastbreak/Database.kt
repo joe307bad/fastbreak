@@ -1,6 +1,17 @@
 package com.joebad.fastbreak
 
-import kotbase.DatabaseConfiguration
 import kotbase.Database
-import kotbase.Collection
-import kotbase.DataSource
+
+class FastBreakDatabase {
+
+    private var database: Database? = null
+
+    // Create a database
+    fun createDb() {
+        database = Database("FastBreakDatabase")
+        Log.i(TAG, "Database created: $database")
+    }
+    private companion object {
+        private const val TAG = "SHARED_KOTLIN"
+    }
+}

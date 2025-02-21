@@ -1,0 +1,23 @@
+PODS:
+  - CouchbaseLite (3.1.9)
+  - shared (1.0):
+    - CouchbaseLite (= 3.1.9)
+
+DEPENDENCIES:
+  - shared (from `../shared`)
+
+SPEC REPOS:
+  trunk:
+    - CouchbaseLite
+
+EXTERNAL SOURCES:
+  shared:
+    :path: "../shared"
+
+SPEC CHECKSUMS:
+  CouchbaseLite: 1d9f2f7b5cd5477f7dad820070a98f6f6176956b
+  shared: 381ff0f34040cc81234d024fe21121f303558a9c
+
+PODFILE CHECKSUM: f282da88f39e69507b0a255187c8a6b644477756
+
+COCOAPODS: 1.16.2

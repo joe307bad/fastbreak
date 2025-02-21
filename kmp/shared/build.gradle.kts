@@ -1,4 +1,7 @@
+
 import com.codingfeline.buildkonfig.compiler.FieldSpec.Type.STRING
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 import org.jetbrains.kotlin.konan.properties.Properties
 
 plugins {
@@ -21,14 +24,11 @@ tasks {
 }
 
 kotlin {
-    androidTarget {
-        compilations.all {
-            kotlinOptions {
-                jvmTarget = "1.8"
-            }
-        }
-    }
-
+    androidTarget()
+    jvm()
+    iosArm64()
+    iosX64()
+    iosSimulatorArm64()
 
     cocoapods {
         version = "1.0"
@@ -42,27 +42,9 @@ kotlin {
         }
     }
 
-    iosArm64()
-    iosSimulatorArm64()
-
-    listOf(
-        iosX64(),
-        iosArm64(),
-        iosSimulatorArm64()
-    ).forEach {
-        it.binaries.framework {
-            baseName = "shared"
-            isStatic = false  // Try setting this to false if it's currently true
-            linkerOpts("-ObjC") // Ensure Obj-C symbols are linked
-            export(libs.kotbase)
-            binaryOption("bundleId", "com.joebad.fastbreak.shared")
-
-        }
-    }
-
     sourceSets {
         commonMain.dependencies {
-            //put your multiplatform dependencies here
+            api(libs.kotbase)
             implementation(compose.runtime)
             implementation(compose.foundation)
             implementation(compose.material)
@@ -76,42 +58,32 @@ kotlin {
             implementation(libs.kotbase)
         }
 
+        val iosX64Main by getting
         val iosArm64Main by getting
         val iosSimulatorArm64Main by getting
-
         val iosMain by creating {
             dependsOn(commonMain.get())
+            iosX64Main.dependsOn(this)
             iosArm64Main.dependsOn(this)
             iosSimulatorArm64Main.dependsOn(this)
-
-            dependencies {
-                implementation("org.jetbrains.compose.ui:ui:1.7.3")
-                implementation(compose.ui)
-            }
         }
 
-        androidMain {
-            dependsOn(commonMain.get())
+        androidMain.dependencies {
+            implementation(libs.compose.ui.tooling.preview)
+            api(libs.androidx.activity.compose)
+            implementation("io.github.mirzemehdi:kmpauth-google:2.0.0")
+            implementation("io.github.mirzemehdi:kmpauth-uihelper:2.0.0")
+            implementation("com.arkivanov.decompose:extensions-android:3.2.2")
 
-            dependencies {
-                implementation("io.github.mirzemehdi:kmpauth-google:2.0.0")
-                implementation("io.github.mirzemehdi:kmpauth-uihelper:2.0.0")
-                implementation("com.arkivanov.decompose:extensions-android:3.2.2")
-            }
         }
-
-        iosMain {
-            dependsOn(commonMain.get())
-
-            dependencies {
-                api(libs.kotbase)
-            }
-        }
-
-        commonTest.dependencies {
-            implementation(libs.kotlin.test)
+        jvmMain.dependencies {
+            implementation(compose.desktop.currentOs)
         }
     }
+}
+
+tasks.withType<KotlinCompile> {
+    compilerOptions.jvmTarget.set(JvmTarget.JVM_1_8)
 }
 
 android {
@@ -120,6 +92,7 @@ android {
     defaultConfig {
         minSdk = 24
     }
+    packaging.resources.excludes += "/META-INF/{AL2.0,LGPL2.1}"
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_1_8
         targetCompatibility = JavaVersion.VERSION_1_8

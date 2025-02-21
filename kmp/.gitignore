@@ -2,3 +2,4 @@ kotlin-js-store/**/*
 .kotlin
 /iosApp/Pods
 /iosApp/CouchbaseLite.xcframework
+/shared/shared.podspec

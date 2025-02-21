@@ -21,3 +21,4 @@ rootProject.name = "fastbreak"
 include(":shared")
 include(":androidApp")
 include(":shared:iosmain")
+include(":iosMain")

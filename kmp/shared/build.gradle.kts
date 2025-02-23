@@ -1,7 +1,5 @@
 
 import com.codingfeline.buildkonfig.compiler.FieldSpec.Type.STRING
-import org.jetbrains.kotlin.gradle.dsl.JvmTarget
-import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 import org.jetbrains.kotlin.konan.properties.Properties
 
 plugins {
@@ -25,21 +23,23 @@ tasks {
 
 kotlin {
     androidTarget()
-    jvm()
     iosArm64()
     iosX64()
     iosSimulatorArm64()
 
     cocoapods {
         version = "1.0"
-        summary = "Kotbase Getting Started Compose Multiplatform"
-        homepage = "https://kotbase.dev/"
+        summary = "Fastbreak"
+        homepage = "https://joebad.com/"
         ios.deploymentTarget = "14.1"
         podfile = project.file("../iosApp/Podfile")
         pod("CouchbaseLite") {
             version = libs.versions.couchbase.lite.c.get()
             linkOnly = true
         }
+
+        pod("GoogleSignIn", linkOnly = true)
+        pod("FirebaseCore", linkOnly = true)
     }
 
     sourceSets {
@@ -56,6 +56,8 @@ kotlin {
             implementation(libs.cupertino.adaptive)
             implementation(libs.cupertino.iconsExtended)
             implementation(libs.kotbase)
+            implementation("io.github.mirzemehdi:kmpauth-google:2.0.0")
+            implementation("io.github.mirzemehdi:kmpauth-uihelper:2.0.0")
         }
 
         val iosX64Main by getting
@@ -71,19 +73,10 @@ kotlin {
         androidMain.dependencies {
             implementation(libs.compose.ui.tooling.preview)
             api(libs.androidx.activity.compose)
-            implementation("io.github.mirzemehdi:kmpauth-google:2.0.0")
-            implementation("io.github.mirzemehdi:kmpauth-uihelper:2.0.0")
             implementation("com.arkivanov.decompose:extensions-android:3.2.2")
 
         }
-        jvmMain.dependencies {
-            implementation(compose.desktop.currentOs)
-        }
     }
-}
-
-tasks.withType<KotlinCompile> {
-    compilerOptions.jvmTarget.set(JvmTarget.JVM_1_8)
 }
 
 android {

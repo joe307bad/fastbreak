@@ -20,5 +20,5 @@ dependencyResolutionManagement {
 rootProject.name = "fastbreak"
 include(":shared")
 include(":androidApp")
-include(":shared:iosmain")
-include(":iosMain")
+include(":shared:iosMain")
+include(":iosApp")

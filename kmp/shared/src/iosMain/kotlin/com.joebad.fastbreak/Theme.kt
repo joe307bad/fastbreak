@@ -7,6 +7,7 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.window.ComposeUIViewController
+import com.joebad.fastbreak.ui.GoogleSignInButton
 import io.github.alexzhirkevich.cupertino.adaptive.AdaptiveTheme
 import io.github.alexzhirkevich.cupertino.adaptive.CupertinoThemeSpec
 import io.github.alexzhirkevich.cupertino.adaptive.MaterialThemeSpec
@@ -124,7 +125,7 @@ data class CupertinoButton(val render: () -> UIViewController)
 
 // Function that returns a UIViewController
 fun CupertinoButtonViewController(): UIViewController =
-    ComposeUIViewController { IconButtonWithText() }
+    ComposeUIViewController { GoogleSignInButton() }
 
 // Correct way to initialize CupertinoButton
 val CupertinoButtonDefault get() = CupertinoButton(::CupertinoButtonViewController)

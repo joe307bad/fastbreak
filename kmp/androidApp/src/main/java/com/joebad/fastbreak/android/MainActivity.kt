@@ -1,18 +1,19 @@
 package com.joebad.fastbreak.android
 
-import AndroidAppRoot
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import com.joebad.fastbreak.ui.AppInitializer
+import com.joebad.fastbreak.App
+import com.joebad.fastbreak.createRootComponent
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        AppInitializer.onApplicationStart()
+
+        val rootComponent = createRootComponent()
 
         setContent {
-            AndroidAppRoot()
+            App(rootComponent = rootComponent)
         }
     }
 }

@@ -53,6 +53,7 @@ kotlin {
             implementation(compose.components.uiToolingPreview)
             implementation("com.arkivanov.decompose:decompose:3.2.2")
             implementation("com.arkivanov.decompose:extensions-compose:3.2.2")
+            implementation("com.arkivanov.decompose:extensions-compose-experimental:3.2.2")
             implementation(libs.cupertino.adaptive)
             implementation(libs.cupertino.iconsExtended)
             implementation(libs.kotbase)
@@ -109,5 +110,12 @@ buildkonfig {
         }
 
         buildConfigField(STRING, "GOOGLE_AUTH_SERVER_ID", apiKey)
+        buildConfigField(com.codingfeline.buildkonfig.compiler.FieldSpec.Type.BOOLEAN, "IS_DEBUG", "false")
+    }
+
+    targetConfigs {
+        create("android") {
+            buildConfigField(com.codingfeline.buildkonfig.compiler.FieldSpec.Type.BOOLEAN, "IS_DEBUG", "true")
+        }
     }
 }

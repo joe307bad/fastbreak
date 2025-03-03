@@ -1,32 +1,34 @@
 
+//import compose.icons.TablerIcons
+//import compose.icons.tablericons.LayoutAlignLeft
 import androidx.compose.animation.ExperimentalAnimationApi
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.BottomNavigation
 import androidx.compose.material.BottomNavigationItem
 import androidx.compose.material.DrawerValue
 import androidx.compose.material.Icon
-import androidx.compose.material.IconButton
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.ModalDrawer
 import androidx.compose.material.Text
-import androidx.compose.material.TopAppBar
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.rememberDrawerState
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
 import com.arkivanov.decompose.ExperimentalDecomposeApi
 import com.arkivanov.decompose.extensions.compose.stack.Children
@@ -34,7 +36,6 @@ import com.arkivanov.decompose.extensions.compose.subscribeAsState
 import com.joebad.fastbreak.DrawerContent
 import com.joebad.fastbreak.DrawerItem
 import com.joebad.fastbreak.ProtectedComponent
-import com.joebad.fastbreak.ui.TeamCard
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalAnimationApi::class, ExperimentalDecomposeApi::class)
@@ -66,24 +67,28 @@ fun ProtectedContent(component: ProtectedComponent) {
         }
     ) {
         Scaffold(
-            topBar = {
-                TopAppBar(
-                    title = { Text("Fastbreak") },
-                    navigationIcon = {
-                        IconButton(onClick = {
-                            scope.launch {
-                                if (drawerState.isOpen) {
-                                    drawerState.close()
-                                } else {
-                                    drawerState.open()
-                                }
-                            }
-                        }) {
-                            Icon(Icons.Default.Menu, contentDescription = "Menu")
-                        }
-                    }
-                )
-            },
+//            topBar = {
+//                TopAppBar(
+//                    title = { Text("Fastbreak") },
+//                    navigationIcon = {
+//                        IconButton(onClick = {
+//                            scope.launch {
+//                                if (drawerState.isOpen) {
+//                                    drawerState.close()
+//                                } else {
+//                                    drawerState.open()
+//                                }
+//                            }
+//                        }) {
+//                            Icon(
+//                                imageVector = MenuDeep,
+//                                contentDescription = "Menu",
+//                                modifier = Modifier.graphicsLayer(scaleX = -1f)
+//                            )
+//                        }
+//                    }
+//                )
+//            },
             bottomBar = {
                 BottomNavigation {
                     BottomNavigationItem(
@@ -107,7 +112,7 @@ fun ProtectedContent(component: ProtectedComponent) {
                 ) { child ->
                     when (child.instance) {
                         is ProtectedComponent.Child.Home -> {
-                            TeamCard()
+                            HomeScreen()
                         }
                         is ProtectedComponent.Child.Leaderboard -> {
                             Column(
@@ -120,6 +125,27 @@ fun ProtectedContent(component: ProtectedComponent) {
                                 Text("Leaderboard Screen", style = MaterialTheme.typography.h1)
                             }
                         }
+                    }
+                    SmallFloatingActionButton(
+                        onClick = {
+                            scope.launch {
+                                if (drawerState.isOpen) {
+                                    drawerState.close()
+                                } else {
+                                    drawerState.open()
+                                }
+                            }
+                        },
+                        modifier = Modifier
+                            .padding(16.dp)
+                            .offset(x = 0.dp, y = 0.dp),
+                        containerColor = MaterialTheme.colors.background
+                    ) {
+                        Icon(
+                            imageVector = MenuDeep,
+                            contentDescription = "Menu",
+                            modifier = Modifier.graphicsLayer(scaleX = -1f)
+                        )
                     }
                 }
             }

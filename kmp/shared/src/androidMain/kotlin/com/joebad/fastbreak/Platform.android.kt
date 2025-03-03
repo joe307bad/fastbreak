@@ -8,3 +8,18 @@ private class AndroidPlatform : Platform {
 
 actual fun onApplicationStartPlatformSpecific() {
 }
+//
+//actual class FontLoaderImpl(private val context: Context) : FontLoader {
+//    actual override fun loadFont(fontName: String): FontFamily {
+//        val resId = context.resources.getIdentifier(
+//            fontName, "font", context.packageName
+//        )
+//        return FontFamily(
+//            Font(
+//                resId,
+//                FontWeight.Normal,
+//                FontStyle.Normal
+//            )
+//        )
+//    }
+//}

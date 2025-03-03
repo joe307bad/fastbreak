@@ -59,6 +59,7 @@ kotlin {
             implementation(libs.kotbase)
             implementation("io.github.mirzemehdi:kmpauth-google:2.0.0")
             implementation("io.github.mirzemehdi:kmpauth-uihelper:2.0.0")
+//            implementation(files("libs/tabler-icons-release.aar"))
         }
 
         val iosX64Main by getting
@@ -88,8 +89,8 @@ android {
     }
     packaging.resources.excludes += "/META-INF/{AL2.0,LGPL2.1}"
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
+        sourceCompatibility = JavaVersion.VERSION_21
+        targetCompatibility = JavaVersion.VERSION_21
     }
 }
 dependencies {

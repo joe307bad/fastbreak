@@ -8,16 +8,13 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.Card
@@ -45,7 +42,7 @@ fun TeamCard() {
     val brightGreen = Color(0xFF00C853)
     var selectedRowIndex by remember { mutableStateOf(-1) }
 
-    Column(modifier = Modifier.fillMaxWidth().padding(top = 10.dp)) {
+    Column(modifier = Modifier.fillMaxWidth()) {
             SelectableRow(
                 text = "Pittsburgh Steelers",
                 subText = "Last in the North, verge of bankruptcy",
@@ -61,36 +58,40 @@ fun TeamCard() {
                 onSelect = { selectedRowIndex = 1 },
                 highlightColor = brightGreen
             )
+        Spacer(
+            modifier = Modifier
+//                .padding(bottom = 20.dp)
+        )
 
-            Text(
-                text = "Pick a prop",
-                style = MaterialTheme.typography.subtitle2,
-                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-            )
+//            Text(
+//                text = "Pick a prop",
+//                style = MaterialTheme.typography.subtitle2,
+//                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+//            )
 
-            LazyRow(
-                modifier = Modifier.padding(bottom = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-                contentPadding = PaddingValues(horizontal = 8.dp)
-            ) {
-                val items = listOf(
-                    "A.J. Brown receiving yards (Over/Under 88.5 yards)",
-                    "George Pickens longest reception (Over/Under 28.5 yards)",
-                    "Eagles total field goals made (Over/Under 1.5)",
-                    "Will there be a defensive or special teams touchdown? (Yes +375, No -450)",
-                    "Total sacks in the game (Over/Under 5.5 sacks)",
-                    "Time of first scoring play (Under 7:30 of first quarter -115, Over 7:30 of first quarter -105)"
-                )
-                items(items.indices.toList()) { index ->
-                    val cardIndex = index + 2 // Start at 2 since we used 0 and 1 for the rows
-                    MiniCard(
-                        text = items[index],
-                        isSelected = selectedRowIndex == cardIndex,
-                        onSelect = { selectedRowIndex = cardIndex },
-                        highlightColor = brightGreen
-                    )
-                }
-            }
+//            LazyRow(
+//                modifier = Modifier.padding(bottom = 8.dp),
+//                horizontalArrangement = Arrangement.spacedBy(4.dp),
+//                contentPadding = PaddingValues(horizontal = 8.dp)
+//            ) {
+//                val items = listOf(
+//                    "A.J. Brown receiving yards (Over/Under 88.5 yards)",
+//                    "George Pickens longest reception (Over/Under 28.5 yards)",
+//                    "Eagles total field goals made (Over/Under 1.5)",
+//                    "Will there be a defensive or special teams touchdown? (Yes +375, No -450)",
+//                    "Total sacks in the game (Over/Under 5.5 sacks)",
+//                    "Time of first scoring play (Under 7:30 of first quarter -115, Over 7:30 of first quarter -105)"
+//                )
+//                items(items.indices.toList()) { index ->
+//                    val cardIndex = index + 2 // Start at 2 since we used 0 and 1 for the rows
+//                    MiniCard(
+//                        text = items[index],
+//                        isSelected = selectedRowIndex == cardIndex,
+//                        onSelect = { selectedRowIndex = cardIndex },
+//                        highlightColor = brightGreen
+//                    )
+//                }
+//            }
         }
 }
 //}
@@ -148,7 +149,7 @@ fun SelectableRow(
                     )
                     .padding(8.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
+//                verticalAlignment = Alignment.CenterVertically
             ) {
                 Box(
                     modifier = Modifier
@@ -189,7 +190,7 @@ private fun MiniCard(
     Card(
         modifier = Modifier
             .width(100.dp)
-            .height(50.dp)
+//            .height(50.dp)
             .clickable(onClick = onSelect)
 //            .shadow(
 ////                elevation = animatedElevation,

@@ -3,3 +3,4 @@ kotlin-js-store/**/*
 /iosApp/Pods
 /iosApp/CouchbaseLite.xcframework
 /shared/shared.podspec
+/androidApp/src/main/assets/font/CodeBold.otf

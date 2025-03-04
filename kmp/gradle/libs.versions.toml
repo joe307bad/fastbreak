@@ -18,6 +18,10 @@ couchbase-lite-c = "3.1.9"
 kmp-native-coroutines = "1.0.0-ALPHA-25"
 kotbase = "3.1.9-1.1.1"
 jetbrainsKotlinJvm = "2.0.21"
+uiTextGoogleFonts = "1.7.8"
+uiTextAndroid = "1.7.8"
+coreI18n = "1.0.0-alpha01"
+uiAndroid = "1.7.8"
 
 [libraries]
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
@@ -37,6 +41,10 @@ junit = { group = "junit", name = "junit", version.ref = "junit" }
 androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "junitVersion" }
 androidx-espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espressoCore" }
 kotbase = { module = "dev.kotbase:couchbase-lite-ktx", version.ref = "kotbase" }
+androidx-ui-text-google-fonts = { group = "androidx.compose.ui", name = "ui-text-google-fonts", version.ref = "uiTextGoogleFonts" }
+androidx-ui-text-android = { group = "androidx.compose.ui", name = "ui-text-android", version.ref = "uiTextAndroid" }
+androidx-core-i18n = { group = "androidx.core", name = "core-i18n", version.ref = "coreI18n" }
+androidx-ui-android = { group = "androidx.compose.ui", name = "ui-android", version.ref = "uiAndroid" }
 
 [plugins]
 androidApplication = { id = "com.android.application", version.ref = "agp" }

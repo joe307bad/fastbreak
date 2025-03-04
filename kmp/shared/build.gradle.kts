@@ -92,10 +92,19 @@ android {
         sourceCompatibility = JavaVersion.VERSION_21
         targetCompatibility = JavaVersion.VERSION_21
     }
+    sourceSets {
+        getByName("main") {
+            assets.srcDir("src/main/assets")
+        }
+    }
 }
 dependencies {
     implementation(libs.androidx.appcompat)
     implementation(libs.material)
+    implementation(libs.androidx.ui.text.google.fonts)
+    implementation(libs.androidx.ui.text.android)
+    implementation(libs.androidx.core.i18n)
+    implementation(libs.androidx.ui.android)
 }
 
 buildkonfig {
@@ -119,4 +128,13 @@ buildkonfig {
             buildConfigField(com.codingfeline.buildkonfig.compiler.FieldSpec.Type.BOOLEAN, "IS_DEBUG", "true")
         }
     }
+}
+
+tasks.register<Copy>("copyFontsToAndroidAssets") {
+    from("src/commonMain/resources/font")
+    into("../androidApp/src/main/assets/font")
+}
+
+tasks.named("preBuild") {
+    dependsOn("copyFontsToAndroidAssets")
 }

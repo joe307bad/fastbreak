@@ -35,6 +35,7 @@ import com.arkivanov.decompose.router.stack.push
 import com.arkivanov.decompose.router.stack.replaceAll
 import com.arkivanov.decompose.value.Value
 import com.arkivanov.essenty.lifecycle.LifecycleRegistry
+import com.joebad.fastbreak.ui.theme.LocalColors
 
 fun shouldEnforceLogin(): Boolean {
     return !BuildKonfig.IS_DEBUG // Require login only in production
@@ -159,9 +160,10 @@ fun createRootComponent(): RootComponent {
 }
 
 @Composable
-fun App(rootComponent: RootComponent) {
+fun App(rootComponent: RootComponent, onToggleTheme: () -> Unit) {
+    val colors = LocalColors.current;
     MaterialTheme {
-        Surface(color = MaterialTheme.colors.background) {
+        Surface(color = colors.background) {
             val childStack = rootComponent.stack.subscribeAsState()
 
             Children(
@@ -170,7 +172,7 @@ fun App(rootComponent: RootComponent) {
             ) { child ->
                 when (val instance = child.instance) {
                     is RootComponent.Child.Login -> LoginContent(instance.component)
-                    is RootComponent.Child.Protected -> ProtectedContent(instance.component)
+                    is RootComponent.Child.Protected -> ProtectedContent(instance.component, onToggleTheme)
                 }
             }
         }

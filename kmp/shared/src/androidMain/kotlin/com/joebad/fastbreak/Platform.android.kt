@@ -55,11 +55,10 @@ class AndroidFontLoader(private val context: Context) : FontLoader {
     }
 }
 
-// Context needs to be provided each time
 private lateinit var appContext: Context
 
 fun initFontLoader(context: Context) {
-    appContext = context.applicationContext // Use application context to avoid leaks
+    appContext = context.applicationContext
 }
 
 actual fun createFontLoader(): FontLoader {

@@ -19,6 +19,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
+import com.joebad.fastbreak.ui.theme.LocalColors
 import io.github.alexzhirkevich.cupertino.CupertinoIcon
 import io.github.alexzhirkevich.cupertino.icons.CupertinoIcons
 import io.github.alexzhirkevich.cupertino.icons.filled.Heart
@@ -37,6 +38,7 @@ fun IconButtonWithText() {
         label = "offset"
     )
 
+    val colors = LocalColors.current;
     Box(
         modifier = Modifier
             .size(44.dp)
@@ -45,7 +47,7 @@ fun IconButtonWithText() {
                 elevation = elevation.dp,
                 shape = RoundedCornerShape(8.dp)
             )
-            .background(Color.White, RoundedCornerShape(8.dp))
+            .background(colors.background, RoundedCornerShape(8.dp))
             .border(1.dp, Color(0xFF007AFF), RoundedCornerShape(8.dp))
             .pointerInput(Unit) {
                 detectTapGestures(

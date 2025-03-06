@@ -9,15 +9,13 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.Card
 import androidx.compose.material.Icon
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Text
@@ -34,67 +32,55 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.joebad.fastbreak.ui.theme.LocalColors
+
 
 @Composable
-fun TeamCard() {
-    val brightGreen = Color(0xFF00C853)
+fun TeamCard(dayOfWeek: String, date: String, time: String) {
+    val colors = LocalColors.current;
     var selectedRowIndex by remember { mutableStateOf(-1) }
-
-    Column(modifier = Modifier.fillMaxWidth()) {
-            SelectableRow(
-                text = "Pittsburgh Steelers",
-                subText = "Last in the North, verge of bankruptcy",
-                selected = selectedRowIndex == 0,
-                onSelect = { selectedRowIndex = 0 },
-                highlightColor = brightGreen
-            )
-
+    Row(modifier = Modifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
+        Column(
+            modifier = Modifier
+                .weight(3f)
+        ) {
             SelectableRow(
                 text = "Philadeplhia Eagles",
                 subText = "1st in the universe",
                 selected = selectedRowIndex == 1,
                 onSelect = { selectedRowIndex = 1 },
-                highlightColor = brightGreen
+                highlightColor = colors.accent
             )
-        Spacer(
-            modifier = Modifier
-//                .padding(bottom = 20.dp)
-        )
-
-//            Text(
-//                text = "Pick a prop",
-//                style = MaterialTheme.typography.subtitle2,
-//                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-//            )
-
-//            LazyRow(
-//                modifier = Modifier.padding(bottom = 8.dp),
-//                horizontalArrangement = Arrangement.spacedBy(4.dp),
-//                contentPadding = PaddingValues(horizontal = 8.dp)
-//            ) {
-//                val items = listOf(
-//                    "A.J. Brown receiving yards (Over/Under 88.5 yards)",
-//                    "George Pickens longest reception (Over/Under 28.5 yards)",
-//                    "Eagles total field goals made (Over/Under 1.5)",
-//                    "Will there be a defensive or special teams touchdown? (Yes +375, No -450)",
-//                    "Total sacks in the game (Over/Under 5.5 sacks)",
-//                    "Time of first scoring play (Under 7:30 of first quarter -115, Over 7:30 of first quarter -105)"
-//                )
-//                items(items.indices.toList()) { index ->
-//                    val cardIndex = index + 2 // Start at 2 since we used 0 and 1 for the rows
-//                    MiniCard(
-//                        text = items[index],
-//                        isSelected = selectedRowIndex == cardIndex,
-//                        onSelect = { selectedRowIndex = cardIndex },
-//                        highlightColor = brightGreen
-//                    )
-//                }
-//            }
+            SelectableRow(
+                text = "Pittsburgh Steelers",
+                subText = "Last in the North, verge of bankruptcy",
+                selected = selectedRowIndex == 0,
+                onSelect = { selectedRowIndex = 0 },
+                highlightColor = colors.accent
+            )
         }
+
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxHeight()
+                .padding(start = 12.dp)
+        ) {
+            Text(dayOfWeek, fontSize = 14.sp, color = colors.text)
+            Text(
+                "$date $time", style = TextStyle(
+                    fontSize = 14.sp,
+                    lineHeight = 18.sp
+                ),
+                color = colors.text
+            )
+        }
+    }
 }
-//}
+
 
 @Composable
 fun SelectableRow(
@@ -109,113 +95,50 @@ fun SelectableRow(
         targetValue = if (selected) 1.025f else 1.0f,
         animationSpec = tween(durationMillis = 300)
     )
+    val colors = LocalColors.current;
 
-
-    Box(
-        modifier = Modifier
-            .padding(start = 10.dp, end = 10.dp)
-    ) {
-//        Card(
-//            modifier = Modifier
-//                .fillMaxWidth()
-//                .padding(8.dp)
-//                .zIndex(1f)
-//                .graphicsLayer(
-//                    scaleX = animatedScale,
-//                    scaleY = animatedScale,
-//                    transformOrigin = TransformOrigin(0.5f, 0.5f)
-//                )
-//                .zIndex(1f)
-//                .clickable { onSelect() }
-//                .border(
-//                    width = 2.dp,
-//                    color = if (selected) highlightColor else Color.Transparent,
-//                    shape = RoundedCornerShape(4.dp)
-//                )
-//        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .graphicsLayer(
-                        scaleX = animatedScale,
-                        scaleY = animatedScale,
-                        transformOrigin = TransformOrigin(0.5f, 0.5f)
-                    )
-                    .clickable { onSelect() }
-                    .border(
-                        width = 2.dp,
-                        color = if (selected) highlightColor else Color.Transparent,
-                        shape = RoundedCornerShape(4.dp)
-                    )
-                    .padding(8.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-//                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(40.dp)
-                        .background(Color.LightGray)
-                        .clip(CircleShape),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Person,
-                        contentDescription = "Icon",
-                        modifier = Modifier.size(24.dp)
-                    )
-                }
-
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(text = text, style = MaterialTheme.typography.subtitle1)
-                    Text(
-                        text = subText,
-                        style = MaterialTheme.typography.caption,
-                        color = MaterialTheme.colors.onSurface.copy(alpha = 0.6f)
-                    )
-                }
-            }
-//        }
-    }
-}
-
-@Composable
-private fun MiniCard(
-    text: String,
-    isSelected: Boolean,
-    onSelect: () -> Unit,
-    highlightColor: Color
-) {
-//    val animatedElevation by animateDpAsState(targetValue = if (isSelected) 10.dp else 2.dp)
-
-    Card(
-        modifier = Modifier
-            .width(100.dp)
-//            .height(50.dp)
-            .clickable(onClick = onSelect)
-//            .shadow(
-////                elevation = animatedElevation,
-//                shape = RoundedCornerShape(4.dp),
-//                clip = false,
-//                ambientColor = Color.Black,
-//                spotColor = Color.Black
-//            ),
-//        elevation = animatedElevation
-    ) {
-        Box(
+    Box {
+        Row(
             modifier = Modifier
-                .fillMaxSize()
+                .fillMaxWidth()
+                .graphicsLayer(
+                    scaleX = animatedScale,
+                    scaleY = animatedScale,
+                    transformOrigin = TransformOrigin(0.5f, 0.5f)
+                )
+                .clickable { onSelect() }
                 .border(
                     width = 2.dp,
-                    color = if (isSelected) highlightColor else Color.Transparent,
+                    color = if (selected) highlightColor else Color.Transparent,
                     shape = RoundedCornerShape(4.dp)
                 )
-                .padding(4.dp),
+                .padding(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Text(
-                text = text,
-                fontSize = 10.sp,
-                lineHeight = 12.sp,
-            )
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .background(Color.LightGray)
+                    .clip(CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Person,
+                    contentDescription = "Icon",
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(text = text, style = MaterialTheme.typography.subtitle1, color = colors.text)
+                Text(
+                    text = subText,
+                    style = MaterialTheme.typography.caption,
+                    color = colors.text,
+                    maxLines = 1
+                )
+            }
         }
+//        }
     }
 }

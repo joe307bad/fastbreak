@@ -19,11 +19,17 @@ actual fun onApplicationStartPlatformSpecific() {
 class IosFontLoader : FontLoader {
     override fun loadFont(fontName: String): FontFamily {
         val bundle = platform.Foundation.NSBundle.mainBundle
-        val path = bundle.pathForResource(fontName, "otf") ?: throw Exception("Font not found")
+
+        // Try to find the font with just the name (without path)
+        val fontFilename = fontName.split("/").last()
+        val path = bundle.pathForResource(fontFilename.removeSuffix(".otf"), "otf")
+            ?: throw Exception("Font not found: $fontName")
+
         return FontFamily(
             Font(
                 identity = fontName,
-                data = NSData.dataWithContentsOfFile(path)?.toByteArray() ?: throw Exception("Failed to load font"),
+                data = NSData.dataWithContentsOfFile(path)?.toByteArray()
+                    ?: throw Exception("Failed to load font data from $path"),
                 weight = androidx.compose.ui.text.font.FontWeight.Normal,
                 style = androidx.compose.ui.text.font.FontStyle.Normal
             )

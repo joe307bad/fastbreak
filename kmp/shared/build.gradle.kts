@@ -59,6 +59,7 @@ kotlin {
             implementation(libs.kotbase)
             implementation("io.github.mirzemehdi:kmpauth-google:2.0.0")
             implementation("io.github.mirzemehdi:kmpauth-uihelper:2.0.0")
+            implementation ("com.google.guava:guava:27.0.1-android")
 //            implementation(files("libs/tabler-icons-release.aar"))
         }
 
@@ -70,6 +71,8 @@ kotlin {
             iosX64Main.dependsOn(this)
             iosArm64Main.dependsOn(this)
             iosSimulatorArm64Main.dependsOn(this)
+
+            resources.srcDirs("src/commonMain/resources")
         }
 
         androidMain.dependencies {
@@ -105,6 +108,7 @@ dependencies {
     implementation(libs.androidx.ui.text.android)
     implementation(libs.androidx.core.i18n)
     implementation(libs.androidx.ui.android)
+    implementation(libs.androidx.compiler)
 }
 
 buildkonfig {
@@ -125,6 +129,9 @@ buildkonfig {
 
     targetConfigs {
         create("android") {
+            buildConfigField(com.codingfeline.buildkonfig.compiler.FieldSpec.Type.BOOLEAN, "IS_DEBUG", "true")
+        }
+        create("ios") {
             buildConfigField(com.codingfeline.buildkonfig.compiler.FieldSpec.Type.BOOLEAN, "IS_DEBUG", "true")
         }
     }

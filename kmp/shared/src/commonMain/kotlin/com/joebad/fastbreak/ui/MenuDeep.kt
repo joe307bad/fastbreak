@@ -2,6 +2,7 @@
 * Converted using https://composables.com/svgtocompose
 */
 
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathFillType
 import androidx.compose.ui.graphics.SolidColor
@@ -10,9 +11,12 @@ import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.path
 import androidx.compose.ui.unit.dp
+import com.joebad.fastbreak.ui.theme.LocalColors
 
 public val MenuDeep: ImageVector
+	@Composable
 	get() {
+		val colors = LocalColors.current
 		if (_MenuDeep != null) {
 			return _MenuDeep!!
 		}
@@ -43,7 +47,7 @@ public val MenuDeep: ImageVector
 			path(
 				fill = null,
 				fillAlpha = 1.0f,
-				stroke = SolidColor(Color.White),
+				stroke = SolidColor(colors.onPrimary),
 				strokeAlpha = 1.0f,
 				strokeLineWidth = 2f,
 				strokeLineCap = StrokeCap.Round,
@@ -57,7 +61,7 @@ public val MenuDeep: ImageVector
 			path(
 				fill = null,
 				fillAlpha = 1.0f,
-				stroke = SolidColor(Color.White),
+				stroke = SolidColor(colors.onPrimary),
 				strokeAlpha = 1.0f,
 				strokeLineWidth = 2f,
 				strokeLineCap = StrokeCap.Round,
@@ -71,7 +75,7 @@ public val MenuDeep: ImageVector
 			path(
 				fill = null,
 				fillAlpha = 1.0f,
-				stroke = SolidColor(Color.White),
+				stroke = SolidColor(colors.onPrimary),
 				strokeAlpha = 1.0f,
 				strokeLineWidth = 2f,
 				strokeLineCap = StrokeCap.Round,

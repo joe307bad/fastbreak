@@ -1,6 +1,6 @@
-
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
 import androidx.compose.foundation.layout.Arrangement
@@ -14,7 +14,6 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.Card
-import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -30,6 +29,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.joebad.fastbreak.ui.theme.LocalColors
 import kotlinx.coroutines.launch
 import kotlinx.datetime.Clock
 import kotlinx.datetime.DateTimeUnit
@@ -46,6 +46,7 @@ fun WeekNavigator() {
     val currentDate = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date
     val weeks = remember { generateMondayToMondayWeeks(currentDate) }
     val cardWidth = 250.dp
+    val colors = LocalColors.current;
 
     val listState = rememberLazyListState()
     var selectedWeekIndex by remember { mutableStateOf(weeks.size - 1) } // Default to current week
@@ -62,6 +63,7 @@ fun WeekNavigator() {
         contentPadding = PaddingValues(horizontal = cardWidth / 3.1f),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         modifier = Modifier.fillMaxWidth()
+            .background(color = colors.background)
     ) {
         itemsIndexed(weeks) { index, week ->
             WeekCard(
@@ -71,6 +73,7 @@ fun WeekNavigator() {
                 isSelected = index == selectedWeekIndex,
                 modifier = Modifier
                     .width(cardWidth)
+                    .background(color = colors.background)
                     .clickable {
                         selectedWeekIndex = index
                         coroutineScope.launch {
@@ -91,20 +94,20 @@ fun WeekCard(
     isSelected: Boolean = false,
     modifier: Modifier = Modifier
 ) {
+    val colors = LocalColors.current;
     Card(
-        modifier = modifier
-            .background(
-                color = if (isSelected) MaterialTheme.colors.primaryVariant else MaterialTheme.colors.secondary
-            ),
+        modifier = modifier,
         elevation = if (isSelected) 8.dp else 4.dp,
         shape = RectangleShape
     ) {
-        Column {
-            // Week header
+        Column(
+            Modifier.background(color = colors.background)
+                .border(width = 1.dp, color = colors.primary)
+        ) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(if (isSelected) MaterialTheme.colors.primary else MaterialTheme.colors.primaryVariant)
+                    .background(colors.primary)
                     .padding(8.dp),
                 contentAlignment = Alignment.Center
             ) {
@@ -113,7 +116,7 @@ fun WeekCard(
                     fontWeight = FontWeight.Bold,
                     fontSize = 16.sp,
                     textAlign = TextAlign.Center,
-                    color = MaterialTheme.colors.onPrimary
+                    color = colors.onPrimary
                 )
             }
 
@@ -121,12 +124,14 @@ fun WeekCard(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(8.dp),
+                    .padding(8.dp)
+                    .background(color = colors.background),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
                     text = "${startDate.format()} - ${endDate.format()}",
-                    fontSize = 14.sp
+                    fontSize = 14.sp,
+                    color = colors.text
                 )
             }
         }

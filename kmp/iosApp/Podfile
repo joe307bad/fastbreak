@@ -2,5 +2,5 @@ target 'Fastbreak' do
   use_frameworks!
   platform :ios, '14.1'
   pod 'shared', :path => '../shared'
-  pod 'GoogleSignIn'
+  pod 'GoogleSignIn', '~> 6.0'
 end

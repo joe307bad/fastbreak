@@ -6,18 +6,13 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.BottomNavigation
 import androidx.compose.material.BottomNavigationItem
 import androidx.compose.material.DrawerValue
-import androidx.compose.material.FloatingActionButton
 import androidx.compose.material.Icon
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.ModalDrawer
@@ -40,7 +35,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import com.arkivanov.decompose.ExperimentalDecomposeApi
@@ -50,9 +44,6 @@ import com.joebad.fastbreak.DrawerContent
 import com.joebad.fastbreak.DrawerItem
 import com.joebad.fastbreak.ProtectedComponent
 import com.joebad.fastbreak.ui.theme.LocalColors
-import io.github.alexzhirkevich.cupertino.CupertinoIcon
-import io.github.alexzhirkevich.cupertino.icons.CupertinoIcons
-import io.github.alexzhirkevich.cupertino.icons.filled.LockOpen
 import kotlinx.coroutines.launch
 import kotlin.math.min
 
@@ -103,30 +94,32 @@ fun ProtectedContent(component: ProtectedComponent, onToggleTheme: () -> Unit) {
         Scaffold(
             modifier = Modifier.background(color = colors.background),
             floatingActionButton = {
-                FloatingActionButton(
-                    onClick = { /* Your click handler */ },
-                    backgroundColor = colors.primary,
-                    contentColor = colors.onPrimary
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center,
-                        modifier = Modifier.padding(20.dp)
-                    ) {
-                        CupertinoIcon(
-                            imageVector = CupertinoIcons.Filled.LockOpen,
-                            contentDescription = "Lock",
-                            tint = colors.onPrimary,
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "2,324",
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                }
+                FABWithExactShapeBorder()
+//                FloatingActionButton(
+//                    modifier = Modifier.padding(0.dp),
+//                    onClick = { /* Your click handler */ },
+//                    backgroundColor = colors.primary,
+//                    contentColor = colors.onPrimary
+//                ) {
+//                    Row(
+//                        verticalAlignment = Alignment.CenterVertically,
+//                        horizontalArrangement = Arrangement.Center,
+//                        modifier = Modifier.padding(20.dp)
+//                    ) {
+//                        CupertinoIcon(
+//                            imageVector = CupertinoIcons.Filled.LockOpen,
+//                            contentDescription = "Lock",
+//                            tint = colors.onPrimary,
+//                            modifier = Modifier.size(20.dp)
+//                        )
+//                        Spacer(modifier = Modifier.width(8.dp))
+//                        Text(
+//                            text = "2,324",
+//                            maxLines = 1,
+//                            overflow = TextOverflow.Visible,
+//                        )
+//                    }
+//                }
 
 
             },

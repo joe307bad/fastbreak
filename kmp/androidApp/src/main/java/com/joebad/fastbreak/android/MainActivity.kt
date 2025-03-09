@@ -7,6 +7,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.core.view.WindowCompat
 import com.joebad.fastbreak.App
 import com.joebad.fastbreak.createRootComponent
 import com.joebad.fastbreak.initFontLoader
@@ -21,6 +22,7 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             var isDarkTheme by remember { mutableStateOf(false) }
+            WindowCompat.setDecorFitsSystemWindows(window, false) // Enable edge-to-edge rendering
             AppTheme(isDarkTheme, onToggleTheme = {
                 isDarkTheme = !isDarkTheme
             }) {

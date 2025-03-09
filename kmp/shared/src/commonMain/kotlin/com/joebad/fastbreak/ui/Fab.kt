@@ -34,7 +34,7 @@ import io.github.alexzhirkevich.cupertino.icons.CupertinoIcons
 import io.github.alexzhirkevich.cupertino.icons.filled.LockOpen
 
 @Composable
-fun FABWithExactShapeBorder() {
+fun FABWithExactShapeBorder(showModal: () -> Unit) {
     val colors = LocalColors.current
 
     // Create infinite transition for animation
@@ -49,7 +49,7 @@ fun FABWithExactShapeBorder() {
     )
 
     // The segment length as a fraction of the total path length
-    val segmentLength = 0.15f
+    val segmentLength = 0.50f
 
     // Custom modifier that draws a precise traveling border
     val preciseBorderModifier = Modifier.drawWithCache {
@@ -79,7 +79,7 @@ fun FABWithExactShapeBorder() {
             // Then draw our precise border segment
             drawPath(
                 path = borderPath,
-                color = colors.accent,
+                color = colors.accent.copy(alpha = 0.7f),
                 style = Stroke(
                     width = 4.dp.toPx(),
                     cap = StrokeCap.Round,
@@ -93,7 +93,7 @@ fun FABWithExactShapeBorder() {
     // Apply the custom modifier to the FAB
     FloatingActionButton(
         modifier = preciseBorderModifier.padding(0.dp),
-        onClick = { /* Your click handler */ },
+        onClick = { showModal() },
         backgroundColor = colors.primary,
         contentColor = colors.onPrimary
     ) {

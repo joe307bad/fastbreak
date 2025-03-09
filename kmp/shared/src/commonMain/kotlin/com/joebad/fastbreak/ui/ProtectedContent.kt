@@ -30,10 +30,12 @@ import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
@@ -69,8 +71,7 @@ fun ProtectedContent(component: ProtectedComponent, onToggleTheme: () -> Unit) {
             onClick = { /* Handle settings click */ }
         )
     )
-
-
+    val showModal = remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
 
     val scrollOffset by remember {
@@ -79,13 +80,14 @@ fun ProtectedContent(component: ProtectedComponent, onToggleTheme: () -> Unit) {
         }
     }
 
-    val animatedAlpha by animateFloatAsState(
+    val animatedAlpha: Float by animateFloatAsState(
         targetValue = 1f - scrollOffset,
         label = "Text Fade Animation"
     )
-
+    BlurredScreen(true, onDismiss = { showModal.value = false })
     ModalDrawer(
-        modifier = Modifier.background(color = colors.background),
+        modifier = Modifier.background(color = colors.background)
+            .then(if (showModal.value) Modifier.blur(16.dp) else Modifier),
         drawerState = drawerState,
         drawerContent = {
             DrawerContent(items = drawerItems)
@@ -94,7 +96,7 @@ fun ProtectedContent(component: ProtectedComponent, onToggleTheme: () -> Unit) {
         Scaffold(
             modifier = Modifier.background(color = colors.background),
             floatingActionButton = {
-                FABWithExactShapeBorder()
+                FABWithExactShapeBorder(showModal = { showModal.value = true })
 //                FloatingActionButton(
 //                    modifier = Modifier.padding(0.dp),
 //                    onClick = { /* Your click handler */ },
@@ -160,6 +162,7 @@ fun ProtectedContent(component: ProtectedComponent, onToggleTheme: () -> Unit) {
                     SmallFloatingActionButton(
                         onClick = {
                             scope.launch {
+//                                showModal.value = true
                                 onToggleTheme();
 //                                if (drawerState.isOpen) {
 //                                    drawerState.close()
@@ -184,7 +187,7 @@ fun ProtectedContent(component: ProtectedComponent, onToggleTheme: () -> Unit) {
                     }
                     RoundedBottomHeaderBox(
                         "FASTBREAK",
-                        "Daily sports fantasy games and trivia",
+                        "Daily fantasy sports games and trivia",
                         "Season 1 • Week 50 • Day 3",
                         animatedAlpha
                     )

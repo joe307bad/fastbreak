@@ -177,6 +177,7 @@ fun App(rootComponent: RootComponent, onToggleTheme: () -> Unit) {
             }
         }
     }
+    ApplySystemBarsColor(colors.primary)
 }
 
 data class DrawerItem(

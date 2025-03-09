@@ -1,10 +1,17 @@
 package com.joebad.fastbreak
 
 import android.content.Context
+import android.os.Build
+import androidx.annotation.RequiresApi
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.core.view.WindowInsetsControllerCompat
 import java.io.File
 
 actual fun getPlatform(): Platform = AndroidPlatform()
@@ -66,4 +73,21 @@ actual fun createFontLoader(): FontLoader {
         throw IllegalStateException("Font loader not initialized. Call initFontLoader(context) first.")
     }
     return AndroidFontLoader(appContext)
+}
+
+@RequiresApi(Build.VERSION_CODES.O)
+@Composable
+actual fun ApplySystemBarsColor(color: Color) {
+    val context = LocalContext.current
+    val window = (context as? android.app.Activity)?.window
+    window?.let {
+        // Set status bar and navigation bar colors
+        it.statusBarColor = color.toArgb()
+        it.navigationBarColor = color.toArgb()
+
+        // Optional: Adjust the icons for dark or light mode
+        val insetsController = WindowInsetsControllerCompat(window, window.decorView)
+        insetsController.isAppearanceLightStatusBars = false
+        insetsController.isAppearanceLightNavigationBars = false
+    }
 }

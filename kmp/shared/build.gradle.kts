@@ -60,7 +60,7 @@ kotlin {
             implementation("io.github.mirzemehdi:kmpauth-google:2.0.0")
             implementation("io.github.mirzemehdi:kmpauth-uihelper:2.0.0")
             implementation ("com.google.guava:guava:27.0.1-android")
-//            implementation(files("libs/tabler-icons-release.aar"))
+            implementation("com.google.accompanist:accompanist-systemuicontroller:0.34.0")
         }
 
         val iosX64Main by getting
@@ -79,7 +79,6 @@ kotlin {
             implementation(libs.compose.ui.tooling.preview)
             api(libs.androidx.activity.compose)
             implementation("com.arkivanov.decompose:extensions-android:3.2.2")
-
         }
     }
 }

@@ -49,10 +49,9 @@ fun WeekNavigator() {
     val colors = LocalColors.current;
 
     val listState = rememberLazyListState()
-    var selectedWeekIndex by remember { mutableStateOf(weeks.size - 1) } // Default to current week
+    var selectedWeekIndex by remember { mutableStateOf(weeks.size - 1) }
     val coroutineScope = rememberCoroutineScope()
 
-    // Scroll to the last week when the composable first appears
     LaunchedEffect(Unit) {
         listState.scrollToItem(selectedWeekIndex)
     }
@@ -120,7 +119,6 @@ fun WeekCard(
                 )
             }
 
-            // Week dates
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -138,10 +136,8 @@ fun WeekCard(
     }
 }
 
-// Helper extension function to format date
 fun LocalDate.format(): String = "${monthName()} $dayOfMonth"
 
-// Helper function to get month name
 fun LocalDate.monthName(): String = when (month) {
     Month.JANUARY -> "Jan"
     Month.FEBRUARY -> "Feb"
@@ -158,7 +154,6 @@ fun LocalDate.monthName(): String = when (month) {
     else -> TODO()
 }
 
-// Generate weeks from the first Monday of the year to the current week
 fun generateMondayToMondayWeeks(currentDate: LocalDate): List<Pair<LocalDate, LocalDate>> {
     var firstMonday = LocalDate(currentDate.year, Month.JANUARY, 1)
     while (firstMonday.dayOfWeek != DayOfWeek.MONDAY) {

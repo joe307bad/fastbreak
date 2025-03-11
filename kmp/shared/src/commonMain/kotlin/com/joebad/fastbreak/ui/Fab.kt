@@ -37,7 +37,6 @@ import io.github.alexzhirkevich.cupertino.icons.filled.LockOpen
 fun FABWithExactShapeBorder(showModal: () -> Unit) {
     val colors = LocalColors.current
 
-    // Create infinite transition for animation
     val infiniteTransition = rememberInfiniteTransition()
     val progress by infiniteTransition.animateFloat(
         initialValue = 0f,
@@ -48,35 +47,28 @@ fun FABWithExactShapeBorder(showModal: () -> Unit) {
         )
     )
 
-    // The segment length as a fraction of the total path length
     val segmentLength = 0.50f
 
-    // Custom modifier that draws a precise traveling border
     val preciseBorderModifier = Modifier.drawWithCache {
-        // Create a path that follows the exact shape of the FAB (including rounded corners)
         val borderPath = Path()
         val outlineShape = CircleShape.createOutline(size, layoutDirection, this)
         borderPath.addOutline(outlineShape)
 
-        // Create a path measure to calculate positions along the path
         val pathMeasure = PathMeasure()
-        pathMeasure.setPath(borderPath, true) // true = closed path
+        pathMeasure.setPath(borderPath, true)
 
         val totalLength = pathMeasure.length
         val dashLength = totalLength * segmentLength
         val dashPhase = totalLength * progress
 
-        // Create the effect that only shows a segment of the path
         val pathEffect = PathEffect.dashPathEffect(
             floatArrayOf(dashLength, totalLength - dashLength),
             dashPhase
         )
 
         onDrawWithContent {
-            // First draw the content
             drawContent()
 
-            // Then draw our precise border segment
             drawPath(
                 path = borderPath,
                 color = colors.accent.copy(alpha = 0.7f),
@@ -90,7 +82,6 @@ fun FABWithExactShapeBorder(showModal: () -> Unit) {
         }
     }
 
-    // Apply the custom modifier to the FAB
     FloatingActionButton(
         modifier = preciseBorderModifier.padding(0.dp),
         onClick = { showModal() },

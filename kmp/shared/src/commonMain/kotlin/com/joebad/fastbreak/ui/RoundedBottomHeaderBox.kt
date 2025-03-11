@@ -18,7 +18,7 @@ import com.joebad.fastbreak.createFontLoader
 import com.joebad.fastbreak.ui.theme.LocalColors
 
 @Composable
-fun Title(title: String, animatedAlpha: Float) {
+fun Title(title: String, animatedAlpha: Float? = null) {
     val fontLoader = createFontLoader()
     val customFont = fontLoader.loadFont("CodeBold")
     val colors = LocalColors.current;
@@ -28,7 +28,7 @@ fun Title(title: String, animatedAlpha: Float) {
         text = title,
         fontWeight = FontWeight.Bold,
         fontFamily = customFont,
-        color = colors.onPrimary.copy(alpha = animatedAlpha),
+        color = colors.onPrimary.copy(alpha = animatedAlpha ?: 1f),
         modifier = Modifier.padding(top = 4.5.dp)
     )
 }

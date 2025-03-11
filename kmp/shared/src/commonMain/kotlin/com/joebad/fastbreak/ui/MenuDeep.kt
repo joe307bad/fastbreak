@@ -1,9 +1,4 @@
-/*
-* Converted using https://composables.com/svgtocompose
-*/
-
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathFillType
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeCap
@@ -30,7 +25,6 @@ public val MenuDeep: ImageVector
 			path(
 				fill = null,
 				fillAlpha = 1.0f,
-//            stroke = null,
 				strokeAlpha = 1.0f,
 				strokeLineWidth = 10f,
 				strokeLineCap = StrokeCap.Round,

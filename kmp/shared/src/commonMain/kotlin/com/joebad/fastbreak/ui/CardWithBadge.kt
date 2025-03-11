@@ -78,7 +78,6 @@ fun CardWithBadge(
     Card(
         modifier = modifier
             .fillMaxHeight()
-//            .wrapContentHeight()
             .background(colors.background),
         elevation = 4.dp,
         shape = RectangleShape

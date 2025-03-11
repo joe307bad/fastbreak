@@ -1,5 +1,6 @@
 package com.joebad.fastbreak
 
+import Theme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 
@@ -12,3 +13,8 @@ expect fun onApplicationStartPlatformSpecific()
 
 @Composable
 expect fun ApplySystemBarsColor(color: Color)
+
+interface ThemePreference {
+    suspend fun saveTheme(theme: Theme)
+    suspend fun getTheme(): Theme
+}

@@ -1,5 +1,3 @@
-//import compose.icons.TablerIcons
-//import compose.icons.tablericons.LayoutAlignLeft
 import androidx.compose.animation.ExperimentalAnimationApi
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
@@ -45,13 +43,18 @@ import com.arkivanov.decompose.extensions.compose.subscribeAsState
 import com.joebad.fastbreak.DrawerContent
 import com.joebad.fastbreak.DrawerItem
 import com.joebad.fastbreak.ProtectedComponent
+import com.joebad.fastbreak.ThemePreference
 import com.joebad.fastbreak.ui.theme.LocalColors
 import kotlinx.coroutines.launch
 import kotlin.math.min
 
 @OptIn(ExperimentalAnimationApi::class, ExperimentalDecomposeApi::class)
 @Composable
-fun ProtectedContent(component: ProtectedComponent, onToggleTheme: () -> Unit) {
+fun ProtectedContent(
+    component: ProtectedComponent,
+    onToggleTheme: (theme: Theme) -> Unit,
+    themePreference: ThemePreference
+) {
 
     val childStack by component.stack.subscribeAsState()
     val activeChild = childStack.active
@@ -84,44 +87,23 @@ fun ProtectedContent(component: ProtectedComponent, onToggleTheme: () -> Unit) {
         targetValue = 1f - scrollOffset,
         label = "Text Fade Animation"
     )
-    BlurredScreen(true, onDismiss = { showModal.value = false })
+    BlurredScreen(showModal.value, onDismiss = { showModal.value = false })
     ModalDrawer(
         modifier = Modifier.background(color = colors.background)
             .then(if (showModal.value) Modifier.blur(16.dp) else Modifier),
         drawerState = drawerState,
         drawerContent = {
-            DrawerContent(items = drawerItems)
+            DrawerContent(
+                items = drawerItems,
+                themePreference = themePreference,
+                onToggleTheme = onToggleTheme
+            )
         }
     ) {
         Scaffold(
             modifier = Modifier.background(color = colors.background),
             floatingActionButton = {
                 FABWithExactShapeBorder(showModal = { showModal.value = true })
-//                FloatingActionButton(
-//                    modifier = Modifier.padding(0.dp),
-//                    onClick = { /* Your click handler */ },
-//                    backgroundColor = colors.primary,
-//                    contentColor = colors.onPrimary
-//                ) {
-//                    Row(
-//                        verticalAlignment = Alignment.CenterVertically,
-//                        horizontalArrangement = Arrangement.Center,
-//                        modifier = Modifier.padding(20.dp)
-//                    ) {
-//                        CupertinoIcon(
-//                            imageVector = CupertinoIcons.Filled.LockOpen,
-//                            contentDescription = "Lock",
-//                            tint = colors.onPrimary,
-//                            modifier = Modifier.size(20.dp)
-//                        )
-//                        Spacer(modifier = Modifier.width(8.dp))
-//                        Text(
-//                            text = "2,324",
-//                            maxLines = 1,
-//                            overflow = TextOverflow.Visible,
-//                        )
-//                    }
-//                }
 
 
             },
@@ -162,13 +144,11 @@ fun ProtectedContent(component: ProtectedComponent, onToggleTheme: () -> Unit) {
                     SmallFloatingActionButton(
                         onClick = {
                             scope.launch {
-//                                showModal.value = true
-                                onToggleTheme();
-//                                if (drawerState.isOpen) {
-//                                    drawerState.close()
-//                                } else {
-//                                    drawerState.open()
-//                                }
+                                if (drawerState.isOpen) {
+                                    drawerState.close()
+                                } else {
+                                    drawerState.open()
+                                }
                             }
                         },
                         modifier = Modifier

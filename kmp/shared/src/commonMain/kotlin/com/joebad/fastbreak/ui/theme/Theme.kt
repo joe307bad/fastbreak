@@ -27,7 +27,6 @@ fun darken(color: Color, factor: Float = 0.8f): Color {
     )
 }
 
-// Light Mode: Soft pastel pinks and purples
 val LightThemeColors = AppColors(
     background = Color(0xFFF8E8F8),
     text = Color(0xFF4A2040),
@@ -41,7 +40,6 @@ val LightThemeColors = AppColors(
     onAccent = darken(Color(0xFFFFC75F), 0.5f)
 )
 
-// Dark Mode: Indigo/Violet-based with cool greys
 val DarkThemeColors = AppColors(
     background = darken(Color(0xFF242038), 0.5f),
     text = Color(0xFFE0C3FC),
@@ -55,8 +53,6 @@ val DarkThemeColors = AppColors(
     onAccent = darken(Color(0xFF6A0DAD), 0.5f),
 )
 
-
-// Local composition holder for colors
 val LocalColors = staticCompositionLocalOf { LightThemeColors }
 
 @Composable

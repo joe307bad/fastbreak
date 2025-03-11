@@ -52,9 +52,8 @@ fun App() {
                 textAlign = TextAlign.Start,
             )
 
-            //Google Sign-In with Custom Button and authentication without Firebase
             GoogleButtonUiContainer(onGoogleSignInResult = { googleUser ->
-                val idToken = googleUser?.idToken // Send this idToken to your backend to verify
+                val idToken = googleUser?.idToken
                 signedInUserName = googleUser?.displayName ?: "Null User"
             }) {
                 Button(onClick = { this.onClick() }) { Text("Google Sign-In(Custom Design)") }

@@ -61,6 +61,7 @@ kotlin {
             implementation("io.github.mirzemehdi:kmpauth-uihelper:2.0.0")
             implementation ("com.google.guava:guava:27.0.1-android")
             implementation("com.google.accompanist:accompanist-systemuicontroller:0.34.0")
+            implementation("androidx.datastore:datastore-preferences:1.1.3")
         }
 
         val iosX64Main by getting

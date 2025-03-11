@@ -139,6 +139,5 @@ fun SelectableRow(
                 )
             }
         }
-//        }
     }
 }

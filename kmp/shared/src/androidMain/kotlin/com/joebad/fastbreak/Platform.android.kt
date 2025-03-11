@@ -1,5 +1,6 @@
 package com.joebad.fastbreak
 
+import Theme
 import android.content.Context
 import android.os.Build
 import androidx.annotation.RequiresApi
@@ -12,6 +13,10 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.core.view.WindowInsetsControllerCompat
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.preferencesDataStore
+import kotlinx.coroutines.flow.first
 import java.io.File
 
 actual fun getPlatform(): Platform = AndroidPlatform()
@@ -31,7 +36,6 @@ class AndroidFontLoader(private val context: Context) : FontLoader {
 
         if (!fontFile.exists()) {
             try {
-                // Load from assets
                 context.assets.open("font/$fontName.otf").use { input ->
                     fontFile.outputStream().use { output ->
                         input.copyTo(output)
@@ -39,7 +43,6 @@ class AndroidFontLoader(private val context: Context) : FontLoader {
                 }
             } catch (e: Exception) {
                 try {
-                    // Fallback: try to load as a resource in the common module
                     val inputStream = this::class.java.classLoader?.getResourceAsStream("font/$fontName.otf")
                         ?: throw Exception("Font not found: $fontName.otf")
                     fontFile.outputStream().use { output ->
@@ -51,7 +54,6 @@ class AndroidFontLoader(private val context: Context) : FontLoader {
             }
         }
 
-        // Now we have the font file, use the File constructor
         return FontFamily(
             Font(
                 file = fontFile,
@@ -81,13 +83,28 @@ actual fun ApplySystemBarsColor(color: Color) {
     val context = LocalContext.current
     val window = (context as? android.app.Activity)?.window
     window?.let {
-        // Set status bar and navigation bar colors
         it.statusBarColor = color.toArgb()
         it.navigationBarColor = color.toArgb()
 
-        // Optional: Adjust the icons for dark or light mode
         val insetsController = WindowInsetsControllerCompat(window, window.decorView)
         insetsController.isAppearanceLightStatusBars = false
         insetsController.isAppearanceLightNavigationBars = false
+    }
+}
+
+private val Context.dataStore by preferencesDataStore(name = "theme_prefs")
+
+class AndroidThemePreference(private val context: Context) : ThemePreference {
+    private val THEME_KEY = intPreferencesKey("theme")
+
+    override suspend fun saveTheme(theme: Theme) {
+        context.dataStore.edit { preferences ->
+            preferences[THEME_KEY] = theme.ordinal
+        }
+    }
+
+    override suspend fun getTheme(): Theme {
+        val preferences = context.dataStore.data.first()
+        return Theme.values()[preferences[THEME_KEY] ?: Theme.Dark.ordinal]
     }
 }

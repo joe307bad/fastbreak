@@ -1,25 +1,21 @@
 import androidx.compose.animation.ExperimentalAnimationApi
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.BottomNavigation
 import androidx.compose.material.BottomNavigationItem
 import androidx.compose.material.DrawerValue
 import androidx.compose.material.Icon
-import androidx.compose.material.MaterialTheme
 import androidx.compose.material.ModalDrawer
 import androidx.compose.material.Text
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.rememberDrawerState
 import androidx.compose.material3.FabPosition
 import androidx.compose.material3.FloatingActionButtonDefaults
@@ -31,7 +27,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.graphics.graphicsLayer
@@ -40,8 +35,6 @@ import androidx.compose.ui.zIndex
 import com.arkivanov.decompose.ExperimentalDecomposeApi
 import com.arkivanov.decompose.extensions.compose.stack.Children
 import com.arkivanov.decompose.extensions.compose.subscribeAsState
-import com.joebad.fastbreak.DrawerContent
-import com.joebad.fastbreak.DrawerItem
 import com.joebad.fastbreak.ProtectedComponent
 import com.joebad.fastbreak.ThemePreference
 import com.joebad.fastbreak.ui.theme.LocalColors
@@ -58,24 +51,13 @@ fun ProtectedContent(
 
     val childStack by component.stack.subscribeAsState()
     val activeChild = childStack.active
-    val drawerState = rememberDrawerState(DrawerValue.Closed)
+    val drawerState = rememberDrawerState(DrawerValue.Open)
     val scope = rememberCoroutineScope()
     val colors = LocalColors.current;
 
-    val drawerItems = listOf(
-        DrawerItem(
-            title = "Profile",
-            icon = Icons.Default.Person,
-            onClick = { /* Handle profile click */ }
-        ),
-        DrawerItem(
-            title = "Settings",
-            icon = Icons.Default.Settings,
-            onClick = { /* Handle settings click */ }
-        )
-    )
     val showModal = remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
+    val scrollState = rememberScrollState()
 
     val scrollOffset by remember {
         derivedStateOf {
@@ -94,7 +76,6 @@ fun ProtectedContent(
         drawerState = drawerState,
         drawerContent = {
             DrawerContent(
-                items = drawerItems,
                 themePreference = themePreference,
                 onToggleTheme = onToggleTheme
             )
@@ -102,11 +83,6 @@ fun ProtectedContent(
     ) {
         Scaffold(
             modifier = Modifier.background(color = colors.background),
-            floatingActionButton = {
-                FABWithExactShapeBorder(showModal = { showModal.value = true })
-
-
-            },
             floatingActionButtonPosition = FabPosition.Center,
             bottomBar = {
                 BottomNavigation(backgroundColor = colors.primary) {
@@ -165,28 +141,14 @@ fun ProtectedContent(
                             modifier = Modifier.graphicsLayer(scaleX = -1f)
                         )
                     }
-                    RoundedBottomHeaderBox(
-                        "FASTBREAK",
-                        "Daily fantasy sports games and trivia",
-                        "Season 1 • Week 50 • Day 3",
-                        animatedAlpha
-                    )
                     Column(modifier = Modifier.zIndex(2f)) {
                         when (child.instance) {
                             is ProtectedComponent.Child.Home -> {
-                                HomeScreen(listState)
+                                HomeScreen(listState, animatedAlpha, showModal)
                             }
 
                             is ProtectedComponent.Child.Leaderboard -> {
-                                Column(
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .padding(16.dp),
-                                    verticalArrangement = Arrangement.Center,
-                                    horizontalAlignment = Alignment.CenterHorizontally
-                                ) {
-                                    Text("Leaderboard Screen", style = MaterialTheme.typography.h1)
-                                }
+                                LeaderboardScreen(scrollState)
                             }
                         }
                     }

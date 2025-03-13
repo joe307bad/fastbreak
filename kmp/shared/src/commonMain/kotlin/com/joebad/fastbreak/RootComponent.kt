@@ -2,34 +2,20 @@ package com.joebad.fastbreak
 
 import ProtectedContent
 import Theme
-import ThemeSelector
-import Title
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.Button
-import androidx.compose.material.Icon
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Surface
 import androidx.compose.material.Text
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Person
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.arkivanov.decompose.ComponentContext
 import com.arkivanov.decompose.DefaultComponentContext
@@ -46,7 +32,6 @@ import com.arkivanov.decompose.router.stack.replaceAll
 import com.arkivanov.decompose.value.Value
 import com.arkivanov.essenty.lifecycle.LifecycleRegistry
 import com.joebad.fastbreak.ui.theme.LocalColors
-import io.github.alexzhirkevich.cupertino.ExperimentalCupertinoApi
 
 fun shouldEnforceLogin(): Boolean {
     return !BuildKonfig.IS_DEBUG
@@ -204,218 +189,3 @@ data class DrawerItem(
     val icon: ImageVector,
     val onClick: () -> Unit
 )
-
-@OptIn(ExperimentalCupertinoApi::class)
-@Composable
-fun DrawerContent(
-    items: List<DrawerItem>,
-    themePreference: ThemePreference,
-    onToggleTheme: (theme: Theme) -> Unit
-) {
-    val colors = LocalColors.current;
-    Column(
-        modifier = Modifier.fillMaxSize().background(color = colors.background)
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .weight(1f)
-        ) {
-            Column {
-                Column(modifier = Modifier.background(color = colors.primary)) {
-                    Column(modifier = Modifier.padding(10.dp, top = 20.dp).fillMaxWidth()) {
-                        Title("FASTBREAK")
-                        Column(
-                            modifier = Modifier.padding(
-                                start = 10.dp,
-                                top = 20.dp,
-                                bottom = 20.dp
-                            )
-                        ) {
-                            Row {
-                                Icon(
-                                    Icons.Default.Person,
-                                    tint = colors.onPrimary,
-                                    contentDescription = "User"
-                                )
-                                Spacer(modifier = Modifier.width(10.dp))
-                                Text(
-                                    text = "joebad",
-                                    color = colors.onPrimary,
-                                    style = MaterialTheme.typography.h6
-                                )
-                            }
-                        }
-                    }
-                }
-                Column(modifier = Modifier.padding(10.dp, top = 20.dp).fillMaxWidth()) {
-                    Text(
-                        text = "My Stat Sheet",
-                        color = colors.text,
-                        style = MaterialTheme.typography.h6
-                    )
-                    Spacer(modifier = Modifier.height(10.dp))
-                    Row(
-                        modifier = Modifier.height(50.dp), // Ensures children match the tallest height
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(
-                            modifier = Modifier.fillMaxHeight().width(80.dp)// Make column fill the row height
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .background(colors.accent, RoundedCornerShape(8.dp))
-                                    .padding(horizontal = 8.dp, vertical = 4.dp) // Adjust padding as needed
-                                    .fillMaxHeight()
-                                    .width(60.dp), // Make box fill the height of the row
-                                contentAlignment = Alignment.Center // Center the text vertically
-                            ) {
-                                Text(
-                                    text = "10,065",
-                                    color = colors.onAccent,
-                                    style = MaterialTheme.typography.body1,
-                                )
-                            }
-                        }
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Text(
-                            text = "Days in a row locking in your FastBreak card",
-                            color = colors.text,
-                            style = MaterialTheme.typography.body1
-                        )
-                    }
-                    Spacer(modifier = Modifier.height(10.dp))
-                    Row(
-                        modifier = Modifier.height(50.dp), // Ensures children match the tallest height
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(
-                            modifier = Modifier.fillMaxHeight().width(80.dp)
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .background(colors.accent, RoundedCornerShape(8.dp))
-                                    .padding(horizontal = 8.dp, vertical = 4.dp) // Adjust padding as needed
-                                    .fillMaxHeight()
-                                    .width(60.dp), // Make box fill the height of the row
-                                contentAlignment = Alignment.Center // Center the text vertically
-                            ) {
-                                Text(
-                                    text = "365",
-                                    color = colors.onAccent,
-                                    style = MaterialTheme.typography.body1,
-                                )
-                            }
-                        }
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Text(
-                            text = "Your highest Fastbreak card",
-                            color = colors.text,
-                            style = MaterialTheme.typography.body1
-                        )
-                    }
-                    Spacer(modifier = Modifier.height(10.dp))
-                    Row(
-                        modifier = Modifier.height(50.dp), // Ensures children match the tallest height
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(
-                            modifier = Modifier.fillMaxHeight().width(80.dp)
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .background(colors.accent, RoundedCornerShape(8.dp))
-                                    .padding(horizontal = 8.dp, vertical = 4.dp) // Adjust padding as needed
-                                    .fillMaxHeight()
-                                    .width(60.dp), // Make box fill the height of the row
-                                contentAlignment = Alignment.Center // Center the text vertically
-                            ) {
-                                Text(
-                                    text = "123",
-                                    color = colors.onAccent,
-                                    style = MaterialTheme.typography.body1,
-                                )
-                            }
-                        }
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Text(
-                            text = "Days in a row with a winning pick",
-                            color = colors.text,
-                            style = MaterialTheme.typography.body1
-                        )
-                    }
-                    Spacer(modifier = Modifier.height(10.dp))
-                    Row(
-                        modifier = Modifier.height(50.dp), // Ensures children match the tallest height
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(
-                            modifier = Modifier.fillMaxHeight().width(80.dp)
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .background(colors.accent, RoundedCornerShape(8.dp))
-                                    .padding(horizontal = 8.dp, vertical = 4.dp) // Adjust padding as needed
-                                    .fillMaxHeight()
-                                    .width(60.dp), // Make box fill the height of the row
-                                contentAlignment = Alignment.Center // Center the text vertically
-                            ) {
-                                Text(
-                                    text = "34",
-                                    color = colors.onAccent,
-                                    style = MaterialTheme.typography.body1,
-                                )
-                            }
-                        }
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Text(
-                            text = "Number of perfect Fastbreak cards",
-                            color = colors.text,
-                            style = MaterialTheme.typography.body1
-                        )
-                    }
-                    Spacer(modifier = Modifier.height(10.dp))
-                    Row(
-                        modifier = Modifier.height(50.dp), // Ensures children match the tallest height
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(
-                            modifier = Modifier.fillMaxHeight().width(80.dp)
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .background(colors.accent, RoundedCornerShape(8.dp))
-                                    .padding(horizontal = 8.dp, vertical = 4.dp) // Adjust padding as needed
-                                    .fillMaxHeight()
-                                    .width(60.dp), // Make box fill the height of the row
-                                contentAlignment = Alignment.Center // Center the text vertically
-                            ) {
-                                Text(
-                                    text = "87",
-                                    color = colors.onAccent,
-                                    style = MaterialTheme.typography.body1,
-                                )
-                            }
-                        }
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Text(
-                            text = "Number of weekly wins",
-                            color = colors.text,
-                            style = MaterialTheme.typography.body1
-                        )
-                    }
-                }
-            }
-        }
-        Column(modifier = Modifier.padding(16.dp).fillMaxWidth()) {
-            Text(
-                text = "Theme",
-                color = colors.text,
-                style = MaterialTheme.typography.body1,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.padding(5.dp).fillMaxWidth()
-            )
-            ThemeSelector(themePreference = themePreference, onToggleTheme = onToggleTheme)
-        }
-    }
-}

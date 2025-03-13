@@ -6,11 +6,11 @@ PODS:
   - AppAuth/ExternalUserAgent (1.7.6):
     - AppAuth/Core
   - CouchbaseLite (3.1.9)
-  - FirebaseCore (11.8.1):
-    - FirebaseCoreInternal (~> 11.8.0)
+  - FirebaseCore (11.9.0):
+    - FirebaseCoreInternal (~> 11.9.0)
     - GoogleUtilities/Environment (~> 8.0)
     - GoogleUtilities/Logger (~> 8.0)
-  - FirebaseCoreInternal (11.8.0):
+  - FirebaseCoreInternal (11.9.0):
     - "GoogleUtilities/NSData+zlib (~> 8.0)"
   - GoogleSignIn (6.2.4):
     - AppAuth (~> 1.5)
@@ -55,8 +55,8 @@ EXTERNAL SOURCES:
 SPEC CHECKSUMS:
   AppAuth: d4f13a8fe0baf391b2108511793e4b479691fb73
   CouchbaseLite: 1d9f2f7b5cd5477f7dad820070a98f6f6176956b
-  FirebaseCore: 99fe0c4b44a39f37d99e6404e02009d2db5d718d
-  FirebaseCoreInternal: df24ce5af28864660ecbd13596fc8dd3a8c34629
+  FirebaseCore: 7cfcf7e8b33985c06478fd2b96e2f7101eb61a1c
+  FirebaseCoreInternal: 154779013b85b4b290fdba38414df475f42e3096
   GoogleSignIn: 5651ce3a61e56ca864160e79b484cd9ed3f49b7a
   GoogleUtilities: 26a3abef001b6533cf678d3eb38fd3f614b7872d
   GTMAppAuth: 0ff230db599948a9ad7470ca667337803b3fc4dd

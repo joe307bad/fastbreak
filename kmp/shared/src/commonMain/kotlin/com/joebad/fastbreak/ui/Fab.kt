@@ -1,4 +1,3 @@
-
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -68,7 +67,6 @@ fun FABWithExactShapeBorder(showModal: () -> Unit) {
 
         onDrawWithContent {
             drawContent()
-
             drawPath(
                 path = borderPath,
                 color = colors.accent.copy(alpha = 0.7f),
@@ -101,7 +99,7 @@ fun FABWithExactShapeBorder(showModal: () -> Unit) {
             )
             Spacer(modifier = Modifier.width(8.dp))
             Text(
-                text = "2,324",
+                text = "12,324,092",
                 maxLines = 1,
                 overflow = TextOverflow.Visible,
             )

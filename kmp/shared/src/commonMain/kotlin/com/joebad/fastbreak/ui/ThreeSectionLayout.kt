@@ -208,10 +208,9 @@ fun MyScreen(onDismiss: () -> Unit) {
                             elevation = 8.dp,
                             pressDepth = 4.dp,
                             backgroundColor = colors.secondary
-
                         ) {
                             Text(
-                                "CONFIRM CARD",
+                                "LOCK CARD",
                                 color = colors.onSecondary,
                                 fontWeight = FontWeight.Bold
                             )

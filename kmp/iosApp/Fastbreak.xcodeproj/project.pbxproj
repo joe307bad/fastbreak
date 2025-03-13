@@ -20,7 +20,7 @@
 		A62229AB2B479D28001B39BD /* FirebaseAnalyticsSwift in Frameworks */ = {isa = PBXBuildFile; productRef = A62229AA2B479D28001B39BD /* FirebaseAnalyticsSwift */; };
 		A62229AD2B479D28001B39BD /* FirebaseAnalyticsWithoutAdIdSupport in Frameworks */ = {isa = PBXBuildFile; productRef = A62229AC2B479D28001B39BD /* FirebaseAnalyticsWithoutAdIdSupport */; };
 		A62229AF2B479D28001B39BD /* FirebaseAppCheck in Frameworks */ = {isa = PBXBuildFile; productRef = A62229AE2B479D28001B39BD /* FirebaseAppCheck */; };
-		FF44905A96D11D479A367BB4 /* Pods_Fastbreak.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 12E3AE2C560BFC52EE3773CE /* Pods_Fastbreak.framework */; };
+		DBDFB14BD8C0A307389DE946 /* Pods_Fastbreak.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 7C64F5C82A41387D41A65D45 /* Pods_Fastbreak.framework */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -37,17 +37,17 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
-		02F0AA2C375222591715FFAA /* Pods-Fastbreak.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Fastbreak.debug.xcconfig"; path = "Target Support Files/Pods-Fastbreak/Pods-Fastbreak.debug.xcconfig"; sourceTree = "<group>"; };
 		058557BA273AAA24004C7B11 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		058557D8273AAEEB004C7B11 /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
-		12E3AE2C560BFC52EE3773CE /* Pods_Fastbreak.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_Fastbreak.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		2152FB032600AC8F00CF470E /* iOSApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = iOSApp.swift; sourceTree = "<group>"; };
-		44C1195856B76EB1A35BA6C9 /* Pods-Fastbreak.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Fastbreak.release.xcconfig"; path = "Target Support Files/Pods-Fastbreak/Pods-Fastbreak.release.xcconfig"; sourceTree = "<group>"; };
 		5ECF459B2D780BE7008DAE5C /* CodeBold.otf */ = {isa = PBXFileReference; lastKnownFileType = file; path = CodeBold.otf; sourceTree = "<group>"; };
 		7555FF7B242A565900829871 /* Fastbreak.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Fastbreak.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		7555FF82242A565900829871 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		7555FF8C242A565B00829871 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		7C64F5C82A41387D41A65D45 /* Pods_Fastbreak.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_Fastbreak.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		8D5A27FFED70500D841B3479 /* Pods-Fastbreak.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Fastbreak.release.xcconfig"; path = "Target Support Files/Pods-Fastbreak/Pods-Fastbreak.release.xcconfig"; sourceTree = "<group>"; };
 		A679C57A2B02E91A008F0522 /* iosApp.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = iosApp.entitlements; sourceTree = "<group>"; };
+		BFA9FE60902FF3AE73AB07E6 /* Pods-Fastbreak.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Fastbreak.debug.xcconfig"; path = "Target Support Files/Pods-Fastbreak/Pods-Fastbreak.debug.xcconfig"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -63,7 +63,7 @@
 				A62229A92B479D28001B39BD /* FirebaseAnalyticsOnDeviceConversion in Frameworks */,
 				A62229AB2B479D28001B39BD /* FirebaseAnalyticsSwift in Frameworks */,
 				A615958B2B479F2A008C86AE /* FirebaseAuth in Frameworks */,
-				FF44905A96D11D479A367BB4 /* Pods_Fastbreak.framework in Frameworks */,
+				DBDFB14BD8C0A307389DE946 /* Pods_Fastbreak.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -78,14 +78,6 @@
 			path = "Preview Content";
 			sourceTree = "<group>";
 		};
-		2C06F67BBDFB508B0DF8E76D /* Frameworks */ = {
-			isa = PBXGroup;
-			children = (
-				12E3AE2C560BFC52EE3773CE /* Pods_Fastbreak.framework */,
-			);
-			name = Frameworks;
-			sourceTree = "<group>";
-		};
 		7555FF72242A565900829871 = {
 			isa = PBXGroup;
 			children = (
@@ -93,7 +85,7 @@
 				7555FF7D242A565900829871 /* iosApp */,
 				7555FF7C242A565900829871 /* Products */,
 				A2F255CBD7954ECFCCBC4AF3 /* Pods */,
-				2C06F67BBDFB508B0DF8E76D /* Frameworks */,
+				A5B863F9CE214B7F53FD7DC6 /* Frameworks */,
 			);
 			sourceTree = "<group>";
 		};
@@ -121,10 +113,18 @@
 		A2F255CBD7954ECFCCBC4AF3 /* Pods */ = {
 			isa = PBXGroup;
 			children = (
-				02F0AA2C375222591715FFAA /* Pods-Fastbreak.debug.xcconfig */,
-				44C1195856B76EB1A35BA6C9 /* Pods-Fastbreak.release.xcconfig */,
+				BFA9FE60902FF3AE73AB07E6 /* Pods-Fastbreak.debug.xcconfig */,
+				8D5A27FFED70500D841B3479 /* Pods-Fastbreak.release.xcconfig */,
 			);
 			path = Pods;
+			sourceTree = "<group>";
+		};
+		A5B863F9CE214B7F53FD7DC6 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				7C64F5C82A41387D41A65D45 /* Pods_Fastbreak.framework */,
+			);
+			name = Frameworks;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -134,14 +134,14 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 7555FFA5242A565B00829871 /* Build configuration list for PBXNativeTarget "Fastbreak" */;
 			buildPhases = (
-				07817E849AF698490A233446 /* [CP] Check Pods Manifest.lock */,
+				E4738AB01ECAA38DA4E85842 /* [CP] Check Pods Manifest.lock */,
 				7555FFB5242A651A00829871 /* ShellScript */,
 				7555FF77242A565900829871 /* Sources */,
 				7555FF78242A565900829871 /* Frameworks */,
 				7555FF79242A565900829871 /* Resources */,
 				7555FFB4242A642300829871 /* Embed Frameworks */,
-				ED633BD26B0B3E0D57DE1B7E /* [CP] Embed Pods Frameworks */,
-				8D2F190DF9850018AF4BFA59 /* [CP] Copy Pods Resources */,
+				580AB9B0E4C5F0F40A959CC3 /* [CP] Embed Pods Frameworks */,
+				32169694239C2CE946BE914C /* [CP] Copy Pods Resources */,
 			);
 			buildRules = (
 			);
@@ -213,26 +213,38 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXShellScriptBuildPhase section */
-		07817E849AF698490A233446 /* [CP] Check Pods Manifest.lock */ = {
+		32169694239C2CE946BE914C /* [CP] Copy Pods Resources */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 			);
 			inputFileListPaths = (
+				"${PODS_ROOT}/Target Support Files/Pods-Fastbreak/Pods-Fastbreak-resources-${CONFIGURATION}-input-files.xcfilelist",
 			);
-			inputPaths = (
-				"${PODS_PODFILE_DIR_PATH}/Podfile.lock",
-				"${PODS_ROOT}/Manifest.lock",
-			);
-			name = "[CP] Check Pods Manifest.lock";
+			name = "[CP] Copy Pods Resources";
 			outputFileListPaths = (
-			);
-			outputPaths = (
-				"$(DERIVED_FILE_DIR)/Pods-Fastbreak-checkManifestLockResult.txt",
+				"${PODS_ROOT}/Target Support Files/Pods-Fastbreak/Pods-Fastbreak-resources-${CONFIGURATION}-output-files.xcfilelist",
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
+			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-Fastbreak/Pods-Fastbreak-resources.sh\"\n";
+			showEnvVarsInLog = 0;
+		};
+		580AB9B0E4C5F0F40A959CC3 /* [CP] Embed Pods Frameworks */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+				"${PODS_ROOT}/Target Support Files/Pods-Fastbreak/Pods-Fastbreak-frameworks-${CONFIGURATION}-input-files.xcfilelist",
+			);
+			name = "[CP] Embed Pods Frameworks";
+			outputFileListPaths = (
+				"${PODS_ROOT}/Target Support Files/Pods-Fastbreak/Pods-Fastbreak-frameworks-${CONFIGURATION}-output-files.xcfilelist",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-Fastbreak/Pods-Fastbreak-frameworks.sh\"\n";
 			showEnvVarsInLog = 0;
 		};
 		7555FFB5242A651A00829871 /* ShellScript */ = {
@@ -252,38 +264,26 @@
 			shellPath = /bin/sh;
 			shellScript = "../gradlew :shared:embedAndSignAppleFrameworkForXcode\n";
 		};
-		8D2F190DF9850018AF4BFA59 /* [CP] Copy Pods Resources */ = {
+		E4738AB01ECAA38DA4E85842 /* [CP] Check Pods Manifest.lock */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 			);
 			inputFileListPaths = (
-				"${PODS_ROOT}/Target Support Files/Pods-Fastbreak/Pods-Fastbreak-resources-${CONFIGURATION}-input-files.xcfilelist",
 			);
-			name = "[CP] Copy Pods Resources";
+			inputPaths = (
+				"${PODS_PODFILE_DIR_PATH}/Podfile.lock",
+				"${PODS_ROOT}/Manifest.lock",
+			);
+			name = "[CP] Check Pods Manifest.lock";
 			outputFileListPaths = (
-				"${PODS_ROOT}/Target Support Files/Pods-Fastbreak/Pods-Fastbreak-resources-${CONFIGURATION}-output-files.xcfilelist",
+			);
+			outputPaths = (
+				"$(DERIVED_FILE_DIR)/Pods-Fastbreak-checkManifestLockResult.txt",
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-Fastbreak/Pods-Fastbreak-resources.sh\"\n";
-			showEnvVarsInLog = 0;
-		};
-		ED633BD26B0B3E0D57DE1B7E /* [CP] Embed Pods Frameworks */ = {
-			isa = PBXShellScriptBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputFileListPaths = (
-				"${PODS_ROOT}/Target Support Files/Pods-Fastbreak/Pods-Fastbreak-frameworks-${CONFIGURATION}-input-files.xcfilelist",
-			);
-			name = "[CP] Embed Pods Frameworks";
-			outputFileListPaths = (
-				"${PODS_ROOT}/Target Support Files/Pods-Fastbreak/Pods-Fastbreak-frameworks-${CONFIGURATION}-output-files.xcfilelist",
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-Fastbreak/Pods-Fastbreak-frameworks.sh\"\n";
+			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
 			showEnvVarsInLog = 0;
 		};
 /* End PBXShellScriptBuildPhase section */
@@ -419,7 +419,7 @@
 		};
 		7555FFA6242A565B00829871 /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 02F0AA2C375222591715FFAA /* Pods-Fastbreak.debug.xcconfig */;
+			baseConfigurationReference = BFA9FE60902FF3AE73AB07E6 /* Pods-Fastbreak.debug.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = iosApp/iosApp.entitlements;
@@ -454,7 +454,7 @@
 		};
 		7555FFA7242A565B00829871 /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 44C1195856B76EB1A35BA6C9 /* Pods-Fastbreak.release.xcconfig */;
+			baseConfigurationReference = 8D5A27FFED70500D841B3479 /* Pods-Fastbreak.release.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = iosApp/iosApp.entitlements;

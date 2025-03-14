@@ -51,7 +51,7 @@ fun ProtectedContent(
 
     val childStack by component.stack.subscribeAsState()
     val activeChild = childStack.active
-    val drawerState = rememberDrawerState(DrawerValue.Open)
+    val drawerState = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
     val colors = LocalColors.current;
 

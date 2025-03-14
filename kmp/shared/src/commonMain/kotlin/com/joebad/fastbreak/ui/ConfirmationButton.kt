@@ -1,4 +1,3 @@
-
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.Spring
@@ -9,10 +8,14 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -109,7 +112,7 @@ fun AnimatedBorderButton(
 
             // Animation complete - trigger haptic feedback and mark as completed
             hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
-            animationCompleted = true
+//            animationCompleted = true
         } else if (!isPressed && !animationCompleted) {
             // Reset animation when not pressed (only if animation wasn't completed)
             animationProgress.snapTo(0f)
@@ -123,14 +126,26 @@ fun AnimatedBorderButton(
     ) {
         // Bottom layer (creates the 3D effect)
         Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(
-                    color = bottomBorderColor,
-                    shape = androidx.compose.foundation.shape.RoundedCornerShape(cornerRadius.dp)
-                )
+            modifier = Modifier.fillMaxHeight().fillMaxWidth()
                 .zIndex(0f)
-        )
+                .offset(y = depthAmount.dp - 2.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(0.96f)
+                    .background(
+                        color = bottomBorderColor,
+                        shape = RoundedCornerShape(
+                            bottomStart = cornerRadius.dp,
+                            bottomEnd = cornerRadius.dp
+                        )
+                    )
+                    .align(Alignment.BottomCenter)
+            ) {
+                Spacer(modifier = Modifier.height(40.dp))
+            }
+        }
+
 
         // Top button layer (slides down when pressed)
         Box(
@@ -166,6 +181,7 @@ fun AnimatedBorderButton(
             Box(
                 contentAlignment = Alignment.Center,
                 modifier = Modifier.fillMaxSize()
+                    .offset(y = (-1).dp)
             ) {
                 content()
             }

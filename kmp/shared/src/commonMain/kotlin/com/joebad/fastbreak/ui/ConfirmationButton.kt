@@ -1,3 +1,4 @@
+
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.Spring
@@ -25,7 +26,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
@@ -45,14 +45,13 @@ import com.joebad.fastbreak.ui.theme.LocalColors
 
 @Composable
 fun AnimatedBorderButton(
-//    buttonColor: Color = Color.White,
     borderColor: Color = Color(0xFF3B82F6), // Blue color
     textColor: Color = Color(0xFF3B82F6),
     bottomBorderColor: Color = Color(0xCC3B82F6), // Slightly darker blue for bottom border
     width: Int = 160,
     height: Int = 60,
-    cornerRadius: Float = 12f,
-    borderWidth: Float = 10f,
+    cornerRadius: Float = 6f,
+    borderWidth: Float = 8f,
     depthAmount: Float = 6f, // Amount of depth for the bottom border
     content: @Composable () -> Unit = {
         Text(
@@ -64,7 +63,7 @@ fun AnimatedBorderButton(
     }
 ) {
     val colors = LocalColors.current
-    val buttonColor = colors.primary
+    val buttonColor = colors.secondary
     val hapticFeedback = LocalHapticFeedback.current
 
     // Animation progress (0.0 to 1.0)
@@ -94,9 +93,6 @@ fun AnimatedBorderButton(
         label = "scale"
     )
 
-    // Track animation completion
-//    var animationCompleted by remember { mutableStateOf(false) }
-
     // Handle button press animation
     LaunchedEffect(isPressed) {
         if (isPressed && !animationCompleted) {
@@ -114,7 +110,6 @@ fun AnimatedBorderButton(
 
             // Animation complete - trigger haptic feedback and mark as completed
             hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
-//            animationCompleted = true
         } else if (!isPressed && !animationCompleted) {
             // Reset animation when not pressed (only if animation wasn't completed)
             animationProgress.snapTo(0f)
@@ -128,7 +123,9 @@ fun AnimatedBorderButton(
     ) {
         // Bottom layer (creates the 3D effect)
         Box(
-            modifier = Modifier.fillMaxHeight().fillMaxWidth()
+            modifier = Modifier
+                .fillMaxHeight()
+                .fillMaxWidth()
                 .zIndex(0f)
                 .offset(y = depthAmount.dp - 2.dp)
         ) {
@@ -148,7 +145,6 @@ fun AnimatedBorderButton(
             }
         }
 
-
         // Top button layer (slides down when pressed)
         Box(
             modifier = Modifier
@@ -158,10 +154,7 @@ fun AnimatedBorderButton(
                     scaleX = scale
                     scaleY = scale
                 }
-                .background(
-                    color = buttonColor,
-                    shape = androidx.compose.foundation.shape.RoundedCornerShape(cornerRadius.dp)
-                )
+                .zIndex(1f)
                 .pointerInput(Unit) {
                     detectTapGestures(
                         onPress = {
@@ -177,21 +170,34 @@ fun AnimatedBorderButton(
                         }
                     )
                 }
-                .zIndex(1f)
         ) {
-            // Button content
+            // Button background (lower z-index)
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .zIndex(1f)
+                    .background(
+                        color = buttonColor,
+                        shape = RoundedCornerShape(cornerRadius.dp)
+                    )
+            )
+
+            // Button content (middle z-index)
             Box(
                 contentAlignment = Alignment.Center,
-                modifier = Modifier.fillMaxSize()
-                    .offset(y = (-1).dp).zIndex(1f)
+                modifier = Modifier
+                    .fillMaxSize()
+                    .offset(y = (-1).dp)
+                    .zIndex(2f)
             ) {
                 content()
             }
 
-            // Animated border
+            // Animated border (highest z-index)
             Canvas(
-                modifier = Modifier.matchParentSize().clip(RoundedCornerShape(cornerRadius.dp))
-                    .background(color = colors.secondary).zIndex(0f)
+                modifier = Modifier
+                    .matchParentSize()
+                    .zIndex(3f)
             ) {
                 val canvasWidth = size.width
                 val canvasHeight = size.height

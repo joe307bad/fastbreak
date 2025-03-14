@@ -25,6 +25,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
@@ -44,14 +45,14 @@ import com.joebad.fastbreak.ui.theme.LocalColors
 
 @Composable
 fun AnimatedBorderButton(
-    buttonColor: Color = Color.White,
+//    buttonColor: Color = Color.White,
     borderColor: Color = Color(0xFF3B82F6), // Blue color
     textColor: Color = Color(0xFF3B82F6),
     bottomBorderColor: Color = Color(0xCC3B82F6), // Slightly darker blue for bottom border
     width: Int = 160,
     height: Int = 60,
     cornerRadius: Float = 12f,
-    borderWidth: Float = 3f,
+    borderWidth: Float = 10f,
     depthAmount: Float = 6f, // Amount of depth for the bottom border
     content: @Composable () -> Unit = {
         Text(
@@ -63,6 +64,7 @@ fun AnimatedBorderButton(
     }
 ) {
     val colors = LocalColors.current
+    val buttonColor = colors.primary
     val hapticFeedback = LocalHapticFeedback.current
 
     // Animation progress (0.0 to 1.0)
@@ -181,13 +183,16 @@ fun AnimatedBorderButton(
             Box(
                 contentAlignment = Alignment.Center,
                 modifier = Modifier.fillMaxSize()
-                    .offset(y = (-1).dp)
+                    .offset(y = (-1).dp).zIndex(1f)
             ) {
                 content()
             }
 
             // Animated border
-            Canvas(modifier = Modifier.matchParentSize()) {
+            Canvas(
+                modifier = Modifier.matchParentSize().clip(RoundedCornerShape(cornerRadius.dp))
+                    .background(color = colors.secondary).zIndex(0f)
+            ) {
                 val canvasWidth = size.width
                 val canvasHeight = size.height
                 val cr = cornerRadius

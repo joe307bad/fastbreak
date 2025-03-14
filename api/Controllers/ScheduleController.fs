@@ -71,5 +71,31 @@ let getTomorrowsSchedulesHandler (database: IMongoDatabase) : HttpHandler =
             return! json schedules next ctx
         }
 
+// Define the record to match the JSON object structure
+type ScheduleResponse = {
+    card: string
+    leaderboard: string
+    statSheet: string
+    week: int
+    season: int
+    day: int
+}
+
+let getScheduleHandler (next: HttpFunc) (ctx: HttpContext) =
+    // Creating a mock response that conforms to the given JSON structure
+    let schedule = {
+        card = "Card A"
+        leaderboard = "Leaderboard B"
+        statSheet = "StatSheet C"
+        week = 12
+        season = 2025
+        day = 15
+    }
+    // Return the schedule as a JSON response
+    json schedule next ctx
+
 let scheduleController database =
-    router { get "/tomorrow" (getTomorrowsSchedulesHandler database) }
+    router {
+        post "/" (getScheduleHandler)
+        get "/" getScheduleHandler
+    }

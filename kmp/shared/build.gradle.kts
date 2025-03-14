@@ -62,6 +62,11 @@ kotlin {
             implementation ("com.google.guava:guava:27.0.1-android")
             implementation("com.google.accompanist:accompanist-systemuicontroller:0.34.0")
             implementation("androidx.datastore:datastore-preferences:1.1.3")
+//            implementation("io.ktor:ktor-client-core:2.3.6")
+            implementation("io.ktor:ktor-client-cio:2.3.6")
+//            implementation("io.ktor:ktor-client-darwin:2.3.6")
+            implementation("io.ktor:ktor-client-serialization:2.3.6")
+            implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.0")
         }
 
         val iosX64Main by getting

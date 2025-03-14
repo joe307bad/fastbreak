@@ -50,6 +50,7 @@ fun PhysicalButton(
     shape: Shape = RectangleShape,
     textSize: Int = 18,
     loading: Boolean = false,
+    zIndex: Float = 0f,
     content: @Composable () -> Unit,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
@@ -66,7 +67,7 @@ fun PhysicalButton(
     val finalContentColor = if (disabled) Color.Black else contentColor
 
     BoxWithConstraints(
-        modifier = modifier.fillMaxWidth().padding(bottom = 2.dp),
+        modifier = modifier.fillMaxWidth().padding(bottom = 2.dp).zIndex(zIndex),
         contentAlignment = Alignment.Center
     ) {
         Box(

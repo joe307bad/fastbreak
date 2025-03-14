@@ -153,14 +153,14 @@ let defaultRouter =
             (router {
                 pipe_through api
                 forward "/schedule" (scheduleController database)
-            })
-
-        // Protected routes
-        forward
-            "/api"
-            (router {
-                pipe_through googleAuthPipeline
-                get "/todos1" Find
+                
+                // Protected routes - nested under the same /api path
+                forward
+                    "/auth"
+                    (router {
+                        pipe_through googleAuthPipeline
+                        get "/todos1" Find
+                    })
             })
     }
 

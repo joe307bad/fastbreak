@@ -15,9 +15,13 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.Icon
 import androidx.compose.material.Text
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -26,6 +30,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
@@ -69,6 +74,10 @@ fun AnimatedBorderButton(
     // Animation progress (0.0 to 1.0)
     val animationProgress = remember { Animatable(0f) }
 
+    // Lock icon animation
+    val lockIconOffsetX = remember { Animatable(-50f) } // Start further off-screen
+    val lockIconAlpha = remember { Animatable(1f) } // Full opacity but clipped
+
     // Button press state
     var isPressed by remember { mutableStateOf(false) }
     // Track animation completion
@@ -93,11 +102,12 @@ fun AnimatedBorderButton(
         label = "scale"
     )
 
-    // Handle button press animation
     LaunchedEffect(isPressed) {
         if (isPressed && !animationCompleted) {
             // Reset animation state
             animationProgress.snapTo(0f)
+            lockIconOffsetX.snapTo(-50f) // Start completely off-screen
+            lockIconAlpha.snapTo(1f) // Full opacity but will be clipped
 
             // Start animation
             animationProgress.animateTo(
@@ -110,9 +120,21 @@ fun AnimatedBorderButton(
 
             // Animation complete - trigger haptic feedback and mark as completed
             hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+            animationCompleted = true
+
+            // Animate lock icon entrance with no bounce
+            lockIconOffsetX.animateTo(
+                targetValue = 0f,
+                animationSpec = tween(
+                    durationMillis = 300,
+                    easing = LinearEasing
+                )
+            )
         } else if (!isPressed && !animationCompleted) {
             // Reset animation when not pressed (only if animation wasn't completed)
             animationProgress.snapTo(0f)
+            lockIconOffsetX.snapTo(-50f)
+            lockIconAlpha.snapTo(1f)
         }
     }
 
@@ -190,7 +212,28 @@ fun AnimatedBorderButton(
                     .offset(y = (-1).dp)
                     .zIndex(2f)
             ) {
+                // Regular content (centered regardless of animation state)
                 content()
+
+                // Lock icon that overlays without affecting layout
+                if (animationCompleted) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .clip(RoundedCornerShape(cornerRadius.dp)) // Clip to button shape
+                            .padding(start = 5.dp) // 5dp from left edge
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Lock,
+                            contentDescription = "Locked",
+                            tint = textColor,
+                            modifier = Modifier
+                                .align(Alignment.CenterStart)
+                                .offset(x = lockIconOffsetX.value.dp)
+                                .graphicsLayer(alpha = lockIconAlpha.value)
+                        )
+                    }
+                }
             }
 
             // Animated border (highest z-index)
@@ -204,47 +247,12 @@ fun AnimatedBorderButton(
                 val cr = cornerRadius
 
                 // Create a rounded rectangle path for the button border
-                // We'll create it with the starting point at the top center
+                // Now we'll create it with the starting point at the bottom center
                 val borderPath = Path().apply {
-                    moveTo(canvasWidth / 2, 0f) // Start at top center
+                    moveTo(canvasWidth / 2, canvasHeight) // Start at bottom center
 
-                    // Top right
-                    lineTo(canvasWidth - cr, 0f)
-                    arcTo(
-                        rect = Rect(
-                            left = canvasWidth - 2 * cr,
-                            top = 0f,
-                            right = canvasWidth,
-                            bottom = 2 * cr
-                        ),
-                        startAngleDegrees = 270f,
-                        sweepAngleDegrees = 90f,
-                        forceMoveTo = false
-                    )
-
-                    // Right side
-                    lineTo(canvasWidth, canvasHeight - cr)
-
-                    // Bottom right corner
-                    arcTo(
-                        rect = Rect(
-                            left = canvasWidth - 2 * cr,
-                            top = canvasHeight - 2 * cr,
-                            right = canvasWidth,
-                            bottom = canvasHeight
-                        ),
-                        startAngleDegrees = 0f,
-                        sweepAngleDegrees = 90f,
-                        forceMoveTo = false
-                    )
-
-                    // Bottom side to center
-                    lineTo(canvasWidth / 2, canvasHeight)
-
-                    // Bottom side from center to left
+                    // Bottom left
                     lineTo(cr, canvasHeight)
-
-                    // Bottom left corner
                     arcTo(
                         rect = Rect(
                             left = 0f,
@@ -273,8 +281,40 @@ fun AnimatedBorderButton(
                         forceMoveTo = false
                     )
 
-                    // Back to top center
-                    lineTo(canvasWidth / 2, 0f)
+                    // Top side
+                    lineTo(canvasWidth - cr, 0f)
+
+                    // Top right corner
+                    arcTo(
+                        rect = Rect(
+                            left = canvasWidth - 2 * cr,
+                            top = 0f,
+                            right = canvasWidth,
+                            bottom = 2 * cr
+                        ),
+                        startAngleDegrees = 270f,
+                        sweepAngleDegrees = 90f,
+                        forceMoveTo = false
+                    )
+
+                    // Right side
+                    lineTo(canvasWidth, canvasHeight - cr)
+
+                    // Bottom right corner
+                    arcTo(
+                        rect = Rect(
+                            left = canvasWidth - 2 * cr,
+                            top = canvasHeight - 2 * cr,
+                            right = canvasWidth,
+                            bottom = canvasHeight
+                        ),
+                        startAngleDegrees = 0f,
+                        sweepAngleDegrees = 90f,
+                        forceMoveTo = false
+                    )
+
+                    // Back to bottom center
+                    lineTo(canvasWidth / 2, canvasHeight)
                 }
 
                 // Create a PathMeasure to get the total length of the path
@@ -283,29 +323,27 @@ fun AnimatedBorderButton(
                 val totalLength = pathMeasure.length
 
                 // Calculate path positions for animation
-                // Start from top center (0) and end at bottom center (totalLength/2)
-                val topCenter = 0f
-                val bottomCenter = totalLength / 2
+                // Start from bottom center (0) and end at top center (totalLength/2)
+                val bottomCenter = 0f
+                val topCenter = totalLength / 2
 
                 // Create paths for the right and left sides
                 val rightPath = Path()
                 val leftPath = Path()
 
                 // Calculate progress for both sides
-                val rightProgress = animationProgress.value * bottomCenter
-                val leftProgress = animationProgress.value * bottomCenter
+                val rightProgress = animationProgress.value * topCenter
+                val leftProgress = animationProgress.value * topCenter
 
-                // Extract the right path (clockwise from top center to bottom center)
+                // Extract the right path (clockwise from bottom center to top center)
                 val rightPathSegment = pathMeasure.getSegment(
-                    startDistance = topCenter,
-                    stopDistance = topCenter + rightProgress,
+                    startDistance = bottomCenter,
+                    stopDistance = bottomCenter + rightProgress,
                     destination = rightPath,
                     startWithMoveTo = true
                 )
 
-                // Extract the left path (counter-clockwise from top center to bottom center)
-                // For this to work properly, we need to go from the end point (totalLength)
-                // and move backwards
+                // Extract the left path (counter-clockwise from bottom center to top center)
                 val leftPathSegment = pathMeasure.getSegment(
                     startDistance = totalLength - leftProgress,
                     stopDistance = totalLength,

@@ -1,3 +1,4 @@
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -24,7 +25,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.joebad.fastbreak.ui.theme.LocalColors
-import com.joebad.fastbreak.ui.theme.darken
 
 @Composable
 fun ThreeSectionLayout(
@@ -193,48 +193,48 @@ fun MyScreen(onDismiss: () -> Unit) {
             }
         },
         footer = {
-            Row {
-                Row(
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .weight(1f),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        PhysicalButton(
-                            bottomBorderColor = darken(colors.secondary, 0.7f),
-                            onClick = { onDismiss() },
-                            elevation = 8.dp,
-                            pressDepth = 4.dp,
-                            backgroundColor = colors.secondary
-                        ) {
-                            Text(
-                                "LOCK CARD",
-                                color = colors.onSecondary,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    }
-                    Spacer(modifier = Modifier.width(5.dp))
-                    Box(
-                        modifier = Modifier
-                            .weight(1f),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        PhysicalButton(
-                            bottomBorderColor = colors.accent,
-                            onClick = { onDismiss() },
-                            elevation = 8.dp,
-                            pressDepth = 4.dp,
-                            borderColor = colors.accent,
-                            backgroundColor = colors.background
-                        ) {
-                            Text("CANCEL", color = colors.onPrimary, fontWeight = FontWeight.Bold)
-                        }
-                    }
-                }
-            }
+//            Row {
+//                Row(
+//                    modifier = Modifier.fillMaxWidth()
+//                ) {
+//                    Box(
+//                        modifier = Modifier
+//                            .weight(1f),
+//                        contentAlignment = Alignment.Center
+//                    ) {
+//                        PhysicalButton(
+//                            bottomBorderColor = darken(colors.secondary, 0.7f),
+//                            onClick = { onDismiss() },
+//                            elevation = 8.dp,
+//                            pressDepth = 4.dp,
+//                            backgroundColor = colors.secondary
+//                        ) {
+//                            Text(
+//                                "LOCK CARD",
+//                                color = colors.onSecondary,
+//                                fontWeight = FontWeight.Bold
+//                            )
+//                        }
+//                    }
+//                    Spacer(modifier = Modifier.width(5.dp))
+//                    Box(
+//                        modifier = Modifier
+//                            .weight(1f),
+//                        contentAlignment = Alignment.Center
+//                    ) {
+//                        PhysicalButton(
+//                            bottomBorderColor = colors.accent,
+//                            onClick = { onDismiss() },
+//                            elevation = 8.dp,
+//                            pressDepth = 4.dp,
+//                            borderColor = colors.accent,
+//                            backgroundColor = colors.background
+//                        ) {
+//                            Text("CANCEL", color = colors.onPrimary, fontWeight = FontWeight.Bold)
+//                        }
+//                    }
+//                }
+//            }
         }
     )
 }

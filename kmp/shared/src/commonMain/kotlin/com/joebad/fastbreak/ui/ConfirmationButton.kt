@@ -1,14 +1,19 @@
-
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.ExperimentalAnimationApi
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.with
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -16,6 +21,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.Icon
@@ -48,40 +54,40 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import com.joebad.fastbreak.ui.theme.LocalColors
 
+@OptIn(ExperimentalAnimationApi::class)
 @Composable
 fun AnimatedBorderButton(
     borderColor: Color = Color(0xFF3B82F6), // Blue color
     textColor: Color = Color(0xFF3B82F6),
     bottomBorderColor: Color = Color(0xCC3B82F6), // Slightly darker blue for bottom border
-    width: Int = 160,
+    width: Int = 200,
     height: Int = 60,
     cornerRadius: Float = 6f,
     borderWidth: Float = 8f,
     depthAmount: Float = 6f, // Amount of depth for the bottom border
-    content: @Composable () -> Unit = {
-        Text(
-            text = "hey",
-            color = textColor,
-            fontSize = 16.sp,
-            fontWeight = FontWeight.Bold
-        )
-    }
+    locked: Boolean = false, // New parameter to initialize in locked state
+    unlockText: String = "Lock Card", // Text when unlocked
+    lockedText: String = "Card Locked", // Text when locked
+    content: @Composable ((isLocked: Boolean) -> Unit)? = null // Modified to receive lock state
 ) {
     val colors = LocalColors.current
     val buttonColor = colors.secondary
     val hapticFeedback = LocalHapticFeedback.current
 
     // Animation progress (0.0 to 1.0)
-    val animationProgress = remember { Animatable(0f) }
+    val animationProgress = remember { Animatable(if (locked) 1f else 0f) }
 
     // Lock icon animation
-    val lockIconOffsetX = remember { Animatable(-50f) } // Start further off-screen
-    val lockIconAlpha = remember { Animatable(1f) } // Full opacity but clipped
+    val lockIconOffsetX = remember { Animatable(if (locked) 0f else -50f) }
+    val lockIconAlpha = remember { Animatable(1f) }
 
     // Button press state
-    var isPressed by remember { mutableStateOf(false) }
+    var isPressed by remember { mutableStateOf(locked) }
     // Track animation completion
-    var animationCompleted by remember { mutableStateOf(false) }
+    var animationCompleted by remember { mutableStateOf(locked) }
+
+    // Text state - simply tied to whether animation is completed
+    val buttonText = if (animationCompleted || locked) lockedText else unlockText
 
     // Animated properties for press effect
     val pressOffset by animateFloatAsState(
@@ -104,10 +110,10 @@ fun AnimatedBorderButton(
 
     LaunchedEffect(isPressed) {
         if (isPressed && !animationCompleted) {
-            // Reset animation state
+            // Reset animation state if needed
             animationProgress.snapTo(0f)
-            lockIconOffsetX.snapTo(-50f) // Start completely off-screen
-            lockIconAlpha.snapTo(1f) // Full opacity but will be clipped
+            lockIconOffsetX.snapTo(-50f)
+            lockIconAlpha.snapTo(1f)
 
             // Start animation
             animationProgress.animateTo(
@@ -122,7 +128,7 @@ fun AnimatedBorderButton(
             hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
             animationCompleted = true
 
-            // Animate lock icon entrance with no bounce
+            // Animate lock icon entrance
             lockIconOffsetX.animateTo(
                 targetValue = 0f,
                 animationSpec = tween(
@@ -130,13 +136,31 @@ fun AnimatedBorderButton(
                     easing = LinearEasing
                 )
             )
+
+            // Text will automatically update since we're using animationCompleted state
         } else if (!isPressed && !animationCompleted) {
             // Reset animation when not pressed (only if animation wasn't completed)
             animationProgress.snapTo(0f)
             lockIconOffsetX.snapTo(-50f)
             lockIconAlpha.snapTo(1f)
+            // Text handled automatically by buttonText
         }
     }
+
+    // Initialize in locked state if required
+    LaunchedEffect(locked) {
+        if (locked && !animationCompleted) {
+            // Set states for locked appearance
+            isPressed = true
+            animationCompleted = true
+
+            // Set animation values directly
+            animationProgress.snapTo(1f)
+            lockIconOffsetX.snapTo(0f)
+        }
+    }
+
+    // No separate effect needed for text - it's directly tied to animationCompleted state
 
     Box(
         modifier = Modifier
@@ -180,13 +204,15 @@ fun AnimatedBorderButton(
                 .pointerInput(Unit) {
                     detectTapGestures(
                         onPress = {
-                            isPressed = true
-                            try {
-                                awaitRelease()
-                            } finally {
-                                // If animation completed, don't change pressed state
-                                if (!animationCompleted) {
-                                    isPressed = false
+                            if (!locked && !animationCompleted) {
+                                isPressed = true
+                                try {
+                                    awaitRelease()
+                                } finally {
+                                    // If animation completed, don't change pressed state
+                                    if (!animationCompleted) {
+                                        isPressed = false
+                                    }
                                 }
                             }
                         }
@@ -209,29 +235,58 @@ fun AnimatedBorderButton(
                 contentAlignment = Alignment.Center,
                 modifier = Modifier
                     .fillMaxSize()
-                    .offset(y = (-1).dp)
                     .zIndex(2f)
             ) {
-                // Regular content (centered regardless of animation state)
-                content()
+                // Use custom content if provided, otherwise use default text
+//                if (content != null) {
+//                    content(animationCompleted)
+//                } else {
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    AnimatedContent(
+                        targetState = if (animationProgress.value >= 0.99f) lockedText else unlockText,
+                        transitionSpec = {
+                            slideInVertically { it } with slideOutVertically { -it }
+                        },
+                        label = "buttonTextTransition"
+                    ) { targetText ->
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            // Show the lock icon only when locked
+                            if (targetText == lockedText) {
+                                Icon(
+                                    imageVector = Icons.Filled.Lock,
+                                    contentDescription = "Lock",
+                                    tint = colors.onSecondary,
+                                    modifier = Modifier.size(17.dp)
+                                ) // Space between text and icon
+                                Spacer(modifier = Modifier.width(10.dp))
+                            }
+                            Text(
+                                text = targetText.uppercase(),
+                                color = colors.onSecondary,
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold,
+//                                modifier = Modifier.padding(top = 2.dp)
+                            )
+                        }
+                    }
+                }
+//                }
 
                 // Lock icon that overlays without affecting layout
                 if (animationCompleted) {
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
-                            .clip(RoundedCornerShape(cornerRadius.dp)) // Clip to button shape
-                            .padding(start = 5.dp) // 5dp from left edge
+                            .clip(RoundedCornerShape(cornerRadius.dp))
+                            .padding(start = 5.dp)
                     ) {
-                        Icon(
-                            imageVector = Icons.Filled.Lock,
-                            contentDescription = "Locked",
-                            tint = textColor,
-                            modifier = Modifier
-                                .align(Alignment.CenterStart)
-                                .offset(x = lockIconOffsetX.value.dp)
-                                .graphicsLayer(alpha = lockIconAlpha.value)
-                        )
+                        // Lock icon would go here
+                        // Originally commented out in the provided code
                     }
                 }
             }

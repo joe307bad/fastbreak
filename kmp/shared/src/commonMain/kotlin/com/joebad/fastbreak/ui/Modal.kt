@@ -1,3 +1,4 @@
+
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -5,6 +6,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -27,8 +29,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import com.joebad.fastbreak.ui.theme.LocalColors
 import kotlin.random.Random
@@ -139,16 +143,31 @@ fun BlurredScreen(open: Boolean, onDismiss: () -> Unit) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.3f)),
+                .background(Color.Black.copy(alpha = 0.5f))
+                .clickable(onClick = { onDismiss() }, indication = null, interactionSource = null),
             contentAlignment = Alignment.Center
         ) {
             Card(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(top = 10.dp, start = 20.dp, end = 20.dp),
-                shape = RoundedCornerShape(topEnd = 16.dp, topStart = 16.dp)
+                    .padding(top = 20.dp, start = 20.dp, end = 20.dp, bottom = 100.dp)
+                    .clickable(onClick = {  }, indication = null, interactionSource = null),
+                shape = RoundedCornerShape(16.dp)
             ) {
                 MyScreen(onDismiss)
+            }
+            Column(modifier = Modifier.padding(20.dp).align(Alignment.BottomCenter)) {
+                AnimatedBorderButton(
+                    borderColor = colors.accent, //darken(colors.accent, 0.7f),
+                    bottomBorderColor = colors.accent //darken(colors.accent, 0.7f)
+                ) {
+                    androidx.compose.material.Text(
+                        text = "LOCK CARD",
+                        color = colors.onSecondary,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
             }
         }
     }

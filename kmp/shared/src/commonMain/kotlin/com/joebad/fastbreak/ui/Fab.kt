@@ -83,8 +83,8 @@ fun FABWithExactShapeBorder(showModal: () -> Unit) {
     FloatingActionButton(
         modifier = preciseBorderModifier.padding(0.dp),
         onClick = { showModal() },
-        backgroundColor = colors.primary,
-        contentColor = colors.onPrimary
+        backgroundColor = colors.secondary,
+        contentColor = colors.onSecondary
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,

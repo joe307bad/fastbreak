@@ -1,3 +1,4 @@
+
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -23,10 +24,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import com.joebad.fastbreak.ui.CardWithBadge
 import com.joebad.fastbreak.ui.TeamCard
@@ -92,7 +91,7 @@ fun QuestionComponent(
                                 shape = buttonShape,
                                 border = BorderStroke(
                                     width = 1.dp,
-                                    color = if (selectedAnswer == answer) colors.secondary else colors.primary
+                                    color = colors.secondary
                                 ),
                                 colors = ButtonDefaults.outlinedButtonColors(
                                     containerColor = if (selectedAnswer == answer) colors.secondary else colors.background
@@ -132,16 +131,6 @@ fun HomeScreen(listState: LazyListState, animatedAlpha: Float, showModal: Mutabl
                 Spacer(
                     modifier = Modifier.height(130.dp)
                 )
-                Column(modifier = Modifier.padding(10.dp)) {
-                    AnimatedBorderButton {
-                        androidx.compose.material.Text(
-                            text = "LOCK CARD",
-                            color = colors.onSecondary,
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                }
                 CardWithBadge(
                     badgeText = "FEATURED PICK-EM",
                     modifier = Modifier.padding(bottom = 30.dp),

@@ -114,7 +114,7 @@ fun QuestionComponent(
 
 
 @Composable
-fun HomeScreen(listState: LazyListState, animatedAlpha: Float, showModal: MutableState<Boolean>) {
+fun HomeScreen(locked: Boolean, listState: LazyListState, animatedAlpha: Float, showModal: MutableState<Boolean>) {
     val colors = LocalColors.current;
 
 
@@ -217,7 +217,7 @@ fun HomeScreen(listState: LazyListState, animatedAlpha: Float, showModal: Mutabl
                     .align(Alignment.BottomCenter)
                     .padding(bottom = 16.dp)
             ) {
-                FABWithExactShapeBorder(showModal = { showModal.value = true })
+                FABWithExactShapeBorder(locked, showModal = { showModal.value = true })
             }
         }
     }

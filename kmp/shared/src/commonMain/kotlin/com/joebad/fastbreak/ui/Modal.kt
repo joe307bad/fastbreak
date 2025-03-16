@@ -1,4 +1,3 @@
-
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -132,7 +131,16 @@ fun ScrollableColumn(content: @Composable () -> Unit) {
 
 
 @Composable
-fun BlurredScreen(open: Boolean, onDismiss: () -> Unit) {
+fun BlurredScreen(
+    locked: Boolean,
+    onLocked: () -> Unit,
+    open: Boolean,
+    onDismiss: () -> Unit,
+    date: String,
+    hideLockCardButton: Boolean = false,
+    title: String = "My Daily Fastbreak Card",
+    showCloseButton: Boolean = false
+) {
     val colors = LocalColors.current;
     AnimatedVisibility(
         modifier = Modifier.zIndex(4f),
@@ -150,23 +158,28 @@ fun BlurredScreen(open: Boolean, onDismiss: () -> Unit) {
             Card(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(top = 20.dp, start = 20.dp, end = 20.dp, bottom = 100.dp)
-                    .clickable(onClick = {  }, indication = null, interactionSource = null),
+                    .padding(top = 20.dp, start = 20.dp, end = 20.dp, bottom = if(hideLockCardButton) 20.dp else 90.dp)
+                    .border(1.dp, colors.accent, RoundedCornerShape(16.dp))
+                    .clickable(onClick = { }, indication = null, interactionSource = null),
                 shape = RoundedCornerShape(16.dp)
             ) {
-                MyScreen(onDismiss)
+                FastbreakCard(title, date, locked, onDismiss, showCloseButton)
             }
-            Column(modifier = Modifier.padding(20.dp).align(Alignment.BottomCenter)) {
-                AnimatedBorderButton(
-                    borderColor = colors.accent, //darken(colors.accent, 0.7f),
-                    bottomBorderColor = colors.accent //darken(colors.accent, 0.7f)
-                ) {
-                    androidx.compose.material.Text(
-                        text = "LOCK CARD",
-                        color = colors.onSecondary,
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold
-                    )
+            if (!hideLockCardButton) {
+                Column(modifier = Modifier.padding(20.dp).align(Alignment.BottomCenter)) {
+                    AnimatedBorderButton(
+                        locked = locked,
+                        onLocked = onLocked,
+                        borderColor = colors.accent, //darken(colors.accent, 0.7f),
+                        bottomBorderColor = colors.accent //darken(colors.accent, 0.7f)
+                    ) {
+                        androidx.compose.material.Text(
+                            text = "LOCK CARD",
+                            color = colors.onSecondary,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
                 }
             }
         }

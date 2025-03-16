@@ -1,3 +1,5 @@
+
+
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -30,10 +32,11 @@ import androidx.compose.ui.unit.dp
 import com.joebad.fastbreak.ui.theme.LocalColors
 import io.github.alexzhirkevich.cupertino.CupertinoIcon
 import io.github.alexzhirkevich.cupertino.icons.CupertinoIcons
+import io.github.alexzhirkevich.cupertino.icons.filled.Lock
 import io.github.alexzhirkevich.cupertino.icons.filled.LockOpen
 
 @Composable
-fun FABWithExactShapeBorder(showModal: () -> Unit) {
+fun FABWithExactShapeBorder(locked: Boolean, showModal: () -> Unit) {
     val colors = LocalColors.current
 
     val infiniteTransition = rememberInfiniteTransition()
@@ -48,7 +51,7 @@ fun FABWithExactShapeBorder(showModal: () -> Unit) {
 
     val segmentLength = 0.50f
 
-    val preciseBorderModifier = Modifier.drawWithCache {
+    val borderModifier = Modifier.drawWithCache {
         val borderPath = Path()
         val outlineShape = CircleShape.createOutline(size, layoutDirection, this)
         borderPath.addOutline(outlineShape)
@@ -57,13 +60,18 @@ fun FABWithExactShapeBorder(showModal: () -> Unit) {
         pathMeasure.setPath(borderPath, true)
 
         val totalLength = pathMeasure.length
-        val dashLength = totalLength * segmentLength
-        val dashPhase = totalLength * progress
 
-        val pathEffect = PathEffect.dashPathEffect(
-            floatArrayOf(dashLength, totalLength - dashLength),
-            dashPhase
-        )
+        // Apply different path effects based on locked state
+        val pathEffect = if (!locked) {
+            val dashLength = totalLength * segmentLength
+            val dashPhase = totalLength * progress
+            PathEffect.dashPathEffect(
+                floatArrayOf(dashLength, totalLength - dashLength),
+                dashPhase
+            )
+        } else {
+            null // No path effect for solid border
+        }
 
         onDrawWithContent {
             drawContent()
@@ -81,7 +89,7 @@ fun FABWithExactShapeBorder(showModal: () -> Unit) {
     }
 
     FloatingActionButton(
-        modifier = preciseBorderModifier.padding(0.dp),
+        modifier = borderModifier.padding(0.dp),
         onClick = { showModal() },
         backgroundColor = colors.secondary,
         contentColor = colors.onSecondary
@@ -91,9 +99,10 @@ fun FABWithExactShapeBorder(showModal: () -> Unit) {
             horizontalArrangement = Arrangement.Center,
             modifier = Modifier.padding(20.dp)
         ) {
+            // Use different icons based on locked state
             CupertinoIcon(
-                imageVector = CupertinoIcons.Filled.LockOpen,
-                contentDescription = "Lock",
+                imageVector = if (locked) CupertinoIcons.Filled.Lock else CupertinoIcons.Filled.LockOpen,
+                contentDescription = if (locked) "Locked" else "Unlocked",
                 tint = colors.onPrimary,
                 modifier = Modifier.size(20.dp)
             )

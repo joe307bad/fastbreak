@@ -57,6 +57,7 @@ import com.joebad.fastbreak.ui.theme.LocalColors
 @OptIn(ExperimentalAnimationApi::class)
 @Composable
 fun AnimatedBorderButton(
+    onLocked: () -> Unit = {},
     borderColor: Color = Color(0xFF3B82F6), // Blue color
     textColor: Color = Color(0xFF3B82F6),
     bottomBorderColor: Color = Color(0xCC3B82F6), // Slightly darker blue for bottom border
@@ -127,6 +128,7 @@ fun AnimatedBorderButton(
             // Animation complete - trigger haptic feedback and mark as completed
             hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
             animationCompleted = true
+            onLocked()
 
             // Animate lock icon entrance
             lockIconOffsetX.animateTo(

@@ -1,4 +1,3 @@
-
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -8,12 +7,10 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.Divider
 import androidx.compose.material.Icon
 import androidx.compose.material.MaterialTheme
@@ -23,6 +20,7 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -32,22 +30,38 @@ import com.joebad.fastbreak.ui.theme.LocalColors
 import com.joebad.fastbreak.ui.theme.darken
 
 data class StatSheetItem(
-    val highlight: Boolean,
+    val statSheetType: StatSheetType,
     val leftColumnText: String,
     val rightColumnText: String,
 )
 
+enum class StatSheetType {
+    Button,
+    MonoSpace
+}
+
 val statSheetItems = listOf(
-    StatSheetItem(true, "1,900,065", "My Week 10 score"),
-    StatSheetItem(false, "10,065", "Days in a row locking in your FastBreak card"),
-    StatSheetItem(false, "365", "Your highest Fastbreak card"),
-    StatSheetItem(false, "123", "Days in a row with a winning pick"),
-    StatSheetItem(false, "34", "Number of perfect Fastbreak cards"),
-    StatSheetItem(false, "87", "Number of weekly wins"),
+    StatSheetItem(StatSheetType.Button, "2,486", "Yesterday's Fastbreak card total"),
+    StatSheetItem(StatSheetType.MonoSpace, "1,900,065", "Current week total\nWeek 11"),
+    StatSheetItem(StatSheetType.MonoSpace, "1,222,486", "Last week's total\nWeek 10"),
+    StatSheetItem(
+        StatSheetType.MonoSpace,
+        "10,065",
+        "Days in a row locking in your FastBreak card"
+    ),
+    StatSheetItem(StatSheetType.MonoSpace, "365", "Your highest Fastbreak card"),
+    StatSheetItem(StatSheetType.MonoSpace, "123", "Days in a row with a winning pick"),
+    StatSheetItem(StatSheetType.MonoSpace, "34", "Number of perfect Fastbreak cards"),
+    StatSheetItem(StatSheetType.MonoSpace, "87", "Number of weekly wins"),
 )
 
 @Composable
-fun StatSheetRow(highlight: Boolean, leftColumnText: String, rightColumnText: String) {
+fun StatSheetRow(
+    statSheetType: StatSheetType,
+    leftColumnText: String,
+    rightColumnText: String,
+    onClick: (Boolean) -> Unit
+) {
     val colors = LocalColors.current;
     Row(
         modifier = Modifier.height(50.dp),
@@ -57,39 +71,77 @@ fun StatSheetRow(highlight: Boolean, leftColumnText: String, rightColumnText: St
             modifier = Modifier.width(100.dp).height(50.dp), //.background(color = Color.Red),
 //            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Box(
-                modifier = Modifier
-                    .background(
-                        if (highlight) colors.secondary else colors.accent,
-                        RoundedCornerShape(8.dp)
-                    )
-                    .height(45.dp)
-                    .fillMaxWidth()
-                    .zIndex(2f),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = leftColumnText,
-                    color = if (highlight) colors.onSecondary else colors.onAccent,
-                    style = MaterialTheme.typography.body1,
-                )
-            }
-            Box(
-                modifier = Modifier
-                    .zIndex(1f)
-                    .width(98.dp)
-                    .offset(y = (-1).dp)
-                    .align(Alignment.BottomCenter)
-//                    .offset(y = (-13).dp)
-                    .background(
-                        if (highlight) darken(
-                            colors.secondary,
-                            0.7f
-                        ) else darken(colors.accent, 0.7f),
-                        shape = RoundedCornerShape(bottomStart = 8.dp, bottomEnd = 8.dp)
-                    )
-            ) {
-                Spacer(modifier = Modifier.height(15.dp))
+            when (statSheetType) {
+                StatSheetType.Button -> {
+                    PhysicalButton(
+                        bottomBorderColor = darken(colors.secondary, 0.7f),
+                        onClick = { onClick(true) },
+                        elevation = 8.dp,
+                        pressDepth = 4.dp,
+                        backgroundColor = colors.secondary
+                    ) {
+                        Text(
+                            text = leftColumnText,
+                            color = colors.onSecondary,
+                            fontFamily = FontFamily.Monospace,
+
+                            )
+                    }
+//                    Box(
+//                        modifier = Modifier
+//                            .background(
+//                                colors.secondary,
+//                                RoundedCornerShape(8.dp)
+//                            )
+//                            .height(45.dp)
+//                            .fillMaxWidth()
+//                            .zIndex(2f),
+//                        contentAlignment = Alignment.Center
+//                    ) {
+//                        Text(
+//                            text = leftColumnText,
+//                            color = colors.onSecondary,
+//                            fontFamily = FontFamily.Monospace,
+//
+//                            )
+//                    }
+//                    Box(
+//                        modifier = Modifier
+//                            .zIndex(1f)
+//                            .width(98.dp)
+//                            .offset(y = (-1).dp)
+//                            .align(Alignment.BottomCenter)
+////                    .offset(y = (-13).dp)
+//                            .background(
+//                                darken(
+//                                    colors.secondary,
+//                                    0.7f
+//                                ),
+//                                shape = RoundedCornerShape(bottomStart = 8.dp, bottomEnd = 8.dp)
+//                            )
+//                    ) {
+//                        Spacer(modifier = Modifier.height(15.dp))
+//                    }
+                }
+
+                StatSheetType.MonoSpace -> {
+                    Box(
+                        modifier = Modifier
+                            .background(
+                                colors.accent,
+                            )
+                            .height(50.dp)
+                            .fillMaxWidth()
+                            .zIndex(2f),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = leftColumnText,
+                            color = colors.onAccent,
+                            fontFamily = FontFamily.Monospace
+                        )
+                    }
+                }
             }
         }
         Spacer(modifier = Modifier.width(10.dp))
@@ -103,6 +155,7 @@ fun StatSheetRow(highlight: Boolean, leftColumnText: String, rightColumnText: St
 
 @Composable
 fun DrawerContent(
+    onShowLastweeksFastbreakCard: () -> Unit,
     themePreference: ThemePreference,
     onToggleTheme: (theme: Theme) -> Unit
 ) {
@@ -155,7 +208,12 @@ fun DrawerContent(
                     Spacer(modifier = Modifier.height(10.dp))
                     LazyColumn {
                         items(statSheetItems) { item ->
-                            StatSheetRow(item.highlight, item.leftColumnText, item.rightColumnText);
+                            StatSheetRow(
+                                item.statSheetType,
+                                item.leftColumnText,
+                                item.rightColumnText,
+                                onClick = { isButton -> if (isButton) onShowLastweeksFastbreakCard() }
+                            );
                             Spacer(modifier = Modifier.height(10.dp))
                         }
                     }

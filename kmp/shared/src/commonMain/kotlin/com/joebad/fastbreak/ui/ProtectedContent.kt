@@ -27,6 +27,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.graphics.graphicsLayer
@@ -55,6 +56,7 @@ fun ProtectedContent(
     val scope = rememberCoroutineScope()
     val colors = LocalColors.current;
 
+    val showLastweeksFastbreakCard = remember { mutableStateOf(false) }
     val showModal = remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
     val scrollState = rememberScrollState()
@@ -69,13 +71,33 @@ fun ProtectedContent(
         targetValue = 1f - scrollOffset,
         label = "Text Fade Animation"
     )
-    BlurredScreen(showModal.value, onDismiss = { showModal.value = false })
+
+    var locked by remember { mutableStateOf(false) }
+
+    BlurredScreen(
+        locked = true,
+        onLocked = { },
+        showLastweeksFastbreakCard.value,
+        onDismiss = { showLastweeksFastbreakCard.value = false },
+        date = "2025-10-11",
+        hideLockCardButton = true,
+        title = "Yesterday's Fastbreak Card",
+        showCloseButton = true
+    )
+    BlurredScreen(
+        locked,
+        onLocked = { locked = true },
+        showModal.value,
+        onDismiss = { showModal.value = false },
+        date = "2025-10-11"
+    )
     ModalDrawer(
         modifier = Modifier.background(color = colors.background)
             .then(if (showModal.value) Modifier.blur(16.dp) else Modifier),
         drawerState = drawerState,
         drawerContent = {
             DrawerContent(
+                onShowLastweeksFastbreakCard = { showLastweeksFastbreakCard.value = true },
                 themePreference = themePreference,
                 onToggleTheme = onToggleTheme
             )
@@ -144,7 +166,7 @@ fun ProtectedContent(
                     Column(modifier = Modifier.zIndex(2f)) {
                         when (child.instance) {
                             is ProtectedComponent.Child.Home -> {
-                                HomeScreen(listState, animatedAlpha, showModal)
+                                HomeScreen(locked, listState, animatedAlpha, showModal)
                             }
 
                             is ProtectedComponent.Child.Leaderboard -> {

@@ -3,6 +3,7 @@ package com.joebad.fastbreak
 import Theme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
+import kotlinx.coroutines.CoroutineDispatcher
 
 interface Platform {
     val name: String
@@ -18,3 +19,6 @@ interface ThemePreference {
     suspend fun saveTheme(theme: Theme)
     suspend fun getTheme(): Theme
 }
+
+
+expect val MainDispatcher: CoroutineDispatcher

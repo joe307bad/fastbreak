@@ -74,6 +74,8 @@ fun ProtectedContent(
 
     var locked by remember { mutableStateOf(false) }
 
+    val fastbreakCard = FastbreakCardViewModel();
+
     BlurredScreen(
         locked = true,
         onLocked = { },
@@ -99,7 +101,8 @@ fun ProtectedContent(
             DrawerContent(
                 onShowLastweeksFastbreakCard = { showLastweeksFastbreakCard.value = true },
                 themePreference = themePreference,
-                onToggleTheme = onToggleTheme
+                onToggleTheme = onToggleTheme,
+                fastbreakCard
             )
         }
     ) {
@@ -166,7 +169,7 @@ fun ProtectedContent(
                     Column(modifier = Modifier.zIndex(2f)) {
                         when (child.instance) {
                             is ProtectedComponent.Child.Home -> {
-                                HomeScreen(locked, listState, animatedAlpha, showModal)
+                                HomeScreen(locked, listState, animatedAlpha, showModal, fastbreakCard)
                             }
 
                             is ProtectedComponent.Child.Leaderboard -> {

@@ -7,6 +7,8 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.platform.Font
 import io.github.alexzhirkevich.cupertino.toUIColor
 import kotbase.ext.toByteArray
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
 import platform.Foundation.NSData
 import platform.Foundation.NSUserDefaults
 import platform.Foundation.dataWithContentsOfFile
@@ -66,3 +68,5 @@ class IosThemePreference : ThemePreference {
         return Theme.values().getOrElse(themeOrdinal) { Theme.Dark }
     }
 }
+
+actual val MainDispatcher: CoroutineDispatcher = Dispatchers.Main

@@ -16,6 +16,8 @@ import androidx.core.view.WindowInsetsControllerCompat
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import java.io.File
 
@@ -108,3 +110,5 @@ class AndroidThemePreference(private val context: Context) : ThemePreference {
         return Theme.values()[preferences[THEME_KEY] ?: Theme.Dark.ordinal]
     }
 }
+
+actual val MainDispatcher: CoroutineDispatcher = Dispatchers.Main

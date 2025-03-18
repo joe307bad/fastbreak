@@ -37,6 +37,7 @@ import com.arkivanov.decompose.ExperimentalDecomposeApi
 import com.arkivanov.decompose.extensions.compose.stack.Children
 import com.arkivanov.decompose.extensions.compose.subscribeAsState
 import com.joebad.fastbreak.ProtectedComponent
+import com.joebad.fastbreak.Theme
 import com.joebad.fastbreak.ThemePreference
 import com.joebad.fastbreak.ui.theme.LocalColors
 import kotlinx.coroutines.launch
@@ -73,6 +74,8 @@ fun ProtectedContent(
     )
 
     var locked by remember { mutableStateOf(false) }
+
+    val fastbreakCard = FastbreakCardViewModel();
 
     BlurredScreen(
         locked = true,

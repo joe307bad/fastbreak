@@ -1,6 +1,5 @@
 package com.joebad.fastbreak.android
 
-import Theme
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -17,6 +16,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import com.joebad.fastbreak.AndroidThemePreference
 import com.joebad.fastbreak.App
+import com.joebad.fastbreak.Theme
 import com.joebad.fastbreak.createRootComponent
 import com.joebad.fastbreak.initFontLoader
 import com.joebad.fastbreak.ui.theme.AppTheme

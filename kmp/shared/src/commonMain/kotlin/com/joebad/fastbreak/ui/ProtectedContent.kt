@@ -37,6 +37,7 @@ import com.arkivanov.decompose.ExperimentalDecomposeApi
 import com.arkivanov.decompose.extensions.compose.stack.Children
 import com.arkivanov.decompose.extensions.compose.subscribeAsState
 import com.joebad.fastbreak.ProtectedComponent
+import com.joebad.fastbreak.Theme
 import com.joebad.fastbreak.ThemePreference
 import com.joebad.fastbreak.ui.theme.LocalColors
 import kotlinx.coroutines.launch
@@ -101,8 +102,7 @@ fun ProtectedContent(
             DrawerContent(
                 onShowLastweeksFastbreakCard = { showLastweeksFastbreakCard.value = true },
                 themePreference = themePreference,
-                onToggleTheme = onToggleTheme,
-                fastbreakCard
+                onToggleTheme = onToggleTheme
             )
         }
     ) {
@@ -169,7 +169,7 @@ fun ProtectedContent(
                     Column(modifier = Modifier.zIndex(2f)) {
                         when (child.instance) {
                             is ProtectedComponent.Child.Home -> {
-                                HomeScreen(locked, listState, animatedAlpha, showModal, fastbreakCard)
+                                HomeScreen(locked, listState, animatedAlpha, showModal)
                             }
 
                             is ProtectedComponent.Child.Leaderboard -> {

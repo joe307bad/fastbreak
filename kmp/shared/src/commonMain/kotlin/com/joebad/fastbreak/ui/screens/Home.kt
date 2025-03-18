@@ -1,10 +1,15 @@
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ButtonDefaults
@@ -17,9 +22,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
+import com.joebad.fastbreak.ui.CardWithBadge
+import com.joebad.fastbreak.ui.TeamCard
 import com.joebad.fastbreak.ui.theme.LocalColors
 
 sealed interface Question {
@@ -105,118 +114,111 @@ fun QuestionComponent(
 
 
 @Composable
-fun HomeScreen(
-    locked: Boolean,
-    listState: LazyListState,
-    animatedAlpha: Float,
-    showModal: MutableState<Boolean>,
-    fastbreakCard: FastbreakCardViewModel
-) {
+fun HomeScreen(locked: Boolean, listState: LazyListState, animatedAlpha: Float, showModal: MutableState<Boolean>) {
     val colors = LocalColors.current;
 
-    FastbreakCardScreen(fastbreakCard)
 
-//    Box(modifier = Modifier.fillMaxSize()) {
-//        LazyColumn(
-//            state = listState,
-//            modifier = Modifier
-//                .fillMaxSize()
-//                .padding(horizontal = 16.dp)
-//                .zIndex(2f),
-//            verticalArrangement = Arrangement.spacedBy(16.dp)
-//        ) {
-//            item {
-//                Spacer(
-//                    modifier = Modifier.height(130.dp)
-//                )
-//                CardWithBadge(
-//                    badgeText = "FEATURED PICK-EM",
-//                    modifier = Modifier.padding(bottom = 30.dp),
-//                    content = { TeamCard("Monday", "Sept. 10th", "@ 1pm") },
-//                    badgeColor = colors.accent,
-//                    badgeTextColor = colors.onAccent,
-//                    points = "1,000"
-//                )
-////                CardWithBadge(
-////                    badgeText = "TRIVIA",
-////                    modifier = Modifier.padding(bottom = 30.dp),
-////                    content = {
-////                        Column {
-////                            QuestionComponent(Question.TrueFalse("Lorem ipsum dolor sit amet, consectetur tempor incididunt ut labore et dolore magna aliqua?"))
-////                        }
-////                    },
-////                    badgeColor = colors.secondary,
-////                    badgeTextColor = colors.onSecondary,
-////                    points = "6,000"
-////                )
+    Box(modifier = Modifier.fillMaxSize()) {
+        LazyColumn(
+            state = listState,
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 16.dp)
+                .zIndex(2f),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            item {
+                Spacer(
+                    modifier = Modifier.height(130.dp)
+                )
+                CardWithBadge(
+                    badgeText = "FEATURED PICK-EM",
+                    modifier = Modifier.padding(bottom = 30.dp),
+                    content = { TeamCard("Monday", "Sept. 10th", "@ 1pm") },
+                    badgeColor = colors.accent,
+                    badgeTextColor = colors.onAccent,
+                    points = "1,000"
+                )
 //                CardWithBadge(
 //                    badgeText = "TRIVIA",
 //                    modifier = Modifier.padding(bottom = 30.dp),
 //                    content = {
 //                        Column {
-//                            QuestionComponent(
-//                                Question.MultipleChoice(
-//                                    "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed doet dolore magna aliqua?",
-//                                    listOf(
-//                                        "Stephen Curry",
-//                                        "Reggie Miller",
-//                                        "Ray Allen",
-//                                        "Paul Pierce"
-//                                    )
-//                                )
-//                            )
+//                            QuestionComponent(Question.TrueFalse("Lorem ipsum dolor sit amet, consectetur tempor incididunt ut labore et dolore magna aliqua?"))
 //                        }
 //                    },
 //                    badgeColor = colors.secondary,
 //                    badgeTextColor = colors.onSecondary,
-//                    points = "2,000"
+//                    points = "6,000"
 //                )
-//                CardWithBadge(
-//                    badgeText = "PICK-EM",
-//                    modifier = Modifier.padding(bottom = 10.dp),
-//                    content = { TeamCard("Monday", "Sept. 10th", "@ 1pm") }
-//                )
-//                CardWithBadge(
-//                    badgeText = "PICK-EM",
-//                    modifier = Modifier.padding(bottom = 10.dp),
-//                    content = { TeamCard("Monday", "Sept. 10th", "@ 1pm") }
-//                )
-//                CardWithBadge(
-//                    badgeText = "PICK-EM",
-//                    modifier = Modifier.padding(bottom = 10.dp),
-//                    content = { TeamCard("Monday", "Sept. 10th", "@ 1pm") }
-//                )
-//                CardWithBadge(
-//                    badgeText = "PICK-EM",
-//                    modifier = Modifier.padding(bottom = 10.dp),
-//                    content = { TeamCard("Monday", "Sept. 10th", "@ 1pm") }
-//                )
-//                Spacer(
-//                    modifier = Modifier.height(100.dp)
-//                )
-//            }
-//        }
-//        Box(modifier = Modifier.zIndex(1f)) {
-//            RoundedBottomHeaderBox(
-//                "FASTBREAK",
-//                "Daily sports pick-em and trivia",
-//                "Season 1 • Week 50 • Day 3",
-//                animatedAlpha = animatedAlpha
-//            )
-//        }
-//        Box(
-//            modifier = Modifier
-//                .fillMaxSize()
-//                .zIndex(3f)
-//        ) {
-//
-//            Box(
-//                modifier = Modifier
-//                    .align(Alignment.BottomCenter)
-//                    .padding(bottom = 16.dp)
-//            ) {
-//                FABWithExactShapeBorder(locked, showModal = { showModal.value = true })
-//            }
-//        }
-//    }
+                CardWithBadge(
+                    badgeText = "TRIVIA",
+                    modifier = Modifier.padding(bottom = 30.dp),
+                    content = {
+                        Column {
+                            QuestionComponent(
+                                Question.MultipleChoice(
+                                    "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed doet dolore magna aliqua?",
+                                    listOf(
+                                        "Stephen Curry",
+                                        "Reggie Miller",
+                                        "Ray Allen",
+                                        "Paul Pierce"
+                                    )
+                                )
+                            )
+                        }
+                    },
+                    badgeColor = colors.secondary,
+                    badgeTextColor = colors.onSecondary,
+                    points = "2,000"
+                )
+                CardWithBadge(
+                    badgeText = "PICK-EM",
+                    modifier = Modifier.padding(bottom = 10.dp),
+                    content = { TeamCard("Monday", "Sept. 10th", "@ 1pm") }
+                )
+                CardWithBadge(
+                    badgeText = "PICK-EM",
+                    modifier = Modifier.padding(bottom = 10.dp),
+                    content = { TeamCard("Monday", "Sept. 10th", "@ 1pm") }
+                )
+                CardWithBadge(
+                    badgeText = "PICK-EM",
+                    modifier = Modifier.padding(bottom = 10.dp),
+                    content = { TeamCard("Monday", "Sept. 10th", "@ 1pm") }
+                )
+                CardWithBadge(
+                    badgeText = "PICK-EM",
+                    modifier = Modifier.padding(bottom = 10.dp),
+                    content = { TeamCard("Monday", "Sept. 10th", "@ 1pm") }
+                )
+                Spacer(
+                    modifier = Modifier.height(100.dp)
+                )
+            }
+        }
+        Box(modifier = Modifier.zIndex(1f)) {
+            RoundedBottomHeaderBox(
+                "FASTBREAK",
+                "Daily sports pick-em and trivia",
+                "Season 1 • Week 50 • Day 3",
+                animatedAlpha = animatedAlpha
+            )
+        }
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .zIndex(3f)
+        ) {
+
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 16.dp)
+            ) {
+                FABWithExactShapeBorder(locked, showModal = { showModal.value = true })
+            }
+        }
+    }
 }

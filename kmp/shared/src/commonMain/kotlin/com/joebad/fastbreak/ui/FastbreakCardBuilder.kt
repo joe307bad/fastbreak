@@ -30,10 +30,8 @@ import androidx.compose.ui.unit.dp
 
 @Composable
 fun FastbreakCardScreen(viewModel: FastbreakCardViewModel) {
-    // Use Orbit's built-in collectAsState
     val state by viewModel.container.stateFlow.collectAsState()
 
-    // Load data when the screen appears
     LaunchedEffect(Unit) {
         viewModel.loadGameStates()
     }
@@ -51,7 +49,6 @@ fun FastbreakCardScreen(viewModel: FastbreakCardViewModel) {
                 modifier = Modifier.padding(bottom = 16.dp)
             )
 
-            // Display loading or content based on state
             if (state.isLoading) {
                 Box(
                     modifier = Modifier
@@ -62,7 +59,6 @@ fun FastbreakCardScreen(viewModel: FastbreakCardViewModel) {
                     CircularProgressIndicator()
                 }
             } else if (state.cards.isEmpty()) {
-                // Empty state
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -72,7 +68,6 @@ fun FastbreakCardScreen(viewModel: FastbreakCardViewModel) {
                     Text("No cards available")
                 }
             } else {
-                // Display cards
                 LazyColumn(
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
@@ -84,7 +79,6 @@ fun FastbreakCardScreen(viewModel: FastbreakCardViewModel) {
                 }
             }
 
-            // Simple UI to force a refresh (useful for debugging)
             Button(
                 onClick = { viewModel.loadGameStates() },
                 modifier = Modifier.padding(top = 16.dp)

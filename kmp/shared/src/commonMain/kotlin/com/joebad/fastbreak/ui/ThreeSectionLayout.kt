@@ -1,3 +1,4 @@
+
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.ExperimentalAnimationApi
@@ -25,10 +26,6 @@ import androidx.compose.material.Text
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -98,24 +95,6 @@ fun AnimatedLockIcon(
             }
         }
     }
-}
-
-/**
- * Usage example - demonstrates how to use the AnimatedLockIcon composable
- */
-@Composable
-fun LockIconDemo() {
-    var isLocked by remember { mutableStateOf(true) }
-
-    // The lock icon with animation
-    AnimatedLockIcon(
-        locked = isLocked,
-        modifier = Modifier.size(48.dp),
-        color = Color.Blue
-    )
-
-    // In a real app, add a way to toggle the state, like:
-    // Button(onClick = { isLocked = !isLocked }) { Text("Toggle") }
 }
 
 @Composable

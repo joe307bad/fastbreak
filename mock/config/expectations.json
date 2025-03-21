@@ -1,0 +1,192 @@
+[
+  {
+    "httpRequest": {
+      "method": "GET",
+      "path": "/api/daily"
+    },
+    "httpResponse": {
+      "statusCode": 200,
+      "body": {
+        "leaderboard": [
+          {
+            "id": "123",
+            "user": "joebad",
+            "points": 1234
+          },
+          {
+            "id": "345",
+            "user": "bilbo-baggins",
+            "points": 1233423
+          },
+          {
+            "id": "456",
+            "user": "legolas",
+            "points": 8979087
+          }
+        ],
+        "fastbreakCard": [
+          {
+            "id": "123",
+            "type": "featured-pick-em",
+            "homeTeam": "Philadelphia Eagles",
+            "homeTeamSubtitle": "1st in the North",
+            "awayTeam": "Pittsburgh Steelers",
+            "awayTeamSubtitle": "1st in the North",
+            "dateLine1": "Monday",
+            "dateLine2": "Sept. 10th",
+            "dateLine3": "@ 1pm",
+            "points": 1000
+          },
+          {
+            "id": "345",
+            "type": "pick-em",
+            "homeTeam": "Chicago Bears",
+            "homeTeamSubtitle": "1st in the North",
+            "awayTeam": "St. Louis Rams",
+            "awayTeamSubtitle": "1st in the North",
+            "dateLine1": "Monday",
+            "dateLine2": "Sept. 10th",
+            "dateLine3": "@ 1pm",
+            "points": 2000
+          },
+          {
+            "id": "567",
+            "type": "trivia-multiple-choice",
+            "question": "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua?",
+            "answer1": "Stephen Curry",
+            "answer2": "Reggie Miller",
+            "answer3": "Ray Allen",
+            "answer4": "Paul Pierce",
+            "correctAnswer": "answer1",
+            "points": 100
+          },
+          {
+            "id": "098",
+            "type": "trivia-tf",
+            "question": "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua?",
+            "correctAnswer": "true",
+            "points": 200
+          }
+        ]
+      }
+    },
+    "times": {
+      "unlimited": true
+    }
+  },
+  {
+    "httpRequest": {
+      "method": "GET",
+      "path": "api/user/123"
+    },
+    "httpResponse": {
+      "statusCode": 200,
+      "body": {
+        "statSheet": {
+          "streaks": [
+            {
+              "text": "Days in a row locking in my Fastbreak card",
+              "value": 1234
+            },
+            {
+              "text": "Days in a row with a correct pick-em",
+              "value": 1234
+            },
+            {
+              "text": "Days in a row with a correct trivia answer",
+              "value": 1234
+            }
+          ],
+          "totals": [
+            {
+              "text": "Yesterday's Fastbreak card total",
+              "value": 12123
+            },
+            {
+              "text": "Current week's total\nWeek 10",
+              "value": 12123
+            },
+            {
+              "text": "Last week's total\nWeek 9",
+              "value": 12123
+            },
+            {
+              "text": "Current season total\n2025",
+              "value": 12123
+            },
+            {
+              "text": "My all-time highest Fastbreak card",
+              "value": 234324
+            },
+            {
+              "text": "Number of weekly wins",
+              "value": 23
+            }
+          ]
+        },
+        "yesterdaysFastbreakCard": {
+          "id": "vRdG6b24dHhB",
+          "total": 123123,
+          "totalPossible": 3223324324,
+          "totalCorrect": 10,
+          "totalWrong": 3,
+          "cards": [
+            {
+              "id": "123",
+              "type": "featured-pick-em",
+              "homeTeam": "Philadelphia Eagles",
+              "homeTeamSubtitle": "1st in the North",
+              "awayTeam": "Pittsburgh Steelers",
+              "awayTeamSubtitle": "1st in the North",
+              "dateLine1": "Monday",
+              "dateLine2": "Sept. 10th",
+              "dateLine3": "@ 1pm",
+              "playerPick": "awayTeam",
+              "points": 1000,
+              "correct": true
+            },
+            {
+              "id": "345",
+              "type": "pick-em",
+              "homeTeam": "Chicago Bears",
+              "homeTeamSubtitle": "1st in the North",
+              "awayTeam": "St. Louis Rams",
+              "awayTeamSubtitle": "1st in the North",
+              "dateLine1": "Monday",
+              "dateLine2": "Sept. 10th",
+              "dateLine3": "@ 1pm",
+              "playerPick": "homeTeam",
+              "points": 2000,
+              "correct": true
+            },
+            {
+              "id": "567",
+              "type": "trivia-multiple-choice",
+              "question": "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua?",
+              "answer1": "Stephen Curry",
+              "answer2": "Reggie Miller",
+              "answer3": "Ray Allen",
+              "answer4": "Paul Pierce",
+              "correctAnswer": "answer1",
+              "playerAnswer": "answer2",
+              "points": 100,
+              "correct": false
+            },
+            {
+              "id": "098",
+              "type": "trivia-tf",
+              "question": "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua?",
+              "correctAnswer": "true",
+              "playerAnswer": "false",
+              "points": 200,
+              "correct": false
+            }
+          ]
+        }
+      }
+    },
+    "times": {
+      "unlimited": true
+    }
+  }
+]

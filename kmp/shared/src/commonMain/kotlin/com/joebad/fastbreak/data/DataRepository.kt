@@ -1,7 +1,5 @@
 
 import io.ktor.client.HttpClient
-import io.ktor.client.request.get
-import io.ktor.client.statement.bodyAsText
 import kotbase.DataSource
 import kotbase.Database
 import kotbase.Meta
@@ -31,11 +29,11 @@ class FastbreakStateRepository(private val db: Database, private val httpClient:
 
     companion object {
         private const val LAST_FETCHED_KEY = "lastFetchedDate"
-        private const val API_URL = "http://10.0.2.2:5000/api/schedule"
+        private const val API_URL = "http://10.0.2.2:1080/api/daily"
         private val FETCH_THRESHOLD = 12 * 60 * 60 // 12 hours in seconds
     }
 
-    suspend fun getDailyFastbreakState(date: String): FastbreakState {
+    suspend fun getDailyFastbreakState(date: String): ApiResponse? {
         val now = Clock.System.now().epochSeconds
         val lastFetchedTime = getLastFetchedTime()
 
@@ -51,7 +49,7 @@ class FastbreakStateRepository(private val db: Database, private val httpClient:
             ?.getLong("timestamp")
     }
 
-    private suspend fun fetchAndStoreState(date: String): FastbreakState {
+    private suspend fun fetchAndStoreState(date: String): ApiResponse? {
         val response = fetchFromApi()
         saveStateToDatabase(date, response)
         saveLastFetchedTime()
@@ -59,12 +57,17 @@ class FastbreakStateRepository(private val db: Database, private val httpClient:
         return response
     }
 
-    private suspend fun fetchFromApi(): FastbreakState {
-        val response: String = httpClient.get(API_URL).bodyAsText()
-        return Json.decodeFromString(response)
+    private suspend fun fetchFromApi(): ApiResponse? {
+//        val response: String = httpClient.get(API_URL).bodyAsText()
+        val apiResponse = getApiResponse(API_URL)
+        apiResponse?.let {
+            println("Leaderboard: ${it.leaderboard}")
+            println("Fastbreak Cards: ${it.fastbreakCard}")
+        }
+        return apiResponse
     }
 
-    private fun saveStateToDatabase(date: String, state: FastbreakState) {
+    private fun saveStateToDatabase(date: String, state: ApiResponse?) {
         val doc = MutableDocument(date)
             .setString("data", Json.encodeToString(state))
 
@@ -78,7 +81,7 @@ class FastbreakStateRepository(private val db: Database, private val httpClient:
         lastFetchedCollection.save(doc)
     }
 
-    private fun getStateFromDatabase(date: String): FastbreakState? {
+    private fun getStateFromDatabase(date: String): ApiResponse? {
         return dailyStateCollection.getDocument(date)
             ?.getString("data")
             ?.let { Json.decodeFromString(it) }

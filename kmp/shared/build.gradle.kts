@@ -66,9 +66,14 @@ kotlin {
             implementation("io.ktor:ktor-client-cio:2.3.6")
 
             implementation("io.ktor:ktor-client-serialization:2.3.6")
+            implementation("io.ktor:ktor-client-content-negotiation:2.3.6")
+            implementation("io.ktor:ktor-serialization-kotlinx-json:2.3.6")
+
             implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.0")
             implementation("org.orbit-mvi:orbit-core:9.0.0")
             implementation("org.orbit-mvi:orbit-compose:9.0.0")
+
+            implementation("com.eygraber:compose-placeholder-material3:1.0.10")
 
         }
 

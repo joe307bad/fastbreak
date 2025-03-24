@@ -7,20 +7,10 @@ import kotbase.MutableDocument
 import kotbase.Ordering
 import kotbase.QueryBuilder
 import kotbase.SelectResult
+import kotlinx.coroutines.delay
 import kotlinx.datetime.Clock
-import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
-
-@Serializable
-data class FastbreakRemoteState(
-    val card: String,
-    val leaderboard: String,
-    val statSheet: String,
-    val week: Int,
-    val season: Int,
-    val day: Int
-)
 
 class FastbreakStateRepository(private val db: Database, private val httpClient: HttpClient) {
 
@@ -30,17 +20,18 @@ class FastbreakStateRepository(private val db: Database, private val httpClient:
     companion object {
         private const val LAST_FETCHED_KEY = "lastFetchedDate"
         private const val API_URL = "http://10.0.2.2:1080/api/daily"
-        private val FETCH_THRESHOLD = 12 * 60 * 60 // 12 hours in seconds
+        private const val FETCH_THRESHOLD = 12 * 60 * 60
     }
 
-    suspend fun getDailyFastbreakState(date: String): ApiResponse? {
+    suspend fun getDailyFastbreakState(date: String): DailyFastbreak? {
         val now = Clock.System.now().epochSeconds
         val lastFetchedTime = getLastFetchedTime()
+        delay(2000)
 
         return if (lastFetchedTime == null || (now - lastFetchedTime) > FETCH_THRESHOLD) {
             fetchAndStoreState(date)
         } else {
-            getStateFromDatabase(date) ?: fetchAndStoreState(date) // Fallback if missing
+            getStateFromDatabase(date) ?: fetchAndStoreState(date)
         }
     }
 
@@ -49,25 +40,24 @@ class FastbreakStateRepository(private val db: Database, private val httpClient:
             ?.getLong("timestamp")
     }
 
-    private suspend fun fetchAndStoreState(date: String): ApiResponse? {
+    private suspend fun fetchAndStoreState(date: String): DailyFastbreak? {
         val response = fetchFromApi()
         saveStateToDatabase(date, response)
         saveLastFetchedTime()
-        enforceMaxDocumentsLimit() // Ensure only 10 documents are stored
+        enforceMaxDocumentsLimit()
         return response
     }
 
-    private suspend fun fetchFromApi(): ApiResponse? {
-//        val response: String = httpClient.get(API_URL).bodyAsText()
-        val apiResponse = getApiResponse(API_URL)
+    private suspend fun fetchFromApi(): DailyFastbreak? {
+        val apiResponse = getDailyFastbreakApi(API_URL)
         apiResponse?.let {
-            println("Leaderboard: ${it.leaderboard}")
-            println("Fastbreak Cards: ${it.fastbreakCard}")
+            println("FASTBREAK-LOG Leaderboard: ${it.leaderboard}")
+            println("FASTBREAK-LOG Fastbreak Cards: ${it.fastbreakCard}")
         }
         return apiResponse
     }
 
-    private fun saveStateToDatabase(date: String, state: ApiResponse?) {
+    private fun saveStateToDatabase(date: String, state: DailyFastbreak?) {
         val doc = MutableDocument(date)
             .setString("data", Json.encodeToString(state))
 
@@ -81,7 +71,7 @@ class FastbreakStateRepository(private val db: Database, private val httpClient:
         lastFetchedCollection.save(doc)
     }
 
-    private fun getStateFromDatabase(date: String): ApiResponse? {
+    private fun getStateFromDatabase(date: String): DailyFastbreak? {
         return dailyStateCollection.getDocument(date)
             ?.getString("data")
             ?.let { Json.decodeFromString(it) }

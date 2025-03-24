@@ -48,7 +48,8 @@ import kotlin.math.min
 fun ProtectedContent(
     component: ProtectedComponent,
     onToggleTheme: (theme: Theme) -> Unit,
-    themePreference: ThemePreference
+    themePreference: ThemePreference,
+    dailyFastbreak: DailyFastbreak?
 ) {
 
     val childStack by component.stack.subscribeAsState()
@@ -169,7 +170,13 @@ fun ProtectedContent(
                     Column(modifier = Modifier.zIndex(2f)) {
                         when (child.instance) {
                             is ProtectedComponent.Child.Home -> {
-                                HomeScreen(locked, listState, animatedAlpha, showModal)
+                                HomeScreen(
+                                    locked,
+                                    listState,
+                                    animatedAlpha,
+                                    showModal,
+                                    dailyFastbreak
+                                )
                             }
 
                             is ProtectedComponent.Child.Leaderboard -> {

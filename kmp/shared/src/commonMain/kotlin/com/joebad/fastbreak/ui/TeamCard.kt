@@ -32,7 +32,15 @@ import com.joebad.fastbreak.ui.theme.LocalColors
 
 
 @Composable
-fun TeamCard(dayOfWeek: String, date: String, time: String) {
+fun TeamCard(
+    dayOfWeek: String?,
+    date: String?,
+    time: String?,
+    homeTeam: String?,
+    homeTeamSubtitle: String?,
+    awayTeam: String?,
+    awayTeamSubtitle: String?
+) {
     val colors = LocalColors.current;
     var selectedRowIndex by remember { mutableStateOf(-1) }
     Row(modifier = Modifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
@@ -41,15 +49,15 @@ fun TeamCard(dayOfWeek: String, date: String, time: String) {
                 .weight(3f)
         ) {
             SelectableRow(
-                text = "Philadeplhia Eagles",
-                subText = "1st in the universe",
+                text = awayTeam ?: "",
+                subText =  awayTeamSubtitle ?: "",
                 selected = selectedRowIndex == 1,
                 onSelect = { selectedRowIndex = 1 },
                 highlightColor = colors.accent
             )
             SelectableRow(
-                text = "Pittsburgh Steelers",
-                subText = "Last in the North, verge of bankruptcy",
+                text = homeTeam ?: "",
+                subText =  homeTeamSubtitle ?: "",
                 selected = selectedRowIndex == 0,
                 onSelect = { selectedRowIndex = 0 },
                 highlightColor = colors.accent
@@ -62,7 +70,7 @@ fun TeamCard(dayOfWeek: String, date: String, time: String) {
                 .fillMaxHeight()
                 .padding(start = 12.dp)
         ) {
-            Text(dayOfWeek, fontSize = 14.sp, color = colors.text)
+            Text(dayOfWeek ?: "", fontSize = 14.sp, color = colors.text)
             Text(
                 "$date $time", style = TextStyle(
                     fontSize = 14.sp,

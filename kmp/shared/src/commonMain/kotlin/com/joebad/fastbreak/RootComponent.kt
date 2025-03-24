@@ -1,5 +1,7 @@
 package com.joebad.fastbreak
 
+import DailyFastbreak
+import FastbreakStateRepository
 import ProtectedContent
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -12,6 +14,12 @@ import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Surface
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -31,6 +39,12 @@ import com.arkivanov.decompose.router.stack.replaceAll
 import com.arkivanov.decompose.value.Value
 import com.arkivanov.essenty.lifecycle.LifecycleRegistry
 import com.joebad.fastbreak.ui.theme.LocalColors
+import io.ktor.client.HttpClient
+import kotbase.Database
+import kotlinx.coroutines.launch
+import kotlinx.datetime.Clock
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
 
 fun shouldEnforceLogin(): Boolean {
     return !BuildKonfig.IS_DEBUG
@@ -161,6 +175,39 @@ fun App(
     themePreference: ThemePreference
 ) {
     val colors = LocalColors.current;
+
+
+    try {
+//        Database.delete("fastbreak")
+    } catch(e: Exception) {
+        println("Database already deleted")
+    }
+
+    val db = Database("fastbreak");
+
+    val dailyFastbreakRepository = FastbreakStateRepository(
+        db,
+        HttpClient()
+    )
+
+    var fastbreakState by remember { mutableStateOf<DailyFastbreak?>(null) }
+    var error by remember { mutableStateOf<String?>(null) }
+    val coroutineScope = rememberCoroutineScope()
+
+    val currentDate =
+        Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date.toString()
+
+    LaunchedEffect(key1 = Unit) {
+        coroutineScope.launch {
+            try {
+                fastbreakState = dailyFastbreakRepository.getDailyFastbreakState(currentDate)
+                print(fastbreakState);
+            } catch (e: Exception) {
+                error = "Failed to fetch state: ${e.message}"
+            }
+        }
+    }
+
     MaterialTheme {
         Surface(color = colors.background) {
             val childStack = rootComponent.stack.subscribeAsState()
@@ -174,7 +221,8 @@ fun App(
                     is RootComponent.Child.Protected -> ProtectedContent(
                         instance.component,
                         onToggleTheme,
-                        themePreference = themePreference
+                        themePreference = themePreference,
+                        fastbreakState
                     )
                 }
             }

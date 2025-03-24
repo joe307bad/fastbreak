@@ -34,13 +34,13 @@ data class EmptyFastbreakCardItem(
 
 
 @Serializable
-data class ApiResponse(
+data class DailyFastbreak(
     val leaderboard: List<LeaderboardItem>,
     val fastbreakCard: List<EmptyFastbreakCardItem>
 )
 
 
-suspend fun getApiResponse(url: String): ApiResponse? {
+suspend fun getDailyFastbreakApi(url: String): DailyFastbreak? {
     val client = HttpClient {
         install(ContentNegotiation) {
             json(Json {
@@ -52,7 +52,7 @@ suspend fun getApiResponse(url: String): ApiResponse? {
 
 
     return try {
-        client.get(url).body<ApiResponse>()
+        client.get(url).body<DailyFastbreak>()
     } catch (e: Exception) {
         println("Error fetching data: ${e.message}")
         null
@@ -60,11 +60,3 @@ suspend fun getApiResponse(url: String): ApiResponse? {
         client.close()
     }
 }
-
-
-// Example usage (in a Ktor route or other suspending context):
-// val apiResponse = getApiResponse("https://example.com/api/data")
-// apiResponse?.let {
-//  println("Leaderboard: ${it.leaderboard}")
-//  println("Fastbreak Cards: ${it.fastbreakCard}")
-// }

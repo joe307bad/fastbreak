@@ -49,7 +49,8 @@ fun ProtectedContent(
     component: ProtectedComponent,
     onToggleTheme: (theme: Theme) -> Unit,
     themePreference: ThemePreference,
-    dailyFastbreak: DailyFastbreak?
+    dailyFastbreak: DailyFastbreak?,
+    viewModel: FastbreakViewModel
 ) {
 
     val childStack by component.stack.subscribeAsState()
@@ -75,8 +76,6 @@ fun ProtectedContent(
     )
 
     var locked by remember { mutableStateOf(false) }
-
-    val fastbreakCard = FastbreakCardViewModel();
 
     BlurredScreen(
         locked = true,
@@ -175,7 +174,8 @@ fun ProtectedContent(
                                     listState,
                                     animatedAlpha,
                                     showModal,
-                                    dailyFastbreak
+                                    dailyFastbreak,
+                                    viewModel
                                 )
                             }
 

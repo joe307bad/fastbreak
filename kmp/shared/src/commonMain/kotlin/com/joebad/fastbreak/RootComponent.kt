@@ -2,6 +2,7 @@ package com.joebad.fastbreak
 
 import DailyFastbreak
 import FastbreakStateRepository
+import FastbreakViewModel
 import ProtectedContent
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -176,10 +177,9 @@ fun App(
 ) {
     val colors = LocalColors.current;
 
-
     try {
 //        Database.delete("fastbreak")
-    } catch(e: Exception) {
+    } catch (e: Exception) {
         println("Database already deleted")
     }
 
@@ -191,6 +191,7 @@ fun App(
     )
 
     var fastbreakState by remember { mutableStateOf<DailyFastbreak?>(null) }
+    val viewModel = remember { FastbreakViewModel() }
     var error by remember { mutableStateOf<String?>(null) }
     val coroutineScope = rememberCoroutineScope()
 
@@ -222,7 +223,8 @@ fun App(
                         instance.component,
                         onToggleTheme,
                         themePreference = themePreference,
-                        fastbreakState
+                        fastbreakState,
+                        viewModel
                     )
                 }
             }

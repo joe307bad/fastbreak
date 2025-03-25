@@ -1,4 +1,3 @@
-
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Spacer
@@ -9,6 +8,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -21,9 +21,11 @@ fun FastbreakHome(
     listState: LazyListState,
     animatedAlpha: Float,
     showModal: MutableState<Boolean>,
-    dailyFastbreak: DailyFastbreak?
+    dailyFastbreak: DailyFastbreak?,
+    fastbreakViewModel: FastbreakViewModel
 ) {
 
+    val totalPoints = fastbreakViewModel.container.stateFlow.collectAsState().value.totalPoints;
     Box(modifier = Modifier.fillMaxSize()) {
         LazyColumn(
             state = listState,
@@ -40,7 +42,7 @@ fun FastbreakHome(
                 if (dailyFastbreak == null)
                     LoadingDailyFastbreak()
                 else
-                    FastbreakHomeList(dailyFastbreak)
+                    FastbreakHomeList(dailyFastbreak, fastbreakViewModel)
             }
         }
         Box(modifier = Modifier.zIndex(1f)) {
@@ -57,13 +59,17 @@ fun FastbreakHome(
                 .zIndex(3f)
         ) {
 
-            if(dailyFastbreak != null)
+            if (dailyFastbreak != null)
                 Box(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .padding(bottom = 16.dp)
                 ) {
-                    FABWithExactShapeBorder(locked, showModal = { showModal.value = true })
+                    FABWithExactShapeBorder(
+                        locked,
+                        showModal = { showModal.value = true },
+                        totalPoints
+                    )
                 }
         }
     }

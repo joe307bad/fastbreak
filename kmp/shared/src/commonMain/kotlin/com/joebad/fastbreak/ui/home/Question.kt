@@ -1,3 +1,4 @@
+
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -6,14 +7,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.ElevatedButton
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -29,9 +25,11 @@ sealed interface Question {
 
 @Composable
 fun QuestionComponent(
-    question: Question
+    question: Question,
+    selectedAnswer: String? = null,
+    onAnswerSelected: (String) -> Unit
 ) {
-    var selectedAnswer by remember { mutableStateOf<String?>(null) }
+//    var selectedAnswer by remember { mutableStateOf<String?>(null) }
     val colors = LocalColors.current;
 
     Column {
@@ -53,12 +51,16 @@ fun QuestionComponent(
             horizontalArrangement = Arrangement.SpaceEvenly
         ) {
             when (question) {
-                is Question.TrueFalse -> answers?.forEach { answer ->
-                    ElevatedButton(
-                        onClick = { selectedAnswer = answer },
+                is Question.TrueFalse -> answers.forEach { answer ->
+                    OutlinedButton(
+                        onClick = { onAnswerSelected(answer ?: "") },
                         modifier = Modifier.weight(1f).padding(4.dp),
-                        colors = ButtonDefaults.elevatedButtonColors(
-                            containerColor = if (selectedAnswer == answer) colors.secondary else colors.primary
+                        border = BorderStroke(
+                            width = 1.dp,
+                            color = colors.secondary
+                        ),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            containerColor = if (selectedAnswer == answer) colors.secondary else colors.background
                         )
                     ) {
                         if (answer != null) {
@@ -73,9 +75,9 @@ fun QuestionComponent(
                 is Question.MultipleChoice -> {
                     val buttonShape = RoundedCornerShape(50.dp)   // Define the shape once
                     Column {
-                        answers?.forEach { answer ->
+                        answers.forEach { answer ->
                             OutlinedButton(
-                                onClick = { selectedAnswer = answer },
+                                onClick = { onAnswerSelected(answer ?: "") },
                                 modifier = Modifier.fillMaxWidth(1f).padding(4.dp),
                                 shape = buttonShape,
                                 border = BorderStroke(

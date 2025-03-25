@@ -72,9 +72,7 @@ fun CardWithBadge(
     content: @Composable () -> Unit,
     badgeColor: Color? = null,
     badgeTextColor: Color? = null,
-    points: String = "100",
-    selectedAnswer: String? = null,
-    onAnswerSelected: (String) -> Unit
+    points: String = "100"
 ) {
     val colors = LocalColors.current;
     Card(

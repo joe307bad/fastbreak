@@ -17,9 +17,6 @@ import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -39,10 +36,11 @@ fun TeamCard(
     homeTeam: String?,
     homeTeamSubtitle: String?,
     awayTeam: String?,
-    awayTeamSubtitle: String?
+    awayTeamSubtitle: String?,
+    selectedAnswer: String? = null,
+    onAnswerSelected: (String) -> Unit
 ) {
     val colors = LocalColors.current;
-    var selectedRowIndex by remember { mutableStateOf(-1) }
     Row(modifier = Modifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
         Column(
             modifier = Modifier
@@ -51,15 +49,15 @@ fun TeamCard(
             SelectableRow(
                 text = awayTeam ?: "",
                 subText =  awayTeamSubtitle ?: "",
-                selected = selectedRowIndex == 1,
-                onSelect = { selectedRowIndex = 1 },
+                selected = selectedAnswer == awayTeam,
+                onSelect = { onAnswerSelected(awayTeam ?: "") },
                 highlightColor = colors.accent
             )
             SelectableRow(
                 text = homeTeam ?: "",
                 subText =  homeTeamSubtitle ?: "",
-                selected = selectedRowIndex == 0,
-                onSelect = { selectedRowIndex = 0 },
+                selected = selectedAnswer == homeTeam,
+                onSelect = { onAnswerSelected(homeTeam ?: "") },
                 highlightColor = colors.accent
             )
         }

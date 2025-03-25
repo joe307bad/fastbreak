@@ -1,4 +1,3 @@
-
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.cancel
@@ -11,14 +10,16 @@ import org.orbitmvi.orbit.container
  */
 data class FastbreakSelection(
     val id: String,
-    val userAnswer: String
+    val userAnswer: String,
+    val points: Int
 )
 
 /**
  * State class that holds the current list of user selections
  */
 data class FastbreakSelectionState(
-    val selections: List<FastbreakSelection> = emptyList()
+    val selections: List<FastbreakSelection> = emptyList(),
+    val totalPoints: Int = 0
 )
 
 /**
@@ -29,7 +30,8 @@ sealed class FastbreakSideEffect {
     data class SelectionUpdated(val selection: FastbreakSelection) : FastbreakSideEffect()
 }
 
-class FastbreakViewModel : ContainerHost<FastbreakSelectionState, FastbreakSideEffect>, CoroutineScope by MainScope() {
+class FastbreakViewModel() : ContainerHost<FastbreakSelectionState, FastbreakSideEffect>,
+    CoroutineScope by MainScope() {
 
     // Initialize the Orbit container with initial state
     override val container: Container<FastbreakSelectionState, FastbreakSideEffect> = container(
@@ -42,13 +44,14 @@ class FastbreakViewModel : ContainerHost<FastbreakSelectionState, FastbreakSideE
      * @param cardId The ID of the EmptyFastbreakCardItem
      * @param userAnswer The user's answer (one of answer1-4, "true"/"false", or "homeTeam"/"awayTeam")
      */
-    fun updateSelection(cardId: String, userAnswer: String) = intent {
+    fun updateSelection(cardId: String, userAnswer: String, points: Int) = intent {
         val currentSelections = state.selections
         val existingSelectionIndex = currentSelections.indexOfFirst { it.id == cardId }
 
         val selection = FastbreakSelection(
             id = cardId,
-            userAnswer = userAnswer
+            userAnswer = userAnswer,
+            points
         )
 
         if (existingSelectionIndex != -1) {
@@ -56,10 +59,11 @@ class FastbreakViewModel : ContainerHost<FastbreakSelectionState, FastbreakSideE
             val updatedSelections = currentSelections.toMutableList().apply {
                 set(existingSelectionIndex, selection)
             }
+            val newTotalPoints = updatedSelections.sumOf { it.points }
 
             // Update state with the new list
             reduce {
-                state.copy(selections = updatedSelections)
+                state.copy(selections = updatedSelections, totalPoints = newTotalPoints)
             }
 
             // Post side effect for selection update
@@ -67,10 +71,11 @@ class FastbreakViewModel : ContainerHost<FastbreakSelectionState, FastbreakSideE
         } else {
             // Add new selection
             val updatedSelections = currentSelections + selection
+            val newTotalPoints = updatedSelections.sumOf { it.points }
 
             // Update state with the new list
             reduce {
-                state.copy(selections = updatedSelections)
+                state.copy(selections = updatedSelections, totalPoints = newTotalPoints)
             }
 
             // Post side effect for selection addition

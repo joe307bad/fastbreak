@@ -1,4 +1,3 @@
-
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableState
@@ -9,7 +8,15 @@ fun HomeScreen(
     listState: LazyListState,
     animatedAlpha: Float,
     showModal: MutableState<Boolean>,
-    dailyFastbreak: DailyFastbreak?
+    dailyFastbreak: DailyFastbreak?,
+    viewModel: FastbreakViewModel
 ) {
-    FastbreakHome(locked, listState, animatedAlpha, showModal, dailyFastbreak)
+    FastbreakHome(
+        locked,
+        listState,
+        animatedAlpha,
+        showModal,
+        dailyFastbreak,
+        viewModel
+    )
 }

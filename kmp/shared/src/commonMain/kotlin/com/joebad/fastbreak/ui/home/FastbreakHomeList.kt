@@ -18,11 +18,15 @@ import com.joebad.fastbreak.ui.TeamCard
 import com.joebad.fastbreak.ui.theme.LocalColors
 
 @Composable
-fun FastbreakHomeList(dailyFastbreak: DailyFastbreak?) {
+fun FastbreakHomeList(dailyFastbreak: DailyFastbreak?, viewModel: FastbreakViewModel) {
     val colors = LocalColors.current;
 
-    val viewModel = FastbreakViewModel()
+//    val viewModel = FastbreakViewModel()
     val state by viewModel.container.stateFlow.collectAsState()
+
+    state.let {
+        println("FASTBREAK-LOG $state");
+    }
 
     if (dailyFastbreak?.fastbreakCard == null)
         throw Exception("DailyFastbreak is null");
@@ -41,22 +45,23 @@ fun FastbreakHomeList(dailyFastbreak: DailyFastbreak?) {
                             item.homeTeam,
                             item.homeTeamSubtitle,
                             item.awayTeam,
-                            item.awayTeamSubtitle
+                            item.awayTeamSubtitle,
+                            selectedAnswer = state.selections.find { it.id == item.id }?.userAnswer,
+                            onAnswerSelected = { answer ->
+                                viewModel.updateSelection(item.id, answer, item.points)
+                            }
                         )
                     },
                     badgeColor = colors.accent,
                     badgeTextColor = colors.onAccent,
-                    points = "1,000",
-                    selectedAnswer = state.selections.find { it.id == item.id }?.userAnswer,
-                    onAnswerSelected = { answer ->
-                        viewModel.updateSelection(item.id, answer)
-                    }
+                    points = item.points.toString()
                 )
 
             "pick-em" ->
                 CardWithBadge(
                     badgeText = "PICK-EM",
                     modifier = Modifier.padding(bottom = 10.dp),
+                    points = item.points.toString(),
                     content = {
                         TeamCard(
                             item.dateLine1,
@@ -65,12 +70,12 @@ fun FastbreakHomeList(dailyFastbreak: DailyFastbreak?) {
                             item.homeTeam,
                             item.homeTeamSubtitle,
                             item.awayTeam,
-                            item.awayTeamSubtitle
+                            item.awayTeamSubtitle,
+                            selectedAnswer = state.selections.find { it.id == item.id }?.userAnswer,
+                            onAnswerSelected = { answer ->
+                                viewModel.updateSelection(item.id, answer, item.points)
+                            }
                         )
-                    },
-                    selectedAnswer = state.selections.find { it.id == item.id }?.userAnswer,
-                    onAnswerSelected = { answer ->
-                        viewModel.updateSelection(item.id, answer)
                     }
                 )
 
@@ -89,17 +94,17 @@ fun FastbreakHomeList(dailyFastbreak: DailyFastbreak?) {
                                         item.answer3,
                                         item.answer4
                                     )
-                                )
+                                ),
+                                selectedAnswer = state.selections.find { it.id == item.id }?.userAnswer,
+                                onAnswerSelected = { answer ->
+                                    viewModel.updateSelection(item.id, answer, item.points)
+                                }
                             )
                         }
                     },
                     badgeColor = colors.secondary,
                     badgeTextColor = colors.onSecondary,
-                    points = "2,000",
-                    selectedAnswer = state.selections.find { it.id == item.id }?.userAnswer,
-                    onAnswerSelected = { answer ->
-                        viewModel.updateSelection(item.id, answer)
-                    }
+                    points = item.points.toString()
                 )
 
             "trivia-tf" ->
@@ -111,17 +116,17 @@ fun FastbreakHomeList(dailyFastbreak: DailyFastbreak?) {
                             QuestionComponent(
                                 Question.TrueFalse(
                                     item.question
-                                )
+                                ),
+                                selectedAnswer = state.selections.find { it.id == item.id }?.userAnswer,
+                                onAnswerSelected = { answer ->
+                                    viewModel.updateSelection(item.id, answer, item.points)
+                                }
                             )
                         }
                     },
                     badgeColor = colors.secondary,
                     badgeTextColor = colors.onSecondary,
-                    points = "2,000",
-                    selectedAnswer = state.selections.find { it.id == item.id }?.userAnswer,
-                    onAnswerSelected = { answer ->
-                        viewModel.updateSelection(item.id, answer)
-                    }
+                    points = item.points.toString()
                 )
 
             else -> println("Unknown Type")

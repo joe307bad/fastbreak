@@ -83,8 +83,6 @@ fun AnimatedBorderButton(
     var isPressed by remember { mutableStateOf(locked) }
     var animationCompleted by remember { mutableStateOf(locked) }
 
-    val buttonText = if (animationCompleted || locked) lockedText else unlockText
-
     val pressOffset by animateFloatAsState(
         targetValue = if (isPressed || animationCompleted) depthAmount * 0.85f else 0f,
         animationSpec = spring(

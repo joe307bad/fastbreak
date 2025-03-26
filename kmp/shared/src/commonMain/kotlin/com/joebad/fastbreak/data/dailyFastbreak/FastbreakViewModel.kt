@@ -11,7 +11,9 @@ import org.orbitmvi.orbit.container
 data class FastbreakSelection(
     val id: String,
     val userAnswer: String,
-    val points: Int
+    val points: Int,
+    val description: String,
+    val type: String
 )
 
 /**
@@ -44,44 +46,47 @@ class FastbreakViewModel() : ContainerHost<FastbreakSelectionState, FastbreakSid
      * @param cardId The ID of the EmptyFastbreakCardItem
      * @param userAnswer The user's answer (one of answer1-4, "true"/"false", or "homeTeam"/"awayTeam")
      */
-    fun updateSelection(cardId: String, userAnswer: String, points: Int) = intent {
-        val currentSelections = state.selections
-        val existingSelectionIndex = currentSelections.indexOfFirst { it.id == cardId }
+    fun updateSelection(cardId: String, userAnswer: String, points: Int, description: String, type: String) =
+        intent {
+            val currentSelections = state.selections
+            val existingSelectionIndex = currentSelections.indexOfFirst { it.id == cardId }
 
-        val selection = FastbreakSelection(
-            id = cardId,
-            userAnswer = userAnswer,
-            points
-        )
+            val selection = FastbreakSelection(
+                id = cardId,
+                userAnswer = userAnswer,
+                points,
+                description,
+                type
+            )
 
-        if (existingSelectionIndex != -1) {
-            // Update existing selection
-            val updatedSelections = currentSelections.toMutableList().apply {
-                set(existingSelectionIndex, selection)
+            if (existingSelectionIndex != -1) {
+                // Update existing selection
+                val updatedSelections = currentSelections.toMutableList().apply {
+                    set(existingSelectionIndex, selection)
+                }
+                val newTotalPoints = updatedSelections.sumOf { it.points }
+
+                // Update state with the new list
+                reduce {
+                    state.copy(selections = updatedSelections, totalPoints = newTotalPoints)
+                }
+
+                // Post side effect for selection update
+                postSideEffect(FastbreakSideEffect.SelectionUpdated(selection))
+            } else {
+                // Add new selection
+                val updatedSelections = currentSelections + selection
+                val newTotalPoints = updatedSelections.sumOf { it.points }
+
+                // Update state with the new list
+                reduce {
+                    state.copy(selections = updatedSelections, totalPoints = newTotalPoints)
+                }
+
+                // Post side effect for selection addition
+                postSideEffect(FastbreakSideEffect.SelectionAdded(selection))
             }
-            val newTotalPoints = updatedSelections.sumOf { it.points }
-
-            // Update state with the new list
-            reduce {
-                state.copy(selections = updatedSelections, totalPoints = newTotalPoints)
-            }
-
-            // Post side effect for selection update
-            postSideEffect(FastbreakSideEffect.SelectionUpdated(selection))
-        } else {
-            // Add new selection
-            val updatedSelections = currentSelections + selection
-            val newTotalPoints = updatedSelections.sumOf { it.points }
-
-            // Update state with the new list
-            reduce {
-                state.copy(selections = updatedSelections, totalPoints = newTotalPoints)
-            }
-
-            // Post side effect for selection addition
-            postSideEffect(FastbreakSideEffect.SelectionAdded(selection))
         }
-    }
 
     /**
      * Returns the current user selection for a given card ID, or null if not selected

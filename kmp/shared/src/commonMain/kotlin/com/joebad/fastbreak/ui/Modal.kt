@@ -126,7 +126,8 @@ fun BlurredScreen(
     date: String,
     hideLockCardButton: Boolean = false,
     title: String = "My Daily Fastbreak Card",
-    showCloseButton: Boolean = false
+    showCloseButton: Boolean = false,
+    fastbreakViewModel: FastbreakViewModel? = null
 ) {
     val colors = LocalColors.current;
     AnimatedVisibility(
@@ -150,7 +151,7 @@ fun BlurredScreen(
                     .clickable(onClick = { }, indication = null, interactionSource = null),
                 shape = RoundedCornerShape(16.dp)
             ) {
-                FastbreakCard(title, date, locked, onDismiss, showCloseButton)
+                FastbreakCard(title, date, locked, onDismiss, showCloseButton, fastbreakViewModel)
             }
             if (!hideLockCardButton) {
                 Column(modifier = Modifier.padding(20.dp).align(Alignment.BottomCenter)) {

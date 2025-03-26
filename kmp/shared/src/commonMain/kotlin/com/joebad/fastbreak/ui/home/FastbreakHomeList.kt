@@ -48,7 +48,15 @@ fun FastbreakHomeList(dailyFastbreak: DailyFastbreak?, viewModel: FastbreakViewM
                             item.awayTeamSubtitle,
                             selectedAnswer = state.selections.find { it.id == item.id }?.userAnswer,
                             onAnswerSelected = { answer ->
-                                viewModel.updateSelection(item.id, answer, item.points)
+                                val userLoser =
+                                    if (answer == item.homeTeam) item.awayTeam else item.homeTeam
+                                viewModel.updateSelection(
+                                    item.id,
+                                    answer,
+                                    item.points,
+                                    "$answer to win against $userLoser",
+                                    "FEATURED PICK-EM"
+                                )
                             }
                         )
                     },
@@ -73,7 +81,15 @@ fun FastbreakHomeList(dailyFastbreak: DailyFastbreak?, viewModel: FastbreakViewM
                             item.awayTeamSubtitle,
                             selectedAnswer = state.selections.find { it.id == item.id }?.userAnswer,
                             onAnswerSelected = { answer ->
-                                viewModel.updateSelection(item.id, answer, item.points)
+                                val userLoser =
+                                    if (answer == item.homeTeam) item.awayTeam else item.homeTeam
+                                viewModel.updateSelection(
+                                    item.id,
+                                    answer,
+                                    item.points,
+                                    "$answer to win against $userLoser",
+                                    "PICK-EM"
+                                )
                             }
                         )
                     }
@@ -97,7 +113,13 @@ fun FastbreakHomeList(dailyFastbreak: DailyFastbreak?, viewModel: FastbreakViewM
                                 ),
                                 selectedAnswer = state.selections.find { it.id == item.id }?.userAnswer,
                                 onAnswerSelected = { answer ->
-                                    viewModel.updateSelection(item.id, answer, item.points)
+                                    viewModel.updateSelection(
+                                        item.id,
+                                        answer,
+                                        item.points,
+                                        "${item.question} - $answer",
+                                        "TRIVIA"
+                                    )
                                 }
                             )
                         }
@@ -119,7 +141,13 @@ fun FastbreakHomeList(dailyFastbreak: DailyFastbreak?, viewModel: FastbreakViewM
                                 ),
                                 selectedAnswer = state.selections.find { it.id == item.id }?.userAnswer,
                                 onAnswerSelected = { answer ->
-                                    viewModel.updateSelection(item.id, answer, item.points)
+                                    viewModel.updateSelection(
+                                        item.id,
+                                        answer,
+                                        item.points,
+                                        "${item.question} - $answer",
+                                        "TRIVIA"
+                                    )
                                 }
                             )
                         }

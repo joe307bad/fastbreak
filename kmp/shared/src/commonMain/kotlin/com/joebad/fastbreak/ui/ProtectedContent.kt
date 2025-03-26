@@ -92,7 +92,8 @@ fun ProtectedContent(
         onLocked = { locked = true },
         showModal.value,
         onDismiss = { showModal.value = false },
-        date = "2025-10-11"
+        date = "2025-10-11",
+        fastbreakViewModel = viewModel
     )
     ModalDrawer(
         modifier = Modifier.background(color = colors.background)

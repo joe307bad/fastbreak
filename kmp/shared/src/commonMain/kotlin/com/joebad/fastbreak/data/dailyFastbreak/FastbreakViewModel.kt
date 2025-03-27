@@ -1,6 +1,8 @@
+import kotbase.Database
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 import org.orbitmvi.orbit.Container
 import org.orbitmvi.orbit.ContainerHost
 import org.orbitmvi.orbit.container
@@ -32,21 +34,33 @@ sealed class FastbreakSideEffect {
     data class SelectionUpdated(val selection: FastbreakSelection) : FastbreakSideEffect()
 }
 
-class FastbreakViewModel() : ContainerHost<FastbreakSelectionState, FastbreakSideEffect>,
-    CoroutineScope by MainScope() {
+
+class FastbreakViewModel(
+    private val database: Database
+) : ContainerHost<FastbreakSelectionState, FastbreakSideEffect>, CoroutineScope by MainScope() {
+
+    private val persistence = FastbreakSelectionsPersistence(database)
 
     // Initialize the Orbit container with initial state
     override val container: Container<FastbreakSelectionState, FastbreakSideEffect> = container(
         initialState = FastbreakSelectionState()
     )
 
+    init {
+        // Load saved selections when ViewModel is created
+        loadSavedSelections()
+    }
+
     /**
      * Updates or adds a selection based on the provided card ID and user answer
-     *
-     * @param cardId The ID of the EmptyFastbreakCardItem
-     * @param userAnswer The user's answer (one of answer1-4, "true"/"false", or "homeTeam"/"awayTeam")
      */
-    fun updateSelection(cardId: String, userAnswer: String, points: Int, description: String, type: String) =
+    fun updateSelection(
+        cardId: String,
+        userAnswer: String,
+        points: Int,
+        description: String,
+        type: String
+    ) =
         intent {
             val currentSelections = state.selections
             val existingSelectionIndex = currentSelections.indexOfFirst { it.id == cardId }
@@ -54,9 +68,9 @@ class FastbreakViewModel() : ContainerHost<FastbreakSelectionState, FastbreakSid
             val selection = FastbreakSelection(
                 id = cardId,
                 userAnswer = userAnswer,
-                points,
-                description,
-                type
+                points = points,
+                description = description,
+                type = type
             )
 
             if (existingSelectionIndex != -1) {
@@ -86,6 +100,9 @@ class FastbreakViewModel() : ContainerHost<FastbreakSelectionState, FastbreakSid
                 // Post side effect for selection addition
                 postSideEffect(FastbreakSideEffect.SelectionAdded(selection))
             }
+
+            // Save updated selections to database
+            saveSelections()
         }
 
     /**
@@ -100,7 +117,47 @@ class FastbreakViewModel() : ContainerHost<FastbreakSelectionState, FastbreakSid
      */
     fun clearSelections() = intent {
         reduce {
-            state.copy(selections = emptyList())
+            state.copy(selections = emptyList(), totalPoints = 0)
+        }
+
+        // Save cleared selections to database
+        saveSelections()
+    }
+
+    /**
+     * Save current selections to the database
+     */
+    private fun saveSelections() {
+        launch {
+            try {
+                persistence.saveSelections(container.stateFlow.value.selections)
+            } catch (e: Exception) {
+                // Handle error (log, retry, etc.)
+            }
+        }
+    }
+
+    /**
+     * Load saved selections from the database
+     */
+    private fun loadSavedSelections() {
+        launch {
+            try {
+                val savedSelections = persistence.loadTodaySelections()
+                if (savedSelections != null) {
+                    intent {
+                        reduce {
+                            state.copy(
+                                selections = savedSelections,
+                                totalPoints = savedSelections.sumOf { it.points }
+                            )
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                println(e.message)
+                // Handle error (log, etc.)
+            }
         }
     }
 

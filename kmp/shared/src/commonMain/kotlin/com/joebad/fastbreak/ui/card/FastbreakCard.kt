@@ -119,7 +119,7 @@ fun FastbreakCard(
 //                        )
 //                    )
 //                }
-                PerforatedDashedLine()
+                PerforatedDashedLine(color = colors.accent)
             }
         },
         content = {
@@ -128,10 +128,10 @@ fun FastbreakCard(
                     .fillMaxSize(),
                 horizontalAlignment = Alignment.Start,
             ) {
-                if (state != null) {
-                    for (item in state.selections) {
-                        PickEmRow(item.type, item.description, item.points.toString())
-                        Divider(modifier = Modifier.background(color = colors.onPrimary))
+                state?.selections?.forEachIndexed { index, item ->
+                    PickEmRow(item.type, item.description, item.points.toString())
+                    if (index < state.selections.lastIndex) {
+                        Divider(modifier = Modifier.background(color = colors.accent))
                     }
                 }
 //                Column(modifier = Modifier.padding(20.dp)) {
@@ -183,7 +183,7 @@ fun FastbreakCard(
             }
         },
         footer = {
-            PerforatedDashedLine()
+            PerforatedDashedLine(color = colors.accent)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically

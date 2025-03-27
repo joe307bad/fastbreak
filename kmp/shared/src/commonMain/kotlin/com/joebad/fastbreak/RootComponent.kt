@@ -191,7 +191,7 @@ fun App(
     )
 
     var fastbreakState by remember { mutableStateOf<DailyFastbreak?>(null) }
-    val viewModel = remember { FastbreakViewModel() }
+    val viewModel = remember { FastbreakViewModel(db) }
     var error by remember { mutableStateOf<String?>(null) }
     val coroutineScope = rememberCoroutineScope()
 

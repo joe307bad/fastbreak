@@ -23,7 +23,8 @@ data class FastbreakSelection(
  */
 data class FastbreakSelectionState(
     val selections: List<FastbreakSelection> = emptyList(),
-    val totalPoints: Int = 0
+    val totalPoints: Int = 0,
+    val id: String? = getRandomId()
 )
 
 /**

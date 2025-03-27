@@ -41,6 +41,9 @@ import com.joebad.fastbreak.Theme
 import com.joebad.fastbreak.ThemePreference
 import com.joebad.fastbreak.ui.theme.LocalColors
 import kotlinx.coroutines.launch
+import kotlinx.datetime.Clock
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
 import kotlin.math.min
 
 @OptIn(ExperimentalAnimationApi::class, ExperimentalDecomposeApi::class)
@@ -76,6 +79,10 @@ fun ProtectedContent(
     )
 
     var locked by remember { mutableStateOf(false) }
+    val today = Clock.System.now()
+        .toLocalDateTime(TimeZone.currentSystemDefault())
+        .date
+        .toString()
 
     BlurredScreen(
         locked = true,
@@ -85,14 +92,14 @@ fun ProtectedContent(
         date = "2025-10-11",
         hideLockCardButton = true,
         title = "Yesterday's Fastbreak Card",
-        showCloseButton = true
+        showCloseButton = true,
     )
     BlurredScreen(
         locked,
         onLocked = { locked = true },
         showModal.value,
         onDismiss = { showModal.value = false },
-        date = "2025-10-11",
+        date = today,
         fastbreakViewModel = viewModel
     )
     ModalDrawer(

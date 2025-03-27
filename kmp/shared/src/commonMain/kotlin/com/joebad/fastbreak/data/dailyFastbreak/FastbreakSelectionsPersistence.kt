@@ -8,6 +8,7 @@ import kotlinx.datetime.toLocalDateTime
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import kotlin.time.Duration.Companion.days
 
 @Serializable
 data class FastbreakSelectionDto(
@@ -79,12 +80,17 @@ class FastbreakSelectionsPersistence(private val db: Database) {
             .toLocalDateTime(TimeZone.currentSystemDefault())
             .date
             .toString()
+        val yesterday = (Clock.System.now() - 1.days)
+            .toLocalDateTime(TimeZone.currentSystemDefault())
+            .date
+            .toString()
 
         // Try to get document for today
-        val document = getCollectionSafe().getDocument(today) ?: return null
+        val document = getCollectionSafe().getDocument(today)
+        val yestDocument = getCollectionSafe().getDocument(yesterday)
 
         // Parse JSON string from the document
-        val selectionsJson = document.getString("selections") ?: return null
+        val selectionsJson = document?.getString("selections") ?: return null
 
         // Deserialize JSON to DTOs
         val selectionDtos = json.decodeFromString<List<FastbreakSelectionDto>>(selectionsJson)

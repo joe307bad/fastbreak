@@ -1,3 +1,4 @@
+
 import androidx.compose.animation.ExperimentalAnimationApi
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
@@ -22,12 +23,12 @@ import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.graphics.graphicsLayer
@@ -56,6 +57,7 @@ fun ProtectedContent(
     viewModel: FastbreakViewModel
 ) {
 
+    val locked = viewModel.container.stateFlow.collectAsState().value.locked ?: false;
     val childStack by component.stack.subscribeAsState()
     val activeChild = childStack.active
     val drawerState = rememberDrawerState(DrawerValue.Closed)
@@ -78,7 +80,6 @@ fun ProtectedContent(
         label = "Text Fade Animation"
     )
 
-    var locked by remember { mutableStateOf(false) }
     val today = Clock.System.now()
         .toLocalDateTime(TimeZone.currentSystemDefault())
         .date
@@ -96,7 +97,7 @@ fun ProtectedContent(
     )
     BlurredScreen(
         locked,
-        onLocked = { locked = true },
+        onLocked = { viewModel.lockCard() },
         showModal.value,
         onDismiss = { showModal.value = false },
         date = today,

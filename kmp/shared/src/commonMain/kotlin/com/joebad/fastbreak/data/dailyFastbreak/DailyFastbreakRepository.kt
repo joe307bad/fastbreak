@@ -50,10 +50,6 @@ class FastbreakStateRepository(private val db: Database, private val httpClient:
 
     private suspend fun fetchFromApi(): DailyFastbreak? {
         val apiResponse = getDailyFastbreakApi(API_URL)
-        apiResponse?.let {
-            println("FASTBREAK-LOG Leaderboard: ${it.leaderboard}")
-            println("FASTBREAK-LOG Fastbreak Cards: ${it.fastbreakCard}")
-        }
         return apiResponse
     }
 

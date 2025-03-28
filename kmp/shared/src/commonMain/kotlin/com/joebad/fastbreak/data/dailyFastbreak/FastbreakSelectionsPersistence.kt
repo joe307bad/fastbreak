@@ -10,7 +10,7 @@ import kotlinx.serialization.Serializable
 import kotlin.time.Duration.Companion.days
 
 @Serializable
-data class SelectionsWrapper(val id: String, val selectionDtos: List<FastbreakSelection>)
+data class SelectionsWrapper(val id: String, val selectionDtos: List<FastbreakSelection>, val locked: Boolean? = false)
 
 class FastbreakSelectionsPersistence(private val db: Database) {
 
@@ -34,7 +34,7 @@ class FastbreakSelectionsPersistence(private val db: Database) {
     /**
      * Save the current selections to the database
      */
-    suspend fun saveSelections(id: String, selections: List<FastbreakSelection>) {
+    suspend fun saveSelections(id: String, selections: List<FastbreakSelection>, locked: Boolean? = false) {
 
         val selectionMaps = selections.map { selection ->
             mapOf(
@@ -56,6 +56,7 @@ class FastbreakSelectionsPersistence(private val db: Database) {
         val document = MutableDocument(today)
         document.setValue("selections", selectionMaps)
         document.setString("id", id)
+        document.setBoolean("locked", locked ?: false)
 
         // Save to database
         getCollectionSafe().save(document)
@@ -82,10 +83,11 @@ class FastbreakSelectionsPersistence(private val db: Database) {
         // Parse JSON string from the document
         val id = document?.getString("id") ?: return null
         val selections = getSelectionsFromDocument(document);
+        val locked = document.getBoolean("locked");
 
 
         // Convert DTOs back to domain objects
-        return SelectionsWrapper(id, selections.toList() as List<FastbreakSelection>)
+        return SelectionsWrapper(id, selections.toList(), locked)
     }
 
     private fun getSelectionsFromDocument(document: Document): List<FastbreakSelection> {

@@ -27,7 +27,8 @@ data class FastbreakSelection(
 data class FastbreakSelectionState(
     val selections: List<FastbreakSelection> = emptyList(),
     val totalPoints: Int = 0,
-    val id: String? = getRandomId()
+    val id: String? = getRandomId(),
+    val locked: Boolean? = false
 )
 
 /**
@@ -36,6 +37,7 @@ data class FastbreakSelectionState(
 sealed class FastbreakSideEffect {
     data class SelectionAdded(val selection: FastbreakSelection) : FastbreakSideEffect()
     data class SelectionUpdated(val selection: FastbreakSelection) : FastbreakSideEffect()
+    data class SelectionDeleted(val selection: FastbreakSelection) : FastbreakSideEffect()
 }
 
 
@@ -55,6 +57,16 @@ class FastbreakViewModel(
         loadSavedSelections()
     }
 
+    fun lockCard() {
+        intent {
+            reduce {
+                state.copy(locked = true)
+            }
+        }
+
+        saveSelections()
+    }
+
     /**
      * Updates or adds a selection based on the provided card ID and user answer
      */
@@ -66,6 +78,11 @@ class FastbreakViewModel(
         type: String
     ) =
         intent {
+            if(state.locked == true) {
+                return@intent;
+            }
+
+
             val currentSelections = state.selections
             val existingSelectionIndex = currentSelections.indexOfFirst { it.id == selectionId }
 
@@ -78,19 +95,35 @@ class FastbreakViewModel(
             )
 
             if (existingSelectionIndex != -1) {
-                // Update existing selection
-                val updatedSelections = currentSelections.toMutableList().apply {
-                    set(existingSelectionIndex, selection)
-                }
-                val newTotalPoints = updatedSelections.sumOf { it.points }
 
-                // Update state with the new list
-                reduce {
-                    state.copy(selections = updatedSelections, totalPoints = newTotalPoints)
-                }
+                // previous selection
+                val previousSelection = currentSelections[existingSelectionIndex];
 
-                // Post side effect for selection update
-                postSideEffect(FastbreakSideEffect.SelectionUpdated(selection))
+                if (previousSelection.userAnswer == userAnswer) {
+
+                    val updatedSelections = currentSelections.toMutableList()
+                    updatedSelections.removeAt(existingSelectionIndex)
+
+                    val newTotalPoints = updatedSelections.sumOf { it.points }
+                    reduce {
+                        state.copy(selections = updatedSelections, totalPoints = newTotalPoints)
+                    }
+
+                    postSideEffect(FastbreakSideEffect.SelectionDeleted(selection))
+                } else {
+                    // Update existing selection
+                    val updatedSelections = currentSelections.toMutableList().apply {
+                        set(existingSelectionIndex, selection)
+                    }
+                    val newTotalPoints = updatedSelections.sumOf { it.points }
+
+                    // Update state with the new list
+                    reduce {
+                        state.copy(selections = updatedSelections, totalPoints = newTotalPoints)
+                    }
+
+                    postSideEffect(FastbreakSideEffect.SelectionUpdated(selection))
+                }
             } else {
                 // Add new selection
                 val updatedSelections = currentSelections + selection
@@ -135,7 +168,7 @@ class FastbreakViewModel(
         launch {
             try {
                 val state = container.stateFlow.value;
-                persistence.saveSelections(state.id ?: "", state.selections);
+                persistence.saveSelections(state.id ?: "", state.selections, state.locked);
             } catch (e: Exception) {
                 println(e)
                 // Handle error (log, retry, etc.)
@@ -156,7 +189,8 @@ class FastbreakViewModel(
                             state.copy(
                                 id = savedSelections.id,
                                 selections = savedSelections.selectionDtos,
-                                totalPoints = savedSelections.selectionDtos.sumOf { it.points }
+                                totalPoints = savedSelections.selectionDtos.sumOf { it.points },
+                                locked = savedSelections.locked
                             )
                         }
                     }

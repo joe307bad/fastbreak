@@ -3,6 +3,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import kotlinx.serialization.Serializable
 import org.orbitmvi.orbit.Container
 import org.orbitmvi.orbit.ContainerHost
 import org.orbitmvi.orbit.container
@@ -10,6 +11,8 @@ import org.orbitmvi.orbit.container
 /**
  * Represents a user selection for a FastbreakCardItem
  */
+
+@Serializable
 data class FastbreakSelection(
     val id: String,
     val userAnswer: String,
@@ -56,7 +59,7 @@ class FastbreakViewModel(
      * Updates or adds a selection based on the provided card ID and user answer
      */
     fun updateSelection(
-        cardId: String,
+        selectionId: String,
         userAnswer: String,
         points: Int,
         description: String,
@@ -64,10 +67,10 @@ class FastbreakViewModel(
     ) =
         intent {
             val currentSelections = state.selections
-            val existingSelectionIndex = currentSelections.indexOfFirst { it.id == cardId }
+            val existingSelectionIndex = currentSelections.indexOfFirst { it.id == selectionId }
 
             val selection = FastbreakSelection(
-                id = cardId,
+                id = selectionId,
                 userAnswer = userAnswer,
                 points = points,
                 description = description,
@@ -131,8 +134,10 @@ class FastbreakViewModel(
     private fun saveSelections() {
         launch {
             try {
-                persistence.saveSelections(container.stateFlow.value.selections)
+                val state = container.stateFlow.value;
+                persistence.saveSelections(state.id ?: "", state.selections);
             } catch (e: Exception) {
+                println(e)
                 // Handle error (log, retry, etc.)
             }
         }
@@ -149,8 +154,9 @@ class FastbreakViewModel(
                     intent {
                         reduce {
                             state.copy(
-                                selections = savedSelections,
-                                totalPoints = savedSelections.sumOf { it.points }
+                                id = savedSelections.id,
+                                selections = savedSelections.selectionDtos,
+                                totalPoints = savedSelections.selectionDtos.sumOf { it.points }
                             )
                         }
                     }

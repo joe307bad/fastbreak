@@ -9,6 +9,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import com.joebad.fastbreak.Theme
 import com.joebad.fastbreak.ThemePreference
 import com.joebad.fastbreak.ui.theme.LocalColors
 import io.github.alexzhirkevich.cupertino.CupertinoSegmentedControl
@@ -62,9 +63,4 @@ fun ThemeSelector(themePreference: ThemePreference, onToggleTheme: (theme: Theme
             Text("Dark", color = if (theme == Theme.Dark) colors.onAccent else colors.text)
         }
     }
-}
-
-
-enum class Theme {
-    Light, Dark
 }

@@ -1,7 +1,10 @@
 package com.joebad.fastbreak
 
+import DailyFastbreak
+import FastbreakSelectionState
+import FastbreakStateRepository
+import FastbreakViewModel
 import ProtectedContent
-import Theme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,6 +16,12 @@ import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Surface
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -32,6 +41,13 @@ import com.arkivanov.decompose.router.stack.replaceAll
 import com.arkivanov.decompose.value.Value
 import com.arkivanov.essenty.lifecycle.LifecycleRegistry
 import com.joebad.fastbreak.ui.theme.LocalColors
+import io.ktor.client.HttpClient
+import kotbase.Database
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
+import kotlinx.datetime.Clock
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
 
 fun shouldEnforceLogin(): Boolean {
     return !BuildKonfig.IS_DEBUG
@@ -155,6 +171,22 @@ fun createRootComponent(): RootComponent {
     return RootComponent(DefaultComponentContext(LifecycleRegistry()))
 }
 
+fun onLock(
+    dailyFastbreakRepository: FastbreakStateRepository,
+    coroutineScope: CoroutineScope,
+    state: FastbreakSelectionState
+) {
+    coroutineScope.launch {
+        try {
+            val result = dailyFastbreakRepository.lockCardApi(state)
+            print(result);
+        } catch (e: Exception) {
+            print(e.message);
+//            error = "API failed to lock card: ${e.message}"
+        }
+    }
+}
+
 @Composable
 fun App(
     rootComponent: RootComponent,
@@ -162,6 +194,46 @@ fun App(
     themePreference: ThemePreference
 ) {
     val colors = LocalColors.current;
+
+    try {
+ //      Database.delete("fastbreak")
+    } catch (e: Exception) {
+        println("Database already deleted")
+    }
+
+    val db = Database("fastbreak");
+
+    val dailyFastbreakRepository = FastbreakStateRepository(
+        db,
+        HttpClient()
+    )
+
+    val coroutineScope = rememberCoroutineScope()
+    var fastbreakState by remember { mutableStateOf<DailyFastbreak?>(null) }
+
+    val viewModel = remember {
+        FastbreakViewModel(
+            db,
+            { state -> onLock(dailyFastbreakRepository, coroutineScope, state) }
+        )
+    }
+
+    var error by remember { mutableStateOf<String?>(null) }
+
+    val currentDate =
+        Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date.toString()
+
+    LaunchedEffect(key1 = Unit) {
+        coroutineScope.launch {
+            try {
+                fastbreakState = dailyFastbreakRepository.getDailyFastbreakState(currentDate)
+                print(fastbreakState);
+            } catch (e: Exception) {
+                error = "Failed to fetch state: ${e.message}"
+            }
+        }
+    }
+
     MaterialTheme {
         Surface(color = colors.background) {
             val childStack = rootComponent.stack.subscribeAsState()
@@ -175,7 +247,9 @@ fun App(
                     is RootComponent.Child.Protected -> ProtectedContent(
                         instance.component,
                         onToggleTheme,
-                        themePreference = themePreference
+                        themePreference = themePreference,
+                        fastbreakState,
+                        viewModel
                     )
                 }
             }

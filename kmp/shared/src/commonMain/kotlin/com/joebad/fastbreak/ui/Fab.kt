@@ -1,5 +1,3 @@
-
-
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -14,7 +12,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.FloatingActionButton
+import androidx.compose.material.Icon
 import androidx.compose.material.Text
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -30,13 +31,11 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.joebad.fastbreak.ui.theme.LocalColors
-import io.github.alexzhirkevich.cupertino.CupertinoIcon
 import io.github.alexzhirkevich.cupertino.icons.CupertinoIcons
-import io.github.alexzhirkevich.cupertino.icons.filled.Lock
 import io.github.alexzhirkevich.cupertino.icons.filled.LockOpen
 
 @Composable
-fun FABWithExactShapeBorder(locked: Boolean, showModal: () -> Unit) {
+fun FABWithExactShapeBorder(locked: Boolean, showModal: () -> Unit, totalPoints: Int) {
     val colors = LocalColors.current
 
     val infiniteTransition = rememberInfiniteTransition()
@@ -99,16 +98,15 @@ fun FABWithExactShapeBorder(locked: Boolean, showModal: () -> Unit) {
             horizontalArrangement = Arrangement.Center,
             modifier = Modifier.padding(20.dp)
         ) {
-            // Use different icons based on locked state
-            CupertinoIcon(
-                imageVector = if (locked) CupertinoIcons.Filled.Lock else CupertinoIcons.Filled.LockOpen,
-                contentDescription = if (locked) "Locked" else "Unlocked",
-                tint = colors.onPrimary,
-                modifier = Modifier.size(20.dp)
+            Icon(
+                imageVector = if (locked) Icons.Filled.Lock else CupertinoIcons.Filled.LockOpen,
+                contentDescription = "Lock",
+                tint = colors.onSecondary,
+                modifier = Modifier.size(17.dp)
             )
             Spacer(modifier = Modifier.width(8.dp))
             Text(
-                text = "12,324,092",
+                text = totalPoints.toString(),
                 maxLines = 1,
                 overflow = TextOverflow.Visible,
             )

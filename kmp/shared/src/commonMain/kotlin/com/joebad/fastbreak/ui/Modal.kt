@@ -1,3 +1,4 @@
+
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -17,10 +18,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Card
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -76,12 +75,12 @@ fun PerforatedDashedLine(
                 strokeWidth = thickness.toPx()
             )
 
-            drawLine(
-                color = highlightColor,
-                start = Offset(currentX, y - thickness.toPx() / 2),
-                end = Offset(currentX + dashPx, y - thickness.toPx() / 2),
-                strokeWidth = (thickness.toPx() / 2)
-            )
+//            drawLine(
+//                color = highlightColor,
+//                start = Offset(currentX, y - thickness.toPx() / 2),
+//                end = Offset(currentX + dashPx, y - thickness.toPx() / 2),
+//                strokeWidth = (thickness.toPx() / 2)
+//            )
 
             currentX += dashPx + gapPx
         }
@@ -117,18 +116,6 @@ fun Barcode(
     }
 }
 
-@Composable
-fun ScrollableColumn(content: @Composable () -> Unit) {
-    val scrollState = rememberScrollState()
-
-    Column(
-        modifier = Modifier
-            .verticalScroll(scrollState)
-    ) {
-        content()
-    }
-}
-
 
 @Composable
 fun BlurredScreen(
@@ -139,7 +126,8 @@ fun BlurredScreen(
     date: String,
     hideLockCardButton: Boolean = false,
     title: String = "My Daily Fastbreak Card",
-    showCloseButton: Boolean = false
+    showCloseButton: Boolean = false,
+    fastbreakViewModel: FastbreakViewModel? = null
 ) {
     val colors = LocalColors.current;
     AnimatedVisibility(
@@ -163,7 +151,7 @@ fun BlurredScreen(
                     .clickable(onClick = { }, indication = null, interactionSource = null),
                 shape = RoundedCornerShape(16.dp)
             ) {
-                FastbreakCard(title, date, locked, onDismiss, showCloseButton)
+                FastbreakCard(title, date, locked, onDismiss, showCloseButton, fastbreakViewModel)
             }
             if (!hideLockCardButton) {
                 Column(modifier = Modifier.padding(20.dp).align(Alignment.BottomCenter)) {

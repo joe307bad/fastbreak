@@ -27,6 +27,15 @@ fun darken(color: Color, factor: Float = 0.8f): Color {
     )
 }
 
+fun lighten(color: Color, factor: Float = 0.2f): Color {
+    return Color(
+        red = (color.red + (1 - color.red) * factor).coerceIn(0f, 1f),
+        green = (color.green + (1 - color.green) * factor).coerceIn(0f, 1f),
+        blue = (color.blue + (1 - color.blue) * factor).coerceIn(0f, 1f),
+        alpha = color.alpha
+    )
+}
+
 val LightThemeColors = AppColors(
     background = Color(0xFFF8E8F8),
     text = Color(0xFF4A2040),

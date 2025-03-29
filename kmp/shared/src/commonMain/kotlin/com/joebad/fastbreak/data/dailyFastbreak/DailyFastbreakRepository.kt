@@ -1,7 +1,4 @@
-
 import io.ktor.client.HttpClient
-import io.ktor.client.request.get
-import io.ktor.client.statement.bodyAsText
 import kotbase.DataSource
 import kotbase.Database
 import kotbase.Meta
@@ -9,40 +6,34 @@ import kotbase.MutableDocument
 import kotbase.Ordering
 import kotbase.QueryBuilder
 import kotbase.SelectResult
+import kotlinx.coroutines.delay
 import kotlinx.datetime.Clock
-import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
-@Serializable
-data class FastbreakRemoteState(
-    val card: String,
-    val leaderboard: String,
-    val statSheet: String,
-    val week: Int,
-    val season: Int,
-    val day: Int
-)
-
 class FastbreakStateRepository(private val db: Database, private val httpClient: HttpClient) {
 
-    private val lastFetchedCollection = db.getCollection("LastFetchedCollection") ?: db.createCollection("LastFetchedCollection")
-    private val dailyStateCollection = db.getCollection("FastBreakDailyStateCollection") ?: db.createCollection("FastBreakDailyStateCollection")
+    private val lastFetchedCollection =
+        db.getCollection("LastFetchedCollection") ?: db.createCollection("LastFetchedCollection")
+    private val dailyStateCollection = db.getCollection("FastBreakDailyStateCollection")
+        ?: db.createCollection("FastBreakDailyStateCollection")
 
     companion object {
         private const val LAST_FETCHED_KEY = "lastFetchedDate"
-        private const val API_URL = "http://10.0.2.2:5000/api/schedule"
-        private val FETCH_THRESHOLD = 12 * 60 * 60 // 12 hours in seconds
+        private const val GET_DAILY_FASTBREAK = "http://10.0.2.2:1080/api/daily"
+        private const val LOCK_CARD = "http://10.0.2.2:1080/api/lock"
+        private const val FETCH_THRESHOLD = 12 * 60 * 60
     }
 
-    suspend fun getDailyFastbreakState(date: String): FastbreakState {
+    suspend fun getDailyFastbreakState(date: String): DailyFastbreak? {
         val now = Clock.System.now().epochSeconds
         val lastFetchedTime = getLastFetchedTime()
+        delay(2000)
 
         return if (lastFetchedTime == null || (now - lastFetchedTime) > FETCH_THRESHOLD) {
             fetchAndStoreState(date)
         } else {
-            getStateFromDatabase(date) ?: fetchAndStoreState(date) // Fallback if missing
+            getStateFromDatabase(date) ?: fetchAndStoreState(date)
         }
     }
 
@@ -51,20 +42,25 @@ class FastbreakStateRepository(private val db: Database, private val httpClient:
             ?.getLong("timestamp")
     }
 
-    private suspend fun fetchAndStoreState(date: String): FastbreakState {
-        val response = fetchFromApi()
+    private suspend fun fetchAndStoreState(date: String): DailyFastbreak? {
+        val response = fetchDailyFastbreak()
         saveStateToDatabase(date, response)
         saveLastFetchedTime()
-        enforceMaxDocumentsLimit() // Ensure only 10 documents are stored
+        enforceMaxDocumentsLimit()
         return response
     }
 
-    private suspend fun fetchFromApi(): FastbreakState {
-        val response: String = httpClient.get(API_URL).bodyAsText()
-        return Json.decodeFromString(response)
+    suspend fun lockCardApi(fastbreakSelectionState: FastbreakSelectionState): LockCardResponse? {
+        val apiResponse = lockDailyFastbreakCard(LOCK_CARD, fastbreakSelectionState)
+        return apiResponse
     }
 
-    private fun saveStateToDatabase(date: String, state: FastbreakState) {
+    private suspend fun fetchDailyFastbreak(): DailyFastbreak? {
+        val apiResponse = getDailyFastbreak(GET_DAILY_FASTBREAK)
+        return apiResponse
+    }
+
+    private fun saveStateToDatabase(date: String, state: DailyFastbreak?) {
         val doc = MutableDocument(date)
             .setString("data", Json.encodeToString(state))
 
@@ -78,7 +74,7 @@ class FastbreakStateRepository(private val db: Database, private val httpClient:
         lastFetchedCollection.save(doc)
     }
 
-    private fun getStateFromDatabase(date: String): FastbreakState? {
+    private fun getStateFromDatabase(date: String): DailyFastbreak? {
         return dailyStateCollection.getDocument(date)
             ?.getString("data")
             ?.let { Json.decodeFromString(it) }

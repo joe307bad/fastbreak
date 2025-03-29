@@ -1,4 +1,3 @@
-
 import io.ktor.client.HttpClient
 import kotbase.DataSource
 import kotbase.Database
@@ -14,12 +13,15 @@ import kotlinx.serialization.json.Json
 
 class FastbreakStateRepository(private val db: Database, private val httpClient: HttpClient) {
 
-    private val lastFetchedCollection = db.getCollection("LastFetchedCollection") ?: db.createCollection("LastFetchedCollection")
-    private val dailyStateCollection = db.getCollection("FastBreakDailyStateCollection") ?: db.createCollection("FastBreakDailyStateCollection")
+    private val lastFetchedCollection =
+        db.getCollection("LastFetchedCollection") ?: db.createCollection("LastFetchedCollection")
+    private val dailyStateCollection = db.getCollection("FastBreakDailyStateCollection")
+        ?: db.createCollection("FastBreakDailyStateCollection")
 
     companion object {
         private const val LAST_FETCHED_KEY = "lastFetchedDate"
-        private const val API_URL = "http://10.0.2.2:1080/api/daily"
+        private const val GET_DAILY_FASTBREAK = "http://10.0.2.2:1080/api/daily"
+        private const val LOCK_CARD = "http://10.0.2.2:1080/api/lock"
         private const val FETCH_THRESHOLD = 12 * 60 * 60
     }
 
@@ -41,15 +43,20 @@ class FastbreakStateRepository(private val db: Database, private val httpClient:
     }
 
     private suspend fun fetchAndStoreState(date: String): DailyFastbreak? {
-        val response = fetchFromApi()
+        val response = fetchDailyFastbreak()
         saveStateToDatabase(date, response)
         saveLastFetchedTime()
         enforceMaxDocumentsLimit()
         return response
     }
 
-    private suspend fun fetchFromApi(): DailyFastbreak? {
-        val apiResponse = getDailyFastbreakApi(API_URL)
+    suspend fun lockCardApi(fastbreakSelectionState: FastbreakSelectionState): LockCardResponse? {
+        val apiResponse = lockDailyFastbreakCard(LOCK_CARD, fastbreakSelectionState)
+        return apiResponse
+    }
+
+    private suspend fun fetchDailyFastbreak(): DailyFastbreak? {
+        val apiResponse = getDailyFastbreak(GET_DAILY_FASTBREAK)
         return apiResponse
     }
 

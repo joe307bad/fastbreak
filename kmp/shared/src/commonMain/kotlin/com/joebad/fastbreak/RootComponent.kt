@@ -1,6 +1,7 @@
 package com.joebad.fastbreak
 
 import DailyFastbreak
+import FastbreakSelectionState
 import FastbreakStateRepository
 import FastbreakViewModel
 import ProtectedContent
@@ -42,6 +43,7 @@ import com.arkivanov.essenty.lifecycle.LifecycleRegistry
 import com.joebad.fastbreak.ui.theme.LocalColors
 import io.ktor.client.HttpClient
 import kotbase.Database
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.datetime.Clock
 import kotlinx.datetime.TimeZone
@@ -169,6 +171,22 @@ fun createRootComponent(): RootComponent {
     return RootComponent(DefaultComponentContext(LifecycleRegistry()))
 }
 
+fun onLock(
+    dailyFastbreakRepository: FastbreakStateRepository,
+    coroutineScope: CoroutineScope,
+    state: FastbreakSelectionState
+) {
+    coroutineScope.launch {
+        try {
+            val result = dailyFastbreakRepository.lockCardApi(state)
+            print(result);
+        } catch (e: Exception) {
+            print(e.message);
+//            error = "API failed to lock card: ${e.message}"
+        }
+    }
+}
+
 @Composable
 fun App(
     rootComponent: RootComponent,
@@ -178,7 +196,7 @@ fun App(
     val colors = LocalColors.current;
 
     try {
-//        Database.delete("fastbreak")
+ //      Database.delete("fastbreak")
     } catch (e: Exception) {
         println("Database already deleted")
     }
@@ -190,10 +208,17 @@ fun App(
         HttpClient()
     )
 
-    var fastbreakState by remember { mutableStateOf<DailyFastbreak?>(null) }
-    val viewModel = remember { FastbreakViewModel(db) }
-    var error by remember { mutableStateOf<String?>(null) }
     val coroutineScope = rememberCoroutineScope()
+    var fastbreakState by remember { mutableStateOf<DailyFastbreak?>(null) }
+
+    val viewModel = remember {
+        FastbreakViewModel(
+            db,
+            { state -> onLock(dailyFastbreakRepository, coroutineScope, state) }
+        )
+    }
+
+    var error by remember { mutableStateOf<String?>(null) }
 
     val currentDate =
         Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date.toString()

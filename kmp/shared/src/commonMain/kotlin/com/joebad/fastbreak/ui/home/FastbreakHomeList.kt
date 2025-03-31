@@ -1,7 +1,7 @@
 package com.joebad.fastbreak.ui.home
 
-import DailyFastbreak
-import FastbreakViewModel
+import com.joebad.fastbreak.data.dailyFastbreak.DailyFastbreak
+import com.joebad.fastbreak.data.dailyFastbreak.FastbreakViewModel
 import Question
 import QuestionComponent
 import androidx.compose.foundation.layout.Column

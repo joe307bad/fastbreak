@@ -75,6 +75,10 @@ kotlin {
 
             implementation("com.eygraber:compose-placeholder-material3:1.0.10")
 
+            implementation("com.appstractive:jwt-kt:1.1.0")
+
+            implementation("com.liftric:kvault:1.12.0")
+
         }
 
         val iosX64Main by getting

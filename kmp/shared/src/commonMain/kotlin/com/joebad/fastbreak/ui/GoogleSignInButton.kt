@@ -20,7 +20,7 @@ import org.jetbrains.compose.ui.tooling.preview.Preview
 
 @Composable
 @Preview
-fun GoogleSignInButton() {
+fun GoogleSignInButton(onLogin: (token: String?) -> Unit) {
     var authReady by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
 
@@ -40,8 +40,7 @@ fun GoogleSignInButton() {
             ) {
                 GoogleButtonUiContainer(
                     onGoogleSignInResult = { googleUser ->
-                        val tokenId = googleUser?.idToken
-                        println("TOKEN: $tokenId")
+                        onLogin(googleUser?.idToken)
                     }
                 ) {
                     GoogleSignInButton(

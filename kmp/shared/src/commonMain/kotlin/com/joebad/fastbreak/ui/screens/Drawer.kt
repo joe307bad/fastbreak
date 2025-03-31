@@ -1,4 +1,5 @@
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,6 +18,7 @@ import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Text
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -158,7 +160,8 @@ fun StatSheetRow(
 fun DrawerContent(
     onShowLastweeksFastbreakCard: () -> Unit,
     themePreference: ThemePreference,
-    onToggleTheme: (theme: Theme) -> Unit
+    onToggleTheme: (theme: Theme) -> Unit,
+    goToSettings: () -> Unit
 ) {
     val colors = LocalColors.current;
     Column(
@@ -181,7 +184,7 @@ fun DrawerContent(
                                 bottom = 20.dp
                             )
                         ) {
-                            Row {
+                            Row(modifier = Modifier.fillMaxWidth()) {
                                 Icon(
                                     Icons.Default.Person,
                                     tint = colors.onPrimary,
@@ -193,6 +196,17 @@ fun DrawerContent(
                                     color = colors.onPrimary,
                                     style = MaterialTheme.typography.h6
                                 )
+                                Box(
+                                    modifier = Modifier.padding(start = 10.dp).clickable(onClick = {
+                                        goToSettings()
+                                    })
+                                ) {
+                                    Icon(
+                                        Icons.Default.Settings,
+                                        tint = colors.onPrimary,
+                                        contentDescription = "User"
+                                    )
+                                }
                             }
                         }
                     }

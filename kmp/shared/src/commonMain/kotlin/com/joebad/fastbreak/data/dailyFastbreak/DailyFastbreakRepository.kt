@@ -1,3 +1,5 @@
+package com.joebad.fastbreak.data.dailyFastbreak
+
 import io.ktor.client.HttpClient
 import kotbase.DataSource
 import kotbase.Database

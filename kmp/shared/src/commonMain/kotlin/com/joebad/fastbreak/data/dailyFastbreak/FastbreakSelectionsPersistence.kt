@@ -1,3 +1,5 @@
+package com.joebad.fastbreak.data.dailyFastbreak
+
 import kotbase.Array
 import kotbase.Collection
 import kotbase.Database

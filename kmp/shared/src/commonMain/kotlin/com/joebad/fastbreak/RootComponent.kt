@@ -1,9 +1,6 @@
 package com.joebad.fastbreak
 
-import DailyFastbreak
-import FastbreakSelectionState
-import FastbreakStateRepository
-import FastbreakViewModel
+import AuthRepository
 import ProtectedContent
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -40,6 +37,11 @@ import com.arkivanov.decompose.router.stack.push
 import com.arkivanov.decompose.router.stack.replaceAll
 import com.arkivanov.decompose.value.Value
 import com.arkivanov.essenty.lifecycle.LifecycleRegistry
+import com.joebad.fastbreak.data.dailyFastbreak.DailyFastbreak
+import com.joebad.fastbreak.data.dailyFastbreak.FastbreakSelectionState
+import com.joebad.fastbreak.data.dailyFastbreak.FastbreakStateRepository
+import com.joebad.fastbreak.data.dailyFastbreak.FastbreakViewModel
+import com.joebad.fastbreak.ui.screens.LoginScreen
 import com.joebad.fastbreak.ui.theme.LocalColors
 import io.ktor.client.HttpClient
 import kotbase.Database
@@ -49,8 +51,9 @@ import kotlinx.datetime.Clock
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 
-fun shouldEnforceLogin(): Boolean {
-    return !BuildKonfig.IS_DEBUG
+fun shouldEnforceLogin(authRepository: AuthRepository): Boolean {
+    val authedUser = authRepository.getUser()
+    return authRepository.isUserExpired(authedUser) // ?: true; //!BuildKonfig.IS_DEBUG
 }
 
 class LoginComponent(
@@ -86,7 +89,7 @@ fun LoginContent(component: LoginComponent) {
 }
 
 class ProtectedComponent(
-    componentContext: ComponentContext
+    componentContext: ComponentContext,
 ) : ComponentContext by componentContext {
 
     private val navigation = StackNavigation<Config>()
@@ -103,7 +106,12 @@ class ProtectedComponent(
         return when (config) {
             is Config.Home -> Child.Home
             is Config.Leaderboard -> Child.Leaderboard
+            is Config.Settings -> Child.Settings
         }
+    }
+
+    fun goToSettings() {
+        navigation.push(Config.Settings)
     }
 
     fun selectTab(tab: Config) {
@@ -116,16 +124,19 @@ class ProtectedComponent(
     sealed class Config {
         object Home : Config()
         object Leaderboard : Config()
+        object Settings : Config()
     }
 
     sealed class Child {
         object Home : Child()
         object Leaderboard : Child()
+        object Settings : Child()
     }
 }
 
 class RootComponent(
-    componentContext: ComponentContext
+    componentContext: ComponentContext,
+    authRepository: AuthRepository
 ) : ComponentContext by componentContext {
 
     private val navigation = StackNavigation<Config>()
@@ -134,7 +145,7 @@ class RootComponent(
         childStack(
             source = navigation,
             serializer = null,
-            initialConfiguration = if (shouldEnforceLogin()) Config.Login else Config.Protected,
+            initialConfiguration = if (shouldEnforceLogin(authRepository)) Config.Login else Config.Protected,
             handleBackButton = true,
             childFactory = ::createChild,
         )
@@ -167,8 +178,8 @@ class RootComponent(
     }
 }
 
-fun createRootComponent(): RootComponent {
-    return RootComponent(DefaultComponentContext(LifecycleRegistry()))
+fun createRootComponent(authRepository: AuthRepository): RootComponent {
+    return RootComponent(DefaultComponentContext(LifecycleRegistry()), authRepository)
 }
 
 fun onLock(
@@ -191,12 +202,13 @@ fun onLock(
 fun App(
     rootComponent: RootComponent,
     onToggleTheme: (theme: Theme) -> Unit,
-    themePreference: ThemePreference
+    themePreference: ThemePreference,
+    authRepository: AuthRepository
 ) {
     val colors = LocalColors.current;
 
     try {
- //      Database.delete("fastbreak")
+        //      Database.delete("fastbreak")
     } catch (e: Exception) {
         println("Database already deleted")
     }
@@ -243,13 +255,20 @@ fun App(
                 animation = stackAnimation(fade())
             ) { child ->
                 when (val instance = child.instance) {
-                    is RootComponent.Child.Login -> LoginContent(instance.component)
+                    is RootComponent.Child.Login -> LoginScreen(
+                        goToHome = { authedUser ->
+                            authRepository.storeUser(authedUser)
+                            instance.component.onLoginClick()
+                        }
+                    )
+
                     is RootComponent.Child.Protected -> ProtectedContent(
                         instance.component,
                         onToggleTheme,
                         themePreference = themePreference,
                         fastbreakState,
-                        viewModel
+                        viewModel,
+                        authRepository
                     )
                 }
             }

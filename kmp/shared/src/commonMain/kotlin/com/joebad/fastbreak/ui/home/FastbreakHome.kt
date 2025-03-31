@@ -13,6 +13,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
+import com.joebad.fastbreak.data.dailyFastbreak.DailyFastbreak
+import com.joebad.fastbreak.data.dailyFastbreak.FastbreakViewModel
 import com.joebad.fastbreak.ui.home.FastbreakHomeList
 
 @Composable

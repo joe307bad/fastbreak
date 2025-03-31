@@ -1,4 +1,3 @@
-
 import androidx.compose.animation.ExperimentalAnimationApi
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
@@ -57,7 +56,8 @@ fun ProtectedContent(
     themePreference: ThemePreference,
     dailyFastbreak: DailyFastbreak?,
     viewModel: FastbreakViewModel,
-    authRepository: AuthRepository
+    authRepository: AuthRepository,
+    onLogout: () -> Unit
 ) {
 
     val locked = viewModel.container.stateFlow.collectAsState().value.locked ?: false;
@@ -118,7 +118,7 @@ fun ProtectedContent(
                 goToSettings = {
                     scope.launch {
                         drawerState.close()
-                        if(activeChild.instance != ProtectedComponent.Child.Settings) {
+                        if (activeChild.instance != ProtectedComponent.Child.Settings) {
                             component.goToSettings()
                         }
                     }
@@ -189,7 +189,7 @@ fun ProtectedContent(
                     Column(modifier = Modifier.zIndex(2f)) {
                         when (child.instance) {
                             is ProtectedComponent.Child.Settings -> {
-                                SettingsScreen(onLogout = { })
+                                SettingsScreen(onLogout = onLogout)
                             }
 
                             is ProtectedComponent.Child.Home -> {

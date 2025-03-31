@@ -58,7 +58,8 @@ class MainActivity : ComponentActivity() {
                                 }
                             },
                             themePreference = themePreference,
-                            authRepository = authRepository
+                            authRepository = authRepository,
+                            theme = theme
                         )
                     }
                 }

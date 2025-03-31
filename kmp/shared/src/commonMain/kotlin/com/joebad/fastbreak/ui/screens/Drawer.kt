@@ -181,6 +181,7 @@ fun DrawerContent(
                         Column(
                             modifier = Modifier.padding(
                                 start = 10.dp,
+                                end = 10.dp,
                                 bottom = 20.dp
                             )
                         ) {
@@ -191,11 +192,13 @@ fun DrawerContent(
                                     contentDescription = "User"
                                 )
                                 Spacer(modifier = Modifier.width(10.dp))
-                                Text(
-                                    text = "joebad",
-                                    color = colors.onPrimary,
-                                    style = MaterialTheme.typography.h6
-                                )
+                                Box(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = "joebad",
+                                        color = colors.onPrimary,
+                                        style = MaterialTheme.typography.h6
+                                    )
+                                }
                                 Box(
                                     modifier = Modifier.padding(start = 10.dp).clickable(onClick = {
                                         goToSettings()

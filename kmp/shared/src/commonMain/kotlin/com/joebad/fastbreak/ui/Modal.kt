@@ -158,6 +158,7 @@ fun BlurredScreen(
                 Column(modifier = Modifier.padding(20.dp).align(Alignment.BottomCenter)) {
                     AnimatedBorderButton(
                         locked = locked,
+                        enableLocking = true,
                         onLocked = onLocked,
                         borderColor = colors.accent, //darken(colors.accent, 0.7f),
                         bottomBorderColor = colors.accent //darken(colors.accent, 0.7f)

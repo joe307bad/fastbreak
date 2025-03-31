@@ -25,6 +25,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import com.arkivanov.decompose.ComponentContext
 import com.arkivanov.decompose.DefaultComponentContext
+import com.arkivanov.decompose.DelicateDecomposeApi
 import com.arkivanov.decompose.extensions.compose.stack.Children
 import com.arkivanov.decompose.extensions.compose.stack.animation.fade
 import com.arkivanov.decompose.extensions.compose.stack.animation.stackAnimation
@@ -150,12 +151,17 @@ class RootComponent(
             childFactory = ::createChild,
         )
 
+    @OptIn(DelicateDecomposeApi::class)
+    fun goToLogin() {
+        navigation.replaceAll(Config.Login)
+    }
+
     private fun createChild(config: Config, componentContext: ComponentContext): Child {
         return when (config) {
             is Config.Login -> Child.Login(
                 LoginComponent(
                     componentContext = componentContext,
-                    onLoginClick = { navigation.push(Config.Protected) }
+                    onLoginClick = { navigation.replaceAll(Config.Protected) }
                 )
             )
 
@@ -203,7 +209,8 @@ fun App(
     rootComponent: RootComponent,
     onToggleTheme: (theme: Theme) -> Unit,
     themePreference: ThemePreference,
-    authRepository: AuthRepository
+    authRepository: AuthRepository,
+    theme: Theme?
 ) {
     val colors = LocalColors.current;
 
@@ -259,7 +266,8 @@ fun App(
                         goToHome = { authedUser ->
                             authRepository.storeUser(authedUser)
                             instance.component.onLoginClick()
-                        }
+                        },
+                        theme = theme
                     )
 
                     is RootComponent.Child.Protected -> ProtectedContent(
@@ -268,7 +276,11 @@ fun App(
                         themePreference = themePreference,
                         fastbreakState,
                         viewModel,
-                        authRepository
+                        authRepository,
+                        onLogout = {
+                            authRepository.clearUser()
+                            rootComponent.goToLogin()
+                        }
                     )
                 }
             }

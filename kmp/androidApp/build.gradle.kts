@@ -7,7 +7,7 @@ plugins {
 
 android {
     namespace = "com.joebad.fastbreak.android"
-    compileSdk = 34
+    compileSdk = 35
     defaultConfig {
         applicationId = "com.joebad.fastbreak.android"
         minSdk = 26

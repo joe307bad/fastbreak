@@ -33,10 +33,7 @@ kotlin {
         homepage = "https://joebad.com/"
         ios.deploymentTarget = "14.1"
         podfile = project.file("../iosApp/Podfile")
-        pod("CouchbaseLite") {
-            version = libs.versions.couchbase.lite.c.get()
-            linkOnly = true
-        }
+        pod("CouchbaseLite", version = "3.1.9", linkOnly = true)
 
         pod("GoogleSignIn", linkOnly = true)
         pod("FirebaseCore", linkOnly = true)

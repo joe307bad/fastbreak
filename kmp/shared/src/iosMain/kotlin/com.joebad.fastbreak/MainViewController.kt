@@ -37,7 +37,8 @@ fun MainViewController() = ComposeUIViewController {
                 }
             },
             themePreference = themePreference,
-            authRepository
+            authRepository,
+            theme
         )
     }
 }

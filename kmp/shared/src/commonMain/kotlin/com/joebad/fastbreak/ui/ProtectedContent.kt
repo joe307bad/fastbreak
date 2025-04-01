@@ -117,9 +117,11 @@ fun ProtectedContent(
                 onToggleTheme = onToggleTheme,
                 goToSettings = {
                     scope.launch {
-                        drawerState.close()
-                        if (activeChild.instance != ProtectedComponent.Child.Settings) {
-                            component.goToSettings()
+                        launch { drawerState.close() }
+                        launch {
+                            if (activeChild.instance != ProtectedComponent.Child.Settings) {
+                                component.goToSettings()
+                            }
                         }
                     }
                 }

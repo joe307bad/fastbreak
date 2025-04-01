@@ -1,5 +1,6 @@
 package com.joebad.fastbreak.data.dailyFastbreak
 
+import com.joebad.fastbreak.getPlatform
 import io.ktor.client.HttpClient
 import kotbase.DataSource
 import kotbase.Database
@@ -10,7 +11,6 @@ import kotbase.QueryBuilder
 import kotbase.SelectResult
 import kotlinx.coroutines.delay
 import kotlinx.datetime.Clock
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
 class FastbreakStateRepository(private val db: Database, private val httpClient: HttpClient) {
@@ -19,11 +19,12 @@ class FastbreakStateRepository(private val db: Database, private val httpClient:
         db.getCollection("LastFetchedCollection") ?: db.createCollection("LastFetchedCollection")
     private val dailyStateCollection = db.getCollection("FastBreakDailyStateCollection")
         ?: db.createCollection("FastBreakDailyStateCollection")
+    private val BASE_URL = if (getPlatform().name == "iOS") "localhost" else "10.0.2.2"
+    private val GET_DAILY_FASTBREAK = "http://${BASE_URL}:1080/api/daily"
+    private val LOCK_CARD = "http://=${BASE_URL}:1080/api/lock"
 
     companion object {
         private const val LAST_FETCHED_KEY = "lastFetchedDate"
-        private const val GET_DAILY_FASTBREAK = "http://10.0.2.2:1080/api/daily"
-        private const val LOCK_CARD = "http://10.0.2.2:1080/api/lock"
         private const val FETCH_THRESHOLD = 12 * 60 * 60
     }
 

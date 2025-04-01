@@ -10,7 +10,6 @@ import kotbase.MutableDocument
 import kotbase.Ordering
 import kotbase.QueryBuilder
 import kotbase.SelectResult
-import kotlinx.coroutines.delay
 import kotlinx.datetime.Clock
 import kotlinx.serialization.json.Json
 
@@ -21,7 +20,7 @@ class FastbreakStateRepository(private val db: Database, private val httpClient:
     private val dailyStateCollection = db.getCollection("FastBreakDailyStateCollection")
         ?: db.createCollection("FastBreakDailyStateCollection")
     private val BASE_URL = if (getPlatform().name == "iOS") "localhost" else "10.0.2.2"
-    private val GET_DAILY_FASTBREAK = "http://${BASE_URL}:5000/api/daily"
+    private val GET_DAILY_FASTBREAK = "http://${BASE_URL}:8085/api/fastbreak/daily"
     private val LOCK_CARD = "http://=${BASE_URL}:1080/api/lock"
 
     companion object {
@@ -32,7 +31,7 @@ class FastbreakStateRepository(private val db: Database, private val httpClient:
     suspend fun getDailyFastbreakState(date: String): DailyFastbreak? {
         val now = Clock.System.now().epochSeconds
         val lastFetchedTime = getLastFetchedTime()
-        delay(2000)
+//        delay(2000)
 
         return if (lastFetchedTime == null || (now - lastFetchedTime) > FETCH_THRESHOLD) {
             fetchAndStoreState(date)

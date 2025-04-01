@@ -105,7 +105,7 @@ let mongoStorage =
         )
     )
 
-let database = mongoClient.GetDatabase("fastbreak")
+let database: IMongoDatabase = mongoClient.GetDatabase("fastbreak")
 
 let configureHangfire (services: IServiceCollection) =
     services.AddHangfire(fun config -> config.UseStorage(mongoStorage) |> ignore)
@@ -151,7 +151,7 @@ let defaultRouter =
             "/api"
             (router {
                 pipe_through api
-                forward "/daily" (dailyFastbreakController database)
+                forward "/fastbreak" (dailyFastbreakController database)
                 
                 forward
                     "/auth"
@@ -170,6 +170,7 @@ let app =
     |> ignore
 
     application {
+        url "http://0.0.0.0:8085"
         use_endpoint_router defaultRouter
         service_config configureHangfire
         use_developer_exceptions

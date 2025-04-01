@@ -4,6 +4,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="Entities\ScheduleEntity.fs" />
+    <Compile Include="Entities\EmptyFastbreakCard.fs" />
     <Compile Include="Controllers\DailyFastbreakController.fs" />
     <Compile Include="DailyJob\SchedulePuller.fs" />
     <Compile Include="Todos.fs" />

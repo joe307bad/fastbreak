@@ -1,3 +1,4 @@
+
 import androidx.compose.animation.ExperimentalAnimationApi
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
@@ -39,8 +40,8 @@ import com.arkivanov.decompose.extensions.compose.subscribeAsState
 import com.joebad.fastbreak.ProtectedComponent
 import com.joebad.fastbreak.Theme
 import com.joebad.fastbreak.ThemePreference
-import com.joebad.fastbreak.data.dailyFastbreak.DailyFastbreak
 import com.joebad.fastbreak.data.dailyFastbreak.FastbreakViewModel
+import com.joebad.fastbreak.model.dtos.DailyFastbreak
 import com.joebad.fastbreak.ui.theme.LocalColors
 import kotlinx.coroutines.launch
 import kotlinx.datetime.Clock

@@ -1,7 +1,5 @@
 package com.joebad.fastbreak.ui.home
 
-import com.joebad.fastbreak.data.dailyFastbreak.DailyFastbreak
-import com.joebad.fastbreak.data.dailyFastbreak.FastbreakViewModel
 import Question
 import QuestionComponent
 import androidx.compose.foundation.layout.Column
@@ -13,6 +11,8 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.joebad.fastbreak.data.dailyFastbreak.FastbreakViewModel
+import com.joebad.fastbreak.model.dtos.DailyFastbreak
 import com.joebad.fastbreak.ui.CardWithBadge
 import com.joebad.fastbreak.ui.TeamCard
 import com.joebad.fastbreak.ui.theme.LocalColors

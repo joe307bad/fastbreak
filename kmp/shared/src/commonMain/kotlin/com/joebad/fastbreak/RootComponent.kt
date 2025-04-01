@@ -27,10 +27,10 @@ import com.arkivanov.decompose.router.stack.push
 import com.arkivanov.decompose.router.stack.replaceAll
 import com.arkivanov.decompose.value.Value
 import com.arkivanov.essenty.lifecycle.LifecycleRegistry
-import com.joebad.fastbreak.data.dailyFastbreak.DailyFastbreak
 import com.joebad.fastbreak.data.dailyFastbreak.FastbreakSelectionState
 import com.joebad.fastbreak.data.dailyFastbreak.FastbreakStateRepository
 import com.joebad.fastbreak.data.dailyFastbreak.FastbreakViewModel
+import com.joebad.fastbreak.model.dtos.DailyFastbreak
 import com.joebad.fastbreak.ui.screens.LoginScreen
 import com.joebad.fastbreak.ui.theme.LocalColors
 import io.ktor.client.HttpClient
@@ -177,7 +177,7 @@ fun App(
     val colors = LocalColors.current;
 
     try {
-        //      Database.delete("fastbreak")
+        //Database.delete("fastbreak")
     } catch (e: Exception) {
         println("Database already deleted")
     }

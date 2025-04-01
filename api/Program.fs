@@ -6,7 +6,7 @@ open Hangfire.Mongo.Migration.Strategies
 open MongoDB.Bson.Serialization
 open MongoDB.Driver
 open Saturn
-open ScheduleController
+open DailyFastbreakController
 open Google.Apis.Auth
 open Microsoft.AspNetCore.Http
 open System.Threading.Tasks
@@ -147,14 +147,12 @@ let endpointPipe =
 
 let defaultRouter =
     router {
-        // Public API routes
         forward
             "/api"
             (router {
                 pipe_through api
-                forward "/schedule" (scheduleController database)
+                forward "/daily" (dailyFastbreakController database)
                 
-                // Protected routes - nested under the same /api path
                 forward
                     "/auth"
                     (router {

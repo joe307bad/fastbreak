@@ -18,7 +18,8 @@ import kotlinx.datetime.toLocalDateTime
 fun FastbreakStateDisplay(
     repository: FastbreakStateRepository = FastbreakStateRepository(
         Database("fastbreak"),
-        HttpClient()
+        HttpClient(),
+        authRepository = null
     )
 ) {
     var fastbreakState by remember { mutableStateOf<Any?>(null) }

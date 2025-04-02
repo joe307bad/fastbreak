@@ -6,7 +6,7 @@ open Giraffe
 open Microsoft.AspNetCore.Http
 open MongoDB.Driver
 open Saturn.Endpoint
-open ScheduleEntity
+open Utils
 open api.Entities.EmptyFastbreakCard
 
 type Game =
@@ -46,7 +46,7 @@ let getDailyFastbreakHandler (database: IMongoDatabase) (next: HttpFunc) (ctx: H
     task {
         let collection = database.GetCollection<EmptyFastBreakCard>("empty-fastbreak-cards")
 
-        let tomorrow = DateTime.Now.AddDays(1).ToString("yyyyMMdd")
+        let tomorrow = DateTime.Now.ToString("yyyyMMdd")
 
         let filter = Builders<EmptyFastBreakCard>.Filter.Eq((fun x -> x.date), tomorrow)
 
@@ -60,9 +60,7 @@ let getScheduleHandler database (next: HttpFunc) (ctx: HttpContext) =
     let schedules = async { return Task.FromResult } |> Async.RunSynchronously
     json schedules next ctx
 
-let dailyFastbreakController database =
-
+let dailyFastbreakRouter database =
     router {
         get "/daily" (getDailyFastbreakHandler database)
-        get "/schedule" (getScheduleHandler database)
     }

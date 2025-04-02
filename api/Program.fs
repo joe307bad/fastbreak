@@ -7,10 +7,6 @@ open MongoDB.Bson.Serialization
 open MongoDB.Driver
 open Saturn
 open DailyFastbreakController
-open Google.Apis.Auth
-open Microsoft.AspNetCore.Http
-open System.Threading.Tasks
-open Giraffe
 open Microsoft.AspNetCore.Builder
 open Microsoft.Extensions.DependencyInjection
 open Hangfire
@@ -18,7 +14,7 @@ open Hangfire.Mongo
 open DotNetEnv
 open Saturn.Endpoint
 open SchedulePuller
-open api.Todos
+open api.Controllers.LockCardController
 
 Env.Load() |> ignore
 
@@ -34,46 +30,6 @@ let mongoPass = Environment.GetEnvironmentVariable "MONGO_PASS"
 let mongoIp = Environment.GetEnvironmentVariable "MONGO_IP"
 let mongoDb = Environment.GetEnvironmentVariable "MONGO_DB"
 
-let validateGoogleToken (idToken: string) =
-    task {
-        try
-            let! payload = GoogleJsonWebSignature.ValidateAsync(idToken)
-            return Some payload
-        with ex ->
-            return None
-    }
-
-let requireGoogleAuth: HttpFunc -> HttpContext -> Task<HttpContext option> =
-    fun next ctx ->
-        task {
-            match ctx.Request.Headers.TryGetValue("Authorization") with
-            | true, values when values.Count > 0 ->
-                let token = values.[0].Replace("Bearer ", "").Trim()
-                let! payloadOpt = validateGoogleToken token
-
-                match payloadOpt with
-                | Some payload ->
-                    ctx.Items.["GoogleUser"] <- payload
-                    return! next ctx
-                | None ->
-                    ctx.SetStatusCode 401
-                    ctx.WriteJsonAsync("Token invalid") |> ignore
-                    return Some(ctx)
-            | _ ->
-                ctx.SetStatusCode 404
-                ctx.WriteJsonAsync("Not foiuhiuhund") |> ignore
-                return Some(ctx)
-        }
-
-
-
-let api = pipeline { set_header "x-pipeline-type" "API" }
-
-let googleAuthPipeline =
-    pipeline {
-        plug requireGoogleAuth
-        set_header "x-pipeline-type" "API"
-    }
 
 BsonClassMap.RegisterClassMap<ScheduleEntity.Event>(fun cm ->
     cm.AutoMap()
@@ -144,22 +100,16 @@ let endpointPipe =
         plug head
         plug requestId
     }
-
-let defaultRouter =
+    
+let apiRouter =
     router {
-        forward
-            "/api"
-            (router {
-                pipe_through api
-                forward "/fastbreak" (dailyFastbreakController database)
-                
-                forward
-                    "/auth"
-                    (router {
-                        pipe_through googleAuthPipeline
-                        get "/todos1" Find
-                    })
-            })
+        forward "" (lockCardRouter database)
+        forward "" (dailyFastbreakRouter database)
+    }
+
+let appRouter =
+    router {
+        forward "/api" apiRouter
     }
 
 let app =
@@ -171,7 +121,7 @@ let app =
 
     application {
         url "http://0.0.0.0:8085"
-        use_endpoint_router defaultRouter
+        use_endpoint_router appRouter
         service_config configureHangfire
         use_developer_exceptions
         app_config configureApp

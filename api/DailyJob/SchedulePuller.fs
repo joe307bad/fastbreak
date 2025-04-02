@@ -24,10 +24,25 @@ open System.Globalization
 open api.Entities.EmptyFastbreakCard
 
 let formatDateParts (isoDateString: string) =
-    let date = DateTimeOffset.Parse(isoDateString)
+    // Parse the input date
+    let dateUtc = DateTimeOffset.Parse(isoDateString)
 
-    // Get day of week (Monday)
-    let dayOfWeek = date.DayOfWeek.ToString()
+    // Convert to Eastern Time
+    let easternZone =
+        TimeZoneInfo.FindSystemTimeZoneById("Eastern Standard Time") // Windows
+        |> function
+            | tz -> tz
+
+    // Convert the date to Eastern Time
+    let date = TimeZoneInfo.ConvertTime(dateUtc, easternZone)
+
+    let dayOfWeek =
+        let fullDay = date.DayOfWeek.ToString()
+
+        if fullDay.Length > 6 then
+            fullDay.Substring(0, 3) + "."
+        else
+            fullDay
 
     // Format month and day (Mar. 5th)
     let monthDay = date.ToString("MMM. d", CultureInfo.InvariantCulture)
@@ -179,7 +194,10 @@ let getAllSchedules (runAllAsync: RunScheduleUpserts) (date: string) : Async<seq
 
 
 let pullTomorrowsSchedule (database) =
-    let tomorrow = DateTime.UtcNow.AddDays(1).ToString("yyyyMMdd")
+    let dates =
+        [ DateTime.UtcNow.AddDays(-1).ToString("yyyyMMdd") // yesterday
+          DateTime.UtcNow.ToString("yyyyMMdd") // today
+          DateTime.UtcNow.AddDays(1).ToString("yyyyMMdd") ] // tomorrow
 
     let runAllAsync date =
         urls
@@ -196,21 +214,35 @@ let pullTomorrowsSchedule (database) =
     let collection: IMongoCollection<EmptyFastBreakCard> =
         database.GetCollection<EmptyFastBreakCard>("empty-fastbreak-cards")
 
-    let emptyFastbreakCard =
-        getAllSchedules runAllAsync tomorrow
-        |> Async.RunSynchronously
-        |> getTomorrowsSchedulesHandler
 
-    async {
-        let! cardItems = emptyFastbreakCard |> Async.AwaitTask
 
-        let filter = Builders<EmptyFastBreakCard>.Filter.Eq("date", tomorrow)
 
-        let updateOptions = ReplaceOptions(IsUpsert = true)
+    let insertEmptyFastbreakCard (date: string) =
+        async {
+            let emptyFastbreakCard =
+                getAllSchedules runAllAsync date
+                |> Async.RunSynchronously
+                |> getTomorrowsSchedulesHandler
 
-        let result =
-            collection.ReplaceOne(filter, { date = tomorrow; items = List.toArray cardItems }, updateOptions)
+            let! cardItems = emptyFastbreakCard |> Async.AwaitTask
 
-        printfn $"Empty Fastbreak card inserted for {tomorrow}\n"
-    }
+            let filter = Builders<EmptyFastBreakCard>.Filter.Eq("date", date)
+
+            let updateOptions = ReplaceOptions(IsUpsert = true)
+
+            let result =
+                collection.ReplaceOne(
+                    filter,
+                    { date = date
+                      items = List.toArray cardItems },
+                    updateOptions
+                )
+
+            printfn $"Empty Fastbreak card inserted for {date}\n"
+        }
+
+    dates
+    |> List.map insertEmptyFastbreakCard
+    |> Async.Parallel
     |> Async.RunSynchronously
+// return results

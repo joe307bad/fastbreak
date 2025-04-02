@@ -1,10 +1,12 @@
 package com.joebad.fastbreak.data.dailyFastbreak
 
+import AuthedUser
 import com.joebad.fastbreak.model.dtos.DailyFastbreak
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.request.get
+import io.ktor.client.request.header
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
@@ -43,11 +45,13 @@ suspend fun getDailyFastbreak(url: String): DailyFastbreak? {
 
 suspend fun lockDailyFastbreakCard(
     url: String,
-    fastbreakSelectionState: FastbreakSelectionState
+    fastbreakSelectionState: FastbreakSelectionState,
+    authedUser: AuthedUser
 ): LockCardResponse? {
     return try {
         client.post(url) {
             contentType(ContentType.Application.Json)
+            header("Authorization", "Bearer ${authedUser.idToken}")
             setBody(fastbreakSelectionState)
         }.body<LockCardResponse>()
     } catch (e: Exception) {

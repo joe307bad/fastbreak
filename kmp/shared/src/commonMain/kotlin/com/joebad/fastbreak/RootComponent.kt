@@ -186,7 +186,8 @@ fun App(
 
     val dailyFastbreakRepository = FastbreakStateRepository(
         db,
-        HttpClient()
+        HttpClient(),
+        authRepository
     )
 
     val coroutineScope = rememberCoroutineScope()

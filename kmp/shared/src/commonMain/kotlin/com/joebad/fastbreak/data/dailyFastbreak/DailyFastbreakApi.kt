@@ -37,8 +37,6 @@ suspend fun getDailyFastbreak(url: String): DailyFastbreak? {
     } catch (e: Exception) {
         println("Error fetching data: ${e.message}")
         null
-    } finally {
-        client.close()
     }
 }
 

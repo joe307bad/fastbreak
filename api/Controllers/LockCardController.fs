@@ -1,6 +1,9 @@
 module api.Controllers.LockCardController
 
 open System
+open System.IO
+open System.Text
+open System.Text.Json
 open System.Threading.Tasks
 open Giraffe
 open Microsoft.AspNetCore.Http
@@ -47,13 +50,47 @@ let googleAuthPipeline =
         set_header "x-pipeline-type" "API"
     }
 
-let lockCardHandler database (next: HttpFunc) (ctx: HttpContext) =
-    let schedules = async { return Task.FromResult } |> Async.RunSynchronously
-    json schedules next ctx
-    
+[<CLIMutable>]
+type FastbreakSelection =
+    { id: string
+      userAnswer: string
+      points: int
+      description: string
+      ``type``: string }
 
+[<CLIMutable>]
+type FastbreakSelectionState =
+    { selections: FastbreakSelection list
+      totalPoints: int
+      id: string option
+      locked: bool option }
 
-// Protected routes
+let getRawBody (ctx: HttpContext) =
+    task {
+        ctx.Request.EnableBuffering() // Allows rereading the stream
+        use reader = new StreamReader(ctx.Request.Body, Encoding.UTF8, true, 1024, true)
+        let! body = reader.ReadToEndAsync()
+        ctx.Request.Body.Position <- 0L // Reset stream position for later reading (e.g., model binding)
+        return body
+    }
+
+let deserializeBody<'T> (ctx: HttpContext) =
+    task {
+        let! body = getRawBody ctx
+        let options = JsonSerializerOptions(PropertyNameCaseInsensitive = true)
+        let result = JsonSerializer.Deserialize<'T>(body, options)
+        return result
+    }
+
+let lockCardHandler (database: IMongoDatabase) : HttpHandler =
+    fun next ctx ->
+        task {
+            let! maybeState = deserializeBody<FastbreakSelectionState> ctx
+            match maybeState with
+            | state ->
+                return! Successful.ok (json state) next ctx
+        }
+
 let lockCardRouter database =
     router {
         pipe_through googleAuthPipeline

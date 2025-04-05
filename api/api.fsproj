@@ -3,9 +3,13 @@
     <TargetFramework>net9.0</TargetFramework>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="Utils\apiRouter.fs" />
+    <Compile Include="Utils\asyncMap.fs" />
+    <Compile Include="Utils\tryGetSubject.fs" />
     <Compile Include="Entities\ScheduleEntity.fs" />
-    <Compile Include="Controllers\ScheduleController.fs" />
-    <Compile Include="Controllers\PickController.fs" />
+    <Compile Include="Entities\EmptyFastbreakCard.fs" />
+    <Compile Include="Controllers\DailyFastbreakController.fs" />
+    <Compile Include="Controllers\LockCardController.fs" />
     <Compile Include="DailyJob\SchedulePuller.fs" />
     <Compile Include="Todos.fs" />
     <Compile Include="Program.fs" />

@@ -40,6 +40,8 @@ import com.arkivanov.decompose.extensions.compose.subscribeAsState
 import com.joebad.fastbreak.ProtectedComponent
 import com.joebad.fastbreak.Theme
 import com.joebad.fastbreak.ThemePreference
+import com.joebad.fastbreak.data.dailyFastbreak.FastbreakViewModel
+import com.joebad.fastbreak.model.dtos.DailyFastbreak
 import com.joebad.fastbreak.ui.theme.LocalColors
 import kotlinx.coroutines.launch
 import kotlinx.datetime.Clock
@@ -54,7 +56,9 @@ fun ProtectedContent(
     onToggleTheme: (theme: Theme) -> Unit,
     themePreference: ThemePreference,
     dailyFastbreak: DailyFastbreak?,
-    viewModel: FastbreakViewModel
+    viewModel: FastbreakViewModel,
+    authRepository: AuthRepository,
+    onLogout: () -> Unit
 ) {
 
     val locked = viewModel.container.stateFlow.collectAsState().value.locked ?: false;
@@ -111,7 +115,17 @@ fun ProtectedContent(
             DrawerContent(
                 onShowLastweeksFastbreakCard = { showLastweeksFastbreakCard.value = true },
                 themePreference = themePreference,
-                onToggleTheme = onToggleTheme
+                onToggleTheme = onToggleTheme,
+                goToSettings = {
+                    scope.launch {
+                        launch { drawerState.close() }
+                        launch {
+                            if (activeChild.instance != ProtectedComponent.Child.Settings) {
+                                component.goToSettings()
+                            }
+                        }
+                    }
+                }
             )
         }
     ) {
@@ -177,6 +191,10 @@ fun ProtectedContent(
                     }
                     Column(modifier = Modifier.zIndex(2f)) {
                         when (child.instance) {
+                            is ProtectedComponent.Child.Settings -> {
+                                SettingsScreen(onLogout = onLogout)
+                            }
+
                             is ProtectedComponent.Child.Home -> {
                                 HomeScreen(
                                     locked,

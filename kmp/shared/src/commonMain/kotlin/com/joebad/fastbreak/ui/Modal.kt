@@ -32,6 +32,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
+import com.joebad.fastbreak.data.dailyFastbreak.FastbreakViewModel
 import com.joebad.fastbreak.ui.theme.LocalColors
 import kotlin.random.Random
 
@@ -157,6 +158,7 @@ fun BlurredScreen(
                 Column(modifier = Modifier.padding(20.dp).align(Alignment.BottomCenter)) {
                     AnimatedBorderButton(
                         locked = locked,
+                        enableLocking = true,
                         onLocked = onLocked,
                         borderColor = colors.accent, //darken(colors.accent, 0.7f),
                         bottomBorderColor = colors.accent //darken(colors.accent, 0.7f)

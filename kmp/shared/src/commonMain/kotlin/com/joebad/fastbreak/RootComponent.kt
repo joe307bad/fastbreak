@@ -190,20 +190,21 @@ fun App(
         authRepository
     )
 
+    val currentDate =
+        Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date.toString()
+
     val coroutineScope = rememberCoroutineScope()
     var fastbreakState by remember { mutableStateOf<DailyFastbreak?>(null) }
 
     val viewModel = remember {
         FastbreakViewModel(
             db,
-            { state -> onLock(dailyFastbreakRepository, coroutineScope, state) }
+            { state -> onLock(dailyFastbreakRepository, coroutineScope, state) },
+            currentDate.replace("-", "")
         )
     }
 
     var error by remember { mutableStateOf<String?>(null) }
-
-    val currentDate =
-        Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date.toString()
 
     LaunchedEffect(key1 = Unit) {
         coroutineScope.launch {

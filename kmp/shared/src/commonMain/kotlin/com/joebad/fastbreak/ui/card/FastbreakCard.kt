@@ -54,7 +54,7 @@ fun FastbreakCard(
                     )
                     Row(modifier = Modifier.fillMaxWidth()) {
                         Text(
-                            "ID: ${state?.id}",
+                            "ID: ${state?.cardId}",
                             modifier = Modifier.weight(1f),
                             style = TextStyle(
                                 fontFamily = FontFamily.Monospace, fontSize = 17.sp,

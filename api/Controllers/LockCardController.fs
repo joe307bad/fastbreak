@@ -1,6 +1,5 @@
 module api.Controllers.LockCardController
 
-open System
 open System.IO
 open System.Text
 open System.Text.Json
@@ -11,7 +10,7 @@ open MongoDB.Driver
 open Saturn
 open Saturn.Endpoint
 open Google.Apis.Auth
-open Utils
+open api.Utils.tryGetSubject
 
 let validateGoogleToken (idToken: string) =
     task {
@@ -40,7 +39,7 @@ let requireGoogleAuth: HttpFunc -> HttpContext -> Task<HttpContext option> =
                     return Some(ctx)
             | _ ->
                 ctx.SetStatusCode 404
-                ctx.WriteJsonAsync("Not foiuhiuhund") |> ignore
+                ctx.WriteJsonAsync("Not found") |> ignore
                 return Some(ctx)
         }
 
@@ -62,8 +61,12 @@ type FastbreakSelection =
 type FastbreakSelectionState =
     { selections: FastbreakSelection list
       totalPoints: int
-      id: string option
-      locked: bool option }
+      date: string
+      cardId: string
+      userId: string
+      locked: bool }
+
+type GoogleUser = { subject: string }
 
 let getRawBody (ctx: HttpContext) =
     task {
@@ -85,10 +88,34 @@ let deserializeBody<'T> (ctx: HttpContext) =
 let lockCardHandler (database: IMongoDatabase) : HttpHandler =
     fun next ctx ->
         task {
-            let! maybeState = deserializeBody<FastbreakSelectionState> ctx
-            match maybeState with
-            | state ->
-                return! Successful.ok (json state) next ctx
+            let! state = deserializeBody<FastbreakSelectionState> ctx
+            let userId = tryGetSubject ctx;
+
+            return!
+                match userId with
+                | Some userId ->
+                    let collection: IMongoCollection<FastbreakSelectionState> =
+                            database.GetCollection<FastbreakSelectionState>("locked-fastbreak-cards")
+
+                    let filter =
+                        Builders<FastbreakSelectionState>.Filter.And(
+                            Builders<FastbreakSelectionState>.Filter.Eq(_.userId, userId),
+                            Builders<FastbreakSelectionState>.Filter.Eq(_.date, state.date)
+                        )
+
+                    let update =
+                        Builders<FastbreakSelectionState>.Update
+                            .Set(_.selections, state.selections)
+                            .Set(_.totalPoints, state.totalPoints)
+                            .Set(_.cardId, state.cardId)
+
+                    let updateOptions = UpdateOptions(IsUpsert = true)
+
+                    let result =
+                        collection.UpdateOne(filter, update, updateOptions)
+
+                    Successful.ok (json result) next ctx
+                | None -> Successful.ok (json {| error = "Error locking card" |}) next ctx
         }
 
 let lockCardRouter database =

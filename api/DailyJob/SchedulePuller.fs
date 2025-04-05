@@ -214,9 +214,6 @@ let pullTomorrowsSchedule (database) =
     let collection: IMongoCollection<EmptyFastBreakCard> =
         database.GetCollection<EmptyFastBreakCard>("empty-fastbreak-cards")
 
-
-
-
     let insertEmptyFastbreakCard (date: string) =
         async {
             let emptyFastbreakCard =

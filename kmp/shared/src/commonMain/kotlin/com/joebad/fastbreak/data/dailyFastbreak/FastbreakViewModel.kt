@@ -24,8 +24,9 @@ data class FastbreakSelection(
 data class FastbreakSelectionState(
     val selections: List<FastbreakSelection> = emptyList(),
     val totalPoints: Int = 0,
-    val id: String? = getRandomId(),
-    val locked: Boolean? = false
+    val cardId: String = getRandomId(),
+    val locked: Boolean? = false,
+    val date: String,
 )
 
 sealed class FastbreakSideEffect {
@@ -39,13 +40,14 @@ sealed class FastbreakSideEffect {
 
 class FastbreakViewModel(
     database: Database,
-    onLock: (state: FastbreakSelectionState) -> Unit
+    onLock: (state: FastbreakSelectionState) -> Unit,
+    date: String
 ) : ContainerHost<FastbreakSelectionState, FastbreakSideEffect>, CoroutineScope by MainScope() {
 
     private val persistence = FastbreakSelectionsPersistence(database)
 
     override val container: Container<FastbreakSelectionState, FastbreakSideEffect> = container(
-        initialState = FastbreakSelectionState()
+        initialState = FastbreakSelectionState(date = date)
     )
 
     init {
@@ -140,7 +142,7 @@ class FastbreakViewModel(
         launch {
             try {
                 val state = container.stateFlow.value;
-                persistence.saveSelections(state.id ?: "", state.selections, state.locked);
+                persistence.saveSelections(state.cardId ?: "", state.selections, state.locked);
             } catch (e: Exception) {
                 println(e)
             }
@@ -155,7 +157,7 @@ class FastbreakViewModel(
                     intent {
                         reduce {
                             state.copy(
-                                id = savedSelections.id,
+                                cardId = savedSelections.id,
                                 selections = savedSelections.selectionDtos,
                                 totalPoints = savedSelections.selectionDtos.sumOf { it.points },
                                 locked = savedSelections.locked

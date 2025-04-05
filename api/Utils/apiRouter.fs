@@ -1,4 +1,4 @@
-module Utils
+module Utils.apiRouter
 
 open Giraffe
 open Saturn

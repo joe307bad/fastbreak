@@ -1,10 +1,15 @@
 package com.joebad.fastbreak.data.dailyFastbreak
 
+import AuthRepository
 import kotbase.Array
 import kotbase.Collection
+import kotbase.DataSource
 import kotbase.Database
-import kotbase.Document
+import kotbase.Expression
 import kotbase.MutableDocument
+import kotbase.QueryBuilder
+import kotbase.Result
+import kotbase.SelectResult
 import kotlinx.datetime.Clock
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
@@ -12,9 +17,9 @@ import kotlinx.serialization.Serializable
 import kotlin.time.Duration.Companion.days
 
 @Serializable
-data class SelectionsWrapper(val id: String, val selectionDtos: List<FastbreakSelection>, val locked: Boolean? = false)
+data class SelectionsWrapper(val cardId: String, val selectionDtos: List<FastbreakSelection>, val locked: Boolean? = false)
 
-class FastbreakSelectionsPersistence(private val db: Database) {
+class FastbreakSelectionsPersistence(private val db: Database, private val authRepository: AuthRepository?) {
 
     private val collectionRef: Collection? by lazy {
         val existingCollection = db.getCollection("fastbreak_selections")
@@ -29,7 +34,7 @@ class FastbreakSelectionsPersistence(private val db: Database) {
             ?: throw IllegalStateException("Collection 'fastbreak_selections' not found")
     }
 
-    fun saveSelections(id: String, selections: List<FastbreakSelection>, locked: Boolean? = false) {
+    fun saveSelections(cardId: String, selections: List<FastbreakSelection>, locked: Boolean? = false) {
 
         val selectionMaps = selections.map { selection ->
             mapOf(
@@ -46,9 +51,11 @@ class FastbreakSelectionsPersistence(private val db: Database) {
             .date
             .toString()
 
-        val document = MutableDocument(today)
+        val document = MutableDocument()
         document.setValue("selections", selectionMaps)
-        document.setString("id", id)
+        document.setString("cardId", cardId)
+        document.setString("userId", authRepository?.getUser()?.userId)
+        document.setString("date", today)
         document.setBoolean("locked", locked ?: false)
 
         getCollectionSafe().save(document)
@@ -68,18 +75,24 @@ class FastbreakSelectionsPersistence(private val db: Database) {
             .date
             .toString()
 
-        val document = getCollectionSafe().getDocument(today)
+        val document = QueryBuilder
+            .select(SelectResult.all())
+            .from(DataSource.collection(getCollectionSafe()))
+            .where(
+                Expression.property("date").equalTo(Expression.string(today))
+                    .and(Expression.property("userId").equalTo(Expression.string(authRepository?.getUser()?.userId)))
+            ).execute().first()
         val yestDocument = getCollectionSafe().getDocument(yesterday)
 
-        val id = document?.getString("id") ?: return null
+        val cardId = document?.getString("cardId") ?: return null
         val selections = getSelectionsFromDocument(document);
         val locked = document.getBoolean("locked");
 
 
-        return SelectionsWrapper(id, selections.toList(), locked)
+        return SelectionsWrapper(cardId, selections.toList(), locked)
     }
 
-    private fun getSelectionsFromDocument(document: Document): List<FastbreakSelection> {
+    private fun getSelectionsFromDocument(document: Result): List<FastbreakSelection> {
         @Suppress("UNCHECKED_CAST")
         val selectionsValue = document.getValue("selections") as Array?
 

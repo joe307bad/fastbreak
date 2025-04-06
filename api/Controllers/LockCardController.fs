@@ -11,6 +11,7 @@ open MongoDB.Driver
 open Saturn
 open Saturn.Endpoint
 open Google.Apis.Auth
+open Shared
 open api.Utils.tryGetSubject
 
 let validateGoogleToken (idToken: string) =
@@ -50,22 +51,7 @@ let googleAuthPipeline =
         set_header "x-pipeline-type" "API"
     }
 
-[<CLIMutable>]
-type FastbreakSelection =
-    { id: string
-      userAnswer: string
-      points: int
-      description: string
-      ``type``: string }
 
-[<CLIMutable>]
-type FastbreakSelectionState =
-    { selections: FastbreakSelection list
-      totalPoints: int
-      date: string
-      cardId: string
-      userId: string
-      locked: bool }
 
 type GoogleUser = { subject: string }
 

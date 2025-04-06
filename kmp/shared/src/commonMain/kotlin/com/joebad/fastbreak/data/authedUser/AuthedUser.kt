@@ -2,14 +2,14 @@
 import com.liftric.kvault.KVault
 import kotlinx.datetime.Clock
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
 @Serializable
 data class AuthedUser(
     val email: String,
     val exp: Long,
-    val idToken: String
+    val idToken: String,
+    val userId: String
 )
 
 class AuthRepository(private val secureStorage: KVault) {

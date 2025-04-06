@@ -3,6 +3,7 @@
     <TargetFramework>net9.0</TargetFramework>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="Shared\FastbreakSelectionState.fs" />
     <Compile Include="Utils\apiRouter.fs" />
     <Compile Include="Utils\asyncMap.fs" />
     <Compile Include="Utils\tryGetSubject.fs" />

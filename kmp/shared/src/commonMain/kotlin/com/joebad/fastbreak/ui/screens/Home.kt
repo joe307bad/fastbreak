@@ -12,7 +12,7 @@ fun HomeScreen(
     animatedAlpha: Float,
     showModal: MutableState<Boolean>,
     dailyFastbreak: DailyFastbreak?,
-    viewModel: FastbreakViewModel
+    viewModel: FastbreakViewModel?
 ) {
     FastbreakHome(
         locked,

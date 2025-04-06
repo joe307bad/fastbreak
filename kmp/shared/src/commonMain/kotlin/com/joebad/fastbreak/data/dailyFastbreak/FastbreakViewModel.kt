@@ -1,4 +1,5 @@
 package com.joebad.fastbreak.data.dailyFastbreak
+import AuthRepository
 import getRandomId
 import kotbase.Database
 import kotlinx.coroutines.CoroutineScope
@@ -41,10 +42,11 @@ sealed class FastbreakSideEffect {
 class FastbreakViewModel(
     database: Database,
     onLock: (state: FastbreakSelectionState) -> Unit,
-    date: String
+    date: String,
+    private val authRepository: AuthRepository?
 ) : ContainerHost<FastbreakSelectionState, FastbreakSideEffect>, CoroutineScope by MainScope() {
 
-    private val persistence = FastbreakSelectionsPersistence(database)
+    private val persistence = FastbreakSelectionsPersistence(database, authRepository)
 
     override val container: Container<FastbreakSelectionState, FastbreakSideEffect> = container(
         initialState = FastbreakSelectionState(date = date)
@@ -157,7 +159,7 @@ class FastbreakViewModel(
                     intent {
                         reduce {
                             state.copy(
-                                cardId = savedSelections.id,
+                                cardId = savedSelections.cardId,
                                 selections = savedSelections.selectionDtos,
                                 totalPoints = savedSelections.selectionDtos.sumOf { it.points },
                                 locked = savedSelections.locked

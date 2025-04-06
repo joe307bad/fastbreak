@@ -24,10 +24,10 @@ fun FastbreakHome(
     animatedAlpha: Float,
     showModal: MutableState<Boolean>,
     dailyFastbreak: DailyFastbreak?,
-    fastbreakViewModel: FastbreakViewModel
+    fastbreakViewModel: FastbreakViewModel?
 ) {
 
-    val totalPoints = fastbreakViewModel.container.stateFlow.collectAsState().value.totalPoints;
+    val totalPoints = fastbreakViewModel?.container?.stateFlow?.collectAsState()?.value?.totalPoints;
     Box(modifier = Modifier.fillMaxSize()) {
         LazyColumn(
             state = listState,
@@ -41,7 +41,7 @@ fun FastbreakHome(
                 Spacer(
                     modifier = Modifier.height(130.dp)
                 )
-                if (dailyFastbreak == null)
+                if (dailyFastbreak == null || fastbreakViewModel == null)
                     LoadingDailyFastbreak()
                 else
                     FastbreakHomeList(dailyFastbreak, fastbreakViewModel)

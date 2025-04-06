@@ -1,14 +1,16 @@
 package com.joebad.fastbreak.data.dailyFastbreak
 
 import AuthedUser
-import com.joebad.fastbreak.model.dtos.DailyFastbreak
+import com.joebad.fastbreak.model.dtos.DailyResponse
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.request.get
 import io.ktor.client.request.header
+import io.ktor.client.request.parameter
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
+import io.ktor.client.request.url
 import io.ktor.http.ContentType
 import io.ktor.http.contentType
 import io.ktor.serialization.kotlinx.json.json
@@ -31,9 +33,12 @@ val client = HttpClient {
     }
 }
 
-suspend fun getDailyFastbreak(url: String): DailyFastbreak? {
+suspend fun getDailyFastbreak(url: String, userId: String? = ""): DailyResponse? {
     return try {
-        client.get(url).body<DailyFastbreak>()
+        client.get {
+            url(url)
+            parameter("userId", userId)
+        }.body<DailyResponse>()
     } catch (e: Exception) {
         println("Error fetching data: ${e.message}")
         null
@@ -54,18 +59,6 @@ suspend fun lockDailyFastbreakCard(
         }.body<LockCardResponse>()
     } catch (e: Exception) {
         println("Error locking fastbreak card: ${e.message}")
-        null
-    }
-}
-
-suspend fun getLockedCard(
-    url: String,
-    userId: String,
-): FastbreakSelectionState? {
-    return try {
-        client.get("$url/$userId").body<FastbreakSelectionState>()
-    } catch (e: Exception) {
-        println("Error finding locked fastbreak card: ${e.message}")
         null
     }
 }

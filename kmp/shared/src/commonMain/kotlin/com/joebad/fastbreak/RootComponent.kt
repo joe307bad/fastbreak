@@ -5,12 +5,6 @@ import ProtectedContent
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Surface
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.arkivanov.decompose.ComponentContext
 import com.arkivanov.decompose.DefaultComponentContext
@@ -29,17 +23,11 @@ import com.arkivanov.decompose.value.Value
 import com.arkivanov.essenty.lifecycle.LifecycleRegistry
 import com.joebad.fastbreak.data.dailyFastbreak.FastbreakSelectionState
 import com.joebad.fastbreak.data.dailyFastbreak.FastbreakStateRepository
-import com.joebad.fastbreak.data.dailyFastbreak.FastbreakViewModel
-import com.joebad.fastbreak.model.dtos.DailyFastbreak
 import com.joebad.fastbreak.ui.screens.LoginScreen
 import com.joebad.fastbreak.ui.theme.LocalColors
-import io.ktor.client.HttpClient
 import kotbase.Database
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
-import kotlinx.datetime.Clock
-import kotlinx.datetime.TimeZone
-import kotlinx.datetime.toLocalDateTime
 
 fun shouldEnforceLogin(authRepository: AuthRepository): Boolean {
     val authedUser = authRepository.getUser()
@@ -177,44 +165,9 @@ fun App(
     val colors = LocalColors.current;
 
     try {
-        //Database.delete("fastbreak")
+        Database.delete("fastbreak")
     } catch (e: Exception) {
         println("Database already deleted")
-    }
-
-    val db = Database("fastbreak");
-
-    val dailyFastbreakRepository = FastbreakStateRepository(
-        db,
-        HttpClient(),
-        authRepository
-    )
-
-    val currentDate =
-        Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date.toString()
-
-    val coroutineScope = rememberCoroutineScope()
-    var fastbreakState by remember { mutableStateOf<DailyFastbreak?>(null) }
-
-    val viewModel = remember {
-        FastbreakViewModel(
-            db,
-            { state -> onLock(dailyFastbreakRepository, coroutineScope, state) },
-            currentDate.replace("-", "")
-        )
-    }
-
-    var error by remember { mutableStateOf<String?>(null) }
-
-    LaunchedEffect(key1 = Unit) {
-        coroutineScope.launch {
-            try {
-                fastbreakState = dailyFastbreakRepository.getDailyFastbreakState(currentDate)
-                print(fastbreakState);
-            } catch (e: Exception) {
-                error = "Failed to fetch state: ${e.message}"
-            }
-        }
     }
 
     MaterialTheme {
@@ -238,8 +191,6 @@ fun App(
                         instance.component,
                         onToggleTheme,
                         themePreference = themePreference,
-                        fastbreakState,
-                        viewModel,
                         authRepository,
                         onLogout = {
                             authRepository.clearUser()

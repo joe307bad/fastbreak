@@ -34,12 +34,14 @@ fun LoginScreen(goToHome: (user: AuthedUser) -> Unit, theme: Theme?) {
                         val jwt = JWT.from(token)
                         val email = jwt.claims["email"].toString();
                         val exp = jwt.claims.get("exp").toString().toLong();
+                        val sub = jwt.claims["sub"].toString().replace("\"", "")
                         println("Decoded payload: ${jwt.header}")
                         goToHome(
                             AuthedUser(
                                 email,
                                 exp,
-                                token
+                                token,
+                                userId = sub
                             )
                         )
                     }

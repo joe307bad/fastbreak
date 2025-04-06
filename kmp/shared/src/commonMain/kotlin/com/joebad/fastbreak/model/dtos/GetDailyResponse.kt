@@ -1,4 +1,5 @@
 package com.joebad.fastbreak.model.dtos
+import com.joebad.fastbreak.data.dailyFastbreak.FastbreakSelectionState
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -29,5 +30,13 @@ data class EmptyFastbreakCardItem(
 @Serializable
 data class DailyFastbreak(
     val leaderboard: List<LeaderboardItem>,
-    val fastbreakCard: List<EmptyFastbreakCardItem>
+    val fastbreakCard: List<EmptyFastbreakCardItem>,
+)
+
+
+@Serializable
+data class DailyResponse(
+    val leaderboard: List<LeaderboardItem>,
+    val fastbreakCard: List<EmptyFastbreakCardItem>,
+    val lockedCardForUser: FastbreakSelectionState? = null
 )

@@ -3,6 +3,7 @@ package com.joebad.fastbreak.data.dailyFastbreak
 import AuthRepository
 import com.joebad.fastbreak.getPlatform
 import com.joebad.fastbreak.model.dtos.DailyFastbreak
+import com.joebad.fastbreak.model.dtos.DailyResponse
 import io.ktor.client.HttpClient
 import kotbase.DataSource
 import kotbase.Database
@@ -19,6 +20,7 @@ class FastbreakStateRepository(
     private val httpClient: HttpClient,
     private val authRepository: AuthRepository?
 ) {
+    private val persistence = FastbreakSelectionsPersistence(db, authRepository)
 
     private val lastFetchedCollection =
         db.getCollection("LastFetchedCollection") ?: db.createCollection("LastFetchedCollection")
@@ -27,7 +29,6 @@ class FastbreakStateRepository(
     private val BASE_URL = if (getPlatform().name == "iOS") "localhost" else "10.0.2.2"
     private val GET_DAILY_FASTBREAK = "http://${BASE_URL}:8085/api/daily"
     private val LOCK_CARD = "http://${BASE_URL}:8085/api/lock"
-    private val GET_LOCKED_CARD = "http://${BASE_URL}:8085/api/lock"
 
     companion object {
         private const val LAST_FETCHED_KEY = "lastFetchedDate"
@@ -53,10 +54,17 @@ class FastbreakStateRepository(
 
     private suspend fun fetchAndStoreState(date: String): DailyFastbreak? {
         val response = fetchDailyFastbreak()
-        saveStateToDatabase(date, response)
+        val dailyFastbreak =
+            response?.let { DailyFastbreak(leaderboard = it.leaderboard, fastbreakCard = response.fastbreakCard) }
+        saveStateToDatabase(date, dailyFastbreak)
         saveLastFetchedTime()
         enforceMaxDocumentsLimit()
-        return response
+
+        if(response?.lockedCardForUser != null) {
+            val savedCard = response.lockedCardForUser;
+            persistence.saveSelections(savedCard.cardId, savedCard.selections, true)
+        }
+        return dailyFastbreak
     }
 
     suspend fun lockCardApi(fastbreakSelectionState: FastbreakSelectionState): LockCardResponse? {
@@ -65,8 +73,8 @@ class FastbreakStateRepository(
         return apiResponse
     }
 
-    private suspend fun fetchDailyFastbreak(): DailyFastbreak? {
-        val apiResponse = getDailyFastbreak(GET_DAILY_FASTBREAK)
+    private suspend fun fetchDailyFastbreak(): DailyResponse? {
+        val apiResponse = getDailyFastbreak(GET_DAILY_FASTBREAK, authRepository?.getUser()?.userId)
         return apiResponse
     }
 

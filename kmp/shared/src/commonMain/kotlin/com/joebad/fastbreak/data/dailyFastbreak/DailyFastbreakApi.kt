@@ -57,3 +57,15 @@ suspend fun lockDailyFastbreakCard(
         null
     }
 }
+
+suspend fun getLockedCard(
+    url: String,
+    userId: String,
+): FastbreakSelectionState? {
+    return try {
+        client.get("$url/$userId").body<FastbreakSelectionState>()
+    } catch (e: Exception) {
+        println("Error finding locked fastbreak card: ${e.message}")
+        null
+    }
+}

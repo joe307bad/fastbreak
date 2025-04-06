@@ -27,6 +27,7 @@ class FastbreakStateRepository(
     private val BASE_URL = if (getPlatform().name == "iOS") "localhost" else "10.0.2.2"
     private val GET_DAILY_FASTBREAK = "http://${BASE_URL}:8085/api/daily"
     private val LOCK_CARD = "http://${BASE_URL}:8085/api/lock"
+    private val GET_LOCKED_CARD = "http://${BASE_URL}:8085/api/lock"
 
     companion object {
         private const val LAST_FETCHED_KEY = "lastFetchedDate"

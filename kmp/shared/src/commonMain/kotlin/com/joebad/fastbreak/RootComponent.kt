@@ -25,7 +25,6 @@ import com.joebad.fastbreak.data.dailyFastbreak.FastbreakSelectionState
 import com.joebad.fastbreak.data.dailyFastbreak.FastbreakStateRepository
 import com.joebad.fastbreak.ui.screens.LoginScreen
 import com.joebad.fastbreak.ui.theme.LocalColors
-import kotbase.Database
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
@@ -165,7 +164,7 @@ fun App(
     val colors = LocalColors.current;
 
     try {
-        Database.delete("fastbreak")
+        // Database.delete("fastbreak")
     } catch (e: Exception) {
         println("Database already deleted")
     }

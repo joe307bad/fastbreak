@@ -5,10 +5,10 @@ import kotbase.Array
 import kotbase.Collection
 import kotbase.DataSource
 import kotbase.Database
+import kotbase.Dictionary
 import kotbase.Expression
 import kotbase.MutableDocument
 import kotbase.QueryBuilder
-import kotbase.Result
 import kotbase.SelectResult
 import kotlinx.datetime.Clock
 import kotlinx.datetime.TimeZone
@@ -50,6 +50,7 @@ class FastbreakSelectionsPersistence(private val db: Database, private val authR
             .toLocalDateTime(TimeZone.currentSystemDefault())
             .date
             .toString()
+            .replace("-", "")
 
         val document = MutableDocument()
         document.setValue("selections", selectionMaps)
@@ -66,6 +67,7 @@ class FastbreakSelectionsPersistence(private val db: Database, private val authR
             .toLocalDateTime(TimeZone.currentSystemDefault())
             .date
             .toString()
+            .replace("-", "")
         val yesterday = (Clock.System.now() - 1.days)
             .toLocalDateTime(TimeZone.currentSystemDefault())
             .date
@@ -84,17 +86,17 @@ class FastbreakSelectionsPersistence(private val db: Database, private val authR
             ).execute().first()
         val yestDocument = getCollectionSafe().getDocument(yesterday)
 
-        val cardId = document?.getString("cardId") ?: return null
-        val selections = getSelectionsFromDocument(document);
-        val locked = document.getBoolean("locked");
+        val fs = document?.getDictionary("fastbreak_selections");
+        val cardId = fs?.getString("cardId");
+        val selections = getSelectionsFromDocument(fs);
+        val locked = fs?.getBoolean("locked");
 
-
-        return SelectionsWrapper(cardId, selections.toList(), locked)
+        return cardId?.let { SelectionsWrapper(it, selections.toList(), locked) }
     }
 
-    private fun getSelectionsFromDocument(document: Result): List<FastbreakSelection> {
+    private fun getSelectionsFromDocument(document: Dictionary?): List<FastbreakSelection> {
         @Suppress("UNCHECKED_CAST")
-        val selectionsValue = document.getValue("selections") as Array?
+        val selectionsValue = document?.getValue("selections") as Array?
 
         if (selectionsValue != null) {
             try {

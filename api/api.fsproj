@@ -12,7 +12,6 @@
     <Compile Include="Controllers\DailyFastbreakController.fs" />
     <Compile Include="Controllers\LockCardController.fs" />
     <Compile Include="DailyJob\SchedulePuller.fs" />
-    <Compile Include="Todos.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
   <ItemGroup>

@@ -18,8 +18,8 @@ open api.Controllers.LockCardController
 
 Env.Load() |> ignore
 
-let enablePullTomorrowsSchedule =
-    match Environment.GetEnvironmentVariable "ENABLE_PULL_TOMORROWS_SCHEDULE" with
+let enableDailyJob =
+    match Environment.GetEnvironmentVariable "ENABLE_DAILY_JOB" with
     | "1" -> true
     | "0" -> false
     | null -> false // Default value if env var is not set
@@ -71,23 +71,27 @@ let configureHangfire (services: IServiceCollection) =
     services
 
 type JobRunner =
-    static member LogJob() =
-        if enablePullTomorrowsSchedule then
+    static member DailyJob() =
+        if enableDailyJob then
+            // run at 11:00pm each day
             pullTomorrowsSchedule (database)
-            printfn $"Tomorrows schedule pulled at %A{DateTime.UtcNow}"
+            // calculate results of the past day's fastbreak card for each user
+            // calculate stat sheets for tomorrow for each user
+            // 
+            printfn $"Daily job completed at %A{DateTime.UtcNow}"
         else
-            printfn $"Disabled | Pulling tomorrows schedule | %A{DateTime.UtcNow}"
+            printfn $"Disabled | Daily job | %A{DateTime.UtcNow}"
 
         printfn $"Daily job executed at %A{DateTime.UtcNow}"
 
 let scheduleJobs () =
     let methodCall: Expression<Action<JobRunner>> =
         Expression.Lambda<Action<JobRunner>>(
-            Expression.Call(typeof<JobRunner>.GetMethod("LogJob")),
+            Expression.Call(typeof<JobRunner>.GetMethod("DailyJob")),
             Expression.Parameter(typeof<JobRunner>, "x")
         )
 
-    RecurringJob.AddOrUpdate("every-second-job-3", methodCall, "*/1 * * * *")
+    RecurringJob.AddOrUpdate("daily-job", methodCall, "*/1 * * * *")
 
 let configureApp (app: IApplicationBuilder) =
     app.UseHangfireDashboard() |> ignore

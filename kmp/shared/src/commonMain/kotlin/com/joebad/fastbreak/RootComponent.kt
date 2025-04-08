@@ -164,7 +164,7 @@ fun App(
     val colors = LocalColors.current;
 
     try {
-        // Database.delete("fastbreak")
+        //Database.delete("fastbreak")
     } catch (e: Exception) {
         println("Database already deleted")
     }

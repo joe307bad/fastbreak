@@ -12,7 +12,6 @@ type FastbreakSelection =
     
 [<CLIMutable>]
 [<BsonIgnoreExtraElements>]
-[<Struct>]
 type FastbreakSelectionState =
     { selections: FastbreakSelection[]
       totalPoints: int

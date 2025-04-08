@@ -15,6 +15,7 @@ open DotNetEnv
 open Saturn.Endpoint
 open SchedulePuller
 open api.Controllers.LockCardController
+open api.DailyJob.CalculateFastbreakCardResults
 
 Env.Load() |> ignore
 
@@ -75,7 +76,10 @@ type JobRunner =
         if enableDailyJob then
             // run at 11:00pm each day
             pullTomorrowsSchedule (database)
+            
             // calculate results of the past day's fastbreak card for each user
+            calculateFastbreakCardResults (database)
+            
             // calculate stat sheets for tomorrow for each user
             // 
             printfn $"Daily job completed at %A{DateTime.UtcNow}"

@@ -55,29 +55,24 @@ let getDailyFastbreakHandler (database: IMongoDatabase) (next: HttpFunc) (ctx: H
         let lockedCardForUserAsync =
             match ctx.TryGetQueryStringValue "userId" with
             | Some id ->
-                let lockedCards =
-                    database.GetCollection<FastbreakSelectionState>("locked-fastbreak-cards")
-
-                let f =
-                    Builders<FastbreakSelectionState>.Filter
-                        .And(
-                            Builders<FastbreakSelectionState>.Filter.Eq(_.userId, id),
-                            Builders<FastbreakSelectionState>.Filter.Eq(_.date, today)
-                        )
-
                 async {
-                    try
-                        let! result = lockedCards.Find(f).FirstOrDefaultAsync() |> Async.AwaitTask
+                    let filter =
+                        Builders<FastbreakSelectionState>.Filter.Eq(_.userId, id)
+                        |> fun f ->
+                            Builders<FastbreakSelectionState>.Filter
+                                .And(f, Builders<FastbreakSelectionState>.Filter.Eq(_.date, today))
 
-                        return
-                            if obj.ReferenceEquals(result, null) then
-                                None
-                            else
-                                Some result
-                    with _ ->
-                        return None
+                    let! result =
+                        database
+                            .GetCollection<FastbreakSelectionState>("locked-fastbreak-cards")
+                            .Find(filter)
+                            .FirstOrDefaultAsync()
+                        |> Async.AwaitTask
+                        |> asyncMap Option.ofObj
+
+                    return result
                 }
-            | None -> async { return Option<FastbreakSelectionState>.None }
+            | None -> async { return None }
 
         match card with
         | None -> return! json Seq.empty next ctx
@@ -88,8 +83,8 @@ let getDailyFastbreakHandler (database: IMongoDatabase) (next: HttpFunc) (ctx: H
                         leaderboard = [||]
                         lockedCardForUser =
                          match lockedCardForUserAsync |> Async.RunSynchronously with
-                         | Some v -> Nullable(v)
-                         | None -> Nullable() |})
+                         | Some v -> box v
+                         | None -> null |})
                     next
                     ctx
     }

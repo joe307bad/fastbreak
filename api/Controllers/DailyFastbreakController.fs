@@ -42,10 +42,10 @@ type DailyFastbreak =
 
 let getDailyFastbreakHandler (database: IMongoDatabase) (next: HttpFunc) (ctx: HttpContext) =
     task {
-        let collection = database.GetCollection<EmptyFastBreakCard>("empty-fastbreak-cards")
+        let collection = database.GetCollection<EmptyFastbreakCard>("empty-fastbreak-cards")
         let today = DateTime.Now.ToString("yyyyMMdd")
 
-        let filter = Builders<EmptyFastBreakCard>.Filter.Eq((fun x -> x.date), today)
+        let filter = Builders<EmptyFastbreakCard>.Filter.Eq((fun x -> x.date), today)
 
         let! card =
             collection.Find(filter).FirstOrDefaultAsync()
@@ -88,6 +88,59 @@ let getDailyFastbreakHandler (database: IMongoDatabase) (next: HttpFunc) (ctx: H
                     next
                     ctx
     }
+    
+
+let getYesterdaysFastbreakHandler (database: IMongoDatabase) (next: HttpFunc) (ctx: HttpContext) =
+    task {
+        let collection = database.GetCollection<EmptyFastbreakCard>("empty-fastbreak-cards")
+        let yesterday = DateTime.Now.AddDays(-1).ToString("yyyyMMdd")
+
+        let filter = Builders<EmptyFastbreakCard>.Filter.Eq((fun x -> x.date), yesterday)
+
+        let! card =
+            collection.Find(filter).FirstOrDefaultAsync()
+            |> Async.AwaitTask
+            |> asyncMap Option.ofObj
+
+        let lockedCardForUserAsync =
+            match ctx.TryGetQueryStringValue "userId" with
+            | Some id ->
+                async {
+                    let filter =
+                        Builders<FastbreakSelectionState>.Filter.Eq(_.userId, id)
+                        |> fun f ->
+                            Builders<FastbreakSelectionState>.Filter
+                                .And(f, Builders<FastbreakSelectionState>.Filter.Eq(_.date, yesterday))
+
+                    let! result =
+                        database
+                            .GetCollection<FastbreakSelectionState>("locked-fastbreak-cards")
+                            .Find(filter)
+                            .FirstOrDefaultAsync()
+                        |> Async.AwaitTask
+                        |> asyncMap Option.ofObj
+
+                    return result
+                }
+            | None -> async { return None }
+
+        match card with
+        | None -> return! json Seq.empty next ctx
+        | Some card ->
+            return!
+                json
+                    ({| fastbreakCard = card.items
+                        leaderboard = [||]
+                        lockedCardForUser =
+                         match lockedCardForUserAsync |> Async.RunSynchronously with
+                         | Some v -> box v
+                         | None -> null |})
+                    next
+                    ctx
+    }
 
 let dailyFastbreakRouter database =
-    router { get "/daily" (getDailyFastbreakHandler database) }
+    router {
+        get "/daily" (getDailyFastbreakHandler database)
+        get "/yesterday" (getYesterdaysFastbreakHandler database)
+    }

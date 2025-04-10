@@ -73,12 +73,6 @@ let getTomorrowsSchedulesHandler (schedule: Schedule seq) : Task<EmptyFastbreakC
     task {
         let! schedules =
             async {
-                // let collection = database.GetCollection<Schedule>("schedules")
-                // let tomorrow = DateTime.Now.ToString("yyyyMMdd")
-                // printf $"Tomorrow {tomorrow}"
-                // let filter = Builders<Schedule>.Filter.Eq((fun x -> x.date), tomorrow)
-                // let! results = collection.Find(filter).ToListAsync() |> Async.AwaitTask
-
                 return
                     schedule
                     |> Seq.collect (fun schedule ->
@@ -103,11 +97,20 @@ let getTomorrowsSchedulesHandler (schedule: Schedule seq) : Task<EmptyFastbreakC
                                         { id = null
                                           displayName = null
                                           logo = null }
-
+                                        
+                                let winner =
+                                    match competition.competitors with
+                                    | Some competitors ->
+                                        competitors
+                                        |> Array.tryFind (fun c -> c.winner)
+                                        |> Option.map (fun c -> c.team.displayName)
+                                        |> Option.defaultValue null
+                                    | None -> null
+                                    
                                 let (dayOfWeek, monthDay, time) = formatDateParts event.date
 
                                 { id = event.id
-                                  ``type`` = "pick-em"
+                                  ``type`` = "PICK-EM"
                                   homeTeam = homeTeam.displayName
                                   homeTeamSubtitle =
                                     competition.venue
@@ -124,7 +127,7 @@ let getTomorrowsSchedulesHandler (schedule: Schedule seq) : Task<EmptyFastbreakC
                                   answer2 = null
                                   answer3 = null
                                   answer4 = null
-                                  correctAnswer = null })))
+                                  correctAnswer = winner })))
                     |> Seq.toList
             }
             |> Async.StartAsTask
@@ -151,9 +154,9 @@ let insertSchedule (schedule: Schedule, database: IMongoDatabase, league: string
         let result = collection.ReplaceOne(filter, scheduleWithLeague, updateOptions)
 
         if result.MatchedCount > 0 then
-            printfn $"Schedule updated successfully. {league} | {date}\n"
+            printf $"Schedule updated successfully. {league} | {date}\n"
         else
-            printfn $"Schedule inserted successfully. {league} | {date}\n"
+            printf $"Schedule inserted successfully. {league} | {date}\n"
 
         return scheduleWithLeague
     }
@@ -193,11 +196,11 @@ let getAllSchedules (runAllAsync: RunScheduleUpserts) (date: string) : Async<seq
     }
 
 
-let pullTomorrowsSchedule (database) =
+let pullSchedules (database, yesterday: String, today: String, tomorrow: String) =
     let dates =
-        [ DateTime.UtcNow.AddDays(-1).ToString("yyyyMMdd") // yesterday
-          DateTime.UtcNow.ToString("yyyyMMdd") // today
-          DateTime.UtcNow.AddDays(1).ToString("yyyyMMdd") ] // tomorrow
+        [ yesterday
+          today
+          tomorrow ]
 
     let runAllAsync date =
         urls
@@ -211,10 +214,10 @@ let pullTomorrowsSchedule (database) =
             |> Async.StartAsTask)
         |> Array.ofList
 
-    let collection: IMongoCollection<EmptyFastBreakCard> =
-        database.GetCollection<EmptyFastBreakCard>("empty-fastbreak-cards")
+    let collection: IMongoCollection<EmptyFastbreakCard> =
+        database.GetCollection<EmptyFastbreakCard>("empty-fastbreak-cards")
 
-    let insertEmptyFastbreakCard (date: string) =
+    let insertEmptyFastbreakCard (date) =
         async {
             let emptyFastbreakCard =
                 getAllSchedules runAllAsync date
@@ -223,7 +226,7 @@ let pullTomorrowsSchedule (database) =
 
             let! cardItems = emptyFastbreakCard |> Async.AwaitTask
 
-            let filter = Builders<EmptyFastBreakCard>.Filter.Eq("date", date)
+            let filter = Builders<EmptyFastbreakCard>.Filter.Eq("date", date)
 
             let updateOptions = ReplaceOptions(IsUpsert = true)
 
@@ -235,7 +238,7 @@ let pullTomorrowsSchedule (database) =
                     updateOptions
                 )
 
-            printfn $"Empty Fastbreak card inserted for {date}\n"
+            printf $"Empty Fastbreak card inserted for {date}\n"
         }
 
     dates

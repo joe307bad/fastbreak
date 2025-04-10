@@ -1,34 +1,44 @@
 module api.DailyJob.CalculateFastbreakCardResults
+
 open System
 open MongoDB.Driver
 open Shared
+open api.Entities.EmptyFastbreakCard
 
-let getEasternTime() =
-    let utcNow = DateTime.UtcNow
-    let easternZone = TimeZoneInfo.FindSystemTimeZoneById("Eastern Standard Time")
-    let easternTime = TimeZoneInfo.ConvertTimeFromUtc(utcNow, easternZone)
-    
-    // Format as needed
-    let formatted = easternTime.ToString("yyyy-MM-dd HH:mm:ss")
-    let dateOnly = easternTime.ToString("yyyyMMdd")
-    
-    (easternTime, formatted, dateOnly)
-
-let calculateFastbreakCardResults (database: IMongoDatabase) =
+let calculateFastbreakCardResults (database: IMongoDatabase, yesterday, today, tomorrow) =
     task {
-        let collection = database.GetCollection<FastbreakSelectionState>("locked-fastbreak-cards")
-        let (_, __, etDateOnly) = getEasternTime()
+        let date = yesterday;
 
-        let filter = Builders<FastbreakSelectionState>.Filter.Eq((fun x -> x.date), etDateOnly)
+        let scheduleResults =
+            database.GetCollection<EmptyFastbreakCard>("empty-fastbreak-cards")
+                .Find(fun x -> x.date = date)
+                .ToList()
+                |> Seq.collect (fun card -> card.items)
+                |> Seq.map (fun item -> item.id, item) // Replace `item.id` with your actual key
+                |> dict
 
-        let cardsResult = collection.Find(filter).ToEnumerable()
-        
-        let cards = Seq.cast<FastbreakSelectionState> cardsResult
-            
-        printf($"Locked cards found for {etDateOnly}: {cards |> Seq.length}\n")
-            
+        let lockedCards =
+            database
+                .GetCollection<FastbreakSelectionState>("locked-fastbreak-cards")
+                .Find(Builders<FastbreakSelectionState>.Filter.Eq(_.date, date))
+                .ToEnumerable()
+
+        let cards = Seq.cast<FastbreakSelectionState> lockedCards
+
+        printf ($"Locked cards found for {yesterday}: {cards |> Seq.length}\n")
+
         for card in cards do
-            printf($"Locked card ID: {card.cardId}")
+            let selection = card.selections[0]
+            let result = scheduleResults.Item(selection.id)
+            let points = if selection.userAnswer.Equals(result.correctAnswer) then result.points else 0;
+            printf $"---- Card ID: {card.cardId}\n"
+            printf $"---- Event ID: {result.id}\n"
+            printf $"{result.awayTeam} vs {result.homeTeam}\n"
+            printf $"Winner: {result.correctAnswer}\n"
+            printf $"User pick: {selection.userAnswer}\n"
+            printf $"Points: {points}\n"
+            printf $"-------- /\n"
             ()
+
         ""
     }

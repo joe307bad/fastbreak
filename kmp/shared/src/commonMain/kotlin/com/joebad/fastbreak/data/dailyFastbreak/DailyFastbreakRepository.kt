@@ -27,7 +27,7 @@ class FastbreakStateRepository(
     private val dailyStateCollection = db.getCollection("FastBreakDailyStateCollection")
         ?: db.createCollection("FastBreakDailyStateCollection")
     private val BASE_URL = if (getPlatform().name == "iOS") "localhost" else "10.0.2.2"
-    private val GET_DAILY_FASTBREAK = "http://${BASE_URL}:8085/api/daily"
+    private val GET_DAILY_FASTBREAK = "http://${BASE_URL}:8085/api/yesterday"
     private val LOCK_CARD = "http://${BASE_URL}:8085/api/lock"
 
     companion object {

@@ -54,6 +54,7 @@ import kotlinx.datetime.Clock
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import kotlin.math.min
+import kotlin.time.Duration.Companion.days
 
 @OptIn(ExperimentalAnimationApi::class, ExperimentalDecomposeApi::class)
 @Composable
@@ -71,8 +72,13 @@ fun ProtectedContent(
 
     val db = Database("fastbreak");
 
-    val currentDate =
-        Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date.toString()
+//    val today =
+//        Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date.toString()
+    val today = (Clock.System.now() - 1.days)
+        .toLocalDateTime(TimeZone.currentSystemDefault())
+        .date
+        .toString()
+        .replace("-", "")
     LaunchedEffect(key1 = Unit) {
         coroutineScope.launch {
             try {
@@ -81,13 +87,13 @@ fun ProtectedContent(
                     HttpClient(),
                     authRepository
                 )
-                val state = dailyFastbreakRepository.getDailyFastbreakState(currentDate)
+                val state = dailyFastbreakRepository.getDailyFastbreakState(today)
                 dailyFastbreak = state
 
                 viewModel = FastbreakViewModel(
                     db,
                     { newState -> onLock(dailyFastbreakRepository, coroutineScope, newState) },
-                    currentDate.replace("-", ""),
+                    today,
                     authRepository
                 )
 
@@ -121,11 +127,6 @@ fun ProtectedContent(
         targetValue = 1f - scrollOffset,
         label = "Text Fade Animation"
     )
-
-    val today = Clock.System.now()
-        .toLocalDateTime(TimeZone.currentSystemDefault())
-        .date
-        .toString()
 
     BlurredScreen(
         locked = true,

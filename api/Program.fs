@@ -23,7 +23,13 @@ let enableDailyJob =
     match Environment.GetEnvironmentVariable "ENABLE_DAILY_JOB" with
     | "1" -> true
     | "0" -> false
-    | null -> false // Default value if env var is not set
+    | null -> false
+    | _ -> false
+let enableSchedulePuller =
+    match Environment.GetEnvironmentVariable "ENABLE_SCHEDULE_PULLER" with
+    | "1" -> true
+    | "0" -> false
+    | null -> false
     | _ -> false
 
 let mongoUser = Environment.GetEnvironmentVariable "MONGO_USER"
@@ -71,22 +77,42 @@ let configureHangfire (services: IServiceCollection) =
     services.AddHangfireServer() |> ignore
     services
 
+let getEasternTime (addDays) =
+    let utcNow = DateTime.UtcNow.AddDays(addDays)
+    let easternZone = TimeZoneInfo.FindSystemTimeZoneById("Eastern Standard Time")
+    let easternTime = TimeZoneInfo.ConvertTimeFromUtc(utcNow, easternZone)
+
+    easternTime.ToString("yyyyMMdd")
+
 type JobRunner =
     static member DailyJob() =
         if enableDailyJob then
-            // run at 11:00pm each day
-            pullTomorrowsSchedule (database)
+            let yesterday = getEasternTime (-1)
+            let today = getEasternTime (0)
+            let tomorrow = getEasternTime (1)
             
-            // calculate results of the past day's fastbreak card for each user
-            calculateFastbreakCardResults (database)
+            // run at 4 am ET everyday - this will hopefully get results for any games
+            // that started during primetime on the West coast. The process should be
+            // 1. Get the schedules for yesterday, today and tomorrow
+            // 2. If any of the schedules contain result info, update the schedules collection
+            // 3. Calculate the results for each locked fastbreak card
+            // 4. Calculate results for yesterday's fastbreak card
+            if enableSchedulePuller then
+                pullSchedules (database, yesterday, today, tomorrow)
+                printf $"Schedule puller completed at %A{DateTime.UtcNow}"
+            else
+                printf $"Disabled | Schedule Puller | %A{DateTime.UtcNow}"
+            
+            // calculate results of yesterday's fastbreak card for each user
+            calculateFastbreakCardResults (database, yesterday, today, tomorrow)
             
             // calculate stat sheets for tomorrow for each user
             // 
-            printfn $"Daily job completed at %A{DateTime.UtcNow}"
+            printf $"Daily job completed at %A{DateTime.UtcNow}"
         else
-            printfn $"Disabled | Daily job | %A{DateTime.UtcNow}"
+            printf $"Disabled | Daily job | %A{DateTime.UtcNow}"
 
-        printfn $"Daily job executed at %A{DateTime.UtcNow}"
+        printf $"Daily job executed at %A{DateTime.UtcNow}"
 
 let scheduleJobs () =
     let methodCall: Expression<Action<JobRunner>> =

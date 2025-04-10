@@ -23,7 +23,7 @@ type EmptyFastbreakCardItem =
       correctAnswer: string }
 
 [<BsonIgnoreExtraElements>]
-type EmptyFastBreakCard =
+type EmptyFastbreakCard =
     {
       date: string
       items: EmptyFastbreakCardItem[] }

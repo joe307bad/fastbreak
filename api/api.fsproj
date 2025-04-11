@@ -3,12 +3,12 @@
     <TargetFramework>net9.0</TargetFramework>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="Shared\FastbreakSelectionState.fs" />
     <Compile Include="Utils\apiRouter.fs" />
     <Compile Include="Utils\asyncMap.fs" />
     <Compile Include="Utils\tryGetSubject.fs" />
     <Compile Include="Entities\ScheduleEntity.fs" />
     <Compile Include="Entities\EmptyFastbreakCard.fs" />
+    <Compile Include="Entities\FastbreakSelectionState.fs" />
     <Compile Include="Controllers\DailyFastbreakController.fs" />
     <Compile Include="Controllers\LockCardController.fs" />
     <Compile Include="DailyJob\SchedulePuller.fs" />

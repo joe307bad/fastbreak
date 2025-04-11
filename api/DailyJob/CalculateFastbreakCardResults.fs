@@ -1,15 +1,45 @@
 module api.DailyJob.CalculateFastbreakCardResults
 
-open System
 open MongoDB.Driver
 open Shared
 open api.Entities.EmptyFastbreakCard
 
+
+let calculateResults (correctAnswers: System.Collections.Generic.IDictionary<string, EmptyFastbreakCardItem>) (selectionStates: FastbreakSelectionState seq) =
+    selectionStates |> Seq.map (fun state ->
+        // Process each selection in the state
+        let correctSelections, incorrectSelections =
+            state.selections
+            |> Array.partition (fun selection ->
+                match correctAnswers.TryGetValue(selection.id) with
+                | true, item -> selection.userAnswer = item.correctAnswer
+                | false, _ -> false)
+        
+        // Calculate totals
+        let totalCorrect = correctSelections.Length
+        let totalIncorrect = incorrectSelections.Length
+        let totalPoints = correctSelections |> Array.sumBy (fun s -> s.points)
+        
+        // Extract IDs for correct and incorrect selections
+        let correctIds = correctSelections |> Array.map (fun s -> s.id)
+        let incorrectIds = incorrectSelections |> Array.map (fun s -> s.id)
+        
+        // Create the result
+        let result = 
+            { totalPoints = totalPoints
+              totalCorrect = totalCorrect
+              totalIncorrect = totalIncorrect
+              correct = correctIds
+              incorrect = incorrectIds }
+        
+        // Return an updated state with the calculated results
+        { state with results = result }
+    )
 let calculateFastbreakCardResults (database: IMongoDatabase, yesterday, today, tomorrow) =
     task {
         let date = yesterday;
 
-        let scheduleResults =
+        let scheduleResults: System.Collections.Generic.IDictionary<string, EmptyFastbreakCardItem> =
             database.GetCollection<EmptyFastbreakCard>("empty-fastbreak-cards")
                 .Find(fun x -> x.date = date)
                 .ToList()
@@ -27,16 +57,14 @@ let calculateFastbreakCardResults (database: IMongoDatabase, yesterday, today, t
 
         printf ($"Locked cards found for {yesterday}: {cards |> Seq.length}\n")
 
-        for card in cards do
-            let selection = card.selections[0]
-            let result = scheduleResults.Item(selection.id)
-            let points = if selection.userAnswer.Equals(result.correctAnswer) then result.points else 0;
-            printf $"---- Card ID: {card.cardId}\n"
-            printf $"---- Event ID: {result.id}\n"
-            printf $"{result.awayTeam} vs {result.homeTeam}\n"
-            printf $"Winner: {result.correctAnswer}\n"
-            printf $"User pick: {selection.userAnswer}\n"
-            printf $"Points: {points}\n"
+        let results = calculateResults scheduleResults cards
+        for result in results do
+            let correct = String.concat ", " result.results.correct
+            let incorrect = String.concat ", " result.results.incorrect
+            printf $"---- Card ID: {result.cardId}\n"
+            printf $"Incorrect: {incorrect}\n"
+            printf $"Correct: {correct}\n"
+            printf $"Points: {result.results.totalPoints}\n"
             printf $"-------- /\n"
             ()
 

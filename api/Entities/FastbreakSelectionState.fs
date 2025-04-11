@@ -11,6 +11,14 @@ type FastbreakSelection =
       ``type``: string }
     
 [<CLIMutable>]
+type FastbreakSelectionsResult =
+    { totalPoints: int
+      totalCorrect: int
+      totalIncorrect: int
+      correct: string[]
+      incorrect: string[] }
+    
+[<CLIMutable>]
 [<BsonIgnoreExtraElements>]
 type FastbreakSelectionState =
     { selections: FastbreakSelection[]
@@ -18,4 +26,5 @@ type FastbreakSelectionState =
       date: string
       cardId: string
       userId: string
-      locked: bool }
+      locked: bool
+      results: FastbreakSelectionsResult }

@@ -33,7 +33,7 @@ fun FastbreakHomeList(dailyFastbreak: DailyFastbreak?, viewModel: FastbreakViewM
 
     for (item in dailyFastbreak.fastbreakCard) {
         when (item.type) {
-            "featured-pick-em" ->
+            "FEATURED-PICK-EM" ->
                 CardWithBadge(
                     badgeText = "FEATURED PICK-EM",
                     modifier = Modifier.padding(bottom = 30.dp),
@@ -65,7 +65,7 @@ fun FastbreakHomeList(dailyFastbreak: DailyFastbreak?, viewModel: FastbreakViewM
                     points = item.points.toString()
                 )
 
-            "pick-em" ->
+            "PICK-EM" ->
                 CardWithBadge(
                     badgeText = "PICK-EM",
                     modifier = Modifier.padding(bottom = 10.dp),
@@ -95,7 +95,7 @@ fun FastbreakHomeList(dailyFastbreak: DailyFastbreak?, viewModel: FastbreakViewM
                     }
                 )
 
-            "trivia-multiple-choice" ->
+            "TRIVIA-MULTIPLE-CHOICE" ->
                 CardWithBadge(
                     badgeText = "TRIVIA",
                     modifier = Modifier.padding(bottom = 30.dp),
@@ -129,7 +129,7 @@ fun FastbreakHomeList(dailyFastbreak: DailyFastbreak?, viewModel: FastbreakViewM
                     points = item.points.toString()
                 )
 
-            "trivia-tf" ->
+            "TRIVIA-TF" ->
                 CardWithBadge(
                     badgeText = "TRIVIA",
                     modifier = Modifier.padding(bottom = 30.dp),

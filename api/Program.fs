@@ -99,20 +99,20 @@ type JobRunner =
             // 4. Calculate results for yesterday's fastbreak card
             if enableSchedulePuller then
                 pullSchedules (database, yesterday, today, tomorrow)
-                printf $"Schedule puller completed at %A{DateTime.UtcNow}"
+                printf $"Schedule puller completed at %A{DateTime.UtcNow}\n"
             else
-                printf $"Disabled | Schedule Puller | %A{DateTime.UtcNow}"
+                printf $"Disabled | Schedule Puller | %A{DateTime.UtcNow}\n"
             
             // calculate results of yesterday's fastbreak card for each user
             calculateFastbreakCardResults (database, yesterday, today, tomorrow)
             
             // calculate stat sheets for tomorrow for each user
             // 
-            printf $"Daily job completed at %A{DateTime.UtcNow}"
+            printf $"Daily job completed at %A{DateTime.UtcNow}\n"
         else
-            printf $"Disabled | Daily job | %A{DateTime.UtcNow}"
+            printf $"Disabled | Daily job | %A{DateTime.UtcNow}\n"
 
-        printf $"Daily job executed at %A{DateTime.UtcNow}"
+        printf $"Daily job executed at %A{DateTime.UtcNow}\n"
 
 let scheduleJobs () =
     let methodCall: Expression<Action<JobRunner>> =

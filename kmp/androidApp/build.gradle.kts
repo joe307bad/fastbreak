@@ -7,10 +7,10 @@ plugins {
 
 android {
     namespace = "com.joebad.fastbreak.android"
-    compileSdk = 34
+    compileSdk = 35
     defaultConfig {
         applicationId = "com.joebad.fastbreak.android"
-        minSdk = 24
+        minSdk = 26
         targetSdk = 34
         versionCode = 1
         versionName = "1.0"
@@ -58,4 +58,5 @@ dependencies {
     implementation("com.arkivanov.decompose:decompose:3.2.2")
     implementation("com.arkivanov.decompose:extensions-compose:3.2.2")
     implementation("com.arkivanov.decompose:extensions-android:3.2.2")
+    implementation("com.liftric:kvault:1.12.0")
 }

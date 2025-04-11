@@ -6,11 +6,7 @@ open Hangfire.Mongo.Migration.Strategies
 open MongoDB.Bson.Serialization
 open MongoDB.Driver
 open Saturn
-open ScheduleController
-open Google.Apis.Auth
-open Microsoft.AspNetCore.Http
-open System.Threading.Tasks
-open Giraffe
+open DailyFastbreakController
 open Microsoft.AspNetCore.Builder
 open Microsoft.Extensions.DependencyInjection
 open Hangfire
@@ -18,15 +14,22 @@ open Hangfire.Mongo
 open DotNetEnv
 open Saturn.Endpoint
 open SchedulePuller
-open api.Todos
+open api.Controllers.LockCardController
+open api.DailyJob.CalculateFastbreakCardResults
 
 Env.Load() |> ignore
 
-let enablePullTomorrowsSchedule =
-    match Environment.GetEnvironmentVariable "ENABLE_PULL_TOMORROWS_SCHEDULE" with
+let enableDailyJob =
+    match Environment.GetEnvironmentVariable "ENABLE_DAILY_JOB" with
     | "1" -> true
     | "0" -> false
-    | null -> false // Default value if env var is not set
+    | null -> false
+    | _ -> false
+let enableSchedulePuller =
+    match Environment.GetEnvironmentVariable "ENABLE_SCHEDULE_PULLER" with
+    | "1" -> true
+    | "0" -> false
+    | null -> false
     | _ -> false
 
 let mongoUser = Environment.GetEnvironmentVariable "MONGO_USER"
@@ -34,46 +37,6 @@ let mongoPass = Environment.GetEnvironmentVariable "MONGO_PASS"
 let mongoIp = Environment.GetEnvironmentVariable "MONGO_IP"
 let mongoDb = Environment.GetEnvironmentVariable "MONGO_DB"
 
-let validateGoogleToken (idToken: string) =
-    task {
-        try
-            let! payload = GoogleJsonWebSignature.ValidateAsync(idToken)
-            return Some payload
-        with ex ->
-            return None
-    }
-
-let requireGoogleAuth: HttpFunc -> HttpContext -> Task<HttpContext option> =
-    fun next ctx ->
-        task {
-            match ctx.Request.Headers.TryGetValue("Authorization") with
-            | true, values when values.Count > 0 ->
-                let token = values.[0].Replace("Bearer ", "").Trim()
-                let! payloadOpt = validateGoogleToken token
-
-                match payloadOpt with
-                | Some payload ->
-                    ctx.Items.["GoogleUser"] <- payload
-                    return! next ctx
-                | None ->
-                    ctx.SetStatusCode 401
-                    ctx.WriteJsonAsync("Token invalid") |> ignore
-                    return Some(ctx)
-            | _ ->
-                ctx.SetStatusCode 404
-                ctx.WriteJsonAsync("Not foiuhiuhund") |> ignore
-                return Some(ctx)
-        }
-
-
-
-let api = pipeline { set_header "x-pipeline-type" "API" }
-
-let googleAuthPipeline =
-    pipeline {
-        plug requireGoogleAuth
-        set_header "x-pipeline-type" "API"
-    }
 
 BsonClassMap.RegisterClassMap<ScheduleEntity.Event>(fun cm ->
     cm.AutoMap()
@@ -105,7 +68,7 @@ let mongoStorage =
         )
     )
 
-let database = mongoClient.GetDatabase("fastbreak")
+let database: IMongoDatabase = mongoClient.GetDatabase("fastbreak")
 
 let configureHangfire (services: IServiceCollection) =
     services.AddHangfire(fun config -> config.UseStorage(mongoStorage) |> ignore)
@@ -114,24 +77,51 @@ let configureHangfire (services: IServiceCollection) =
     services.AddHangfireServer() |> ignore
     services
 
-type JobRunner =
-    static member LogJob() =
-        if enablePullTomorrowsSchedule then
-            pullTomorrowsSchedule (database)
-            printfn $"Tomorrows schedule pulled at %A{DateTime.UtcNow}"
-        else
-            printfn $"Disabled | Pulling tomorrows schedule | %A{DateTime.UtcNow}"
+let getEasternTime (addDays) =
+    let utcNow = DateTime.UtcNow.AddDays(addDays)
+    let easternZone = TimeZoneInfo.FindSystemTimeZoneById("Eastern Standard Time")
+    let easternTime = TimeZoneInfo.ConvertTimeFromUtc(utcNow, easternZone)
 
-        printfn $"Daily job executed at %A{DateTime.UtcNow}"
+    easternTime.ToString("yyyyMMdd")
+
+type JobRunner =
+    static member DailyJob() =
+        if enableDailyJob then
+            let yesterday = getEasternTime (-1)
+            let today = getEasternTime (0)
+            let tomorrow = getEasternTime (1)
+            
+            // run at 4 am ET everyday - this will hopefully get results for any games
+            // that started during primetime on the West coast. The process should be
+            // 1. Get the schedules for yesterday, today and tomorrow
+            // 2. If any of the schedules contain result info, update the schedules collection
+            // 3. Calculate the results for each locked fastbreak card
+            // 4. Calculate results for yesterday's fastbreak card
+            if enableSchedulePuller then
+                pullSchedules (database, yesterday, today, tomorrow)
+                printf $"Schedule puller completed at %A{DateTime.UtcNow}\n"
+            else
+                printf $"Disabled | Schedule Puller | %A{DateTime.UtcNow}\n"
+            
+            // calculate results of yesterday's fastbreak card for each user
+            calculateFastbreakCardResults (database, yesterday, today, tomorrow)
+            
+            // calculate stat sheets for tomorrow for each user
+            // 
+            printf $"Daily job completed at %A{DateTime.UtcNow}\n"
+        else
+            printf $"Disabled | Daily job | %A{DateTime.UtcNow}\n"
+
+        printf $"Daily job executed at %A{DateTime.UtcNow}\n"
 
 let scheduleJobs () =
     let methodCall: Expression<Action<JobRunner>> =
         Expression.Lambda<Action<JobRunner>>(
-            Expression.Call(typeof<JobRunner>.GetMethod("LogJob")),
+            Expression.Call(typeof<JobRunner>.GetMethod("DailyJob")),
             Expression.Parameter(typeof<JobRunner>, "x")
         )
 
-    RecurringJob.AddOrUpdate("every-second-job-3", methodCall, "*/1 * * * *")
+    RecurringJob.AddOrUpdate("daily-job", methodCall, "*/1 * * * *")
 
 let configureApp (app: IApplicationBuilder) =
     app.UseHangfireDashboard() |> ignore
@@ -144,24 +134,16 @@ let endpointPipe =
         plug head
         plug requestId
     }
-
-let defaultRouter =
+    
+let apiRouter =
     router {
-        // Public API routes
-        forward
-            "/api"
-            (router {
-                pipe_through api
-                forward "/schedule" (scheduleController database)
-                
-                // Protected routes - nested under the same /api path
-                forward
-                    "/auth"
-                    (router {
-                        pipe_through googleAuthPipeline
-                        get "/todos1" Find
-                    })
-            })
+        forward "" (lockCardRouter database)
+        forward "" (dailyFastbreakRouter database)
+    }
+
+let appRouter =
+    router {
+        forward "/api" apiRouter
     }
 
 let app =
@@ -172,7 +154,8 @@ let app =
     |> ignore
 
     application {
-        use_endpoint_router defaultRouter
+        url "http://0.0.0.0:8085"
+        use_endpoint_router appRouter
         service_config configureHangfire
         use_developer_exceptions
         app_config configureApp

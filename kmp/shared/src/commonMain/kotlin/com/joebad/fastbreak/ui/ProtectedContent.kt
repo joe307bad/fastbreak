@@ -23,12 +23,14 @@ import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.graphics.graphicsLayer
@@ -40,12 +42,19 @@ import com.arkivanov.decompose.extensions.compose.subscribeAsState
 import com.joebad.fastbreak.ProtectedComponent
 import com.joebad.fastbreak.Theme
 import com.joebad.fastbreak.ThemePreference
+import com.joebad.fastbreak.data.dailyFastbreak.FastbreakStateRepository
+import com.joebad.fastbreak.data.dailyFastbreak.FastbreakViewModel
+import com.joebad.fastbreak.model.dtos.DailyFastbreak
+import com.joebad.fastbreak.onLock
 import com.joebad.fastbreak.ui.theme.LocalColors
+import io.ktor.client.HttpClient
+import kotbase.Database
 import kotlinx.coroutines.launch
 import kotlinx.datetime.Clock
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import kotlin.math.min
+import kotlin.time.Duration.Companion.days
 
 @OptIn(ExperimentalAnimationApi::class, ExperimentalDecomposeApi::class)
 @Composable
@@ -53,11 +62,50 @@ fun ProtectedContent(
     component: ProtectedComponent,
     onToggleTheme: (theme: Theme) -> Unit,
     themePreference: ThemePreference,
-    dailyFastbreak: DailyFastbreak?,
-    viewModel: FastbreakViewModel
+    authRepository: AuthRepository,
+    onLogout: () -> Unit
 ) {
+    val coroutineScope = rememberCoroutineScope()
+    var dailyFastbreak by remember { mutableStateOf<DailyFastbreak?>(null) }
+    var viewModel by remember { mutableStateOf<FastbreakViewModel?>(null) }
+    var error by remember { mutableStateOf<String?>(null) }
 
-    val locked = viewModel.container.stateFlow.collectAsState().value.locked ?: false;
+    val db = Database("fastbreak");
+
+//    val today =
+//        Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date.toString()
+    val today = (Clock.System.now() - 1.days)
+        .toLocalDateTime(TimeZone.currentSystemDefault())
+        .date
+        .toString()
+        .replace("-", "")
+    LaunchedEffect(key1 = Unit) {
+        coroutineScope.launch {
+            try {
+                val dailyFastbreakRepository = FastbreakStateRepository(
+                    db,
+                    HttpClient(),
+                    authRepository
+                )
+                val state = dailyFastbreakRepository.getDailyFastbreakState(today)
+                dailyFastbreak = state
+
+                viewModel = FastbreakViewModel(
+                    db,
+                    { newState -> onLock(dailyFastbreakRepository, coroutineScope, newState) },
+                    today,
+                    authRepository
+                )
+
+                print(dailyFastbreak)
+            } catch (e: Exception) {
+                error = "Failed to fetch state: ${e.message}"
+            }
+        }
+    }
+
+    val state = viewModel?.container?.stateFlow?.collectAsState()?.value;
+    val locked = state?.locked ?: false;
     val childStack by component.stack.subscribeAsState()
     val activeChild = childStack.active
     val drawerState = rememberDrawerState(DrawerValue.Closed)
@@ -80,11 +128,6 @@ fun ProtectedContent(
         label = "Text Fade Animation"
     )
 
-    val today = Clock.System.now()
-        .toLocalDateTime(TimeZone.currentSystemDefault())
-        .date
-        .toString()
-
     BlurredScreen(
         locked = true,
         onLocked = { },
@@ -97,7 +140,7 @@ fun ProtectedContent(
     )
     BlurredScreen(
         locked,
-        onLocked = { viewModel.lockCard() },
+        onLocked = { viewModel?.lockCard() },
         showModal.value,
         onDismiss = { showModal.value = false },
         date = today,
@@ -111,7 +154,17 @@ fun ProtectedContent(
             DrawerContent(
                 onShowLastweeksFastbreakCard = { showLastweeksFastbreakCard.value = true },
                 themePreference = themePreference,
-                onToggleTheme = onToggleTheme
+                onToggleTheme = onToggleTheme,
+                goToSettings = {
+                    scope.launch {
+                        launch { drawerState.close() }
+                        launch {
+                            if (activeChild.instance != ProtectedComponent.Child.Settings) {
+                                component.goToSettings()
+                            }
+                        }
+                    }
+                }
             )
         }
     ) {
@@ -177,6 +230,10 @@ fun ProtectedContent(
                     }
                     Column(modifier = Modifier.zIndex(2f)) {
                         when (child.instance) {
+                            is ProtectedComponent.Child.Settings -> {
+                                SettingsScreen(onLogout = onLogout)
+                            }
+
                             is ProtectedComponent.Child.Home -> {
                                 HomeScreen(
                                     locked,

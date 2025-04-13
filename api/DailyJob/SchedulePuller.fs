@@ -97,7 +97,7 @@ let getTomorrowsSchedulesHandler (schedule: Schedule seq) : Task<EmptyFastbreakC
                                         { id = null
                                           displayName = null
                                           logo = null }
-                                        
+
                                 let winner =
                                     match competition.competitors with
                                     | Some competitors ->
@@ -106,7 +106,7 @@ let getTomorrowsSchedulesHandler (schedule: Schedule seq) : Task<EmptyFastbreakC
                                         |> Option.map (fun c -> c.team.displayName)
                                         |> Option.defaultValue null
                                     | None -> null
-                                    
+
                                 let (dayOfWeek, monthDay, time) = formatDateParts event.date
 
                                 { id = event.id
@@ -176,15 +176,46 @@ let urls =
        Printf.StringFormat<string -> string>
            "http://site.api.espn.com/apis/site/v2/sports/baseball/mlb/scoreboard?dates=%s") ]
 
+let parseSchedule (json: string) =
+    JsonSerializer.Deserialize<Schedule>(json, JsonSerializerOptions(PropertyNameCaseInsensitive = true))
+
+let fetchSchedules (date: string) =
+    use client = new HttpClient()
+
+    let tasks =
+        urls
+        |> List.map (fun (league, urlFormat) ->
+            let url = sprintf urlFormat date
+
+            async {
+                try
+                    let! response = client.GetStringAsync(url) |> Async.AwaitTask
+                    let schedule = parseSchedule response
+                    return (schedule, $"Fetched schedule for | date: {date} | league: {league}")
+                with ex ->
+                    let schedule = parseSchedule null
+
+                    return
+                        (schedule,
+                         $"Failed to fetch schedule for | date: {date} | league: {league} | error: {ex.Message}")
+            })
+
+    // Run all tasks concurrently and wait for all to complete
+    let schedules, reports =
+        tasks |> Async.Parallel |> Async.RunSynchronously |> Array.unzip
+
+    // Return the results as lists
+    (schedules |> seq, reports |> List.ofArray)
+
+// Example usage:
+// let schedules, reports = fetchSchedules "20250412"
+
 let fetchSchedule (url: string) =
     async {
         use client = new HttpClient()
         let! response = client.GetStringAsync(url) |> Async.AwaitTask
         return response
     }
-
-let parseSchedule (json: string) =
-    JsonSerializer.Deserialize<Schedule>(json, JsonSerializerOptions(PropertyNameCaseInsensitive = true))
 
 type RunScheduleUpserts = string -> Task<Schedule> array
 
@@ -196,33 +227,16 @@ let getAllSchedules (runAllAsync: RunScheduleUpserts) (date: string) : Async<seq
     }
 
 
-let pullSchedules (database, yesterday: String, today: String, tomorrow: String) =
-    let dates =
-        [ yesterday
-          today
-          tomorrow ]
-
-    let runAllAsync date =
-        urls
-        |> List.map (fun (league, espnScheduleEndpoint: Printf.StringFormat<string -> string>) ->
-            async {
-                let url = sprintf espnScheduleEndpoint date
-                let! json = fetchSchedule url
-                let schedule = parseSchedule json
-                return! insertSchedule (schedule, database, league, date) |> Async.AwaitTask
-            }
-            |> Async.StartAsTask)
-        |> Array.ofList
+let pullSchedules (database: IMongoDatabase, yesterday: String, today: String, tomorrow: String) =
+    let dates = [ yesterday; today; tomorrow ]
 
     let collection: IMongoCollection<EmptyFastbreakCard> =
         database.GetCollection<EmptyFastbreakCard>("empty-fastbreak-cards")
 
     let insertEmptyFastbreakCard (date) =
         async {
-            let emptyFastbreakCard =
-                getAllSchedules runAllAsync date
-                |> Async.RunSynchronously
-                |> getTomorrowsSchedulesHandler
+            let (schedules, report) = fetchSchedules date
+            let emptyFastbreakCard = schedules |> getTomorrowsSchedulesHandler
 
             let! cardItems = emptyFastbreakCard |> Async.AwaitTask
 
@@ -230,19 +244,20 @@ let pullSchedules (database, yesterday: String, today: String, tomorrow: String)
 
             let updateOptions = ReplaceOptions(IsUpsert = true)
 
-            let result =
-                collection.ReplaceOne(
-                    filter,
-                    { date = date
-                      items = List.toArray cardItems },
-                    updateOptions
-                )
+            collection.ReplaceOne(
+                filter,
+                { date = date
+                  items = List.toArray cardItems },
+                updateOptions
+            )
+            |> ignore
 
-            printf $"Empty Fastbreak card inserted for {date}\n"
+            for str in (List.append report [$"Empty Fastbreak card inserted for {date}\n"]) do
+                printfn "%s" str
         }
 
     dates
     |> List.map insertEmptyFastbreakCard
-    |> Async.Parallel
+    |> Async.Sequential
     |> Async.RunSynchronously
 // return results

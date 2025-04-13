@@ -72,6 +72,8 @@ let deserializeBody<'T> (ctx: HttpContext) =
         return result
     }
 
+type LockedCardResponse = { id: string }
+
 let lockCardHandler (database: IMongoDatabase) : HttpHandler =
     fun next ctx ->
         task {
@@ -95,13 +97,14 @@ let lockCardHandler (database: IMongoDatabase) : HttpHandler =
                             .Set(_.selections, state.selections)
                             .Set(_.totalPoints, state.totalPoints)
                             .Set(_.cardId, state.cardId)
+                            .Set(_.createdAt, DateTime.Now)
 
                     let updateOptions = UpdateOptions(IsUpsert = true)
 
                     let result =
                         collection.UpdateOne(filter, update, updateOptions)
-
-                    Successful.ok (json result) next ctx
+                    let response = { id = result.UpsertedId.ToString() }
+                    Successful.ok (json response) next ctx
                 | None -> Successful.ok (json {| error = "Error locking card" |}) next ctx
         }
 

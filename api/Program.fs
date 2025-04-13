@@ -15,7 +15,9 @@ open DotNetEnv
 open Saturn.Endpoint
 open SchedulePuller
 open api.Controllers.LockCardController
+open api.DailyJob
 open api.DailyJob.CalculateFastbreakCardResults
+open api.DailyJob.CalculateStatSheets
 
 Env.Load() |> ignore
 
@@ -82,37 +84,53 @@ let getEasternTime (addDays) =
     let easternZone = TimeZoneInfo.FindSystemTimeZoneById("Eastern Standard Time")
     let easternTime = TimeZoneInfo.ConvertTimeFromUtc(utcNow, easternZone)
 
-    easternTime.ToString("yyyyMMdd")
+    let formatted = easternTime.ToString("yyyyMMdd")
+    let dateTime = easternTime
+    
+    (formatted, dateTime)
 
 type JobRunner =
     static member DailyJob() =
         if enableDailyJob then
-            let yesterday = getEasternTime (-1)
-            let today = getEasternTime (0)
-            let tomorrow = getEasternTime (1)
+            let (yesterday, _) = getEasternTime (-1)
+            let (today, _) = getEasternTime (0)
+            let (tomorrow, _) = getEasternTime (1)
             
-            // run at 4 am ET everyday - this will hopefully get results for any games
-            // that started during primetime on the West coast. The process should be
-            // 1. Get the schedules for yesterday, today and tomorrow
-            // 2. If any of the schedules contain result info, update the schedules collection
-            // 3. Calculate the results for each locked fastbreak card
-            // 4. Calculate results for yesterday's fastbreak card
+            // run at 4 am ET every day - this will hopefully get results for any games
+            // that started during primetime on the West coast.
             if enableSchedulePuller then
-                pullSchedules (database, yesterday, today, tomorrow)
-                printf $"Schedule puller completed at %A{DateTime.UtcNow}\n"
+                try 
+                    pullSchedules (database, yesterday, today, tomorrow) |> ignore
+                    let (_, now) = getEasternTime (0);
+                    printf $"Schedule puller completed at %A{now}\n"
+                with ex ->
+                    let (_, now) = getEasternTime (0);
+                    printf $"Schedule puller failed at %A{now} with error {now}\n"
             else
-                printf $"Disabled | Schedule Puller | %A{DateTime.UtcNow}\n"
+                let (_, now) = getEasternTime (0);
+                printf $"Disabled | Schedule Puller | %A{now}\n"
             
-            // calculate results of yesterday's fastbreak card for each user
-            calculateFastbreakCardResults (database, yesterday, today, tomorrow)
+            try 
+                let (_, now) = getEasternTime (0);
+                calculateFastbreakCardResults (database, yesterday, today, tomorrow) |> ignore
+                printf $"Fastbreak card results completed at %A{now}\n"
+            with ex ->
+                let (_, now) = getEasternTime (0);
+                printf $"Fastbreak card results failed at %A{now} with error {ex.Message}\n"
             
-            // calculate stat sheets for tomorrow for each user
-            // 
-            printf $"Daily job completed at %A{DateTime.UtcNow}\n"
+            try 
+                let (_, now) = getEasternTime (0);
+                calculateStatSheets (database, yesterday, today, tomorrow) |> ignore
+                printf $"Fastbreak card results completed at %A{now}\n"
+            with ex ->
+                let (_, now) = getEasternTime (0);
+                printf $"Fastbreak card results failed at %A{now} with error {ex.Message}\n"
+            
+            let (_, now) = getEasternTime (0);
+            printf $"Daily job completed at %A{now}\n"
         else
-            printf $"Disabled | Daily job | %A{DateTime.UtcNow}\n"
-
-        printf $"Daily job executed at %A{DateTime.UtcNow}\n"
+            let (_, now) = getEasternTime (0);
+            printf $"Disabled | Daily job | %A{now}\n"
 
 let scheduleJobs () =
     let methodCall: Expression<Action<JobRunner>> =

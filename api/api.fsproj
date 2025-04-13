@@ -9,6 +9,7 @@
     <Compile Include="Entities\ScheduleEntity.fs" />
     <Compile Include="Entities\EmptyFastbreakCard.fs" />
     <Compile Include="Entities\FastbreakSelectionState.fs" />
+    <Compile Include="Entities\StatSheet.fs" />
     <Compile Include="Controllers\DailyFastbreakController.fs" />
     <Compile Include="Controllers\LockCardController.fs" />
     <Compile Include="DailyJob\SchedulePuller.fs" />

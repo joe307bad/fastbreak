@@ -1,5 +1,7 @@
 module Shared
 
+open System
+open System.Runtime.InteropServices.JavaScript
 open MongoDB.Bson.Serialization.Attributes
 
 [<CLIMutable>]
@@ -27,4 +29,5 @@ type FastbreakSelectionState =
       cardId: string
       userId: string
       locked: bool
-      results: FastbreakSelectionsResult }
+      results: FastbreakSelectionsResult
+      createdAt: DateTime }

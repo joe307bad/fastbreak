@@ -11,7 +11,7 @@ open MongoDB.Driver
 open Saturn
 open Saturn.Endpoint
 open Google.Apis.Auth
-open Shared
+open api.Entities.FastbreakSelections
 open api.Utils.tryGetSubject
 
 let validateGoogleToken (idToken: string) =

@@ -1,8 +1,7 @@
 module api.DailyJob.CalculateStatSheets
 
+open api.Entities.FastbreakSelections
 open MongoDB.Driver
-open Shared
-open api.Entities
 open api.Entities.StatSheet
 open System
 
@@ -119,7 +118,10 @@ let createCurrentWeek (daysOfTheWeek: Map<string, string>) (collection: IMongoCo
             let selectionState = selectionStateTask.Result |> Seq.tryHead
             
             match selectionState with
-            | Some state -> Result state.results.totalPoints
+            | Some state ->
+                match state.results with
+                | Some results -> Result results.totalPoints
+                | None -> NoLockedCard
             | None -> NoLockedCard
         )
     

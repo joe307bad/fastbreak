@@ -1,8 +1,8 @@
 module api.DailyJob.CalculateFastbreakCardResults
 
 open MongoDB.Driver
-open Shared
 open api.Entities.EmptyFastbreakCard
+open api.Entities.FastbreakSelections
 
 
 let calculateResults
@@ -37,7 +37,7 @@ let calculateResults
               incorrect = incorrectIds }
 
         // Return an updated state with the calculated results
-        { state with results = result })
+        { state with results = Some result })
 
 let toSelectionStateWriteModels (states: seq<FastbreakSelectionState>) : seq<WriteModel<FastbreakSelectionState>> =
     states
@@ -82,16 +82,6 @@ let calculateFastbreakCardResults (database: IMongoDatabase, yesterday, today, t
 
         if results.Length > 0 then
             lockedCardsCollection.BulkWrite(toSelectionStateWriteModels results) |> ignore
-
-        for result in results do
-            let correct = String.concat ", " result.results.correct
-            let incorrect = String.concat ", " result.results.incorrect
-            printf $"---- Card ID: {result.cardId}\n"
-            printf $"Incorrect: {incorrect}\n"
-            printf $"Correct: {correct}\n"
-            printf $"Points: {result.results.totalPoints}\n"
-            printf $"-------- /\n"
-            ()
 
         ""
     }

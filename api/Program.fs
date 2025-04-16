@@ -3,21 +3,24 @@ open System.Linq.Expressions
 open System.Text.Json
 open System.Text.Json.Serialization
 open Hangfire.Mongo.Migration.Strategies
+open MongoDB.Bson
 open MongoDB.Bson.Serialization
+open MongoDB.Bson.Serialization.Serializers
 open MongoDB.Driver
 open Saturn
-open DailyFastbreakController
+open api.Controllers.DailyFastbreakController
 open Microsoft.AspNetCore.Builder
 open Microsoft.Extensions.DependencyInjection
 open Hangfire
 open Hangfire.Mongo
 open DotNetEnv
 open Saturn.Endpoint
-open SchedulePuller
+open api.DailyJob.SchedulePuller
 open api.Controllers.LockCardController
-open api.DailyJob
 open api.DailyJob.CalculateFastbreakCardResults
 open api.DailyJob.CalculateStatSheets
+open api.Entities
+open api.Entities.FastbreakSelections
 
 Env.Load() |> ignore
 
@@ -39,6 +42,25 @@ let mongoPass = Environment.GetEnvironmentVariable "MONGO_PASS"
 let mongoIp = Environment.GetEnvironmentVariable "MONGO_IP"
 let mongoDb = Environment.GetEnvironmentVariable "MONGO_DB"
 
+type OptionSerializer<'T>() =
+    inherit SerializerBase<'T option>()
+    
+    override _.Serialize(context, _, value) =
+        match value with
+        | Some v -> 
+            BsonSerializer.Serialize(context.Writer, typeof<'T>, v)
+        | None -> 
+            context.Writer.WriteNull()
+    
+    override _.Deserialize(context, _) =
+        if context.Reader.CurrentBsonType = BsonType.Null then
+            context.Reader.ReadNull()
+            None
+        else
+            Some(BsonSerializer.Deserialize<'T>(context.Reader))
+
+// Register serializer for Address option type only
+BsonSerializer.RegisterSerializer(typeof<FastbreakSelectionsResult option>, OptionSerializer<FastbreakSelectionsResult>())
 
 BsonClassMap.RegisterClassMap<ScheduleEntity.Event>(fun cm ->
     cm.AutoMap()

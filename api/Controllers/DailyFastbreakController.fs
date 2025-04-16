@@ -1,13 +1,13 @@
-module DailyFastbreakController
+module api.Controllers.DailyFastbreakController
 
 open System
 open Giraffe
 open Microsoft.AspNetCore.Http
 open MongoDB.Driver
 open Saturn.Endpoint
-open Shared
-open Utils.asyncMap
 open api.Entities.EmptyFastbreakCard
+open api.Entities.FastbreakSelections
+open api.Utils.asyncMap
 
 type Game =
     { id: string

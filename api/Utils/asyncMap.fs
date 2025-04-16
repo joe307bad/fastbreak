@@ -1,4 +1,4 @@
-module Utils.asyncMap
+module api.Utils.asyncMap
 
 let asyncMap f asyncVal =
     async {

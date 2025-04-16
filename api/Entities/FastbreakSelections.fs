@@ -1,8 +1,15 @@
-module Shared
+module api.Entities.FastbreakSelections
 
 open System
-open System.Runtime.InteropServices.JavaScript
 open MongoDB.Bson.Serialization.Attributes
+
+[<CLIMutable>]
+type public FastbreakSelectionsResult =
+    { totalPoints: int
+      totalCorrect: int
+      totalIncorrect: int
+      correct: string[]
+      incorrect: string[] }
 
 [<CLIMutable>]
 type FastbreakSelection =
@@ -13,14 +20,6 @@ type FastbreakSelection =
       ``type``: string }
     
 [<CLIMutable>]
-type FastbreakSelectionsResult =
-    { totalPoints: int
-      totalCorrect: int
-      totalIncorrect: int
-      correct: string[]
-      incorrect: string[] }
-    
-[<CLIMutable>]
 [<BsonIgnoreExtraElements>]
 type FastbreakSelectionState =
     { selections: FastbreakSelection[]
@@ -29,5 +28,5 @@ type FastbreakSelectionState =
       cardId: string
       userId: string
       locked: bool
-      results: FastbreakSelectionsResult
+      results: FastbreakSelectionsResult option
       createdAt: DateTime }

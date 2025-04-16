@@ -1,28 +1,13 @@
-module SchedulePuller
+module api.DailyJob.SchedulePuller
 
 open System
 open System.Net.Http
 open System.Text.Json
 open System.Threading.Tasks
-open MongoDB.Driver
-open ScheduleEntity
-
-
-// type Game =
-//     { id: string
-//       homeTeam: string
-//       awayTeam: string
-//       location: string
-//       homeTeamLogo: string
-//       awayTeamLogo: string
-//       league: string
-//       date: string }
-
-
-open System
-open System.Globalization
 open api.Entities.EmptyFastbreakCard
-
+open MongoDB.Driver
+open api.Entities.ScheduleEntity
+open System.Globalization
 let formatDateParts (isoDateString: string) =
     // Parse the input date
     let dateUtc = DateTimeOffset.Parse(isoDateString)

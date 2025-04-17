@@ -1,7 +1,5 @@
 package com.joebad.fastbreak.ui.home
 
-import DailyFastbreak
-import FastbreakViewModel
 import Question
 import QuestionComponent
 import androidx.compose.foundation.layout.Column
@@ -13,6 +11,8 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.joebad.fastbreak.data.dailyFastbreak.FastbreakViewModel
+import com.joebad.fastbreak.model.dtos.DailyFastbreak
 import com.joebad.fastbreak.ui.CardWithBadge
 import com.joebad.fastbreak.ui.TeamCard
 import com.joebad.fastbreak.ui.theme.LocalColors
@@ -33,7 +33,7 @@ fun FastbreakHomeList(dailyFastbreak: DailyFastbreak?, viewModel: FastbreakViewM
 
     for (item in dailyFastbreak.fastbreakCard) {
         when (item.type) {
-            "featured-pick-em" ->
+            "FEATURED-PICK-EM" ->
                 CardWithBadge(
                     badgeText = "FEATURED PICK-EM",
                     modifier = Modifier.padding(bottom = 30.dp),
@@ -65,7 +65,7 @@ fun FastbreakHomeList(dailyFastbreak: DailyFastbreak?, viewModel: FastbreakViewM
                     points = item.points.toString()
                 )
 
-            "pick-em" ->
+            "PICK-EM" ->
                 CardWithBadge(
                     badgeText = "PICK-EM",
                     modifier = Modifier.padding(bottom = 10.dp),
@@ -95,7 +95,7 @@ fun FastbreakHomeList(dailyFastbreak: DailyFastbreak?, viewModel: FastbreakViewM
                     }
                 )
 
-            "trivia-multiple-choice" ->
+            "TRIVIA-MULTIPLE-CHOICE" ->
                 CardWithBadge(
                     badgeText = "TRIVIA",
                     modifier = Modifier.padding(bottom = 30.dp),
@@ -129,7 +129,7 @@ fun FastbreakHomeList(dailyFastbreak: DailyFastbreak?, viewModel: FastbreakViewM
                     points = item.points.toString()
                 )
 
-            "trivia-tf" ->
+            "TRIVIA-TF" ->
                 CardWithBadge(
                     badgeText = "TRIVIA",
                     modifier = Modifier.padding(bottom = 30.dp),

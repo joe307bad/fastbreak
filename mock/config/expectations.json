@@ -188,5 +188,28 @@
     "times": {
       "unlimited": true
     }
+  },
+  {
+    "httpRequest": {
+      "method": "POST",
+      "path": "/api/lock",
+      "body": {
+        "type": "JSON"
+      }
+    },
+    "httpResponse": {
+      "statusCode": 200,
+      "headers": {
+        "Content-Type": [
+          "application/json"
+        ]
+      },
+      "body": {
+        "id": "id-123"
+      }
+    },
+    "times": {
+      "unlimited": true
+    }
   }
 ]

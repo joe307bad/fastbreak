@@ -1,4 +1,4 @@
-
+package com.joebad.fastbreak.data.dailyFastbreak
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.cancel

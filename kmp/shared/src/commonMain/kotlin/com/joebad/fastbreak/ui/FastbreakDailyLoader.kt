@@ -6,6 +6,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import com.joebad.fastbreak.data.dailyFastbreak.FastbreakStateRepository
 import io.ktor.client.HttpClient
 import kotbase.Database
 import kotlinx.coroutines.launch
@@ -17,7 +18,8 @@ import kotlinx.datetime.toLocalDateTime
 fun FastbreakStateDisplay(
     repository: FastbreakStateRepository = FastbreakStateRepository(
         Database("fastbreak"),
-        HttpClient()
+        HttpClient(),
+        authRepository = null
     )
 ) {
     var fastbreakState by remember { mutableStateOf<Any?>(null) }

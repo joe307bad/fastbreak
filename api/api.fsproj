@@ -10,6 +10,8 @@
     <Compile Include="Utils\apiRouter.fs" />
     <Compile Include="Utils\asyncMap.fs" />
     <Compile Include="Utils\tryGetSubject.fs" />
+    <Compile Include="Utils\getWeekDays.fs" />
+    <Compile Include="Utils\calculateLockedCardStreak.fs" />
     <Compile Include="Controllers\DailyFastbreakController.fs" />
     <Compile Include="Controllers\LockCardController.fs" />
     <Compile Include="DailyJob\SchedulePuller.fs" />

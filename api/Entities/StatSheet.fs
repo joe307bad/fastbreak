@@ -9,11 +9,13 @@ type FastbreakCard = { date: string; point: int }
 
 type PerfectFastbreakCards = { cards: FastbreakCard[]; highest: FastbreakCard }
 
-type DailySelection =
-    | Result of points: int
-    | NoLockedCard
+type DayInfo = {
+    DayOfWeek: string
+    DateCode: string
+    TotalPoints: int option
+}
 
-type CurrentWeek = { days: Map<string, DailySelection>; total: int }
+type CurrentWeek = { days: Map<int, DayInfo>; total: int }
 
 [<BsonIgnoreExtraElements>]
 type StatSheetItem =

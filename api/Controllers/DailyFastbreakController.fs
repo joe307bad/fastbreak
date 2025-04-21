@@ -3,11 +3,15 @@ module api.Controllers.DailyFastbreakController
 open System
 open Giraffe
 open Microsoft.AspNetCore.Http
+open MongoDB.Bson
+open MongoDB.Bson.IO
 open MongoDB.Driver
+open Newtonsoft.Json.Linq
 open Saturn.Endpoint
 open api.Entities.EmptyFastbreakCard
 open api.Entities.FastbreakSelections
 open api.Utils.asyncMap
+open api.Utils.lockedCardsForUser
 
 type Game =
     { id: string
@@ -102,39 +106,20 @@ let getYesterdaysFastbreakHandler (database: IMongoDatabase) (next: HttpFunc) (c
             |> Async.AwaitTask
             |> asyncMap Option.ofObj
 
-        let lockedCardForUserAsync =
+        let lockedCardForUser =
             match ctx.TryGetQueryStringValue "userId" with
-            | Some id ->
-                async {
-                    let filter =
-                        Builders<FastbreakSelectionState>.Filter.Eq(_.userId, id)
-                        |> fun f ->
-                            Builders<FastbreakSelectionState>.Filter
-                                .And(f, Builders<FastbreakSelectionState>.Filter.Eq(_.date, yesterday))
-
-                    let! result =
-                        database
-                            .GetCollection<FastbreakSelectionState>("locked-fastbreak-cards")
-                            .Find(filter)
-                            .FirstOrDefaultAsync()
-                        |> Async.AwaitTask
-                        |> asyncMap Option.ofObj
-
-                    return result
-                }
-            | None -> async { return None }
+            | Some id -> lockedCardForUserAsync database id yesterday
+            | None -> async { return null }
 
         match card with
         | None -> return! json Seq.empty next ctx
         | Some card ->
             return!
                 json
-                    ({| fastbreakCard = card.items
-                        leaderboard = [||]
-                        lockedCardForUser =
-                         match lockedCardForUserAsync |> Async.RunSynchronously with
-                         | Some v -> box v
-                         | None -> null |})
+                    ({|
+                        lockedCardForUser = lockedCardForUser |> Async.RunSynchronously
+                        fastbreakCard = card.items
+                        leaderboard = [||] |})
                     next
                     ctx
     }

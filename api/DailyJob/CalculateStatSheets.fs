@@ -4,6 +4,8 @@ open api.Entities.FastbreakSelections
 open MongoDB.Driver
 open api.Entities.StatSheet
 open System
+open api.Utils.getPerfectFastbreakCards
+open api.Utils.findHighestScoringCard
 open api.Utils.calculateLockedCardStreak
 open api.Utils.getWeekDays
 
@@ -83,8 +85,25 @@ let addLockedCardsToStatSheet sheet lockedCardsSinceStatSheet lockedCardsCollect
     task {
         let daysOfTheWeek = getWeekDays ()
         let currentWeek = createCurrentWeek daysOfTheWeek lockedCardsCollection userId
-        let streak = calculateLockedCardStreak currentWeek sheet
-        ""
+        let streak = calculateLockedCardStreak lockedCardsSinceStatSheet sheet
+
+        let getHighestFastbreakCards (statSheet: StatSheet option) : FastbreakCard option =
+            statSheet |> Option.map (fun state -> state.items.highestFastbreakCardEver)
+
+        let highestFastbreakCardEver =
+            findHighestScoringCard lockedCardsSinceStatSheet (getHighestFastbreakCards sheet)
+
+        let getPastPerfectFastbreakCards (statSheet: StatSheet option) : PerfectFastbreakCards option =
+            statSheet |> Option.map (fun state -> state.items.perfectFastbreakCards)
+
+        let perfectFastbreakCards =
+            getPerfectFastbreakCards lockedCardsSinceStatSheet (getPastPerfectFastbreakCards sheet)
+
+        return
+            { currentWeek = currentWeek
+              lockedCardStreak = streak
+              highestFastbreakCardEver = highestFastbreakCardEver
+              perfectFastbreakCards = perfectFastbreakCards }
     }
 
 let getLatestStatSheet (collection: IMongoCollection<StatSheet>) userId =

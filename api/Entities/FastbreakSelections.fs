@@ -3,13 +3,6 @@ module api.Entities.FastbreakSelections
 open System
 open MongoDB.Bson.Serialization.Attributes
 
-[<CLIMutable>]
-type public FastbreakSelectionsResult =
-    { totalPoints: int
-      totalCorrect: int
-      totalIncorrect: int
-      correct: string[]
-      incorrect: string[] }
 
 [<CLIMutable>]
 type FastbreakSelection =
@@ -19,6 +12,14 @@ type FastbreakSelection =
       description: string
       ``type``: string }
     
+[<CLIMutable>]
+type public FastbreakSelectionsResult =
+    { totalPoints: int
+      totalCorrect: int
+      totalIncorrect: int
+      correct: string[]
+      incorrect: string[] }
+
 [<CLIMutable>]
 [<BsonIgnoreExtraElements>]
 type FastbreakSelectionState =

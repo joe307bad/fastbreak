@@ -59,7 +59,6 @@ type OptionSerializer<'T>() =
         else
             Some(BsonSerializer.Deserialize<'T>(context.Reader))
 
-// Register serializer for Address option type only
 BsonSerializer.RegisterSerializer(typeof<FastbreakSelectionsResult option>, OptionSerializer<FastbreakSelectionsResult>())
 
 BsonClassMap.RegisterClassMap<ScheduleEntity.Event>(fun cm ->

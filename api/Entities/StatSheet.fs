@@ -3,9 +3,8 @@ module api.Entities.StatSheet
 open System
 open MongoDB.Bson.Serialization.Attributes
     
-type Streak = { longest: int; current: int }
 
-type FastbreakCard = { date: string; point: int }
+type FastbreakCard = { date: string; points: int }
 
 type PerfectFastbreakCards = { cards: FastbreakCard[]; highest: FastbreakCard }
 
@@ -16,6 +15,8 @@ type DayInfo = {
 }
 
 type CurrentWeek = { days: Map<int, DayInfo>; total: int }
+
+type Streak = { longest: int; current: int }
 
 [<BsonIgnoreExtraElements>]
 type StatSheetItem =

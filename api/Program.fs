@@ -21,6 +21,7 @@ open api.DailyJob.CalculateFastbreakCardResults
 open api.DailyJob.CalculateStatSheets
 open api.Entities
 open api.Entities.FastbreakSelections
+open api.Entities.StatSheet
 
 Env.Load() |> ignore
 
@@ -60,6 +61,10 @@ type OptionSerializer<'T>() =
             Some(BsonSerializer.Deserialize<'T>(context.Reader))
 
 BsonSerializer.RegisterSerializer(typeof<FastbreakSelectionsResult option>, OptionSerializer<FastbreakSelectionsResult>())
+BsonSerializer.RegisterSerializer(typeof<int option>, OptionSerializer<int>())
+BsonSerializer.RegisterSerializer(typeof<bool option>, OptionSerializer<bool>())
+BsonSerializer.RegisterSerializer(typeof<FastbreakCard option>, OptionSerializer<FastbreakCard>())
+BsonSerializer.RegisterSerializer(typeof<PerfectFastbreakCards option>, OptionSerializer<PerfectFastbreakCards>())
 
 BsonClassMap.RegisterClassMap<ScheduleEntity.Event>(fun cm ->
     cm.AutoMap()
@@ -113,15 +118,17 @@ let getEasternTime (addDays) =
 type JobRunner =
     static member DailyJob() =
         if enableDailyJob then
+            let (twoDaysAgo, _) = getEasternTime (-2)
             let (yesterday, _) = getEasternTime (-1)
-            let (today, _) = getEasternTime (0)
+            let (today, now) = getEasternTime (0)
             let (tomorrow, _) = getEasternTime (1)
+            printf $"Daily job started at %A{now}\n"
             
             // run at 4 am ET every day - this will hopefully get results for any games
             // that started during primetime on the West coast.
             if enableSchedulePuller then
                 try 
-                    pullSchedules (database, yesterday, today, tomorrow) |> ignore
+                    pullSchedules (database, twoDaysAgo, yesterday, today, tomorrow) |> ignore
                     let (_, now) = getEasternTime (0);
                     printf $"Schedule puller completed at %A{now}\n"
                 with ex ->
@@ -129,11 +136,11 @@ type JobRunner =
                     printf $"Schedule puller failed at %A{now} with error {now}\n"
             else
                 let (_, now) = getEasternTime (0);
-                printf $"Disabled | Schedule Puller | %A{now}\n"
+                printf $"Schedule puller did not run at %A{now} because its disabled\n"
             
             try 
                 let (_, now) = getEasternTime (0);
-                calculateFastbreakCardResults (database, yesterday, today, tomorrow) |> ignore
+                calculateFastbreakCardResults database |> ignore
                 printf $"Fastbreak card results completed at %A{now}\n"
             with ex ->
                 let (_, now) = getEasternTime (0);
@@ -141,17 +148,17 @@ type JobRunner =
             
             try 
                 let (_, now) = getEasternTime (0);
-                calculateStatSheets (database, yesterday, today, tomorrow) |> ignore
-                printf $"Fastbreak card results completed at %A{now}\n"
+                calculateStatSheets (database, twoDaysAgo, yesterday, today, tomorrow) |> ignore
+                printf $"Fastbreak stat sheets completed at %A{now}\n"
             with ex ->
                 let (_, now) = getEasternTime (0);
-                printf $"Fastbreak card results failed at %A{now} with error {ex.Message}\n"
+                printf $"Stat sheet failed at %A{now} with error {ex.Message}\n"
             
             let (_, now) = getEasternTime (0);
             printf $"Daily job completed at %A{now}\n"
         else
             let (_, now) = getEasternTime (0);
-            printf $"Disabled | Daily job | %A{now}\n"
+            printf $"Daily job did not run at %A{now} because its disabled\n"
 
 let scheduleJobs () =
     let methodCall: Expression<Action<JobRunner>> =

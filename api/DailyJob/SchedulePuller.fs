@@ -212,8 +212,8 @@ let getAllSchedules (runAllAsync: RunScheduleUpserts) (date: string) : Async<seq
     }
 
 
-let pullSchedules (database: IMongoDatabase, yesterday: String, today: String, tomorrow: String) =
-    let dates = [ yesterday; today; tomorrow ]
+let pullSchedules (database: IMongoDatabase, twoDaysAgo: String, yesterday: String, today: String, tomorrow: String) =
+    let dates = [ twoDaysAgo; yesterday; today; tomorrow ]
 
     let collection: IMongoCollection<EmptyFastbreakCard> =
         database.GetCollection<EmptyFastbreakCard>("empty-fastbreak-cards")

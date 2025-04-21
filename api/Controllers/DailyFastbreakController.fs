@@ -107,9 +107,50 @@ let getYesterdaysFastbreakHandler (database: IMongoDatabase) (next: HttpFunc) (c
             |> asyncMap Option.ofObj
 
         let lockedCardForUser =
-            match ctx.TryGetQueryStringValue "userId" with
-            | Some id -> lockedCardForUserAsync database id yesterday
-            | None -> async { return null }
+            async {
+                match ctx.TryGetQueryStringValue "userId" with
+                | Some id ->
+                    let! lockedCard = lockedCardForUserAsync database id yesterday
+                    match lockedCard with
+                    | Some response -> return response
+                    | None -> return null
+                | None -> return null
+            }
+
+        match card with
+        | None -> return! json Seq.empty next ctx
+        | Some card ->
+            return!
+                json
+                    ({|
+                        lockedCardForUser = lockedCardForUser |> Async.RunSynchronously
+                        fastbreakCard = card.items
+                        leaderboard = [||] |})
+                    next
+                    ctx
+    }
+
+let getFastbreakHandler (database: IMongoDatabase) day (next: HttpFunc) (ctx: HttpContext) =
+    task {
+        let collection = database.GetCollection<EmptyFastbreakCard>("empty-fastbreak-cards")
+
+        let filter = Builders<EmptyFastbreakCard>.Filter.Eq((fun x -> x.date), day)
+
+        let! card =
+            collection.Find(filter).FirstOrDefaultAsync()
+            |> Async.AwaitTask
+            |> asyncMap Option.ofObj
+
+        let lockedCardForUser =
+            async {
+                match ctx.TryGetQueryStringValue "userId" with
+                | Some id ->
+                    let! lockedCard = lockedCardForUserAsync database id day
+                    match lockedCard with
+                    | Some response -> return response
+                    | None -> return null
+                | None -> return null
+            }
 
         match card with
         | None -> return! json Seq.empty next ctx
@@ -126,6 +167,7 @@ let getYesterdaysFastbreakHandler (database: IMongoDatabase) (next: HttpFunc) (c
 
 let dailyFastbreakRouter database =
     router {
-        get "/daily" (getDailyFastbreakHandler database)
+        get "/today" (getDailyFastbreakHandler database)
         get "/yesterday" (getYesterdaysFastbreakHandler database)
+        getf "/day/%s" (fun day -> getFastbreakHandler database day)
     }

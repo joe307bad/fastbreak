@@ -6,7 +6,7 @@ open MongoDB.Bson.Serialization.Attributes
 
 [<CLIMutable>]
 type FastbreakSelection =
-    { id: string
+    { _id: string
       userAnswer: string
       points: int
       description: string

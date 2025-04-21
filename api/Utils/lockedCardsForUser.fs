@@ -24,7 +24,7 @@ let lockedCardForUserAsync (database: IMongoDatabase) (id: string) (yesterday: s
         Builders<BsonDocument>.Filter.Eq("userId", BsonValue.Create(id))
         |> fun f ->
             Builders<BsonDocument>.Filter
-                .And(f, Builders<BsonDocument>.Filter.Eq("date", BsonValue.Create("20250416")))
+                .And(f, Builders<BsonDocument>.Filter.Eq("date", BsonValue.Create(yesterday)))
 
     // Query the collection for the first matching document
     let! result =
@@ -33,18 +33,6 @@ let lockedCardForUserAsync (database: IMongoDatabase) (id: string) (yesterday: s
             .Find(filter)
             .FirstOrDefaultAsync()
         |> Async.AwaitTask
-
-    // Convert BsonDocument to actual JSON object with simple integers
-    let toJsonObject (document: BsonDocument option) =
-        match document with
-        | Some doc ->
-            let jsonWriterSettings = JsonWriterSettings()
-            jsonWriterSettings.OutputMode <- JsonOutputMode.RelaxedExtendedJson
-            doc.ToJson(jsonWriterSettings)
-        | None -> 
-            null  // Empty JSON object if no result
-
-    // Return actual JSON object
-    // let jsonObject = doc
-    return BsonSerializer.Deserialize(result)
+        
+    return if (isNull result) then None else Some (BsonSerializer.Deserialize result)
 }

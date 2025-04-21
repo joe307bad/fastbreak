@@ -15,7 +15,7 @@ let calculateResults
         let correctSelections, incorrectSelections =
             state.selections
             |> Array.partition (fun selection ->
-                match correctAnswers.TryGetValue(selection.id) with
+                match correctAnswers.TryGetValue(selection._id) with
                 | true, item -> selection.userAnswer = item.correctAnswer
                 | false, _ -> false)
 
@@ -25,8 +25,8 @@ let calculateResults
         let totalPoints = correctSelections |> Array.sumBy (fun s -> s.points)
 
         // Extract IDs for correct and incorrect selections
-        let correctIds = correctSelections |> Array.map (fun s -> s.id)
-        let incorrectIds = incorrectSelections |> Array.map (fun s -> s.id)
+        let correctIds = correctSelections |> Array.map (fun s -> s._id)
+        let incorrectIds = incorrectSelections |> Array.map (fun s -> s._id)
 
         // Create the result
         let result =
@@ -53,35 +53,37 @@ let toSelectionStateWriteModels (states: seq<FastbreakSelectionState>) : seq<Wri
         update.IsUpsert <- true
         upcast update)
 
-let calculateFastbreakCardResults (database: IMongoDatabase, yesterday, today, tomorrow) =
+let calculateFastbreakCardResults (database: IMongoDatabase) =
     task {
-        let date = yesterday
-
-        let scheduleResults: System.Collections.Generic.IDictionary<string, EmptyFastbreakCardItem> =
-            database
-                .GetCollection<EmptyFastbreakCard>("empty-fastbreak-cards")
-                .Find(fun x -> x.date = date)
-                .ToList()
-            |> Seq.collect (fun card -> card.items)
-            |> Seq.map (fun item -> item.id, item) // Replace `item.id` with your actual key
-            |> dict
-
         let lockedCardsCollection =
             database.GetCollection<FastbreakSelectionState>("locked-fastbreak-cards")
 
         let lockedCards =
             lockedCardsCollection
-                .Find(Builders<FastbreakSelectionState>.Filter.Eq(_.date, date))
+                .Find(Builders<FastbreakSelectionState>.Filter.Eq(_.results, None))
                 .ToEnumerable()
 
         let cards = Seq.cast<FastbreakSelectionState> lockedCards
+        
+        for card in cards do
+            let scheduleResults: System.Collections.Generic.IDictionary<string, EmptyFastbreakCardItem> =
+                database
+                    .GetCollection<EmptyFastbreakCard>("empty-fastbreak-cards")
+                    .Find(fun x -> x.date = card.date)
+                    .ToList()
+                |> Seq.collect _.items
+                |> Seq.map (fun item -> item.id, item) // Replace `item.id` with your actual key
+                |> dict
+                
+            printf ($"Processed locked card for user {card.userId} and date {card.date}\n")
 
-        printf ($"Locked cards found for {yesterday}: {cards |> Seq.length}\n")
+            let results = calculateResults scheduleResults cards |> Seq.toArray
 
-        let results = calculateResults scheduleResults cards |> Seq.toArray
+            if results.Length > 0 then
+                lockedCardsCollection.BulkWrite(toSelectionStateWriteModels results) |> ignore
+            
+            
 
-        if results.Length > 0 then
-            lockedCardsCollection.BulkWrite(toSelectionStateWriteModels results) |> ignore
 
         ""
     }

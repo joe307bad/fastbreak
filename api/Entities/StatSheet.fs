@@ -4,10 +4,6 @@ open System
 open System.Collections.Generic
 open MongoDB.Bson.Serialization.Attributes
 
-type FastbreakCard = { date: string; points: int }
-
-type PerfectFastbreakCards = { cards: FastbreakCard[]; highest: FastbreakCard }
-
 type DayInfo = {
     DayOfWeek: string
     DateCode: string
@@ -21,12 +17,16 @@ type CurrentWeek = {
 
 type Streak = { longest: int; current: int }
 
+type FastbreakCard = { date: string; points: int }
+
+type PerfectFastbreakCards = { cards: FastbreakCard[]; highest: FastbreakCard }
+
 [<BsonIgnoreExtraElements>]
 type StatSheetItem =
     { currentWeek: CurrentWeek
       lockedCardStreak: Streak
-      highestFastbreakCardEver: FastbreakCard option
-      perfectFastbreakCards: PerfectFastbreakCards option }
+      highestFastbreakCardEver: FastbreakCard
+      perfectFastbreakCards: PerfectFastbreakCards }
 
 [<BsonIgnoreExtraElements>]
 type StatSheet = { userId: string; date: string; items: StatSheetItem; createdAt: DateTime; }

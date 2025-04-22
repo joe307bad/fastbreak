@@ -6,6 +6,8 @@ open api.Entities.FastbreakSelections
 open api.Entities.StatSheet
 
 let calculateLockedCardStreak (database: IMongoDatabase) (statSheet: StatSheet option) userId =
+    printf ($"Starting to calculate locked card streak for user {userId}\n")
+
     let lockedCardsCollection =
         database.GetCollection<FastbreakSelectionState>("locked-fastbreak-cards")
 
@@ -18,13 +20,15 @@ let calculateLockedCardStreak (database: IMongoDatabase) (statSheet: StatSheet o
     // Check for early return with recent stat sheet
     match statSheet with
     | Some sheet when sheet.date >= yesterday ->
-        printf ($"Recent stat sheet found for user {userId}. No new locked card streak will be calculated.\n")
+        printf (
+            $"No new locked card streak will be calculated since a recent stat sheet was found for user {userId}\n"
+        )
         // Recent stat sheet exists, return its values directly
         { longest = sheet.items.lockedCardStreak.longest
           current = sheet.items.lockedCardStreak.current }
-    | None -> 
-        printf ($"No stat sheet for user {userId}. Calculating new locked card streak using all cards.\n")
-        
+    | None ->
+        printf ($"Calculating new locked card streak using all cards since there is no stat sheet for user {userId}\n")
+
         // Get all locked cards for this user
         let lockedCards =
             let filter =
@@ -34,7 +38,7 @@ let calculateLockedCardStreak (database: IMongoDatabase) (statSheet: StatSheet o
             lockedCardsCollection.Find(filter).ToListAsync()
             |> Async.AwaitTask
             |> Async.RunSynchronously
-            
+
         // Sort locked cards by date (newest to oldest)
         let sortedCards =
             [ for card in lockedCards -> card.date, card ] |> List.sortByDescending fst
@@ -50,14 +54,16 @@ let calculateLockedCardStreak (database: IMongoDatabase) (statSheet: StatSheet o
             else
                 // Continue counting
                 calculateCurrentStreak ((parseDate currentDate).AddDays(-1.0).ToString("yyyyMMdd")) (count + 1)
-                
+
         // No statSheet provided, calculate streak starting from yesterday
         let current = calculateCurrentStreak yesterday 0
         { longest = current; current = current }
-        
+
     | Some sheet ->
-        printf ($"Latest stat sheet for user {userId} is older than yesterday. Calculating the locked card streak starting with {sheet.date}.\n")
-        
+        printf (
+            $"Calculating the locked card streak starting with {sheet.date} since the latest stat sheet for user {userId} is older than yesterday\n"
+        )
+
         // Get locked cards since the date of the stat sheet
         let lockedCards =
             let filter =
@@ -71,7 +77,7 @@ let calculateLockedCardStreak (database: IMongoDatabase) (statSheet: StatSheet o
             lockedCardsCollection.Find(filter).ToListAsync()
             |> Async.AwaitTask
             |> Async.RunSynchronously
-            
+
         // Sort locked cards by date (newest to oldest)
         let sortedCards =
             [ for card in lockedCards -> card.date, card ] |> List.sortByDescending fst
@@ -87,7 +93,7 @@ let calculateLockedCardStreak (database: IMongoDatabase) (statSheet: StatSheet o
             else
                 // Continue counting
                 calculateCurrentStreak ((parseDate currentDate).AddDays(-1.0).ToString("yyyyMMdd")) (count + 1)
-        
+
         // Check if there's a continuous streak from statSheet date to yesterday
         let rec isStreakFromStatSheetDate (currentDate: string) =
             if currentDate = sheet.date then
@@ -101,7 +107,6 @@ let calculateLockedCardStreak (database: IMongoDatabase) (statSheet: StatSheet o
                 isStreakFromStatSheetDate ((parseDate currentDate).AddDays(-1.0).ToString("yyyyMMdd"))
 
         if isStreakFromStatSheetDate yesterday then
-            // Add statSheet's current streak to number of locked cards since then
             let daysFromStatSheetToYesterday =
                 int ((parseDate yesterday) - (parseDate sheet.date)).TotalDays - 1
 
@@ -111,4 +116,6 @@ let calculateLockedCardStreak (database: IMongoDatabase) (statSheet: StatSheet o
         else
             // Start fresh from yesterday
             let current = calculateCurrentStreak yesterday 0
-            { longest = max current sheet.items.lockedCardStreak.longest; current = current }
+
+            { longest = max current sheet.items.lockedCardStreak.longest
+              current = current }

@@ -38,7 +38,7 @@ class FastbreakSelectionsPersistence(private val db: Database, private val authR
 
         val selectionMaps = selections.map { selection ->
             mapOf(
-                "id" to selection.id,
+                "_id" to selection._id,
                 "userAnswer" to selection.userAnswer,
                 "points" to selection.points,
                 "description" to selection.description,
@@ -106,7 +106,7 @@ class FastbreakSelectionsPersistence(private val db: Database, private val authR
                         val map = item as Map<String, Any?>
 
                         FastbreakSelection(
-                            id = map["id"] as? String ?: "",
+                            _id = map["_id"] as? String ?: "",
                             userAnswer = map["userAnswer"] as? String ?: "",
                             points = (map["points"] as? Number)?.toInt() ?: 0,
                             description = map["description"] as? String ?: "",

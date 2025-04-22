@@ -14,7 +14,7 @@ import org.orbitmvi.orbit.container
 
 @Serializable
 data class FastbreakSelection(
-    val id: String,
+    val _id: String,
     val userAnswer: String,
     val points: Int,
     val description: String,
@@ -89,10 +89,10 @@ class FastbreakViewModel(
 
 
             val currentSelections = state.selections
-            val existingSelectionIndex = currentSelections.indexOfFirst { it.id == selectionId }
+            val existingSelectionIndex = currentSelections.indexOfFirst { it._id == selectionId }
 
             val selection = FastbreakSelection(
-                id = selectionId,
+                _id = selectionId,
                 userAnswer = userAnswer,
                 points = points,
                 description = description,

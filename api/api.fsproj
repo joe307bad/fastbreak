@@ -12,14 +12,15 @@
     <Compile Include="Utils\tryGetSubject.fs" />
     <Compile Include="Utils\getWeekDays.fs" />
     <Compile Include="Utils\calculateLockedCardStreak.fs" />
-    <Compile Include="Utils\findHighestScoringCard.fs" />
-    <Compile Include="Utils\getPerfectFastbreakCards.fs" />
     <Compile Include="Utils\lockedCardsForUser.fs" />
+    <Compile Include="Utils\getHighestAndPerfectCards.fs" />
+    <Compile Include="Utils\getLockedCardsToAnalyze.fs" />
     <Compile Include="Controllers\DailyFastbreakController.fs" />
     <Compile Include="Controllers\LockCardController.fs" />
     <Compile Include="DailyJob\SchedulePuller.fs" />
     <Compile Include="DailyJob\CalculateFastbreakCardResults.fs" />
     <Compile Include="DailyJob\CalculateStatSheets.fs" />
+    <Compile Include="DailyJob\DailyJob.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
   <ItemGroup>

@@ -1,5 +1,4 @@
 
-import androidx.compose.animation.ExperimentalAnimationApi
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -36,7 +35,6 @@ import androidx.compose.ui.draw.blur
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
-import com.arkivanov.decompose.ExperimentalDecomposeApi
 import com.arkivanov.decompose.extensions.compose.stack.Children
 import com.arkivanov.decompose.extensions.compose.subscribeAsState
 import com.joebad.fastbreak.ProtectedComponent
@@ -56,7 +54,6 @@ import kotlinx.datetime.toLocalDateTime
 import kotlin.math.min
 import kotlin.time.Duration.Companion.days
 
-@OptIn(ExperimentalAnimationApi::class, ExperimentalDecomposeApi::class)
 @Composable
 fun ProtectedContent(
     component: ProtectedComponent,
@@ -72,8 +69,6 @@ fun ProtectedContent(
 
     val db = Database("fastbreak");
 
-//    val today =
-//        Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date.toString()
     val today = (Clock.System.now() - 1.days)
         .toLocalDateTime(TimeZone.currentSystemDefault())
         .date

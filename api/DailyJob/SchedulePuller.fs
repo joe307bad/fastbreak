@@ -9,16 +9,13 @@ open MongoDB.Driver
 open api.Entities.ScheduleEntity
 open System.Globalization
 let formatDateParts (isoDateString: string) =
-    // Parse the input date
     let dateUtc = DateTimeOffset.Parse(isoDateString)
 
-    // Convert to Eastern Time
     let easternZone =
         TimeZoneInfo.FindSystemTimeZoneById("Eastern Standard Time") // Windows
         |> function
             | tz -> tz
 
-    // Convert the date to Eastern Time
     let date = TimeZoneInfo.ConvertTime(dateUtc, easternZone)
 
     let dayOfWeek =
@@ -29,7 +26,6 @@ let formatDateParts (isoDateString: string) =
         else
             fullDay
 
-    // Format month and day (Mar. 5th)
     let monthDay = date.ToString("MMM. d", CultureInfo.InvariantCulture)
 
     let suffix =
@@ -45,13 +41,11 @@ let formatDateParts (isoDateString: string) =
 
     let monthDayWithSuffix = monthDay + suffix
 
-    // Format time (@ 1pm)
     let hour = date.Hour % 12
     let hour = if hour = 0 then 12 else hour
     let ampm = if date.Hour >= 12 then "pm" else "am"
     let time = sprintf "@ %d%s" hour ampm
 
-    // Return as tuple
     (dayOfWeek, monthDayWithSuffix, time)
 
 let getTomorrowsSchedulesHandler (schedule: Schedule seq) : Task<EmptyFastbreakCardItem List> =
@@ -68,7 +62,7 @@ let getTomorrowsSchedulesHandler (schedule: Schedule seq) : Task<EmptyFastbreakC
                                 let homeTeam =
                                     competition.competitors
                                     |> Option.bind (Seq.tryFind (fun c -> c.homeAway = "home"))
-                                    |> Option.map (fun obj -> obj.team)
+                                    |> Option.map _.team
                                     |> Option.defaultValue
                                         { id = null
                                           displayName = null
@@ -77,7 +71,7 @@ let getTomorrowsSchedulesHandler (schedule: Schedule seq) : Task<EmptyFastbreakC
                                 let awayTeam =
                                     competition.competitors
                                     |> Option.bind (Seq.tryFind (fun c -> c.homeAway = "away"))
-                                    |> Option.map (fun obj -> obj.team)
+                                    |> Option.map _.team
                                     |> Option.defaultValue
                                         { id = null
                                           displayName = null
@@ -87,8 +81,8 @@ let getTomorrowsSchedulesHandler (schedule: Schedule seq) : Task<EmptyFastbreakC
                                     match competition.competitors with
                                     | Some competitors ->
                                         competitors
-                                        |> Array.tryFind (fun c -> c.winner)
-                                        |> Option.map (fun c -> c.team.displayName)
+                                        |> Array.tryFind _.winner
+                                        |> Option.map _.team.displayName
                                         |> Option.defaultValue null
                                     | None -> null
 
@@ -99,7 +93,7 @@ let getTomorrowsSchedulesHandler (schedule: Schedule seq) : Task<EmptyFastbreakC
                                   homeTeam = homeTeam.displayName
                                   homeTeamSubtitle =
                                     competition.venue
-                                    |> Option.map (fun obj -> obj.fullName)
+                                    |> Option.map _.fullName
                                     |> Option.defaultValue null
                                   awayTeam = awayTeam.displayName
                                   awayTeamSubtitle = null
@@ -185,15 +179,10 @@ let fetchSchedules (date: string) =
                          $"Failed to fetch schedule for | date: {date} | league: {league} | error: {ex.Message}")
             })
 
-    // Run all tasks concurrently and wait for all to complete
     let schedules, reports =
         tasks |> Async.Parallel |> Async.RunSynchronously |> Array.unzip
 
-    // Return the results as lists
     (schedules |> seq, reports |> List.ofArray)
-
-// Example usage:
-// let schedules, reports = fetchSchedules "20250412"
 
 let fetchSchedule (url: string) =
     async {

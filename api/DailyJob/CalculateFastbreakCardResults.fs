@@ -11,7 +11,6 @@ let calculateResults
     =
     selectionStates
     |> Seq.map (fun state ->
-        // Process each selection in the state
         let correctSelections, incorrectSelections =
             state.selections
             |> Array.partition (fun selection ->
@@ -19,16 +18,13 @@ let calculateResults
                 | true, item -> selection.userAnswer = item.correctAnswer
                 | false, _ -> false)
 
-        // Calculate totals
         let totalCorrect = correctSelections.Length
         let totalIncorrect = incorrectSelections.Length
-        let totalPoints = correctSelections |> Array.sumBy (fun s -> s.points)
+        let totalPoints = correctSelections |> Array.sumBy _.points
 
-        // Extract IDs for correct and incorrect selections
-        let correctIds = correctSelections |> Array.map (fun s -> s._id)
-        let incorrectIds = incorrectSelections |> Array.map (fun s -> s._id)
+        let correctIds = correctSelections |> Array.map _._id
+        let incorrectIds = incorrectSelections |> Array.map _._id
 
-        // Create the result
         let result =
             { totalPoints = totalPoints
               totalCorrect = totalCorrect
@@ -36,7 +32,6 @@ let calculateResults
               correct = correctIds
               incorrect = incorrectIds }
 
-        // Return an updated state with the calculated results
         { state with results = Some result })
 
 let toSelectionStateWriteModels (states: seq<FastbreakSelectionState>) : seq<WriteModel<FastbreakSelectionState>> =
@@ -45,8 +40,8 @@ let toSelectionStateWriteModels (states: seq<FastbreakSelectionState>) : seq<Wri
         let filter =
             Builders<FastbreakSelectionState>.Filter
                 .And(
-                    Builders<FastbreakSelectionState>.Filter.Eq((fun s -> s.userId), state.userId),
-                    Builders<FastbreakSelectionState>.Filter.Eq((fun s -> s.date), state.date)
+                    Builders<FastbreakSelectionState>.Filter.Eq(_.userId, state.userId),
+                    Builders<FastbreakSelectionState>.Filter.Eq(_.date, state.date)
                 )
 
         let update = ReplaceOneModel(filter, state)
@@ -81,9 +76,5 @@ let calculateFastbreakCardResults (database: IMongoDatabase) =
 
             if results.Length > 0 then
                 lockedCardsCollection.BulkWrite(toSelectionStateWriteModels results) |> ignore
-            
-            
-
-
         ""
     }

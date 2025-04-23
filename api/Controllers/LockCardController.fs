@@ -57,10 +57,10 @@ type GoogleUser = { subject: string }
 
 let getRawBody (ctx: HttpContext) =
     task {
-        ctx.Request.EnableBuffering() // Allows rereading the stream
+        ctx.Request.EnableBuffering()
         use reader = new StreamReader(ctx.Request.Body, Encoding.UTF8, true, 1024, true)
         let! body = reader.ReadToEndAsync()
-        ctx.Request.Body.Position <- 0L // Reset stream position for later reading (e.g., model binding)
+        ctx.Request.Body.Position <- 0L
         return body
     }
 

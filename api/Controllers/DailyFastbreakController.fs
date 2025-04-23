@@ -23,7 +23,6 @@ type Game =
       league: string
       date: string }
 
-// Define the record to match the JSON object structure
 type ScheduleResponse =
     { card: string
       leaderboard: string
@@ -49,7 +48,7 @@ let getDailyFastbreakHandler (database: IMongoDatabase) (next: HttpFunc) (ctx: H
         let collection = database.GetCollection<EmptyFastbreakCard>("empty-fastbreak-cards")
         let today = DateTime.Now.ToString("yyyyMMdd")
 
-        let filter = Builders<EmptyFastbreakCard>.Filter.Eq((fun x -> x.date), today)
+        let filter = Builders<EmptyFastbreakCard>.Filter.Eq(_.date, today)
 
         let! card =
             collection.Find(filter).FirstOrDefaultAsync()
@@ -99,7 +98,7 @@ let getYesterdaysFastbreakHandler (database: IMongoDatabase) (next: HttpFunc) (c
         let collection = database.GetCollection<EmptyFastbreakCard>("empty-fastbreak-cards")
         let yesterday = DateTime.Now.AddDays(-1).ToString("yyyyMMdd")
 
-        let filter = Builders<EmptyFastbreakCard>.Filter.Eq((fun x -> x.date), yesterday)
+        let filter = Builders<EmptyFastbreakCard>.Filter.Eq(_.date, yesterday)
 
         let! card =
             collection.Find(filter).FirstOrDefaultAsync()
@@ -134,7 +133,7 @@ let getFastbreakHandler (database: IMongoDatabase) day (next: HttpFunc) (ctx: Ht
     task {
         let collection = database.GetCollection<EmptyFastbreakCard>("empty-fastbreak-cards")
 
-        let filter = Builders<EmptyFastbreakCard>.Filter.Eq((fun x -> x.date), day)
+        let filter = Builders<EmptyFastbreakCard>.Filter.Eq(_.date, day)
 
         let! card =
             collection.Find(filter).FirstOrDefaultAsync()

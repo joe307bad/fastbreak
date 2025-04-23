@@ -123,12 +123,6 @@ let updateStatSheets (database: IMongoDatabase) userIds =
 
             let newStatSheet = addLockedCardsToStatSheet latestStatSheet database userId
 
-            // 1. get the users most recent statsheet
-            // 2. get all locked cards since that statsheet was created (may need to change the locked cards
-            //      and statsheet schema to have something that sortable like number or actual date)
-            // 3. calculate the delta in the statsheet based off of the locked cards from the last statsheet
-            // 4. create a new stat sheet for the current day
-
             let filter = Builders<StatSheet>.Filter.Eq("userId", userId)
 
             let updateOptions = ReplaceOptions(IsUpsert = true)
@@ -166,7 +160,6 @@ let toStatSheetWriteModels (states: seq<StatSheet>) : seq<WriteModel<StatSheet>>
 
 let calculateStatSheets (database: IMongoDatabase, twoDaysAgo, yesterday, today, tomorrow) =
     task {
-        // to get an updated stat sheet, the user has to have locked a card yesterday
         let yesterdayFilter = Builders<FastbreakSelectionState>.Filter.Eq(_.date, yesterday)
 
         let userIds =
@@ -177,14 +170,7 @@ let calculateStatSheets (database: IMongoDatabase, twoDaysAgo, yesterday, today,
             |> Seq.map _.userId
             |> Seq.distinct
             |> Seq.toList
-
-        // stat sheet
-
-        // 1. (daily) current week running total of all fastbreak cards
-        // 3. (daily) Days in a row locking in a fastbreak card
-        // 4. (daily) Highest fastbreak card ever
-        // 5. (daily) number of perfect fastbreak card
-        // let statSheets = [ getStatSheets () ]
+            
         updateStatSheets database userIds |> ignore
 
     // 2. (weekly) last weeks total of all fastbreak cards

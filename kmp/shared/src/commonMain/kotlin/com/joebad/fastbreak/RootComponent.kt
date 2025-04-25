@@ -5,7 +5,6 @@ import ProtectedContent
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Surface
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.graphics.vector.ImageVector
 import com.arkivanov.decompose.ComponentContext
 import com.arkivanov.decompose.DefaultComponentContext
 import com.arkivanov.decompose.DelicateDecomposeApi
@@ -203,9 +202,3 @@ fun App(
     }
     ApplySystemBarsColor(colors.primary)
 }
-
-data class DrawerItem(
-    val title: String,
-    val icon: ImageVector,
-    val onClick: () -> Unit
-)

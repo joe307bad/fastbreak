@@ -11,7 +11,7 @@ type DayInfo = {
 }
 
 type CurrentWeek = {
-    days: List<KeyValuePair<string, DayInfo>> 
+    days: DayInfo array 
     total: int
 }
 

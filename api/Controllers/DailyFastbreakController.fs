@@ -3,13 +3,11 @@ module api.Controllers.DailyFastbreakController
 open System
 open Giraffe
 open Microsoft.AspNetCore.Http
-open MongoDB.Bson
-open MongoDB.Bson.IO
 open MongoDB.Driver
-open Newtonsoft.Json.Linq
 open Saturn.Endpoint
 open api.Entities.EmptyFastbreakCard
 open api.Entities.FastbreakSelections
+open api.Entities.Leaderboard
 open api.Utils.asyncMap
 open api.Utils.lockedCardsForUser
 
@@ -46,6 +44,12 @@ type DailyFastbreak =
 let getDailyFastbreakHandler (database: IMongoDatabase) (next: HttpFunc) (ctx: HttpContext) =
     task {
         let collection = database.GetCollection<EmptyFastbreakCard>("empty-fastbreak-cards")
+        
+        let leaderboard =
+            database
+                .GetCollection<LeaderboardHead>("leaderboards")
+                .Find(fun _ -> true)
+                .FirstOrDefault()
         let today = DateTime.Now.ToString("yyyyMMdd")
 
         let filter = Builders<EmptyFastbreakCard>.Filter.Eq(_.date, today)
@@ -83,7 +87,7 @@ let getDailyFastbreakHandler (database: IMongoDatabase) (next: HttpFunc) (ctx: H
             return!
                 json
                     ({| fastbreakCard = card.items
-                        leaderboard = [||]
+                        leaderboard = leaderboard.items
                         lockedCardForUser =
                          match lockedCardForUserAsync |> Async.RunSynchronously with
                          | Some v -> box v

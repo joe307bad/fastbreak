@@ -7,6 +7,7 @@
     <Compile Include="Entities\EmptyFastbreakCard.fs" />
     <Compile Include="Entities\FastbreakSelections.fs" />
     <Compile Include="Entities\StatSheet.fs" />
+    <Compile Include="Entities\Leaderboard.fs" />
     <Compile Include="Utils\apiRouter.fs" />
     <Compile Include="Utils\asyncMap.fs" />
     <Compile Include="Utils\tryGetSubject.fs" />
@@ -15,11 +16,13 @@
     <Compile Include="Utils\lockedCardsForUser.fs" />
     <Compile Include="Utils\getHighestAndPerfectCards.fs" />
     <Compile Include="Utils\getLockedCardsToAnalyze.fs" />
+    <Compile Include="Utils\createCurrentWeek.fs" />
     <Compile Include="Controllers\DailyFastbreakController.fs" />
     <Compile Include="Controllers\LockCardController.fs" />
     <Compile Include="DailyJob\SchedulePuller.fs" />
     <Compile Include="DailyJob\CalculateFastbreakCardResults.fs" />
     <Compile Include="DailyJob\CalculateStatSheets.fs" />
+    <Compile Include="DailyJob\CalculateLeaderboards.fs" />
     <Compile Include="DailyJob\DailyJob.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>

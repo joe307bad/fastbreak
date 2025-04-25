@@ -1,10 +1,10 @@
 module api.DailyJob.CalculateStatSheets
 
-open System.Collections.Generic
 open api.Entities.FastbreakSelections
 open MongoDB.Driver
 open api.Entities.StatSheet
 open System
+open api.Utils.createCurrentWeek
 open api.Utils.getLockedCardsToAnalyze
 open api.Utils.calculateLockedCardStreak
 open api.Utils.getWeekDays
@@ -36,57 +36,6 @@ let getWeekDates () =
         | "Sunday" -> 6
         | _ -> failwith "Invalid day name")
     |> Map.ofList
-
-let createCurrentWeek (daysOfTheWeek: List<KeyValuePair<string, DayInfo>>) (database: IMongoDatabase) (userId: string) =
-    let days = List<KeyValuePair<string, DayInfo>>()
-
-    for kvp in daysOfTheWeek do
-        let dayOfWeek = kvp.Key
-        let date = kvp.Value
-
-        let filter =
-            Builders<FastbreakSelectionState>.Filter
-                .And(
-                    Builders<FastbreakSelectionState>.Filter.Eq(_.date, date.DateCode),
-                    Builders<FastbreakSelectionState>.Filter.Eq(_.userId, userId)
-                )
-
-        let selectionStateTask =
-            database
-                .GetCollection<FastbreakSelectionState>("locked-fastbreak-cards")
-                .Find(filter)
-                .ToListAsync()
-
-        let selectionState = selectionStateTask.Result |> Seq.tryHead
-
-        let updatedDayInfo =
-            match selectionState with
-            | Some state ->
-                match state.results with
-                | Some results ->
-                    { DayOfWeek = date.DayOfWeek
-                      DateCode = date.DateCode
-                      TotalPoints = Some results.totalPoints }
-                | None ->
-                    { DayOfWeek = date.DayOfWeek
-                      DateCode = date.DateCode
-                      TotalPoints = None }
-            | None ->
-                { DayOfWeek = date.DayOfWeek
-                  DateCode = date.DateCode
-                  TotalPoints = None }
-
-        days.Add(KeyValuePair<string, DayInfo>(dayOfWeek, updatedDayInfo))
-
-    let total =
-        days
-        |> Seq.sumBy (fun kvp ->
-            match kvp.Value.TotalPoints with
-            | Some points -> points
-            | None -> 0)
-
-    { days = days; total = total }
-
 let addLockedCardsToStatSheet sheet database userId =
     task {
         printf ($"Starting to process stat sheet for user {userId}\n")

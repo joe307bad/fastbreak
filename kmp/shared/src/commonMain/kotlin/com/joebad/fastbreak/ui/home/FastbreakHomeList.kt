@@ -1,7 +1,5 @@
 package com.joebad.fastbreak.ui.home
 
-import DailyFastbreak
-import FastbreakViewModel
 import Question
 import QuestionComponent
 import androidx.compose.foundation.layout.Column
@@ -13,6 +11,8 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.joebad.fastbreak.data.dailyFastbreak.FastbreakViewModel
+import com.joebad.fastbreak.model.dtos.DailyFastbreak
 import com.joebad.fastbreak.ui.CardWithBadge
 import com.joebad.fastbreak.ui.TeamCard
 import com.joebad.fastbreak.ui.theme.LocalColors
@@ -33,7 +33,7 @@ fun FastbreakHomeList(dailyFastbreak: DailyFastbreak?, viewModel: FastbreakViewM
 
     for (item in dailyFastbreak.fastbreakCard) {
         when (item.type) {
-            "featured-pick-em" ->
+            "FEATURED-PICK-EM" ->
                 CardWithBadge(
                     badgeText = "FEATURED PICK-EM",
                     modifier = Modifier.padding(bottom = 30.dp),
@@ -46,7 +46,7 @@ fun FastbreakHomeList(dailyFastbreak: DailyFastbreak?, viewModel: FastbreakViewM
                             item.homeTeamSubtitle,
                             item.awayTeam,
                             item.awayTeamSubtitle,
-                            selectedAnswer = state.selections.find { it.id == item.id }?.userAnswer,
+                            selectedAnswer = state.selections.find { it._id == item.id }?.userAnswer,
                             onAnswerSelected = { answer ->
                                 val userLoser =
                                     if (answer == item.homeTeam) item.awayTeam else item.homeTeam
@@ -65,7 +65,7 @@ fun FastbreakHomeList(dailyFastbreak: DailyFastbreak?, viewModel: FastbreakViewM
                     points = item.points.toString()
                 )
 
-            "pick-em" ->
+            "PICK-EM" ->
                 CardWithBadge(
                     badgeText = "PICK-EM",
                     modifier = Modifier.padding(bottom = 10.dp),
@@ -79,7 +79,7 @@ fun FastbreakHomeList(dailyFastbreak: DailyFastbreak?, viewModel: FastbreakViewM
                             item.homeTeamSubtitle,
                             item.awayTeam,
                             item.awayTeamSubtitle,
-                            selectedAnswer = state.selections.find { it.id == item.id }?.userAnswer,
+                            selectedAnswer = state.selections.find { it._id == item.id }?.userAnswer,
                             onAnswerSelected = { answer ->
                                 val userLoser =
                                     if (answer == item.homeTeam) item.awayTeam else item.homeTeam
@@ -95,7 +95,7 @@ fun FastbreakHomeList(dailyFastbreak: DailyFastbreak?, viewModel: FastbreakViewM
                     }
                 )
 
-            "trivia-multiple-choice" ->
+            "TRIVIA-MULTIPLE-CHOICE" ->
                 CardWithBadge(
                     badgeText = "TRIVIA",
                     modifier = Modifier.padding(bottom = 30.dp),
@@ -111,7 +111,7 @@ fun FastbreakHomeList(dailyFastbreak: DailyFastbreak?, viewModel: FastbreakViewM
                                         item.answer4
                                     )
                                 ),
-                                selectedAnswer = state.selections.find { it.id == item.id }?.userAnswer,
+                                selectedAnswer = state.selections.find { it._id == item.id }?.userAnswer,
                                 onAnswerSelected = { answer ->
                                     viewModel.updateSelection(
                                         item.id,
@@ -129,7 +129,7 @@ fun FastbreakHomeList(dailyFastbreak: DailyFastbreak?, viewModel: FastbreakViewM
                     points = item.points.toString()
                 )
 
-            "trivia-tf" ->
+            "TRIVIA-TF" ->
                 CardWithBadge(
                     badgeText = "TRIVIA",
                     modifier = Modifier.padding(bottom = 30.dp),
@@ -139,7 +139,7 @@ fun FastbreakHomeList(dailyFastbreak: DailyFastbreak?, viewModel: FastbreakViewM
                                 Question.TrueFalse(
                                     item.question
                                 ),
-                                selectedAnswer = state.selections.find { it.id == item.id }?.userAnswer,
+                                selectedAnswer = state.selections.find { it._id == item.id }?.userAnswer,
                                 onAnswerSelected = { answer ->
                                     viewModel.updateSelection(
                                         item.id,

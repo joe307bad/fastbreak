@@ -1,0 +1,51 @@
+module api.DailyJob.CalculateLeaderboards
+
+open api.Entities.Leaderboard
+open api.Entities.StatSheet
+
+let calculateLeaderboard (statSheets: StatSheet list): LeaderboardResult =
+    let allDateCodes =
+        statSheets
+        |> List.collect (fun sheet -> 
+            sheet.items.currentWeek.days
+            |> List.ofSeq
+            |> List.map (fun kvp -> kvp.DateCode)
+        )
+        |> List.distinct
+    
+    let dailyLeaderboards =
+        allDateCodes
+        |> List.map (fun dateCode ->
+            let dailyScores =
+                statSheets
+                |> List.map (fun sheet ->
+                    let matchingDay = 
+                        sheet.items.currentWeek.days
+                        |> Seq.tryFind (fun kvp -> kvp.DateCode = dateCode)
+                    
+                    let points = 
+                        match matchingDay with
+                        | Some day -> 
+                            match day.TotalPoints with
+                            | Some pts -> pts
+                            | None -> 0
+                        | None -> 0
+                    
+                    { userId = sheet.userId; points = points }
+                )
+                |> List.sortByDescending (fun entry -> entry.points)
+                |> Array.ofList
+            
+            { dateCode = dateCode; entries = dailyScores }
+        )
+        |> Array.ofList
+    
+    let weeklyTotals =
+        statSheets
+        |> List.map (fun sheet -> 
+            { userId = sheet.userId; points = sheet.items.currentWeek.total }
+        )
+        |> List.sortByDescending (fun entry -> entry.points)
+        |> Array.ofList
+    
+    { dailyLeaderboards = dailyLeaderboards; weeklyTotals = weeklyTotals }

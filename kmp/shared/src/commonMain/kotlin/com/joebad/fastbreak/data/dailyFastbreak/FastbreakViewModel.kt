@@ -1,4 +1,6 @@
-
+package com.joebad.fastbreak.data.dailyFastbreak
+import AuthRepository
+import getRandomId
 import kotbase.Database
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.MainScope
@@ -12,7 +14,7 @@ import org.orbitmvi.orbit.container
 
 @Serializable
 data class FastbreakSelection(
-    val id: String,
+    val _id: String,
     val userAnswer: String,
     val points: Int,
     val description: String,
@@ -23,8 +25,9 @@ data class FastbreakSelection(
 data class FastbreakSelectionState(
     val selections: List<FastbreakSelection> = emptyList(),
     val totalPoints: Int = 0,
-    val id: String? = getRandomId(),
-    val locked: Boolean? = false
+    val cardId: String = getRandomId(),
+    val locked: Boolean? = false,
+    val date: String,
 )
 
 sealed class FastbreakSideEffect {
@@ -38,13 +41,15 @@ sealed class FastbreakSideEffect {
 
 class FastbreakViewModel(
     database: Database,
-    onLock: (state: FastbreakSelectionState) -> Unit
+    onLock: (state: FastbreakSelectionState) -> Unit,
+    date: String,
+    private val authRepository: AuthRepository?
 ) : ContainerHost<FastbreakSelectionState, FastbreakSideEffect>, CoroutineScope by MainScope() {
 
-    private val persistence = FastbreakSelectionsPersistence(database)
+    private val persistence = FastbreakSelectionsPersistence(database, authRepository)
 
     override val container: Container<FastbreakSelectionState, FastbreakSideEffect> = container(
-        initialState = FastbreakSelectionState()
+        initialState = FastbreakSelectionState(date = date)
     )
 
     init {
@@ -84,10 +89,10 @@ class FastbreakViewModel(
 
 
             val currentSelections = state.selections
-            val existingSelectionIndex = currentSelections.indexOfFirst { it.id == selectionId }
+            val existingSelectionIndex = currentSelections.indexOfFirst { it._id == selectionId }
 
             val selection = FastbreakSelection(
-                id = selectionId,
+                _id = selectionId,
                 userAnswer = userAnswer,
                 points = points,
                 description = description,
@@ -139,7 +144,7 @@ class FastbreakViewModel(
         launch {
             try {
                 val state = container.stateFlow.value;
-                persistence.saveSelections(state.id ?: "", state.selections, state.locked);
+                persistence.saveSelections(state.cardId ?: "", state.selections, state.locked);
             } catch (e: Exception) {
                 println(e)
             }
@@ -154,7 +159,7 @@ class FastbreakViewModel(
                     intent {
                         reduce {
                             state.copy(
-                                id = savedSelections.id,
+                                cardId = savedSelections.cardId,
                                 selections = savedSelections.selectionDtos,
                                 totalPoints = savedSelections.selectionDtos.sumOf { it.points },
                                 locked = savedSelections.locked

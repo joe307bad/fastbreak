@@ -20,6 +20,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.joebad.fastbreak.data.dailyFastbreak.FastbreakViewModel
 import com.joebad.fastbreak.ui.theme.LocalColors
 
 
@@ -53,7 +54,7 @@ fun FastbreakCard(
                     )
                     Row(modifier = Modifier.fillMaxWidth()) {
                         Text(
-                            "ID: ${state?.id}",
+                            "ID: ${state?.cardId}",
                             modifier = Modifier.weight(1f),
                             style = TextStyle(
                                 fontFamily = FontFamily.Monospace, fontSize = 17.sp,

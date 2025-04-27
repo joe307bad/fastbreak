@@ -4,8 +4,9 @@ services:
   mockserver:
     image: mockserver/mockserver
     container_name: mockserver
+#    network_mode: "host"
     ports:
-      - "1080:1080"
+      - "0.0.0.0:1080:1080"
     environment:
       - MOCKSERVER_INITIALIZATION_JSON_PATH=/config/expectations.json
     volumes:

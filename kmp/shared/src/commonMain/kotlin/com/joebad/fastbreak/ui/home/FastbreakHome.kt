@@ -13,6 +13,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
+import com.joebad.fastbreak.data.dailyFastbreak.FastbreakViewModel
+import com.joebad.fastbreak.model.dtos.DailyFastbreak
 import com.joebad.fastbreak.ui.home.FastbreakHomeList
 
 @Composable
@@ -22,10 +24,10 @@ fun FastbreakHome(
     animatedAlpha: Float,
     showModal: MutableState<Boolean>,
     dailyFastbreak: DailyFastbreak?,
-    fastbreakViewModel: FastbreakViewModel
+    fastbreakViewModel: FastbreakViewModel?
 ) {
 
-    val totalPoints = fastbreakViewModel.container.stateFlow.collectAsState().value.totalPoints;
+    val totalPoints = fastbreakViewModel?.container?.stateFlow?.collectAsState()?.value?.totalPoints;
     Box(modifier = Modifier.fillMaxSize()) {
         LazyColumn(
             state = listState,
@@ -39,7 +41,7 @@ fun FastbreakHome(
                 Spacer(
                     modifier = Modifier.height(130.dp)
                 )
-                if (dailyFastbreak == null)
+                if (dailyFastbreak == null || fastbreakViewModel == null)
                     LoadingDailyFastbreak()
                 else
                     FastbreakHomeList(dailyFastbreak, fastbreakViewModel)

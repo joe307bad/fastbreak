@@ -186,7 +186,8 @@ fun App(
                         theme = theme
                     )
 
-                    is RootComponent.Child.Protected -> ProtectedContent(
+                    is RootComponent.Child.Protected ->
+                        ProtectedContent(
                         instance.component,
                         onToggleTheme,
                         themePreference = themePreference,

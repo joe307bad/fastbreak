@@ -5,6 +5,7 @@ open Giraffe
 open Microsoft.AspNetCore.Http
 open MongoDB.Driver
 open Saturn.Endpoint
+open api.Entities.StatSheet
 open api.Entities.EmptyFastbreakCard
 open api.Entities.FastbreakSelections
 open api.Entities.Leaderboard
@@ -39,23 +40,33 @@ type LeaderboardItem =
 type DailyFastbreak =
     { leaderboard: LeaderboardItem[]
       fastbreakCard: EmptyFastbreakCardItem[]
-      lockedCardForUser: FastbreakSelectionState option }
+      lockedCardForUser: FastbreakSelectionState option
+      statSheetForUser: StatSheet option }
 
 let getDailyFastbreakHandler (database: IMongoDatabase) (next: HttpFunc) (ctx: HttpContext) =
     task {
         let collection = database.GetCollection<EmptyFastbreakCard>("empty-fastbreak-cards")
-        
+
         let leaderboard =
             database
                 .GetCollection<LeaderboardHead>("leaderboards")
                 .Find(fun _ -> true)
                 .FirstOrDefault()
+
         let today = DateTime.Now.ToString("yyyyMMdd")
 
         let filter = Builders<EmptyFastbreakCard>.Filter.Eq(_.date, today)
 
         let! card =
             collection.Find(filter).FirstOrDefaultAsync()
+            |> Async.AwaitTask
+            |> asyncMap Option.ofObj
+
+        let! statSheet =
+            database
+                .GetCollection("user-stat-sheets")
+                .Find(fun _ -> true)
+                .FirstOrDefaultAsync()
             |> Async.AwaitTask
             |> asyncMap Option.ofObj
 
@@ -86,7 +97,12 @@ let getDailyFastbreakHandler (database: IMongoDatabase) (next: HttpFunc) (ctx: H
         | Some card ->
             return!
                 json
-                    ({| fastbreakCard = card.items
+                    ({|
+                        statSheetForUser =
+                            match statSheet with
+                            | Some sheet -> box sheet
+                            | None -> null
+                        fastbreakCard = card.items
                         leaderboard = leaderboard.items
                         lockedCardForUser =
                          match lockedCardForUserAsync |> Async.RunSynchronously with
@@ -95,7 +111,7 @@ let getDailyFastbreakHandler (database: IMongoDatabase) (next: HttpFunc) (ctx: H
                     next
                     ctx
     }
-    
+
 
 let getYesterdaysFastbreakHandler (database: IMongoDatabase) (next: HttpFunc) (ctx: HttpContext) =
     task {
@@ -114,6 +130,7 @@ let getYesterdaysFastbreakHandler (database: IMongoDatabase) (next: HttpFunc) (c
                 match ctx.TryGetQueryStringValue "userId" with
                 | Some id ->
                     let! lockedCard = lockedCardForUserAsync database id yesterday
+
                     match lockedCard with
                     | Some response -> return response
                     | None -> return null
@@ -125,8 +142,7 @@ let getYesterdaysFastbreakHandler (database: IMongoDatabase) (next: HttpFunc) (c
         | Some card ->
             return!
                 json
-                    ({|
-                        lockedCardForUser = lockedCardForUser |> Async.RunSynchronously
+                    ({| lockedCardForUser = lockedCardForUser |> Async.RunSynchronously
                         fastbreakCard = card.items
                         leaderboard = [||] |})
                     next
@@ -149,6 +165,7 @@ let getFastbreakHandler (database: IMongoDatabase) day (next: HttpFunc) (ctx: Ht
                 match ctx.TryGetQueryStringValue "userId" with
                 | Some id ->
                     let! lockedCard = lockedCardForUserAsync database id day
+
                     match lockedCard with
                     | Some response -> return response
                     | None -> return null
@@ -160,9 +177,8 @@ let getFastbreakHandler (database: IMongoDatabase) day (next: HttpFunc) (ctx: Ht
         | Some card ->
             return!
                 json
-                    ({|
-                        lockedCardForUser = lockedCardForUser |> Async.RunSynchronously
-                        fastbreakCard = card.items
+                    ({| lockedCardForUser = lockedCardForUser |> Async.RunSynchronously
+                        fastbreakCard = [||]
                         leaderboard = [||] |})
                     next
                     ctx

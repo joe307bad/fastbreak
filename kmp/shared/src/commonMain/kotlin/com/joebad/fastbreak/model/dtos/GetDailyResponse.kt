@@ -29,14 +29,33 @@ data class EmptyFastbreakCardItem(
 
 @Serializable
 data class DailyFastbreak(
-    val leaderboard: List<LeaderboardItem>,
+    val leaderboard: LeaderboardResult,
     val fastbreakCard: List<EmptyFastbreakCardItem>,
+    val statSheet: StatSheetResponse? = null
 )
 
+@Serializable
+data class LeaderboardEntry(
+    val userId: String,
+    val points: Int
+)
+
+@Serializable
+data class DailyLeaderboard(
+    val dateCode: String,
+    val entries: List<LeaderboardEntry>
+)
+
+@Serializable
+data class LeaderboardResult(
+    val dailyLeaderboards: List<DailyLeaderboard>,
+    val weeklyTotals: List<LeaderboardEntry>
+)
 
 @Serializable
 data class DailyResponse(
-    val leaderboard: List<LeaderboardItem>,
+    val leaderboard: LeaderboardResult,
     val fastbreakCard: List<EmptyFastbreakCardItem>,
-    val lockedCardForUser: FastbreakSelectionState? = null
+    val lockedCardForUser: FastbreakSelectionState? = null,
+    val statSheetForUser: StatSheetResponse? = null
 )

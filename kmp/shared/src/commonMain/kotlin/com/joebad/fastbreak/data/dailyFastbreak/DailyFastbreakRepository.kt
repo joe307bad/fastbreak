@@ -55,12 +55,18 @@ class FastbreakStateRepository(
     private suspend fun fetchAndStoreState(date: String): DailyFastbreak? {
         val response = fetchDailyFastbreak()
         val dailyFastbreak =
-            response?.let { DailyFastbreak(leaderboard = it.leaderboard, fastbreakCard = response.fastbreakCard) }
+            response?.let {
+                DailyFastbreak(
+                    leaderboard = it.leaderboard,
+                    fastbreakCard = response.fastbreakCard,
+                    statSheet = it.statSheetForUser
+                )
+            }
         saveStateToDatabase(date, dailyFastbreak)
         saveLastFetchedTime()
         enforceMaxDocumentsLimit()
 
-        if(response?.lockedCardForUser != null) {
+        if (response?.lockedCardForUser != null) {
             val savedCard = response.lockedCardForUser;
             persistence.saveSelections(savedCard.cardId, savedCard.selections, true)
         }

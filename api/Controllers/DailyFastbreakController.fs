@@ -1,6 +1,7 @@
 module api.Controllers.DailyFastbreakController
 
 open System
+open System.Text.Json
 open Giraffe
 open Microsoft.AspNetCore.Http
 open MongoDB.Driver
@@ -9,8 +10,10 @@ open api.Entities.StatSheet
 open api.Entities.EmptyFastbreakCard
 open api.Entities.FastbreakSelections
 open api.Entities.Leaderboard
+open api.Utils.getStatSheetForUser
 open api.Utils.asyncMap
 open api.Utils.lockedCardsForUser
+open MongoDB.Bson
 
 type Game =
     { id: string
@@ -62,52 +65,37 @@ let getDailyFastbreakHandler (database: IMongoDatabase) (next: HttpFunc) (ctx: H
             |> Async.AwaitTask
             |> asyncMap Option.ofObj
 
-        let! statSheet =
-            database
-                .GetCollection("user-stat-sheets")
-                .Find(fun _ -> true)
-                .FirstOrDefaultAsync()
-            |> Async.AwaitTask
-            |> asyncMap Option.ofObj
-
-        let lockedCardForUserAsync =
-            match ctx.TryGetQueryStringValue "userId" with
-            | Some id ->
-                async {
-                    let filter =
-                        Builders<FastbreakSelectionState>.Filter.Eq(_.userId, id)
-                        |> fun f ->
-                            Builders<FastbreakSelectionState>.Filter
-                                .And(f, Builders<FastbreakSelectionState>.Filter.Eq(_.date, today))
-
-                    let! result =
+        let statSheetForUser =
+            async {
+                match ctx.TryGetQueryStringValue "userId" with
+                | Some id ->
+                    return
                         database
-                            .GetCollection<FastbreakSelectionState>("locked-fastbreak-cards")
-                            .Find(filter)
+                            .GetCollection("user-stat-sheets")
+                            .Find(Builders.Filter.Eq(_.userId, id))
                             .FirstOrDefaultAsync()
                         |> Async.AwaitTask
                         |> asyncMap Option.ofObj
+                | None -> return async { return None }
+            }
+            |> Async.RunSynchronously
 
-                    return result
-                }
-            | None -> async { return None }
+        let lockedCard =
+            match ctx.TryGetQueryStringValue "userId" with
+            | Some id -> 
+                let bsonDoc = getLockedCardForUser database id today
+                if isNull bsonDoc then None else Some (bsonDoc.ToJson() |> JsonSerializer.Deserialize<System.Collections.Generic.Dictionary<string, obj>>)
+            | None -> None
 
         match card with
         | None -> return! json Seq.empty next ctx
         | Some card ->
             return!
                 json
-                    ({|
-                        statSheetForUser =
-                            match statSheet with
-                            | Some sheet -> box sheet
-                            | None -> null
+                    ({| statSheetForUser = statSheetForUser
                         fastbreakCard = card.items
                         leaderboard = leaderboard.items
-                        lockedCardForUser =
-                         match lockedCardForUserAsync |> Async.RunSynchronously with
-                         | Some v -> box v
-                         | None -> null |})
+                        lockedCardForUser = lockedCard |})
                     next
                     ctx
     }
@@ -118,6 +106,12 @@ let getYesterdaysFastbreakHandler (database: IMongoDatabase) (next: HttpFunc) (c
         let collection = database.GetCollection<EmptyFastbreakCard>("empty-fastbreak-cards")
         let yesterday = DateTime.Now.AddDays(-1).ToString("yyyyMMdd")
 
+        let leaderboard =
+            database
+                .GetCollection<LeaderboardHead>("leaderboards")
+                .Find(fun _ -> true)
+                .FirstOrDefault()
+
         let filter = Builders<EmptyFastbreakCard>.Filter.Eq(_.date, yesterday)
 
         let! card =
@@ -125,26 +119,29 @@ let getYesterdaysFastbreakHandler (database: IMongoDatabase) (next: HttpFunc) (c
             |> Async.AwaitTask
             |> asyncMap Option.ofObj
 
-        let lockedCardForUser =
-            async {
-                match ctx.TryGetQueryStringValue "userId" with
-                | Some id ->
-                    let! lockedCard = lockedCardForUserAsync database id yesterday
+        let lockedCard =
+            match ctx.TryGetQueryStringValue "userId" with
+            | Some id -> 
+                let bsonDoc = getLockedCardForUser database id yesterday
+                if isNull bsonDoc then None else Some (bsonDoc.ToJson() |> JsonSerializer.Deserialize<System.Collections.Generic.Dictionary<string, obj>>)
+            | None -> None
 
-                    match lockedCard with
-                    | Some response -> return response
-                    | None -> return null
-                | None -> return null
-            }
-
+        let statSheetForUser =
+            match ctx.TryGetQueryStringValue "userId" with
+            | Some id -> 
+                let bsonDoc = getStatSheetForUser database id
+                if isNull bsonDoc then None else Some (bsonDoc.ToJson() |> JsonSerializer.Deserialize<System.Collections.Generic.Dictionary<string, obj>>)
+            | None -> None
+            
         match card with
         | None -> return! json Seq.empty next ctx
         | Some card ->
             return!
                 json
-                    ({| lockedCardForUser = lockedCardForUser |> Async.RunSynchronously
+                    ({| statSheetForUser = statSheetForUser
                         fastbreakCard = card.items
-                        leaderboard = [||] |})
+                        leaderboard = leaderboard.items
+                        lockedCardForUser = lockedCard |})
                     next
                     ctx
     }
@@ -160,24 +157,20 @@ let getFastbreakHandler (database: IMongoDatabase) day (next: HttpFunc) (ctx: Ht
             |> Async.AwaitTask
             |> asyncMap Option.ofObj
 
-        let lockedCardForUser =
+        let lockedCard =
             async {
                 match ctx.TryGetQueryStringValue "userId" with
-                | Some id ->
-                    let! lockedCard = lockedCardForUserAsync database id day
-
-                    match lockedCard with
-                    | Some response -> return response
-                    | None -> return null
+                | Some id -> return box (getLockedCardForUser database id day)
                 | None -> return null
             }
+            |> Async.RunSynchronously
 
         match card with
         | None -> return! json Seq.empty next ctx
         | Some card ->
             return!
                 json
-                    ({| lockedCardForUser = lockedCardForUser |> Async.RunSynchronously
+                    ({| lockedCardForUser = lockedCard
                         fastbreakCard = [||]
                         leaderboard = [||] |})
                     next

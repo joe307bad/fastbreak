@@ -17,6 +17,7 @@
     <Compile Include="Utils\getHighestAndPerfectCards.fs" />
     <Compile Include="Utils\getLockedCardsToAnalyze.fs" />
     <Compile Include="Utils\createCurrentWeek.fs" />
+    <Compile Include="Utils\getStatSheetForUser.fs" />
     <Compile Include="Controllers\DailyFastbreakController.fs" />
     <Compile Include="Controllers\LockCardController.fs" />
     <Compile Include="DailyJob\SchedulePuller.fs" />

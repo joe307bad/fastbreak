@@ -36,20 +36,24 @@ let getWeekDates () =
         | "Sunday" -> 6
         | _ -> failwith "Invalid day name")
     |> Map.ofList
-let addLockedCardsToStatSheet sheet database userId =
+
+let addLockedCardsToStatSheet sheet database userId yesterday result =
     task {
         printf ($"Starting to process stat sheet for user {userId}\n")
         let daysOfTheWeek = getWeekDays ()
         let currentWeek = createCurrentWeek daysOfTheWeek database userId
         let streak = calculateLockedCardStreak database sheet userId
         let lockedCardsToAnalyze = getLockedCardsToAnalyze database userId sheet
-        let (highestFastbreakCardEver, perfectFastbreakCards) = getHighestAndPerfectCards lockedCardsToAnalyze sheet
+
+        let (highestFastbreakCardEver, perfectFastbreakCards) =
+            getHighestAndPerfectCards lockedCardsToAnalyze sheet
 
         return
             { currentWeek = currentWeek
               lockedCardStreak = streak
               highestFastbreakCardEver = highestFastbreakCardEver
-              perfectFastbreakCards = perfectFastbreakCards }
+              perfectFastbreakCards = perfectFastbreakCards
+              cardResults = result }
     }
 
 let getLatestStatSheet (collection: IMongoCollection<StatSheet>) userId =
@@ -63,14 +67,15 @@ let getLatestStatSheet (collection: IMongoCollection<StatSheet>) userId =
 
 let updateStatSheets (database: IMongoDatabase) userIds =
     task {
-        for userId in userIds do
+        for (userId, result) in userIds do
             let statSheetCollection = database.GetCollection<StatSheet>("user-stat-sheets")
             let statSheetTask = getLatestStatSheet statSheetCollection userId
 
             let latestStatSheet = statSheetTask |> Async.AwaitTask |> Async.RunSynchronously
             let yesterday = DateTime.Now.AddDays(-1).ToString("yyyyMMdd")
 
-            let newStatSheet = addLockedCardsToStatSheet latestStatSheet database userId
+            let newStatSheet =
+                addLockedCardsToStatSheet latestStatSheet database userId yesterday result
 
             let filter = Builders<StatSheet>.Filter.Eq("userId", userId)
 
@@ -109,17 +114,24 @@ let toStatSheetWriteModels (states: seq<StatSheet>) : seq<WriteModel<StatSheet>>
 
 let calculateStatSheets (database: IMongoDatabase, twoDaysAgo, yesterday, today, tomorrow) =
     task {
-        let yesterdayFilter = Builders<FastbreakSelectionState>.Filter.Eq(_.date, yesterday)
-
         let userIds =
             database
                 .GetCollection<FastbreakSelectionState>("locked-fastbreak-cards")
-                .Find(yesterdayFilter)
+                .Find(
+                    Builders<FastbreakSelectionState>.Filter
+                        .And(
+                            Builders<FastbreakSelectionState>.Filter.Ne(_.results, None),
+                            Builders<FastbreakSelectionState>.Filter.Eq(_.date, yesterday)
+                        )
+                )
                 .ToEnumerable()
-            |> Seq.map _.userId
-            |> Seq.distinct
+            |> Seq.choose (fun state ->
+                match state.results with
+                | Some results -> Some(state.userId, results)
+                | None -> None
+            )
+            |> Seq.distinctBy fst
             |> Seq.toList
-            
         updateStatSheets database userIds |> ignore
 
     // 2. (weekly) last weeks total of all fastbreak cards

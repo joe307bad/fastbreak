@@ -86,7 +86,7 @@ fun ProtectedContent(
     }
 
 //
-    val state = viewModel?.container?.stateFlow?.collectAsState()?.value;
+    val state = viewModel.container?.stateFlow?.collectAsState()?.value;
     val locked = state?.locked ?: false;
     val childStack by component.stack.subscribeAsState()
     val activeChild = childStack.active

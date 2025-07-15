@@ -161,7 +161,7 @@ class FastbreakViewModel(
                             state.copy(
                                 cardId = savedSelections.cardId,
                                 selections = savedSelections.selectionDtos,
-                                totalPoints = savedSelections.selectionDtos.sumOf { it.points },
+                                totalPoints = if (savedSelections.selectionDtos.isEmpty()) 0 else savedSelections.selectionDtos.sumOf { it.points },
                                 locked = savedSelections.locked
                             )
                         }
@@ -173,3 +173,4 @@ class FastbreakViewModel(
         }
     }
 }
+

@@ -8,6 +8,9 @@ open MongoDB.Bson.Serialization
 open MongoDB.Bson.Serialization.Serializers
 open MongoDB.Driver
 open Saturn
+open Newtonsoft.Json
+open Newtonsoft.Json.Serialization
+open Giraffe
 open api.Controllers.DailyFastbreakController
 open Microsoft.AspNetCore.Builder
 open Microsoft.Extensions.DependencyInjection
@@ -57,6 +60,54 @@ type OptionSerializer<'T>() =
             None
         else
             Some(BsonSerializer.Deserialize<'T>(context.Reader))
+
+type OptionJsonConverter() =
+    inherit JsonConverter()
+    
+    override _.CanConvert(objectType) =
+        objectType.IsGenericType && objectType.GetGenericTypeDefinition() = typedefof<_ option>
+    
+    override _.WriteJson(writer, value, serializer) =
+        match value with
+        | null -> writer.WriteNull()
+        | _ ->
+            let optionValue = value.GetType().GetProperty("Value").GetValue(value)
+            if isNull optionValue then
+                writer.WriteNull()
+            else
+                serializer.Serialize(writer, optionValue)
+    
+    override _.ReadJson(reader, objectType, existingValue, serializer) =
+        if reader.TokenType = JsonToken.Null then
+            null
+        else
+            let innerType = objectType.GetGenericArguments().[0]
+            let value = serializer.Deserialize(reader, innerType)
+            let someMethod = objectType.GetMethod("Some")
+            someMethod.Invoke(null, [| value |])
+
+type SafeArrayJsonConverter() =
+    inherit JsonConverter()
+    
+    override _.CanConvert(objectType) =
+        objectType.IsArray
+    
+    override _.WriteJson(writer, value, serializer) =
+        match value with
+        | null -> 
+            writer.WriteStartArray()
+            writer.WriteEndArray()
+        | _ -> 
+            let tempConverter = serializer.Converters |> Seq.find (fun c -> c.GetType() = typeof<SafeArrayJsonConverter>)
+            serializer.Converters.Remove(tempConverter) |> ignore
+            serializer.Serialize(writer, value)
+            serializer.Converters.Add(tempConverter)
+    
+    override _.ReadJson(reader, objectType, existingValue, serializer) =
+        if reader.TokenType = JsonToken.Null then
+            System.Array.CreateInstance(objectType.GetElementType(), 0)
+        else
+            serializer.Deserialize(reader, objectType)
 
 BsonSerializer.RegisterSerializer(typeof<FastbreakSelectionsResult option>, OptionSerializer<FastbreakSelectionsResult>())
 BsonSerializer.RegisterSerializer(typeof<int option>, OptionSerializer<int>())
@@ -153,17 +204,19 @@ let appRouter =
         forward "/api" apiRouter
     }
 
-let app =
-    JsonSerializerOptions(
-        PropertyNameCaseInsensitive = true,
-        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
-    )
-    |> ignore
+let configureJson (services: IServiceCollection) =
+    let jsonSettings = JsonSerializerSettings()
+    jsonSettings.Converters.Add(OptionJsonConverter())
+    jsonSettings.Converters.Add(SafeArrayJsonConverter())
+    jsonSettings.NullValueHandling <- NullValueHandling.Include
+    jsonSettings.ContractResolver <- CamelCasePropertyNamesContractResolver()
+    services.AddSingleton<Json.ISerializer>(NewtonsoftJson.Serializer(jsonSettings))
 
+let app =
     application {
         url "http://0.0.0.0:8085"
         use_endpoint_router appRouter
-        service_config configureHangfire
+        service_config (configureHangfire >> configureJson)
         use_developer_exceptions
         app_config configureApp
     }

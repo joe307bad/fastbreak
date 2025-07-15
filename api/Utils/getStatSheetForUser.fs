@@ -1,12 +1,12 @@
 module api.Utils.getStatSheetForUser
 
-open MongoDB.Bson
 open MongoDB.Driver
+open api.Entities.StatSheet
 
 let getStatSheetForUser (database: IMongoDatabase) (id: string) =
     database
-        .GetCollection("user-stat-sheets")
-        .Find(Builders<BsonDocument>.Filter.Eq("userId", id))
+        .GetCollection<StatSheet>("user-stat-sheets")
+        .Find(Builders<StatSheet>.Filter.Eq(_.userId, id))
         .FirstOrDefaultAsync()
     |> Async.AwaitTask
     |> Async.RunSynchronously

@@ -83,7 +83,7 @@ class FastbreakSelectionsPersistence(private val db: Database, private val authR
             .where(
                 Expression.property("date").equalTo(Expression.string(today))
                     .and(Expression.property("userId").equalTo(Expression.string(authRepository?.getUser()?.userId)))
-            ).execute().first()
+            ).execute().firstOrNull()
         val yestDocument = getCollectionSafe().getDocument(yesterday)
 
         val fs = document?.getDictionary("fastbreak_selections");

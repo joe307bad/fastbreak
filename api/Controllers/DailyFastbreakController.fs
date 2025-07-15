@@ -1,7 +1,6 @@
 module api.Controllers.DailyFastbreakController
 
 open System
-open System.Text.Json
 open Giraffe
 open Microsoft.AspNetCore.Http
 open MongoDB.Driver
@@ -13,7 +12,6 @@ open api.Entities.Leaderboard
 open api.Utils.getStatSheetForUser
 open api.Utils.asyncMap
 open api.Utils.lockedCardsForUser
-open MongoDB.Bson
 
 type Game =
     { id: string
@@ -66,30 +64,21 @@ let getDailyFastbreakHandler (database: IMongoDatabase) (next: HttpFunc) (ctx: H
             |> asyncMap Option.ofObj
 
         let statSheetForUser =
-            async {
-                match ctx.TryGetQueryStringValue "userId" with
-                | Some id ->
-                    return
-                        database
-                            .GetCollection("user-stat-sheets")
-                            .Find(Builders.Filter.Eq(_.userId, id))
-                            .FirstOrDefaultAsync()
-                        |> Async.AwaitTask
-                        |> asyncMap Option.ofObj
-                | None -> return async { return None }
-            }
-            |> Async.RunSynchronously
+            match ctx.TryGetQueryStringValue "userId" with
+            | Some id -> 
+                getStatSheetForUser database id |> Option.ofObj
+            | None -> None
 
         let lockedCard =
             match ctx.TryGetQueryStringValue "userId" with
             | Some id -> 
-                let bsonDoc = getLockedCardForUser database id today
-                if isNull bsonDoc then None else Some (bsonDoc.ToJson() |> JsonSerializer.Deserialize<System.Collections.Generic.Dictionary<string, obj>>)
+                getLockedCardForUser database id today |> Option.ofObj
             | None -> None
 
         match card with
         | None -> return! json Seq.empty next ctx
         | Some card ->
+            let safeFastbreakCard = if isNull card.items then [||] else card.items
             return!
                 json
                     ({| statSheetForUser = statSheetForUser
@@ -122,20 +111,19 @@ let getYesterdaysFastbreakHandler (database: IMongoDatabase) (next: HttpFunc) (c
         let lockedCard =
             match ctx.TryGetQueryStringValue "userId" with
             | Some id -> 
-                let bsonDoc = getLockedCardForUser database id yesterday
-                if isNull bsonDoc then None else Some (bsonDoc.ToJson() |> JsonSerializer.Deserialize<System.Collections.Generic.Dictionary<string, obj>>)
+                getLockedCardForUser database id yesterday |> Option.ofObj
             | None -> None
 
         let statSheetForUser =
             match ctx.TryGetQueryStringValue "userId" with
             | Some id -> 
-                let bsonDoc = getStatSheetForUser database id
-                if isNull bsonDoc then None else Some (bsonDoc.ToJson() |> JsonSerializer.Deserialize<System.Collections.Generic.Dictionary<string, obj>>)
+                getStatSheetForUser database id |> Option.ofObj
             | None -> None
             
         match card with
         | None -> return! json Seq.empty next ctx
         | Some card ->
+            let safeFastbreakCard = if isNull card.items then [||] else card.items
             return!
                 json
                     ({| statSheetForUser = statSheetForUser

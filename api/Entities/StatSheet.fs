@@ -33,7 +33,7 @@ type PerfectFastbreakCards = { cards: FastbreakCard[]; highest: FastbreakCard }
 [<CLIMutable>]
 type StatSheetItem =
     { currentWeek: Week
-      // lastWeek: Week
+      lastWeek: Week
       lockedCardStreak: Streak
       highestFastbreakCardEver: FastbreakCard
       perfectFastbreakCards: PerfectFastbreakCards

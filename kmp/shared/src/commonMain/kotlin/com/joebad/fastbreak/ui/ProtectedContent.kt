@@ -61,13 +61,15 @@ fun ProtectedContent(
                 val state = dailyFastbreakRepository.getDailyFastbreakState(selectedDate)
                 dailyFastbreak = state
                 val statSheetItems = state?.statSheet?.items
+                val lastLockedCardResults = state?.statSheet?.items?.cardResults
                 viewModel = FastbreakViewModel(
                     db,
                     { newState -> onLock(dailyFastbreakRepository, coroutineScope, newState) },
                     selectedDate,
                     authRepository,
                     statSheetItems,
-                    selectedDate
+                    selectedDate,
+                    lastLockedCardResults
                 )
             } catch (e: Exception) {
                 error = "Failed to fetch state: ${e.message}"
@@ -108,6 +110,8 @@ fun ProtectedContent(
         hideLockCardButton = true,
         title = "Yesterday's Fastbreak Card",
         showCloseButton = true,
+        fastbreakViewModel = viewModel,
+        fastbreakResultsCard = true
     )
     BlurredScreen(
         locked,

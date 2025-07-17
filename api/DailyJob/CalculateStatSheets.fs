@@ -41,8 +41,10 @@ let getWeekDates () =
 let addLockedCardsToStatSheet sheet database userId yesterday result =
     task {
         printf ($"Starting to process stat sheet for user {userId}\n")
-        let daysOfTheWeek = getWeekDays ()
-        let currentWeek = createCurrentWeek daysOfTheWeek database userId
+        let daysOfTheWeek = getWeekDays (getLastMonday ())
+        let daysOfTheLastWeek = getWeekDays ( getTwoMondaysAgo ())
+        let currentWeek = createWeek daysOfTheWeek database userId
+        let lastWeek = createWeek daysOfTheLastWeek database userId
         let streak = calculateLockedCardStreak database sheet userId
         let lockedCardsToAnalyze = getLockedCardsToAnalyze database userId sheet
 
@@ -51,8 +53,7 @@ let addLockedCardsToStatSheet sheet database userId yesterday result =
 
         return
             { currentWeek = currentWeek
-              // TODO need to implement last week here to display last weeks total points
-              // lastWeek = lastWeek
+              lastWeek = lastWeek
               lockedCardStreak = streak
               highestFastbreakCardEver = highestFastbreakCardEver
               perfectFastbreakCards = perfectFastbreakCards

@@ -65,8 +65,7 @@ fun StatSheetRow(
     statSheetType: StatSheetType,
     leftColumnText: String,
     rightColumnText: String,
-    onClick: (Boolean) -> Unit,
-    statSheetItems: List<StatSheetItemView> = emptyList()
+    onClick: (Boolean) -> Unit
 ) {
     val colors = LocalColors.current;
     Row(

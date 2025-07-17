@@ -31,7 +31,8 @@ fun FastbreakCard(
     locked: Boolean,
     onDismiss: () -> Unit,
     showCloseButton: Boolean = false,
-    fastbreakViewModel: FastbreakViewModel? = null
+    fastbreakViewModel: FastbreakViewModel? = null,
+    fastbreakResultsCard: Boolean = false
 ) {
     val colors = LocalColors.current;
     val state = fastbreakViewModel?.container?.stateFlow?.collectAsState()?.value;

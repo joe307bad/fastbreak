@@ -3,6 +3,7 @@ package com.joebad.fastbreak.data.dailyFastbreak
 import AuthRepository
 import StatSheetItemView
 import StatSheetType
+import com.joebad.fastbreak.model.dtos.FastbreakSelectionsResult
 import com.joebad.fastbreak.model.dtos.StatSheetItem
 import getRandomId
 import getWeekNumber
@@ -16,7 +17,6 @@ import kotlinx.serialization.Serializable
 import org.orbitmvi.orbit.Container
 import org.orbitmvi.orbit.ContainerHost
 import org.orbitmvi.orbit.container
-import parseDateAndGetAdjacent
 
 @Serializable
 data class FastbreakSelection(
@@ -34,7 +34,8 @@ data class FastbreakSelectionState(
     val cardId: String = getRandomId(),
     val locked: Boolean? = false,
     val date: String,
-    val statSheetItems: List<StatSheetItemView> = emptyList()
+    val statSheetItems: List<StatSheetItemView> = emptyList(),
+    val lastLockedCardResults: FastbreakSelectionsResult? = null
 )
 
 sealed class FastbreakSideEffect {
@@ -52,7 +53,8 @@ class FastbreakViewModel(
     date: String,
     private val authRepository: AuthRepository?,
     private val statSheetItems: StatSheetItem?,
-    private val selectedDate: String?
+    private val selectedDate: String?,
+    private val lastLockedCardResults: FastbreakSelectionsResult?
 ) : ContainerHost<FastbreakSelectionState, FastbreakSideEffect>, CoroutineScope by MainScope() {
 
     private val persistence = FastbreakSelectionsPersistence(database, authRepository)
@@ -64,6 +66,7 @@ class FastbreakViewModel(
     init {
         loadSavedSelections()
         setStatSheetItems(statSheetItems, selectedDate);
+        setlastLockedCardResults(lastLockedCardResults)
         container.sideEffectFlow
             .onEach { sideEffect ->
                 when (sideEffect) {
@@ -74,20 +77,31 @@ class FastbreakViewModel(
             .launchIn(MainScope())
     }
 
-    fun setStatSheetItems(statSheetItems: StatSheetItem?, date: String?) {
+    private fun setlastLockedCardResults(lastLockedCardResults: FastbreakSelectionsResult?) {
+        intent {
+            reduce {
+                state.copy(lastLockedCardResults = lastLockedCardResults)
+            }
+        }
+    }
+
+    private fun setStatSheetItems(statSheetItems: StatSheetItem?, date: String?) {
         intent {
             reduce {
                 val statSheetItemViewList = mutableListOf<StatSheetItemView>()
 
-                val (yesterday, tomorrow) = parseDateAndGetAdjacent(date);
                 val lastFastbreakCardResults = statSheetItems?.cardResults;
                 val currentWeek = statSheetItems?.currentWeek;
+                val lastWeek = statSheetItems?.lastWeek;
+                val highest = statSheetItems?.highestFastbreakCardEver;
+                val streak = statSheetItems?.lockedCardStreak;
+
 
                 statSheetItemViewList.add(
                     StatSheetItemView(
                         statSheetType = StatSheetType.Button,
                         leftColumnText = lastFastbreakCardResults?.totalPoints.toString(),
-                        rightColumnText = "Your last Fastbreak card results\n${lastFastbreakCardResults?.date}"
+                        rightColumnText = "My last Fastbreak card results\n${lastFastbreakCardResults?.date}"
                     )
                 )
 
@@ -95,18 +109,49 @@ class FastbreakViewModel(
                     StatSheetItemView(
                         statSheetType = StatSheetType.MonoSpace,
                         leftColumnText = currentWeek?.total.toString(),
-                        rightColumnText = "Current week total\nWeek ${getWeekNumber(currentWeek?.days?.first()?.dateCode)}"
+                        rightColumnText = "Current week's total\nWeek ${getWeekNumber(currentWeek?.days?.first()?.dateCode)}"
                     )
                 )
 
                 statSheetItemViewList.add(
                     StatSheetItemView(
                         statSheetType = StatSheetType.MonoSpace,
-                        leftColumnText = currentWeek?.total.toString(),
-                        rightColumnText = "Current week total\nWeek ${getWeekNumber(currentWeek?.days?.first()?.dateCode)}"
+                        leftColumnText = lastWeek?.total.toString(),
+                        rightColumnText = "Last week's total\nWeek ${getWeekNumber(lastWeek?.days?.first()?.dateCode)}"
                     )
                 )
 
+                statSheetItemViewList.add(
+                    StatSheetItemView(
+                        statSheetType = StatSheetType.MonoSpace,
+                        leftColumnText = highest?.points.toString(),
+                        rightColumnText = "My highest Fastbreak card ever\n${highest?.date}"
+                    )
+                )
+
+//                statSheetItemViewList.add(
+//                    StatSheetItemView(
+//                        statSheetType = StatSheetType.MonoSpace,
+//                        leftColumnText = winningPickStreak?.longest/current.toString(),
+//                        rightColumnText = "Days in a row with a winning pick"
+//                    )
+//                )
+
+                statSheetItemViewList.add(
+                    StatSheetItemView(
+                        statSheetType = StatSheetType.MonoSpace,
+                        leftColumnText = streak?.current.toString(),
+                        rightColumnText = "My current locked Fastbreak card streak"
+                    )
+                )
+
+                statSheetItemViewList.add(
+                    StatSheetItemView(
+                        statSheetType = StatSheetType.MonoSpace,
+                        leftColumnText = streak?.longest.toString(),
+                        rightColumnText = "My longest locked Fastbreak card streak"
+                    )
+                )
 
                 state.copy(statSheetItems = statSheetItemViewList)
             }

@@ -10,7 +10,7 @@ data class DayInfo(
 )
 
 @Serializable
-data class CurrentWeek(
+data class Week(
     val days: List<DayInfo>,
     val total: Int
 )
@@ -35,7 +35,8 @@ data class PerfectFastbreakCards(
 
 @Serializable
 data class StatSheetItem(
-    val currentWeek: CurrentWeek,
+    val currentWeek: Week,
+    val lastWeek: Week,
     val lockedCardStreak: Streak,
     val highestFastbreakCardEver: FastbreakCard,
     val perfectFastbreakCards: PerfectFastbreakCards,

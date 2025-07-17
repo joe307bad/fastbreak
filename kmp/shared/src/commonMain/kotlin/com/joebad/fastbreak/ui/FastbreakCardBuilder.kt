@@ -144,7 +144,7 @@ fun CardItem(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(top = 8.dp),
-                        label = { Text("Your Answer") }
+                        label = { Text("My Answer") }
                     )
 
                     Button(

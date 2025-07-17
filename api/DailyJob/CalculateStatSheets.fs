@@ -16,6 +16,7 @@ let getWeekDates () =
     let daysToSubtract =
         match int today.DayOfWeek with
         | 0 -> 6
+        | 1 -> 0
         | n -> n - 1
 
     let lastMonday = today.AddDays(-daysToSubtract)
@@ -50,6 +51,8 @@ let addLockedCardsToStatSheet sheet database userId yesterday result =
 
         return
             { currentWeek = currentWeek
+              // TODO need to implement last week here to display last weeks total points
+              // lastWeek = lastWeek
               lockedCardStreak = streak
               highestFastbreakCardEver = highestFastbreakCardEver
               perfectFastbreakCards = perfectFastbreakCards

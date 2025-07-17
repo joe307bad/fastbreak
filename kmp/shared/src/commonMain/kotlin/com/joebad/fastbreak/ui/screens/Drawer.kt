@@ -31,8 +31,10 @@ import com.joebad.fastbreak.Theme
 import com.joebad.fastbreak.ThemePreference
 import com.joebad.fastbreak.ui.theme.LocalColors
 import com.joebad.fastbreak.ui.theme.darken
+import kotlinx.serialization.Serializable
 
-data class StatSheetItem(
+@Serializable
+data class StatSheetItemView(
     val statSheetType: StatSheetType,
     val leftColumnText: String,
     val rightColumnText: String,
@@ -43,27 +45,28 @@ enum class StatSheetType {
     MonoSpace
 }
 
-val statSheetItems = listOf(
-    StatSheetItem(StatSheetType.Button, "2,486", "Yesterday's Fastbreak card total"),
-    StatSheetItem(StatSheetType.MonoSpace, "1,900,065", "Current week total\nWeek 11"),
-    StatSheetItem(StatSheetType.MonoSpace, "1,222,486", "Last week's total\nWeek 10"),
-    StatSheetItem(
-        StatSheetType.MonoSpace,
-        "10,065",
-        "Days in a row locking in your FastBreak card"
-    ),
-    StatSheetItem(StatSheetType.MonoSpace, "365", "Your highest Fastbreak card"),
-    StatSheetItem(StatSheetType.MonoSpace, "123", "Days in a row with a winning pick"),
-    StatSheetItem(StatSheetType.MonoSpace, "34", "Number of perfect Fastbreak cards"),
-    StatSheetItem(StatSheetType.MonoSpace, "87", "Number of weekly wins"),
-)
+//val statSheetItems = listOf(
+//    StatSheetItem(StatSheetType.Button, "2,486", "Yesterday's Fastbreak card total"),
+//    StatSheetItem(StatSheetType.MonoSpace, "1,900,065", "Current week total\nWeek 11"),
+//    StatSheetItem(StatSheetType.MonoSpace, "1,222,486", "Last week's total\nWeek 10"),
+//    StatSheetItem(
+//        StatSheetType.MonoSpace,
+//        "10,065",
+//        "Days in a row locking in your FastBreak card"
+//    ),
+//    StatSheetItem(StatSheetType.MonoSpace, "365", "Your highest Fastbreak card"),
+//    StatSheetItem(StatSheetType.MonoSpace, "123", "Days in a row with a winning pick"),
+//    StatSheetItem(StatSheetType.MonoSpace, "34", "Number of perfect Fastbreak cards"),
+//    StatSheetItem(StatSheetType.MonoSpace, "87", "Number of weekly wins"),
+//)
 
 @Composable
 fun StatSheetRow(
     statSheetType: StatSheetType,
     leftColumnText: String,
     rightColumnText: String,
-    onClick: (Boolean) -> Unit
+    onClick: (Boolean) -> Unit,
+    statSheetItems: List<StatSheetItemView> = emptyList()
 ) {
     val colors = LocalColors.current;
     Row(
@@ -161,7 +164,8 @@ fun DrawerContent(
     onShowLastweeksFastbreakCard: () -> Unit,
     themePreference: ThemePreference,
     onToggleTheme: (theme: Theme) -> Unit,
-    goToSettings: () -> Unit
+    goToSettings: () -> Unit,
+    statSheetItems: List<StatSheetItemView> = emptyList()
 ) {
     val colors = LocalColors.current;
     Column(

@@ -8,7 +8,7 @@ let getLastMonday () =
 
     let daysToSubtract =
         match today.DayOfWeek with
-        | System.DayOfWeek.Monday -> 7
+        | System.DayOfWeek.Monday -> 0
         | System.DayOfWeek.Sunday -> 6
         | _ -> int today.DayOfWeek - 1
 

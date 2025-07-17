@@ -1,3 +1,4 @@
+
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -26,16 +27,13 @@ import com.joebad.fastbreak.data.dailyFastbreak.FastbreakViewModel
 import com.joebad.fastbreak.model.dtos.DailyFastbreak
 import com.joebad.fastbreak.onLock
 import com.joebad.fastbreak.ui.theme.LocalColors
+import com.joebad.fastbreak.utils.DateUtils
 import io.ktor.client.HttpClient
 import kotbase.Database
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.launch
-import kotlinx.datetime.Clock
-import kotlinx.datetime.TimeZone
-import kotlinx.datetime.toLocalDateTime
 import kotlin.math.min
-import kotlin.time.Duration.Companion.days
 
 @Composable
 fun ProtectedContent(
@@ -45,48 +43,39 @@ fun ProtectedContent(
     authRepository: AuthRepository,
     onLogout: () -> Unit
 ) {
-    print("perf1 - coroutineScope.launch\n");
     val coroutineScope = rememberCoroutineScope()
     var dailyFastbreak by remember { mutableStateOf<DailyFastbreak?>(null) }
+    var viewModel by remember { mutableStateOf<FastbreakViewModel?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
-//
-//
-    val today = (Clock.System.now() - 1.days)
-        .toLocalDateTime(TimeZone.currentSystemDefault())
-        .date
-        .toString()
-        .replace("-", "")
 
-    // Move these outside the composable or use a ViewModel
+    val selectedDate = "20250718"
+
     val db = remember { Database("fastbreak") }
     val httpClient = remember { HttpClient() }
     val dailyFastbreakRepository =
         remember { FastbreakStateRepository(db, httpClient, authRepository) }
 
-// Only recreate the ViewModel when needed
-    val viewModel = remember {
-        FastbreakViewModel(
-            db,
-            { newState -> onLock(dailyFastbreakRepository, coroutineScope, newState) },
-            today,
-            authRepository
-        )
-    }
-
-// Then, in your LaunchedEffect, only fetch the state
-    LaunchedEffect(key1 = today) { // Only run when the date changes
-        coroutineScope.launch(Dispatchers.IO) { // Move to IO dispatcher
+    LaunchedEffect(key1 = selectedDate) {
+        coroutineScope.launch(Dispatchers.IO) {
             try {
-                val state = dailyFastbreakRepository.getDailyFastbreakState(today)
+                val state = dailyFastbreakRepository.getDailyFastbreakState(selectedDate)
                 dailyFastbreak = state
+                val statSheetItems = state?.statSheet?.items
+                viewModel = FastbreakViewModel(
+                    db,
+                    { newState -> onLock(dailyFastbreakRepository, coroutineScope, newState) },
+                    selectedDate,
+                    authRepository,
+                    statSheetItems,
+                    selectedDate
+                )
             } catch (e: Exception) {
                 error = "Failed to fetch state: ${e.message}"
             }
         }
     }
 
-//
-    val state = viewModel.container?.stateFlow?.collectAsState()?.value;
+    val state = viewModel?.container?.stateFlow?.collectAsState()?.value;
     val locked = state?.locked ?: false;
     val childStack by component.stack.subscribeAsState()
     val activeChild = childStack.active
@@ -115,7 +104,7 @@ fun ProtectedContent(
         onLocked = { },
         showLastweeksFastbreakCard.value,
         onDismiss = { showLastweeksFastbreakCard.value = false },
-        date = "2025-10-11",
+        date = DateUtils.getYesterdayDate(),
         hideLockCardButton = true,
         title = "Yesterday's Fastbreak Card",
         showCloseButton = true,
@@ -125,7 +114,7 @@ fun ProtectedContent(
         onLocked = { viewModel?.lockCard() },
         showModal.value,
         onDismiss = { showModal.value = false },
-        date = today,
+        date = selectedDate,
         fastbreakViewModel = viewModel
     )
     ModalDrawer(
@@ -147,7 +136,8 @@ fun ProtectedContent(
                             }
                         }
                     }
-                }
+                },
+//                statSheetItems = null //dailyFastbreak.statSheet.items
             )
         }
     ) {
@@ -178,7 +168,8 @@ fun ProtectedContent(
             showModal = showModal,
             dailyFastbreak = dailyFastbreak,
             viewModel = viewModel,
-            scrollState = scrollState
+            scrollState = scrollState,
+            selectedDate = selectedDate
         )
     }
 }

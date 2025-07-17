@@ -16,6 +16,8 @@ import androidx.compose.ui.zIndex
 import com.joebad.fastbreak.data.dailyFastbreak.FastbreakViewModel
 import com.joebad.fastbreak.model.dtos.DailyFastbreak
 import com.joebad.fastbreak.ui.home.FastbreakHomeList
+import com.joebad.fastbreak.utils.DateUtils
+import kotlinx.datetime.LocalDate
 
 @Composable
 fun FastbreakHome(
@@ -24,10 +26,25 @@ fun FastbreakHome(
     animatedAlpha: Float,
     showModal: MutableState<Boolean>,
     dailyFastbreak: DailyFastbreak?,
-    fastbreakViewModel: FastbreakViewModel?
+    fastbreakViewModel: FastbreakViewModel?,
+    selectedDate: String
 ) {
 
     val totalPoints = fastbreakViewModel?.container?.stateFlow?.collectAsState()?.value?.totalPoints;
+    
+    // Convert selectedDate (yyyyMMdd) to LocalDate and calculate Season/Week/Day
+    val dateComponents = try {
+        val year = selectedDate.substring(0, 4).toInt()
+        val month = selectedDate.substring(4, 6).toInt()
+        val day = selectedDate.substring(6, 8).toInt()
+        val localDate = LocalDate(year, month, day)
+        DateUtils.getSeasonWeekDay(localDate)
+    } catch (e: Exception) {
+        Triple(1, 1, 1) // fallback values
+    }
+    
+    val (season, week, dayOfWeek) = dateComponents
+    val headerSubtitle = "Season $season • Week $week • Day $dayOfWeek"
     Box(modifier = Modifier.fillMaxSize()) {
         LazyColumn(
             state = listState,
@@ -51,7 +68,7 @@ fun FastbreakHome(
             RoundedBottomHeaderBox(
                 "FASTBREAK",
                 "Daily sports pick-em and trivia",
-                "Season 1 • Week 50 • Day 3",
+                headerSubtitle,
                 animatedAlpha = animatedAlpha
             )
         }

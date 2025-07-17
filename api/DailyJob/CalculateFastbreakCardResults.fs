@@ -1,5 +1,6 @@
 module api.DailyJob.CalculateFastbreakCardResults
 
+open System
 open MongoDB.Driver
 open api.Entities.EmptyFastbreakCard
 open api.Entities.FastbreakSelections
@@ -30,7 +31,8 @@ let calculateResults
               totalCorrect = totalCorrect
               totalIncorrect = totalIncorrect
               correct = correctIds
-              incorrect = incorrectIds }
+              incorrect = incorrectIds
+              date = state.date }
 
         { state with results = Some result })
 
@@ -54,8 +56,15 @@ let calculateFastbreakCardResults (database: IMongoDatabase) =
             database.GetCollection<FastbreakSelectionState>("locked-fastbreak-cards")
 
         let lockedCards =
+            let today = DateTime.Today
+            let filter = 
+                Builders<FastbreakSelectionState>.Filter.And(
+                    Builders<FastbreakSelectionState>.Filter.Eq(_.results, None),
+                    Builders<FastbreakSelectionState>.Filter.Lt(_.createdAt, today)
+                )
+            
             lockedCardsCollection
-                .Find(Builders<FastbreakSelectionState>.Filter.Eq(_.results, None))
+                .Find(filter)
                 .ToEnumerable()
 
         let cards = Seq.cast<FastbreakSelectionState> lockedCards

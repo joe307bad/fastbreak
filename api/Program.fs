@@ -184,6 +184,12 @@ let scheduleJobs () =
 let configureApp (app: IApplicationBuilder) =
     app.UseHangfireDashboard() |> ignore
     scheduleJobs ()
+    let immediateJobCall: Expression<Action<JobRunner>> =
+        Expression.Lambda<Action<JobRunner>>(
+            Expression.Call(typeof<JobRunner>.GetMethod("DailyJob")),
+            Expression.Parameter(typeof<JobRunner>, "x")
+        )
+    BackgroundJob.Enqueue(immediateJobCall) |> ignore
     app
 
 let endpointPipe =

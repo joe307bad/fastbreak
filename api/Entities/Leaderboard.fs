@@ -15,4 +15,4 @@ type LeaderboardResult = {
     weeklyTotals: LeaderboardEntry[]
 }
 
-type LeaderboardHead = { id: string; items: LeaderboardResult; }
+type Leaderboard = { id: string; items: LeaderboardResult; }

@@ -38,7 +38,8 @@ data class StatSheetItem(
     val currentWeek: CurrentWeek,
     val lockedCardStreak: Streak,
     val highestFastbreakCardEver: FastbreakCard,
-    val perfectFastbreakCards: PerfectFastbreakCards
+    val perfectFastbreakCards: PerfectFastbreakCards,
+    val cardResults: FastbreakSelectionsResult
 )
 
 @Serializable
@@ -47,4 +48,15 @@ data class StatSheetResponse(
     val date: String,
     val items: StatSheetItem,
     val createdAt: String
+)
+
+@Serializable
+
+data class FastbreakSelectionsResult(
+    val totalPoints: Int,
+    val totalCorrect: Int,
+    val totalIncorrect: Int,
+    val correct: Array<String>,
+    val incorrect: Array<String>,
+    val date: String
 )

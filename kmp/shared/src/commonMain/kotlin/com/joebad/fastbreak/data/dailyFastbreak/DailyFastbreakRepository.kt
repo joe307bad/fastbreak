@@ -27,7 +27,6 @@ class FastbreakStateRepository(
     private val dailyStateCollection = db.getCollection("FastBreakDailyStateCollection")
         ?: db.createCollection("FastBreakDailyStateCollection")
     private val BASE_URL = if (getPlatform().name == "iOS") "localhost" else "10.0.2.2"
-    private val GET_DAILY_FASTBREAK = "http://${BASE_URL}:8085/api/yesterday"
     private val LOCK_CARD = "http://${BASE_URL}:8085/api/lock"
 
     companion object {
@@ -53,7 +52,7 @@ class FastbreakStateRepository(
     }
 
     private suspend fun fetchAndStoreState(date: String): DailyFastbreak? {
-        val response = fetchDailyFastbreak()
+        val response = fetchDailyFastbreak(date)
         val dailyFastbreak =
             response?.let {
                 DailyFastbreak(
@@ -68,7 +67,7 @@ class FastbreakStateRepository(
 
         if (response?.lockedCardForUser != null) {
             val savedCard = response.lockedCardForUser;
-            persistence.saveSelections(savedCard.cardId, savedCard.selections, true)
+            persistence.saveSelections(savedCard.cardId, savedCard.selections, true, savedCard.date)
         }
         return dailyFastbreak
     }
@@ -79,8 +78,9 @@ class FastbreakStateRepository(
         return apiResponse
     }
 
-    private suspend fun fetchDailyFastbreak(): DailyResponse? {
-        val apiResponse = getDailyFastbreak(GET_DAILY_FASTBREAK, authRepository?.getUser()?.userId)
+    private suspend fun fetchDailyFastbreak(date: String): DailyResponse? {
+        val getDailyFastbreakUrl = "http://${BASE_URL}:8085/api/day/${date}"
+        val apiResponse = getDailyFastbreak(getDailyFastbreakUrl, authRepository?.getUser()?.userId)
         return apiResponse
     }
 

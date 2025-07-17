@@ -5,6 +5,7 @@ open MongoDB.Bson.Serialization.Attributes
 
 
 [<CLIMutable>]
+[<BsonIgnoreExtraElements>]
 type FastbreakSelection =
     { _id: string
       userAnswer: string
@@ -13,12 +14,14 @@ type FastbreakSelection =
       ``type``: string }
     
 [<CLIMutable>]
+[<BsonIgnoreExtraElements>]
 type public FastbreakSelectionsResult =
     { totalPoints: int
       totalCorrect: int
       totalIncorrect: int
       correct: string[]
-      incorrect: string[] }
+      incorrect: string[]
+      date: string }
 
 [<CLIMutable>]
 [<BsonIgnoreExtraElements>]

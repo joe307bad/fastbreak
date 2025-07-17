@@ -1,17 +1,16 @@
 module api.DailyJob.CalculateLeaderboards
 
+open System
 open api.Entities.Leaderboard
 open api.Entities.StatSheet
 
-let calculateLeaderboard (statSheets: StatSheet list): LeaderboardResult =
-    let allDateCodes =
-        statSheets
-        |> List.collect (fun sheet -> 
-            sheet.items.currentWeek.days
-            |> List.ofSeq
-            |> List.map (fun kvp -> kvp.DateCode)
-        )
-        |> List.distinct
+let calculateLeaderboard (statSheets: StatSheet list) (startDateCode: string): LeaderboardResult =
+    let generateWeekDateCodes (startDate: string) =
+        let startDateTime = DateTime.ParseExact(startDate, "yyyyMMdd", null)
+        [0..6]
+        |> List.map (fun i -> startDateTime.AddDays(float i).ToString("yyyyMMdd"))
+    
+    let allDateCodes = generateWeekDateCodes startDateCode
     
     let dailyLeaderboards =
         allDateCodes
@@ -33,6 +32,7 @@ let calculateLeaderboard (statSheets: StatSheet list): LeaderboardResult =
                     
                     { userId = sheet.userId; points = points }
                 )
+                |> List.filter (fun entry -> entry.points > 0)
                 |> List.sortByDescending (fun entry -> entry.points)
                 |> Array.ofList
             
@@ -45,6 +45,7 @@ let calculateLeaderboard (statSheets: StatSheet list): LeaderboardResult =
         |> List.map (fun sheet -> 
             { userId = sheet.userId; points = sheet.items.currentWeek.total }
         )
+        |> List.filter (fun entry -> entry.points > 0)
         |> List.sortByDescending (fun entry -> entry.points)
         |> Array.ofList
     

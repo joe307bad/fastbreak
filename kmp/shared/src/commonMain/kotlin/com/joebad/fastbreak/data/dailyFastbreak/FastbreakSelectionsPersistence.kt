@@ -10,11 +10,7 @@ import kotbase.Expression
 import kotbase.MutableDocument
 import kotbase.QueryBuilder
 import kotbase.SelectResult
-import kotlinx.datetime.Clock
-import kotlinx.datetime.TimeZone
-import kotlinx.datetime.toLocalDateTime
 import kotlinx.serialization.Serializable
-import kotlin.time.Duration.Companion.days
 
 @Serializable
 data class SelectionsWrapper(val cardId: String, val selectionDtos: List<FastbreakSelection>, val locked: Boolean? = false)
@@ -34,7 +30,7 @@ class FastbreakSelectionsPersistence(private val db: Database, private val authR
             ?: throw IllegalStateException("Collection 'fastbreak_selections' not found")
     }
 
-    fun saveSelections(cardId: String, selections: List<FastbreakSelection>, locked: Boolean? = false) {
+    fun saveSelections(cardId: String, selections: List<FastbreakSelection>, locked: Boolean? = false, date: String) {
 
         val selectionMaps = selections.map { selection ->
             mapOf(
@@ -46,45 +42,24 @@ class FastbreakSelectionsPersistence(private val db: Database, private val authR
             )
         }
 
-        val today = Clock.System.now()
-            .toLocalDateTime(TimeZone.currentSystemDefault())
-            .date
-            .toString()
-            .replace("-", "")
-
         val document = MutableDocument()
         document.setValue("selections", selectionMaps)
         document.setString("cardId", cardId)
         document.setString("userId", authRepository?.getUser()?.userId)
-        document.setString("date", today)
+        document.setString("date", date)
         document.setBoolean("locked", locked ?: false)
 
         getCollectionSafe().save(document)
     }
 
-    fun loadTodaySelections(): SelectionsWrapper? {
-        val today = Clock.System.now()
-            .toLocalDateTime(TimeZone.currentSystemDefault())
-            .date
-            .toString()
-            .replace("-", "")
-        val yesterday = (Clock.System.now() - 1.days)
-            .toLocalDateTime(TimeZone.currentSystemDefault())
-            .date
-            .toString()
-        val tomorrow = (Clock.System.now() + 1.days)
-            .toLocalDateTime(TimeZone.currentSystemDefault())
-            .date
-            .toString()
-
+    fun loadSelections(day: String): SelectionsWrapper? {
         val document = QueryBuilder
             .select(SelectResult.all())
             .from(DataSource.collection(getCollectionSafe()))
             .where(
-                Expression.property("date").equalTo(Expression.string(today))
+                Expression.property("date").equalTo(Expression.string(day))
                     .and(Expression.property("userId").equalTo(Expression.string(authRepository?.getUser()?.userId)))
             ).execute().firstOrNull()
-        val yestDocument = getCollectionSafe().getDocument(yesterday)
 
         val fs = document?.getDictionary("fastbreak_selections");
         val cardId = fs?.getString("cardId");

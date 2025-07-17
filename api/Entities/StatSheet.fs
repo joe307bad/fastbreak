@@ -12,7 +12,7 @@ type DayInfo = {
 }
 
 [<BsonIgnoreExtraElements>]
-type CurrentWeek = {
+type Week = {
     days: DayInfo array 
     total: int
 }
@@ -32,7 +32,8 @@ type PerfectFastbreakCards = { cards: FastbreakCard[]; highest: FastbreakCard }
 [<BsonIgnoreExtraElements>]
 [<CLIMutable>]
 type StatSheetItem =
-    { currentWeek: CurrentWeek
+    { currentWeek: Week
+      // lastWeek: Week
       lockedCardStreak: Streak
       highestFastbreakCardEver: FastbreakCard
       perfectFastbreakCards: PerfectFastbreakCards

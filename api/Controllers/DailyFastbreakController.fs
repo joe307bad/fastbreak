@@ -44,99 +44,26 @@ type DailyFastbreak =
       lockedCardForUser: FastbreakSelectionState option
       statSheetForUser: StatSheet option }
 
-let getDailyFastbreakHandler (database: IMongoDatabase) (next: HttpFunc) (ctx: HttpContext) =
-    task {
-        let collection = database.GetCollection<EmptyFastbreakCard>("empty-fastbreak-cards")
-
-        let leaderboard =
-            database
-                .GetCollection<LeaderboardHead>("leaderboards")
-                .Find(fun _ -> true)
-                .FirstOrDefault()
-
-        let today = DateTime.Now.ToString("yyyyMMdd")
-
-        let filter = Builders<EmptyFastbreakCard>.Filter.Eq(_.date, today)
-
-        let! card =
-            collection.Find(filter).FirstOrDefaultAsync()
-            |> Async.AwaitTask
-            |> asyncMap Option.ofObj
-
-        let statSheetForUser =
-            match ctx.TryGetQueryStringValue "userId" with
-            | Some id -> 
-                getStatSheetForUser database id |> Option.ofObj
-            | None -> None
-
-        let lockedCard =
-            match ctx.TryGetQueryStringValue "userId" with
-            | Some id -> 
-                getLockedCardForUser database id today |> Option.ofObj
-            | None -> None
-
-        match card with
-        | None -> return! json Seq.empty next ctx
-        | Some card ->
-            let safeFastbreakCard = if isNull card.items then [||] else card.items
-            return!
-                json
-                    ({| statSheetForUser = statSheetForUser
-                        fastbreakCard = card.items
-                        leaderboard = leaderboard.items
-                        lockedCardForUser = lockedCard |})
-                    next
-                    ctx
-    }
-
-
-let getYesterdaysFastbreakHandler (database: IMongoDatabase) (next: HttpFunc) (ctx: HttpContext) =
-    task {
-        let collection = database.GetCollection<EmptyFastbreakCard>("empty-fastbreak-cards")
-        let yesterday = DateTime.Now.AddDays(-1).ToString("yyyyMMdd")
-
-        let leaderboard =
-            database
-                .GetCollection<LeaderboardHead>("leaderboards")
-                .Find(fun _ -> true)
-                .FirstOrDefault()
-
-        let filter = Builders<EmptyFastbreakCard>.Filter.Eq(_.date, yesterday)
-
-        let! card =
-            collection.Find(filter).FirstOrDefaultAsync()
-            |> Async.AwaitTask
-            |> asyncMap Option.ofObj
-
-        let lockedCard =
-            match ctx.TryGetQueryStringValue "userId" with
-            | Some id -> 
-                getLockedCardForUser database id yesterday |> Option.ofObj
-            | None -> None
-
-        let statSheetForUser =
-            match ctx.TryGetQueryStringValue "userId" with
-            | Some id -> 
-                getStatSheetForUser database id |> Option.ofObj
-            | None -> None
-            
-        match card with
-        | None -> return! json Seq.empty next ctx
-        | Some card ->
-            let safeFastbreakCard = if isNull card.items then [||] else card.items
-            return!
-                json
-                    ({| statSheetForUser = statSheetForUser
-                        fastbreakCard = card.items
-                        leaderboard = leaderboard.items
-                        lockedCardForUser = lockedCard |})
-                    next
-                    ctx
-    }
-
 let getFastbreakHandler (database: IMongoDatabase) day (next: HttpFunc) (ctx: HttpContext) =
     task {
         let collection = database.GetCollection<EmptyFastbreakCard>("empty-fastbreak-cards")
+
+        let dayDate = DateTime.ParseExact(day, "yyyyMMdd", null)
+        let mondayDate = 
+            let daysToSubtract =
+                match dayDate.DayOfWeek with
+                | DayOfWeek.Monday -> 0
+                | DayOfWeek.Sunday -> 6
+                | _ -> int dayDate.DayOfWeek - 1
+            dayDate.AddDays(float -daysToSubtract)
+        
+        let mondayId = mondayDate.ToString("yyyyMMdd")
+
+        let leaderboard =
+            database
+                .GetCollection<Leaderboard>("leaderboards")
+                .Find(Builders<Leaderboard>.Filter.Eq(_.id, mondayId))
+                .FirstOrDefault()
 
         let filter = Builders<EmptyFastbreakCard>.Filter.Eq(_.date, day)
 
@@ -146,28 +73,33 @@ let getFastbreakHandler (database: IMongoDatabase) day (next: HttpFunc) (ctx: Ht
             |> asyncMap Option.ofObj
 
         let lockedCard =
-            async {
-                match ctx.TryGetQueryStringValue "userId" with
-                | Some id -> return box (getLockedCardForUser database id day)
-                | None -> return null
-            }
-            |> Async.RunSynchronously
+            match ctx.TryGetQueryStringValue "userId" with
+            | Some id -> 
+                getLockedCardForUser database id day |> Option.ofObj
+            | None -> None
+            
+        let statSheetForUser =
+            match ctx.TryGetQueryStringValue "userId" with
+            | Some id -> 
+                getStatSheetForUser database id |> Option.ofObj
+            | None -> None
+
+        let leaderboardItems = if box leaderboard |> isNull then null else box leaderboard.items
 
         match card with
         | None -> return! json Seq.empty next ctx
         | Some card ->
             return!
                 json
-                    ({| lockedCardForUser = lockedCard
-                        fastbreakCard = [||]
-                        leaderboard = [||] |})
+                    ({| statSheetForUser = statSheetForUser
+                        lockedCardForUser = lockedCard
+                        fastbreakCard = card.items
+                        leaderboard = leaderboardItems |})
                     next
                     ctx
     }
 
 let dailyFastbreakRouter database =
     router {
-        get "/today" (getDailyFastbreakHandler database)
-        get "/yesterday" (getYesterdaysFastbreakHandler database)
         getf "/day/%s" (fun day -> getFastbreakHandler database day)
     }

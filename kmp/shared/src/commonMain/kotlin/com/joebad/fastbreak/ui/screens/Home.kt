@@ -12,7 +12,8 @@ fun HomeScreen(
     animatedAlpha: Float,
     showModal: MutableState<Boolean>,
     dailyFastbreak: DailyFastbreak?,
-    viewModel: FastbreakViewModel?
+    viewModel: FastbreakViewModel?,
+    selectedDate: String
 ) {
     FastbreakHome(
         locked,
@@ -20,6 +21,7 @@ fun HomeScreen(
         animatedAlpha,
         showModal,
         dailyFastbreak,
-        viewModel
+        viewModel,
+        selectedDate
     )
 }

@@ -1,6 +1,11 @@
 package com.joebad.fastbreak.data.dailyFastbreak
+
 import AuthRepository
+import StatSheetItemView
+import StatSheetType
+import com.joebad.fastbreak.model.dtos.StatSheetItem
 import getRandomId
+import getWeekNumber
 import kotbase.Database
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.MainScope
@@ -11,6 +16,7 @@ import kotlinx.serialization.Serializable
 import org.orbitmvi.orbit.Container
 import org.orbitmvi.orbit.ContainerHost
 import org.orbitmvi.orbit.container
+import parseDateAndGetAdjacent
 
 @Serializable
 data class FastbreakSelection(
@@ -28,6 +34,7 @@ data class FastbreakSelectionState(
     val cardId: String = getRandomId(),
     val locked: Boolean? = false,
     val date: String,
+    val statSheetItems: List<StatSheetItemView> = emptyList()
 )
 
 sealed class FastbreakSideEffect {
@@ -43,7 +50,9 @@ class FastbreakViewModel(
     database: Database,
     onLock: (state: FastbreakSelectionState) -> Unit,
     date: String,
-    private val authRepository: AuthRepository?
+    private val authRepository: AuthRepository?,
+    private val statSheetItems: StatSheetItem?,
+    private val selectedDate: String?
 ) : ContainerHost<FastbreakSelectionState, FastbreakSideEffect>, CoroutineScope by MainScope() {
 
     private val persistence = FastbreakSelectionsPersistence(database, authRepository)
@@ -54,6 +63,7 @@ class FastbreakViewModel(
 
     init {
         loadSavedSelections()
+        setStatSheetItems(statSheetItems, selectedDate);
         container.sideEffectFlow
             .onEach { sideEffect ->
                 when (sideEffect) {
@@ -62,6 +72,45 @@ class FastbreakViewModel(
                 }
             }
             .launchIn(MainScope())
+    }
+
+    fun setStatSheetItems(statSheetItems: StatSheetItem?, date: String?) {
+        intent {
+            reduce {
+                val statSheetItemViewList = mutableListOf<StatSheetItemView>()
+
+                val (yesterday, tomorrow) = parseDateAndGetAdjacent(date);
+                val lastFastbreakCardResults = statSheetItems?.cardResults;
+                val currentWeek = statSheetItems?.currentWeek;
+
+                statSheetItemViewList.add(
+                    StatSheetItemView(
+                        statSheetType = StatSheetType.Button,
+                        leftColumnText = lastFastbreakCardResults?.totalPoints.toString(),
+                        rightColumnText = "Your last Fastbreak card results\n${lastFastbreakCardResults?.date}"
+                    )
+                )
+
+                statSheetItemViewList.add(
+                    StatSheetItemView(
+                        statSheetType = StatSheetType.MonoSpace,
+                        leftColumnText = currentWeek?.total.toString(),
+                        rightColumnText = "Current week total\nWeek ${getWeekNumber(currentWeek?.days?.first()?.dateCode)}"
+                    )
+                )
+
+                statSheetItemViewList.add(
+                    StatSheetItemView(
+                        statSheetType = StatSheetType.MonoSpace,
+                        leftColumnText = currentWeek?.total.toString(),
+                        rightColumnText = "Current week total\nWeek ${getWeekNumber(currentWeek?.days?.first()?.dateCode)}"
+                    )
+                )
+
+
+                state.copy(statSheetItems = statSheetItemViewList)
+            }
+        }
     }
 
     fun lockCard() {
@@ -144,7 +193,12 @@ class FastbreakViewModel(
         launch {
             try {
                 val state = container.stateFlow.value;
-                persistence.saveSelections(state.cardId ?: "", state.selections, state.locked);
+                persistence.saveSelections(
+                    state.cardId ?: "",
+                    state.selections,
+                    state.locked,
+                    state.date
+                );
             } catch (e: Exception) {
                 println(e)
             }
@@ -154,7 +208,8 @@ class FastbreakViewModel(
     private fun loadSavedSelections() {
         launch {
             try {
-                val savedSelections = persistence.loadTodaySelections()
+                val state = container.stateFlow.value;
+                val savedSelections = persistence.loadSelections(state.date)
                 if (savedSelections != null) {
                     intent {
                         reduce {

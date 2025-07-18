@@ -5,7 +5,7 @@ open MongoDB.Driver
 open api.Entities.FastbreakSelections
 open api.Entities.StatSheet
 
-let createCurrentWeek (daysOfTheWeek: List<KeyValuePair<string, DayInfo>>) (database: IMongoDatabase) (userId: string) =
+let createWeek (daysOfTheWeek: List<KeyValuePair<string, DayInfo>>) (database: IMongoDatabase) (userId: string) =
     // Convert input days to a list for processing
     let inputDays = daysOfTheWeek |> List.ofSeq
     

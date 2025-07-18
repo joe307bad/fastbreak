@@ -31,7 +31,8 @@ data class EmptyFastbreakCardItem(
 data class DailyFastbreak(
     val leaderboard: LeaderboardResult,
     val fastbreakCard: List<EmptyFastbreakCardItem>,
-    val statSheet: StatSheetResponse? = null
+    val statSheet: StatSheetResponse? = null,
+    val lastLockedCardResults: FastbreakSelectionState? = null
 )
 
 @Serializable
@@ -57,5 +58,6 @@ data class DailyResponse(
     val leaderboard: LeaderboardResult,
     val fastbreakCard: List<EmptyFastbreakCardItem>,
     val lockedCardForUser: FastbreakSelectionState? = null,
-    val statSheetForUser: StatSheetResponse? = null
+    val statSheetForUser: StatSheetResponse? = null,
+    val lastLockedCardResults: FastbreakSelectionState? = null
 )

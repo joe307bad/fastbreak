@@ -27,7 +27,6 @@ import com.joebad.fastbreak.data.dailyFastbreak.FastbreakViewModel
 import com.joebad.fastbreak.model.dtos.DailyFastbreak
 import com.joebad.fastbreak.onLock
 import com.joebad.fastbreak.ui.theme.LocalColors
-import com.joebad.fastbreak.utils.DateUtils
 import io.ktor.client.HttpClient
 import kotbase.Database
 import kotlinx.coroutines.Dispatchers
@@ -61,7 +60,6 @@ fun ProtectedContent(
                 val state = dailyFastbreakRepository.getDailyFastbreakState(selectedDate)
                 dailyFastbreak = state
                 val statSheetItems = state?.statSheet?.items
-                val lastLockedCardResults = state?.statSheet?.items?.cardResults
                 viewModel = FastbreakViewModel(
                     db,
                     { newState -> onLock(dailyFastbreakRepository, coroutineScope, newState) },
@@ -69,7 +67,7 @@ fun ProtectedContent(
                     authRepository,
                     statSheetItems,
                     selectedDate,
-                    lastLockedCardResults
+                    state?.lastLockedCardResults
                 )
             } catch (e: Exception) {
                 error = "Failed to fetch state: ${e.message}"
@@ -106,9 +104,9 @@ fun ProtectedContent(
         onLocked = { },
         showLastweeksFastbreakCard.value,
         onDismiss = { showLastweeksFastbreakCard.value = false },
-        date = DateUtils.getYesterdayDate(),
+        date = null,
         hideLockCardButton = true,
-        title = "Yesterday's Fastbreak Card",
+        title = "Fastbreak Card Results",
         showCloseButton = true,
         fastbreakViewModel = viewModel,
         fastbreakResultsCard = true
@@ -141,7 +139,7 @@ fun ProtectedContent(
                         }
                     }
                 },
-//                statSheetItems = null //dailyFastbreak.statSheet.items
+                statSheetItems = state?.statSheetItems
             )
         }
     ) {

@@ -58,7 +58,8 @@ class FastbreakStateRepository(
                 DailyFastbreak(
                     leaderboard = it.leaderboard,
                     fastbreakCard = response.fastbreakCard,
-                    statSheet = it.statSheetForUser
+                    statSheet = it.statSheetForUser,
+                    lastLockedCardResults = it.lastLockedCardResults
                 )
             }
         saveStateToDatabase(date, dailyFastbreak)

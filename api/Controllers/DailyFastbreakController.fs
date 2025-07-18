@@ -77,6 +77,12 @@ let getFastbreakHandler (database: IMongoDatabase) day (next: HttpFunc) (ctx: Ht
             | Some id -> 
                 getLockedCardForUser database id day |> Option.ofObj
             | None -> None
+
+        let lastLockedCardResults =
+            match ctx.TryGetQueryStringValue "userId" with
+            | Some id -> 
+                getLastLockedCardResultsForUser database id |> Option.ofObj
+            | None -> None
             
         let statSheetForUser =
             match ctx.TryGetQueryStringValue "userId" with
@@ -91,7 +97,8 @@ let getFastbreakHandler (database: IMongoDatabase) day (next: HttpFunc) (ctx: Ht
         | Some card ->
             return!
                 json
-                    ({| statSheetForUser = statSheetForUser
+                    ({| lastLockedCardResults = lastLockedCardResults
+                        statSheetForUser = statSheetForUser
                         lockedCardForUser = lockedCard
                         fastbreakCard = card.items
                         leaderboard = leaderboardItems |})

@@ -164,7 +164,7 @@ fun DrawerContent(
     themePreference: ThemePreference,
     onToggleTheme: (theme: Theme) -> Unit,
     goToSettings: () -> Unit,
-    statSheetItems: List<StatSheetItemView> = emptyList()
+    statSheetItems: List<StatSheetItemView>?
 ) {
     val colors = LocalColors.current;
     Column(
@@ -228,7 +228,7 @@ fun DrawerContent(
                     )
                     Spacer(modifier = Modifier.height(10.dp))
                     LazyColumn {
-                        items(statSheetItems) { item ->
+                        items(statSheetItems ?: emptyList()) { item ->
                             StatSheetRow(
                                 item.statSheetType,
                                 item.leftColumnText,

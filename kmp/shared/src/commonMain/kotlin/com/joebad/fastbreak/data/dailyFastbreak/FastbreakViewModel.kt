@@ -35,7 +35,8 @@ data class FastbreakSelectionState(
     val locked: Boolean? = false,
     val date: String,
     val statSheetItems: List<StatSheetItemView> = emptyList(),
-    val lastLockedCardResults: FastbreakSelectionsResult? = null
+    val results: FastbreakSelectionsResult? = null,
+    val lastLockedCardResults: FastbreakSelectionState? = null
 )
 
 sealed class FastbreakSideEffect {
@@ -54,7 +55,7 @@ class FastbreakViewModel(
     private val authRepository: AuthRepository?,
     private val statSheetItems: StatSheetItem?,
     private val selectedDate: String?,
-    private val lastLockedCardResults: FastbreakSelectionsResult?
+    private val lastLockedCardResults: FastbreakSelectionState?
 ) : ContainerHost<FastbreakSelectionState, FastbreakSideEffect>, CoroutineScope by MainScope() {
 
     private val persistence = FastbreakSelectionsPersistence(database, authRepository)
@@ -65,7 +66,7 @@ class FastbreakViewModel(
 
     init {
         loadSavedSelections()
-        setStatSheetItems(statSheetItems, selectedDate);
+        setStatSheetItems(statSheetItems, lastLockedCardResults?.results?.totalPoints.toString(), lastLockedCardResults?.results?.date);
         setlastLockedCardResults(lastLockedCardResults)
         container.sideEffectFlow
             .onEach { sideEffect ->
@@ -77,7 +78,7 @@ class FastbreakViewModel(
             .launchIn(MainScope())
     }
 
-    private fun setlastLockedCardResults(lastLockedCardResults: FastbreakSelectionsResult?) {
+    private fun setlastLockedCardResults(lastLockedCardResults: FastbreakSelectionState?) {
         intent {
             reduce {
                 state.copy(lastLockedCardResults = lastLockedCardResults)
@@ -85,12 +86,11 @@ class FastbreakViewModel(
         }
     }
 
-    private fun setStatSheetItems(statSheetItems: StatSheetItem?, date: String?) {
+    private fun setStatSheetItems(statSheetItems: StatSheetItem?, lastCardPoints: String?, lastCardDate: String?) {
         intent {
             reduce {
                 val statSheetItemViewList = mutableListOf<StatSheetItemView>()
 
-                val lastFastbreakCardResults = statSheetItems?.cardResults;
                 val currentWeek = statSheetItems?.currentWeek;
                 val lastWeek = statSheetItems?.lastWeek;
                 val highest = statSheetItems?.highestFastbreakCardEver;
@@ -100,8 +100,8 @@ class FastbreakViewModel(
                 statSheetItemViewList.add(
                     StatSheetItemView(
                         statSheetType = StatSheetType.Button,
-                        leftColumnText = lastFastbreakCardResults?.totalPoints.toString(),
-                        rightColumnText = "My last Fastbreak card results\n${lastFastbreakCardResults?.date}"
+                        leftColumnText = lastCardPoints ?: "",
+                        rightColumnText = "My Fastbreak card results\nfor $lastCardDate"
                     )
                 )
 

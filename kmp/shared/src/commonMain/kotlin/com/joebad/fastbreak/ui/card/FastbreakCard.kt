@@ -8,12 +8,15 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.material.Divider
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -22,12 +25,17 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.joebad.fastbreak.data.dailyFastbreak.FastbreakViewModel
 import com.joebad.fastbreak.ui.theme.LocalColors
+import com.joebad.fastbreak.ui.theme.darken
+import io.github.alexzhirkevich.cupertino.CupertinoIcon
+import io.github.alexzhirkevich.cupertino.icons.CupertinoIcons
+import io.github.alexzhirkevich.cupertino.icons.filled.CheckmarkCircle
+import io.github.alexzhirkevich.cupertino.icons.filled.XmarkApp
 
 
 @Composable
 fun FastbreakCard(
     title: String,
-    date: String,
+    date: String?,
     locked: Boolean,
     onDismiss: () -> Unit,
     showCloseButton: Boolean = false,
@@ -63,7 +71,7 @@ fun FastbreakCard(
                             )
                         )
                         Text(
-                            date,
+                            if (fastbreakResultsCard) state?.lastLockedCardResults?.results?.date ?: "" else date ?: "",
                             style = TextStyle(
                                 fontFamily = FontFamily.Monospace, fontSize = 17.sp,
                                 color = colors.onPrimary,
@@ -79,48 +87,67 @@ fun FastbreakCard(
                 Spacer(
                     modifier = Modifier.height(20.dp)
                 )
-//                Row(
-//                    verticalAlignment = Alignment.CenterVertically,
-//                    modifier = Modifier.fillMaxWidth().padding(16.dp)
-//                ) {
-////                    CupertinoIcon(
-////                        imageVector = CupertinoIcons.Filled.XmarkApp,
-////                        contentDescription = "Lock",
-////                        tint = Color.Red,
-////                        modifier = Modifier.size(21.dp)
-////                    )
-//                    Spacer(
-//                        modifier = Modifier.width(10.dp)
-//                    )
-//                    Text(
-//                        "20",
-//                        style = TextStyle(
-//                            fontFamily = FontFamily.Monospace,
-//                            fontSize = 15.sp,
-//                            color = colors.onPrimary
-//                        )
-//                    )
-//                    Spacer(
-//                        modifier = Modifier.width(10.dp)
-//                    )
-//                    CupertinoIcon(
-//                        imageVector = CupertinoIcons.Filled.CheckmarkCircle,
-//                        contentDescription = "Lock",
-//                        tint = darken(Color.Green, 0.7f),
-//                        modifier = Modifier.padding(start = 10.dp).size(21.dp)
-//                    )
-//                    Spacer(
-//                        modifier = Modifier.width(10.dp)
-//                    )
-//                    Text(
-//                        "1,345",
-//                        style = TextStyle(
-//                            fontFamily = FontFamily.Monospace,
-//                            fontSize = 15.sp,
-//                            color = colors.onPrimary
-//                        )
-//                    )
-//                }
+                if (fastbreakResultsCard) {
+                    val results = state?.lastLockedCardResults?.results
+                    if (results != null) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth().padding(16.dp)
+                        ) {
+                            CupertinoIcon(
+                                imageVector = CupertinoIcons.Filled.XmarkApp,
+                                contentDescription = "Incorrect",
+                                tint = Color.Red,
+                                modifier = Modifier.size(21.dp)
+                            )
+                            Spacer(
+                                modifier = Modifier.width(10.dp)
+                            )
+                            Text(
+                                results.totalIncorrect.toString(),
+                                style = TextStyle(
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = 15.sp,
+                                    color = colors.onPrimary
+                                )
+                            )
+                            Spacer(
+                                modifier = Modifier.width(10.dp)
+                            )
+                            CupertinoIcon(
+                                imageVector = CupertinoIcons.Filled.CheckmarkCircle,
+                                contentDescription = "Correct",
+                                tint = darken(Color.Green, 0.7f),
+                                modifier = Modifier.padding(start = 10.dp).size(21.dp)
+                            )
+                            Spacer(
+                                modifier = Modifier.width(10.dp)
+                            )
+                            Text(
+                                results.totalCorrect.toString(),
+                                style = TextStyle(
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = 15.sp,
+                                    color = colors.onPrimary
+                                )
+                            )
+                            Spacer(modifier = Modifier.weight(1f))
+                            SmallCircle(color = colors.accent)
+                            Spacer(
+                                modifier = Modifier.width(10.dp)
+                            )
+                            Text(
+                                results.totalPoints.toString(),
+                                style = TextStyle(
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = 15.sp,
+                                    color = colors.onPrimary,
+                                    textAlign = TextAlign.End
+                                )
+                            )
+                        }
+                    }
+                }
                 PerforatedDashedLine(color = colors.accent)
             }
         },
@@ -130,58 +157,26 @@ fun FastbreakCard(
                     .fillMaxSize(),
                 horizontalAlignment = Alignment.Start,
             ) {
-                state?.selections?.forEachIndexed { index, item ->
-                    PickEmRow(item.type, item.description, item.points.toString())
-                    if (index < state.selections.lastIndex) {
-                        Divider(modifier = Modifier.background(color = colors.accent))
+                if (fastbreakResultsCard) {
+                    val selection = state?.lastLockedCardResults?.selections;
+                    val results = state?.lastLockedCardResults?.results;
+                    selection?.forEachIndexed { index, item ->
+                        val correct = results?.correct?.contains(item._id)
+                        val incorrect = results?.incorrect?.contains(item._id)
+                        val icon = if (correct == false && incorrect == false) null else correct
+                        PickEmRow(item.type, item.description, item.points.toString(), icon)
+                        if (index < selection.lastIndex) {
+                            Divider(modifier = Modifier.background(color = colors.accent))
+                        }
+                    }
+                } else {
+                    state?.selections?.forEachIndexed { index, item ->
+                        PickEmRow(item.type, item.description, item.points.toString())
+                        if (index < state.selections.lastIndex) {
+                            Divider(modifier = Modifier.background(color = colors.accent))
+                        }
                     }
                 }
-//                Column(modifier = Modifier.padding(20.dp)) {
-//                    Row {
-//                        SmallCircle(color = colors.secondary)
-////                        CupertinoIcon(
-////                            imageVector = CupertinoIcons.Filled.CheckmarkCircle,
-////                            contentDescription = "Lock",
-////                            tint = darken(Color.Green, 0.7f),
-////                            modifier = Modifier.padding(start = 10.dp).size(21.dp)
-////                        )
-//                        Spacer(
-//                            modifier = Modifier.width(20.dp)
-//                        )
-//                        Text(
-//                            "PICK-EM",
-//                            style = TextStyle(
-//                                fontFamily = FontFamily.Monospace,
-//                                fontSize = 17.sp,
-//                                color = colors.onPrimary
-//                            )
-//                        )
-//                    }
-//                    Spacer(
-//                        modifier = Modifier.height(20.dp)
-//                    )
-//                    Text(
-//                        "Pittsburgh Penguins to win against the Minnesota Wild",
-//                        style = TextStyle(
-//                            fontFamily = FontFamily.Monospace,
-//                            fontSize = 15.sp,
-//                            color = colors.onPrimary
-//                        )
-//                    )
-//                    Spacer(
-//                        modifier = Modifier.height(20.dp)
-//                    )
-//                    Text(
-//                        "100",
-//                        modifier = Modifier.fillMaxWidth(),
-//                        style = TextStyle(
-//                            fontFamily = FontFamily.Monospace,
-//                            fontSize = 17.sp,
-//                            textAlign = TextAlign.End,
-//                            color = colors.onPrimary
-//                        )
-//                    )
-//                }
             }
         },
         footer = {
@@ -265,4 +260,8 @@ fun FastbreakCard(
 //            }
         }
     )
+}
+
+fun Text(totalPoints: Int, style: TextStyle) {
+
 }

@@ -124,7 +124,7 @@ fun BlurredScreen(
     onLocked: () -> Unit,
     open: Boolean,
     onDismiss: () -> Unit,
-    date: String,
+    date: String?,
     hideLockCardButton: Boolean = false,
     title: String = "My Daily Fastbreak Card",
     showCloseButton: Boolean = false,

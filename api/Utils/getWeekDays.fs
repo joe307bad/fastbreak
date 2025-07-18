@@ -1,5 +1,6 @@
 module api.Utils.getWeekDays
 
+open System
 open System.Collections.Generic
 open api.Entities.StatSheet
 
@@ -13,13 +14,22 @@ let getLastMonday () =
         | _ -> int today.DayOfWeek - 1
 
     today.AddDays(float -daysToSubtract)
+let getTwoMondaysAgo () =
+    let today = System.DateTime.Now
 
-let getWeekDays () =
-    let lastMonday = getLastMonday ()
+    let daysToSubtract =
+        match today.DayOfWeek with
+        | System.DayOfWeek.Monday -> 14
+        | System.DayOfWeek.Sunday -> 20
+        | _ -> int today.DayOfWeek - 1 + 14
+
+    today.AddDays(float -daysToSubtract)
+
+let getWeekDays (startingDay: DateTime) =
     let daysList = List<KeyValuePair<string, DayInfo>>()
     
     for i in 0..6 do
-        let currentDate = lastMonday.AddDays(float i)
+        let currentDate = startingDay.AddDays(float i)
         
         let dayName =
             match i with

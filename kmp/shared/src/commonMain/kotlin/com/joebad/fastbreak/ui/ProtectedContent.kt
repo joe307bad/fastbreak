@@ -54,24 +54,28 @@ fun ProtectedContent(
     val dailyFastbreakRepository =
         remember { FastbreakStateRepository(db, httpClient, authRepository) }
 
+    val syncData: suspend (forceUpdate: Boolean) -> Unit = { forceUpdate ->
+        try {
+            val state = dailyFastbreakRepository.getDailyFastbreakState(selectedDate, forceUpdate)
+            dailyFastbreak = state
+            val statSheetItems = state?.statSheet?.items
+            viewModel = FastbreakViewModel(
+                db,
+                { newState -> onLock(dailyFastbreakRepository, coroutineScope, newState) },
+                selectedDate,
+                authRepository,
+                statSheetItems,
+                selectedDate,
+                state?.lastLockedCardResults
+            )
+        } catch (e: Exception) {
+            error = "Failed to fetch state: ${e.message}"
+        }
+    }
+
     LaunchedEffect(key1 = selectedDate) {
         coroutineScope.launch(Dispatchers.IO) {
-            try {
-                val state = dailyFastbreakRepository.getDailyFastbreakState(selectedDate)
-                dailyFastbreak = state
-                val statSheetItems = state?.statSheet?.items
-                viewModel = FastbreakViewModel(
-                    db,
-                    { newState -> onLock(dailyFastbreakRepository, coroutineScope, newState) },
-                    selectedDate,
-                    authRepository,
-                    statSheetItems,
-                    selectedDate,
-                    state?.lastLockedCardResults
-                )
-            } catch (e: Exception) {
-                error = "Failed to fetch state: ${e.message}"
-            }
+            syncData(false)
         }
     }
 
@@ -139,7 +143,14 @@ fun ProtectedContent(
                         }
                     }
                 },
-                statSheetItems = state?.statSheetItems
+                statSheetItems = state?.statSheetItems,
+                lastFetchedDate = dailyFastbreak?.lastFetchedDate ?: 0,
+                onSync = {
+                    scope.launch(Dispatchers.IO) {
+                        syncData(true)
+                    }
+                },
+                username = authRepository.getUser()?.email ?: ""
             )
         }
     ) {

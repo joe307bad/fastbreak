@@ -163,11 +163,11 @@ fun App(
 ) {
     val colors = LocalColors.current;
 
-    try {
-        Database.delete("fastbreak")
-    } catch (e: Exception) {
-        println("Database already deleted")
-    }
+//    try {
+//        Database.delete("fastbreak")
+//    } catch (e: Exception) {
+//        println("Database already deleted")
+//    }
 
     MaterialTheme {
         Surface(color = colors.background) {

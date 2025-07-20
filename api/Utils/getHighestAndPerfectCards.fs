@@ -24,12 +24,11 @@ let getHighestAndPerfectCards (fastbreakSelections: FastbreakSelectionState list
         
     match statSheet, highestFromSelections with
     | None, None -> 
-        { date = ""; points = 0 }, { cards = [||]; highest = { date = ""; points = 0 } }
+        { date = ""; points = 0 }, [||]
         
     | None, Some highest -> 
         highest, 
-        { cards = perfectFromSelections |> List.toArray
-          highest = highest }
+        perfectFromSelections |> List.toArray
           
     | Some sheet, None -> 
         sheet.items.highestFastbreakCardEver,
@@ -43,17 +42,8 @@ let getHighestAndPerfectCards (fastbreakSelections: FastbreakSelectionState list
                 sheet.items.highestFastbreakCardEver
                 
         let allPerfectCards =
-            (sheet.items.perfectFastbreakCards.cards |> Array.toList) @ perfectFromSelections
+            (sheet.items.perfectFastbreakCards |> Array.toList) @ perfectFromSelections
             |> List.distinctBy _.date
             |> List.toArray
-            
-        let perfectCards = 
-            { cards = allPerfectCards
-              highest = 
-                  if allPerfectCards.Length > 0 then
-                      allPerfectCards 
-                      |> Array.maxBy _.points
-                  else
-                      { date = ""; points = 0 } }
                 
-        highestCard, perfectCards
+        highestCard, allPerfectCards

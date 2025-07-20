@@ -38,11 +38,11 @@ let getWeekDates () =
         | _ -> failwith "Invalid day name")
     |> Map.ofList
 
-let addLockedCardsToStatSheet sheet database userId yesterday result =
+let addLockedCardsToStatSheet sheet database userId =
     task {
         printf ($"Starting to process stat sheet for user {userId}\n")
         let daysOfTheWeek = getWeekDays (getLastMonday ())
-        let daysOfTheLastWeek = getWeekDays ( getTwoMondaysAgo ())
+        let daysOfTheLastWeek = getWeekDays ( getOneMondayAgo ())
         let currentWeek = createWeek daysOfTheWeek database userId
         let lastWeek = createWeek daysOfTheLastWeek database userId
         let streak = calculateLockedCardStreak database sheet userId
@@ -56,8 +56,7 @@ let addLockedCardsToStatSheet sheet database userId yesterday result =
               lastWeek = lastWeek
               lockedCardStreak = streak
               highestFastbreakCardEver = highestFastbreakCardEver
-              perfectFastbreakCards = perfectFastbreakCards
-              cardResults = result }
+              perfectFastbreakCards = perfectFastbreakCards }
     }
 
 let getLatestStatSheet (collection: IMongoCollection<StatSheet>) userId =
@@ -71,7 +70,7 @@ let getLatestStatSheet (collection: IMongoCollection<StatSheet>) userId =
 
 let updateStatSheets (database: IMongoDatabase) userIds =
     task {
-        for (userId, result) in userIds do
+        for (userId, _) in userIds do
             let statSheetCollection = database.GetCollection<StatSheet>("user-stat-sheets")
             let statSheetTask = getLatestStatSheet statSheetCollection userId
 
@@ -79,7 +78,7 @@ let updateStatSheets (database: IMongoDatabase) userIds =
             let yesterday = DateTime.Now.AddDays(-1).ToString("yyyyMMdd")
 
             let newStatSheet =
-                addLockedCardsToStatSheet latestStatSheet database userId yesterday result
+                addLockedCardsToStatSheet latestStatSheet database userId
 
             let filter = Builders<StatSheet>.Filter.Eq("userId", userId)
 
@@ -124,8 +123,10 @@ let calculateStatSheets (database: IMongoDatabase, twoDaysAgo, yesterday, today,
                 .Find(
                     Builders<FastbreakSelectionState>.Filter
                         .And(
-                            Builders<FastbreakSelectionState>.Filter.Ne(_.results, None),
-                            Builders<FastbreakSelectionState>.Filter.Eq(_.date, yesterday)
+                            Builders<FastbreakSelectionState>.Filter.Ne(_.results, None)
+                            // this is commented for debug purposes, we still need this to trigger a new stat sheet for a user
+                            // if they entered a card yesterday
+                            // Builders<FastbreakSelectionState>.Filter.Eq(_.date, yesterday)
                         )
                 )
                 .ToEnumerable()

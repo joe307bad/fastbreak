@@ -14,14 +14,15 @@ let getLastMonday () =
         | _ -> int today.DayOfWeek - 1
 
     today.AddDays(float -daysToSubtract)
-let getTwoMondaysAgo () =
+    
+let getOneMondayAgo () =
     let today = System.DateTime.Now
 
     let daysToSubtract =
         match today.DayOfWeek with
-        | System.DayOfWeek.Monday -> 14
-        | System.DayOfWeek.Sunday -> 20
-        | _ -> int today.DayOfWeek - 1 + 14
+        | System.DayOfWeek.Monday -> 7
+        | System.DayOfWeek.Sunday -> 13
+        | _ -> int today.DayOfWeek - 1 + 7
 
     today.AddDays(float -daysToSubtract)
 

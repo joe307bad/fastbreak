@@ -56,11 +56,11 @@ let calculateFastbreakCardResults (database: IMongoDatabase) =
             database.GetCollection<FastbreakSelectionState>("locked-fastbreak-cards")
 
         let lockedCards =
-            let today = DateTime.Today
+            let today = DateTime.Today.ToString("yyyyMMdd")
             let filter = 
                 Builders<FastbreakSelectionState>.Filter.And(
                     Builders<FastbreakSelectionState>.Filter.Eq(_.results, None),
-                    Builders<FastbreakSelectionState>.Filter.Lt(_.createdAt, today)
+                    Builders<FastbreakSelectionState>.Filter.Lt(_.date, today)
                 )
             
             lockedCardsCollection

@@ -78,7 +78,7 @@ fun FastbreakHome(
                 .zIndex(3f)
         ) {
 
-            if (dailyFastbreak != null)
+            if (dailyFastbreak != null && totalPoints != null)
                 Box(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)

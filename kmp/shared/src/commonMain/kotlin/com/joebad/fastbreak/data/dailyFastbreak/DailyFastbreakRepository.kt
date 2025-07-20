@@ -13,7 +13,13 @@ import kotbase.Ordering
 import kotbase.QueryBuilder
 import kotbase.SelectResult
 import kotlinx.datetime.Clock
+import kotlinx.datetime.LocalTime
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.atTime
+import kotlinx.datetime.toInstant
+import kotlinx.datetime.todayIn
 import kotlinx.serialization.json.Json
+
 
 class FastbreakStateRepository(
     private val db: Database,
@@ -34,36 +40,58 @@ class FastbreakStateRepository(
         private const val FETCH_THRESHOLD = 12 * 60 * 60
     }
 
-    suspend fun getDailyFastbreakState(date: String): DailyFastbreak? {
-        val now = Clock.System.now().epochSeconds
+    suspend fun getDailyFastbreakState(date: String, forceUpdate: Boolean = false): DailyFastbreak? {
+        val now = Clock.System.now()
         val lastFetchedTime = getLastFetchedTime()
 //        delay(2000)
 
-        return if (lastFetchedTime == null || (now - lastFetchedTime) > FETCH_THRESHOLD) {
+        // If forceUpdate is true, always fetch fresh data
+        if (forceUpdate) {
+            return fetchAndStoreState(date)
+        }
+
+        // Get current time and 4am ET today in UTC
+        val nowUtc = now.epochSeconds
+        val todayAt4amET = getTodayAt4amETInUtc()
+
+        return if (lastFetchedTime == null) {
+            // No previous fetch, always fetch
+            fetchAndStoreState(date)
+        } else if (nowUtc >= todayAt4amET && lastFetchedTime < todayAt4amET) {
+            // Current time is past 4am ET and last fetch was before 4am ET today
             fetchAndStoreState(date)
         } else {
+            // Last fetch was after 4am ET, use database
             getStateFromDatabase(date) ?: fetchAndStoreState(date)
         }
     }
 
     private fun getLastFetchedTime(): Long? {
-        return lastFetchedCollection.getDocument(LAST_FETCHED_KEY)
-            ?.getLong("timestamp")
+        return lastFetchedCollection.getDocument(LAST_FETCHED_KEY)?.getLong("timestamp")
+    }
+
+    private fun getTodayAt4amETInUtc(): Long {
+        val etTimeZone = TimeZone.of("America/New_York")
+        val today = Clock.System.todayIn(etTimeZone)
+        val fourAmET = LocalTime(4, 0)
+        val todayAt4amET = today.atTime(fourAmET)
+        return todayAt4amET.toInstant(etTimeZone).epochSeconds
     }
 
     private suspend fun fetchAndStoreState(date: String): DailyFastbreak? {
         val response = fetchDailyFastbreak(date)
+        saveLastFetchedTime()
         val dailyFastbreak =
             response?.let {
                 DailyFastbreak(
                     leaderboard = it.leaderboard,
                     fastbreakCard = response.fastbreakCard,
                     statSheet = it.statSheetForUser,
-                    lastLockedCardResults = it.lastLockedCardResults
+                    lastLockedCardResults = it.lastLockedCardResults,
+                    lastFetchedDate = getLastFetchedTime()
                 )
             }
         saveStateToDatabase(date, dailyFastbreak)
-        saveLastFetchedTime()
         enforceMaxDocumentsLimit()
 
         if (response?.lockedCardForUser != null) {

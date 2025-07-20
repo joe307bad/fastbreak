@@ -7,37 +7,26 @@ open api.Entities.FastbreakSelections
 
 let getLockedCardsToAnalyze (database: IMongoDatabase) (userId: string) (sheet: StatSheet option) : FastbreakSelectionState list =
     let today = DateTime.Now.ToString("yyyyMMdd")
+    let collection = database.GetCollection<FastbreakSelectionState>("locked-fastbreak-cards")
     
-    let lockedCardsCollection =
-        database.GetCollection<FastbreakSelectionState>("locked-fastbreak-cards")
-    let filter =
+    // Build filter based on whether sheet is provided
+    let dateFilter = 
         match sheet with
-        | Some s ->
-            Builders<FastbreakSelectionState>.Filter
-                .And(
-                    Builders<FastbreakSelectionState>.Filter.Eq(_.userId, userId),
-                    Builders<FastbreakSelectionState>.Filter.Gt(_.date, s.date),
-                    Builders<FastbreakSelectionState>.Filter.Lt(_.date, today)
-                )
-        | None ->
-            Builders<FastbreakSelectionState>.Filter
-                .And(
-                    Builders<FastbreakSelectionState>.Filter.Eq(_.userId, userId),
-                    Builders<FastbreakSelectionState>.Filter.Lt(_.date, today)
-                )
+        | Some s -> Builders<FastbreakSelectionState>.Filter.Gt(_.date, s.date)
+        | None -> Builders<FastbreakSelectionState>.Filter.Empty
     
-    let mongoList = 
-        lockedCardsCollection
-            .Find(filter)
-            .ToListAsync()
-        |> Async.AwaitTask
-        |> Async.RunSynchronously
+    let filter =
+        Builders<FastbreakSelectionState>.Filter.And([
+            Builders<FastbreakSelectionState>.Filter.Eq(_.userId, userId)
+            dateFilter
+            Builders<FastbreakSelectionState>.Filter.Lt(_.date, today)
+        ])
     
-    let resultList = [
-        for i in 0 .. mongoList.Count - 1 do
-            yield mongoList.[i]
-    ]
-    
-    resultList 
-    |> List.filter _.results.IsSome
-    |> List.sortByDescending _.date
+    collection
+        .Find(filter)
+        .ToListAsync()
+    |> Async.AwaitTask
+    |> Async.RunSynchronously
+    |> List.ofSeq
+    |> List.filter (fun x -> x.results.IsSome)
+    |> List.sortByDescending (_.date)

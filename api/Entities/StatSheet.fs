@@ -27,17 +27,12 @@ type FastbreakCard = { date: string; points: int }
 
 [<BsonIgnoreExtraElements>]
 [<CLIMutable>]
-type PerfectFastbreakCards = { cards: FastbreakCard[]; highest: FastbreakCard }
-
-[<BsonIgnoreExtraElements>]
-[<CLIMutable>]
 type StatSheetItem =
     { currentWeek: Week
       lastWeek: Week
       lockedCardStreak: Streak
       highestFastbreakCardEver: FastbreakCard
-      perfectFastbreakCards: PerfectFastbreakCards
-      cardResults: FastbreakSelectionsResult }
+      perfectFastbreakCards: FastbreakCard[] }
 
 [<BsonIgnoreExtraElements>]
 [<CLIMutable>]

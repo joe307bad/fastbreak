@@ -52,6 +52,7 @@ fun HomeScaffold(
     val colors = LocalColors.current;
     val childStack by component.stack.subscribeAsState()
     val activeChild = childStack.active
+    val leaderboard = dailyFastbreak?.leaderboard?.dailyLeaderboards?.find { l -> l.dateCode == selectedDate }
 
     Scaffold(
         modifier = Modifier.background(color = colors.background),
@@ -132,7 +133,7 @@ fun HomeScaffold(
                         }
 
                         is ProtectedComponent.Child.Leaderboard -> {
-                            LeaderboardScreen(scrollState)
+                            LeaderboardScreen(scrollState, leaderboard)
                         }
                     }
                 }

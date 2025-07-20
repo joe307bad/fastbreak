@@ -1,3 +1,4 @@
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -31,7 +32,45 @@ import com.joebad.fastbreak.Theme
 import com.joebad.fastbreak.ThemePreference
 import com.joebad.fastbreak.ui.theme.LocalColors
 import com.joebad.fastbreak.ui.theme.darken
+import kotlinx.datetime.Instant
+import kotlinx.datetime.LocalDateTime
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.format
+import kotlinx.datetime.format.DayOfWeekNames
+import kotlinx.datetime.format.MonthNames
+import kotlinx.datetime.format.char
+import kotlinx.datetime.toLocalDateTime
 import kotlinx.serialization.Serializable
+
+fun formatEpochSecondsToDate(epochSeconds: Long): String {
+    // Convert seconds to Instant
+    val instant = Instant.fromEpochSeconds(epochSeconds)
+
+    // Convert to LocalDateTime in system timezone
+    val localDateTime = instant.toLocalDateTime(TimeZone.currentSystemDefault())
+
+    // Create a custom format for "Monday, May 6, 2025 3:30:45 PM"
+    val dateFormat = LocalDateTime.Format {
+        dayOfWeek(DayOfWeekNames.ENGLISH_FULL)  // Monday
+        chars(", ")
+        monthName(MonthNames.ENGLISH_FULL)      // May
+        char(' ')
+        dayOfMonth()                            // 6
+        chars(", ")
+        year()                                  // 2025
+        char(' ')
+        amPmHour()                             // 12-hour format with AM/PM
+        char(':')
+        minute()                               // 30
+        char(':')
+        second()                               // 45
+        char(' ')
+        amPmMarker("AM", "PM")
+    }
+
+    return localDateTime.format(dateFormat)
+}
+
 
 @Serializable
 data class StatSheetItemView(
@@ -164,7 +203,10 @@ fun DrawerContent(
     themePreference: ThemePreference,
     onToggleTheme: (theme: Theme) -> Unit,
     goToSettings: () -> Unit,
-    statSheetItems: List<StatSheetItemView>?
+    statSheetItems: List<StatSheetItemView>?,
+    lastFetchedDate: Long,
+    onSync: () -> Unit,
+    username: String
 ) {
     val colors = LocalColors.current;
     Column(
@@ -197,7 +239,7 @@ fun DrawerContent(
                                 Spacer(modifier = Modifier.width(10.dp))
                                 Box(modifier = Modifier.weight(1f)) {
                                     Text(
-                                        text = "joebad",
+                                        text = username.replace("\"", ""),
                                         color = colors.onPrimary,
                                         style = MaterialTheme.typography.h6
                                     )
@@ -250,7 +292,7 @@ fun DrawerContent(
             Spacer(modifier = Modifier.height(10.dp))
             Column(modifier = Modifier.padding(horizontal = 10.dp)) {
                 Text(
-                    text = "Last sync: 10/12/2025 @ 10:56am",
+                    text = formatEpochSecondsToDate(lastFetchedDate),
                     color = colors.text,
                     style = MaterialTheme.typography.body1,
                     textAlign = TextAlign.Center,
@@ -258,7 +300,7 @@ fun DrawerContent(
                 )
                 PhysicalButton(
                     bottomBorderColor = darken(colors.secondary, 0.7f),
-                    onClick = { },
+                    onClick = { onSync() },
                     elevation = 8.dp,
                     pressDepth = 4.dp,
                     backgroundColor = colors.secondary

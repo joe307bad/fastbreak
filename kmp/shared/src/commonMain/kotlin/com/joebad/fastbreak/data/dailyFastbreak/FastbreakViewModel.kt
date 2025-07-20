@@ -66,7 +66,7 @@ class FastbreakViewModel(
 
     init {
         loadSavedSelections()
-        setStatSheetItems(statSheetItems, lastLockedCardResults?.results?.totalPoints.toString(), lastLockedCardResults?.results?.date);
+        setStatSheetItems(statSheetItems, lastLockedCardResults?.results?.totalPoints.toString(), lastLockedCardResults?.date);
         setlastLockedCardResults(lastLockedCardResults)
         container.sideEffectFlow
             .onEach { sideEffect ->

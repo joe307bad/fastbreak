@@ -28,18 +28,12 @@ data class FastbreakCard(
 )
 
 @Serializable
-data class PerfectFastbreakCards(
-    val cards: List<FastbreakCard>,
-    val highest: FastbreakCard
-)
-
-@Serializable
 data class StatSheetItem(
     val currentWeek: Week,
     val lastWeek: Week?,
     val lockedCardStreak: Streak,
     val highestFastbreakCardEver: FastbreakCard,
-    val perfectFastbreakCards: PerfectFastbreakCards
+    val perfectFastbreakCards: List<FastbreakCard>?
 )
 
 @Serializable
@@ -56,6 +50,5 @@ data class FastbreakSelectionsResult(
     val totalCorrect: Int,
     val totalIncorrect: Int,
     val correct: Array<String>,
-    val incorrect: Array<String>,
-    val date: String
+    val incorrect: Array<String>
 )

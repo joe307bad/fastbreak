@@ -113,7 +113,6 @@ BsonSerializer.RegisterSerializer(typeof<FastbreakSelectionsResult option>, Opti
 BsonSerializer.RegisterSerializer(typeof<int option>, OptionSerializer<int>())
 BsonSerializer.RegisterSerializer(typeof<bool option>, OptionSerializer<bool>())
 BsonSerializer.RegisterSerializer(typeof<FastbreakCard option>, OptionSerializer<FastbreakCard>())
-BsonSerializer.RegisterSerializer(typeof<PerfectFastbreakCards option>, OptionSerializer<PerfectFastbreakCards>())
 
 BsonClassMap.RegisterClassMap<ScheduleEntity.Event>(fun cm ->
     cm.AutoMap()

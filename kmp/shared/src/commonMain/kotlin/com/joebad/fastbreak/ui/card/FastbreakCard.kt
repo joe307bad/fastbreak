@@ -71,7 +71,7 @@ fun FastbreakCard(
                             )
                         )
                         Text(
-                            if (fastbreakResultsCard) state?.lastLockedCardResults?.results?.date ?: "" else date ?: "",
+                            if (fastbreakResultsCard) state?.lastLockedCardResults?.date ?: "" else date ?: "",
                             style = TextStyle(
                                 fontFamily = FontFamily.Monospace, fontSize = 17.sp,
                                 color = colors.onPrimary,

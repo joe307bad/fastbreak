@@ -24,7 +24,6 @@ import com.joebad.fastbreak.data.dailyFastbreak.FastbreakSelectionState
 import com.joebad.fastbreak.data.dailyFastbreak.FastbreakStateRepository
 import com.joebad.fastbreak.ui.screens.LoginScreen
 import com.joebad.fastbreak.ui.theme.LocalColors
-import kotbase.Database
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
@@ -57,6 +56,7 @@ class ProtectedComponent(
             is Config.Home -> Child.Home
             is Config.Leaderboard -> Child.Leaderboard
             is Config.Settings -> Child.Settings
+            is Config.Profile -> Child.Profile
         }
     }
 
@@ -75,12 +75,14 @@ class ProtectedComponent(
         object Home : Config()
         object Leaderboard : Config()
         object Settings : Config()
+        object Profile : Config()
     }
 
     sealed class Child {
         object Home : Child()
         object Leaderboard : Child()
         object Settings : Child()
+        object Profile : Child()
     }
 }
 

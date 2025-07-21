@@ -13,6 +13,7 @@ import androidx.compose.material.Text
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.FabPosition
 import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.Scaffold
@@ -52,7 +53,8 @@ fun HomeScaffold(
     val colors = LocalColors.current;
     val childStack by component.stack.subscribeAsState()
     val activeChild = childStack.active
-    val leaderboard = dailyFastbreak?.leaderboard?.dailyLeaderboards?.find { l -> l.dateCode == selectedDate }
+    val leaderboard =
+        dailyFastbreak?.leaderboard?.dailyLeaderboards?.find { l -> l.dateCode == selectedDate }
 
     Scaffold(
         modifier = Modifier.background(color = colors.background),
@@ -82,6 +84,18 @@ fun HomeScaffold(
                     label = { Text("Leaderboard", color = colors.onPrimary) },
                     selected = activeChild::class == ProtectedComponent.Child.Leaderboard::class,
                     onClick = { component.selectTab(ProtectedComponent.Config.Leaderboard) }
+                )
+                BottomNavigationItem(
+                    icon = {
+                        Icon(
+                            Icons.Default.Person,
+                            tint = colors.onPrimary,
+                            contentDescription = "Profile"
+                        )
+                    },
+                    label = { Text("Profile", color = colors.onPrimary) },
+                    selected = activeChild::class == ProtectedComponent.Child.Profile::class,
+                    onClick = { component.selectTab(ProtectedComponent.Config.Profile) }
                 )
             }
         }
@@ -134,6 +148,12 @@ fun HomeScaffold(
 
                         is ProtectedComponent.Child.Leaderboard -> {
                             LeaderboardScreen(scrollState, leaderboard)
+                        }
+
+                        is ProtectedComponent.Child.Profile -> {
+                            ProfileScreen(
+                                onLogout = {}
+                            )
                         }
                     }
                 }

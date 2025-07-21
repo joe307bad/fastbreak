@@ -47,7 +47,7 @@ fun ProtectedContent(
     var viewModel by remember { mutableStateOf<FastbreakViewModel?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
 
-    val selectedDate = "20250718"
+    val selectedDate = "20250720"
 
     val db = remember { Database("fastbreak") }
     val httpClient = remember { HttpClient() }

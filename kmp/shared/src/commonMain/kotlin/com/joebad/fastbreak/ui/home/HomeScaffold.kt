@@ -48,7 +48,8 @@ fun HomeScaffold(
     dailyFastbreak: DailyFastbreak?,
     viewModel: FastbreakViewModel?,
     scrollState: ScrollState,
-    selectedDate: String
+    selectedDate: String,
+    authedUser: AuthedUser?
 ) {
     val colors = LocalColors.current;
     val childStack by component.stack.subscribeAsState()
@@ -151,9 +152,14 @@ fun HomeScaffold(
                         }
 
                         is ProtectedComponent.Child.Profile -> {
-                            ProfileScreen(
-                                onLogout = {}
-                            )
+                            authedUser?.let {
+                                ProfileScreen(
+                                    userId = authedUser.userId,
+                                    email = authedUser.email,
+                                    userName = "",
+                                    onSaveUserName = {}
+                                )
+                            }
                         }
                     }
                 }

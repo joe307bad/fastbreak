@@ -5,6 +5,7 @@ import com.joebad.fastbreak.model.dtos.DailyResponse
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.request.parameter
@@ -30,6 +31,9 @@ val client = HttpClient {
             isLenient = true
             ignoreUnknownKeys = true
         })
+    }
+    install(HttpTimeout) {
+        requestTimeoutMillis = 60_000
     }
 }
 

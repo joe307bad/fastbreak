@@ -71,6 +71,7 @@ fun AnimatedBorderButton(
     lockedText: String = "Card Locked",
     enableLocking: Boolean? = true,
     onPressDown: () -> Unit = {},
+    fullWidth: Boolean = false,
     content: @Composable ((isLocked: Boolean) -> Unit)? = null
 ) {
     val colors = LocalColors.current
@@ -156,7 +157,7 @@ fun AnimatedBorderButton(
 
     Box(
         modifier = Modifier
-            .width(width.dp)
+            .let { if (fullWidth) it.fillMaxWidth() else it.width(width.dp) }
             .height(height.dp)
     ) {
         Box(

@@ -182,7 +182,8 @@ fun ProtectedContent(
             dailyFastbreak = dailyFastbreak,
             viewModel = viewModel,
             scrollState = scrollState,
-            selectedDate = selectedDate
+            selectedDate = selectedDate,
+            authedUser = authRepository.getUser()
         )
     }
 }

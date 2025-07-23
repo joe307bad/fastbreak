@@ -86,13 +86,3 @@ class AuthRepository(private val secureStorage: KVault) {
         secureStorage.deleteObject(KEY_AUTHED_USER)
     }
 }
-
-// Example of platform-specific initializations:
-
-// For Android:
-// val kvault = KVault(context, "auth_secure_storage")
-// val authRepository = AuthRepository(kvault)
-
-// For iOS:
-// val kvault = KVault("auth_secure_storage")
-// val authRepository = AuthRepository(kvault)

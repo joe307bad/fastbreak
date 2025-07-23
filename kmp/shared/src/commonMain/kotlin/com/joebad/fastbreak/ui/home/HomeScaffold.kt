@@ -157,7 +157,7 @@ fun HomeScaffold(
                                     userId = authedUser.userId,
                                     email = authedUser.email,
                                     userName = "",
-                                    onSaveUserName = {}
+                                    onSaveUserName = { n -> viewModel?.saveUserName(n) }
                                 )
                             }
                         }

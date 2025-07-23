@@ -40,6 +40,7 @@ fun ProtectedContent(
     onToggleTheme: (theme: Theme) -> Unit,
     themePreference: ThemePreference,
     authRepository: AuthRepository,
+    profileRepository: ProfileRepository,
     onLogout: () -> Unit
 ) {
     val coroutineScope = rememberCoroutineScope()

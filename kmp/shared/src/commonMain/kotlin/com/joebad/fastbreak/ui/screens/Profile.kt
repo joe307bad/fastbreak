@@ -24,7 +24,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextAlign
@@ -131,14 +130,20 @@ fun ProfileScreen(
                                 .fillMaxWidth()
                                 .selectable(
                                     selected = (selectedOption == index),
-                                    onClick = { selectedOption = index }
+                                    onClick = { 
+                                        selectedOption = index
+                                        onSaveUserName(usernameOptions[index])
+                                    }
                                 )
                                 .padding(vertical = 8.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             RadioButton(
                                 selected = (selectedOption == index),
-                                onClick = { selectedOption = index },
+                                onClick = { 
+                                    selectedOption = index
+                                    onSaveUserName(usernameOptions[index])
+                                },
                                 colors = RadioButtonDefaults.colors(
                                     selectedColor = colors.onPrimary,
                                     unselectedColor = colors.onPrimary
@@ -180,20 +185,6 @@ fun ProfileScreen(
                     }
                     
                     Spacer(modifier = Modifier.height(20.dp))
-
-                    AnimatedBorderButton(
-                        locked = false,
-                        onLocked = {},
-                        unlockText = "Save",
-                        enableLocking = false,
-                        borderColor = Color.Transparent,
-                        onPressDown = {
-                            onSaveUserName(selectedUsername)
-                        },
-                        bottomBorderColor = colors.accent,
-                        fullWidth = true
-
-                    )
 
                 }
 

@@ -1,6 +1,7 @@
 package com.joebad.fastbreak.data.dailyFastbreak
 
 import AuthRepository
+import ProfileRepository
 import StatSheetItemView
 import StatSheetType
 import com.joebad.fastbreak.model.dtos.FastbreakSelectionsResult
@@ -52,14 +53,14 @@ class FastbreakViewModel(
     database: Database,
     onLock: (state: FastbreakSelectionState) -> Unit,
     date: String,
-    private val authRepository: AuthRepository?,
+    private val authRepository: AuthRepository,
     private val statSheetItems: StatSheetItem?,
     private val selectedDate: String?,
     private val lastLockedCardResults: FastbreakSelectionState?
 ) : ContainerHost<FastbreakSelectionState, FastbreakSideEffect>, CoroutineScope by MainScope() {
 
     private val persistence = FastbreakSelectionsPersistence(database, authRepository)
-
+    private val _profileRepository = ProfileRepository(authRepository)
     override val container: Container<FastbreakSelectionState, FastbreakSideEffect> = container(
         initialState = FastbreakSelectionState(date = date)
     )
@@ -272,5 +273,16 @@ class FastbreakViewModel(
             }
         }
     }
+
+    fun saveUserName(userName: String) {
+        launch {
+            try {
+                _profileRepository.saveUserName(userName)
+            } catch (e: Exception) {
+                println(e.message)
+            }
+        }
+    }
+
 }
 

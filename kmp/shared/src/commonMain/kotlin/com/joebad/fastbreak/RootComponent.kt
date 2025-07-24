@@ -1,6 +1,7 @@
 package com.joebad.fastbreak
 
 import AuthRepository
+import ProfileRepository
 import ProtectedContent
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Surface
@@ -161,6 +162,7 @@ fun App(
     onToggleTheme: (theme: Theme) -> Unit,
     themePreference: ThemePreference,
     authRepository: AuthRepository,
+    profileRepository: ProfileRepository,
     theme: Theme?
 ) {
     val colors = LocalColors.current;
@@ -197,7 +199,8 @@ fun App(
                         onLogout = {
                             authRepository.clearUser()
                             rootComponent.goToLogin()
-                        }
+                        },
+                        profileRepository = profileRepository
                     )
                 }
             }

@@ -18,8 +18,11 @@
     <Compile Include="Utils\getLockedCardsToAnalyze.fs" />
     <Compile Include="Utils\createCurrentWeek.fs" />
     <Compile Include="Utils\getStatSheetForUser.fs" />
+    <Compile Include="Utils\googleAuthPipeline.fs" />
+    <Compile Include="Utils\deserializeBody.fs" />
     <Compile Include="Controllers\DailyFastbreakController.fs" />
     <Compile Include="Controllers\LockCardController.fs" />
+    <Compile Include="Controllers\ProfileController.fs" />
     <Compile Include="DailyJob\SchedulePuller.fs" />
     <Compile Include="DailyJob\CalculateFastbreakCardResults.fs" />
     <Compile Include="DailyJob\CalculateStatSheets.fs" />

@@ -161,6 +161,9 @@ fun ProfileScreen(
                                 OutlinedButton(
                                     onClick = { 
                                         randomUsername = generateRandomUsername()
+                                        if (selectedOption == 1) {
+                                            onSaveUserName(randomUsername)
+                                        }
                                     },
                                     colors = ButtonDefaults.outlinedButtonColors(
                                         contentColor = colors.onPrimary

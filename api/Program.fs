@@ -1,7 +1,5 @@
 open System
 open System.Linq.Expressions
-open System.Text.Json
-open System.Text.Json.Serialization
 open Hangfire.Mongo.Migration.Strategies
 open MongoDB.Bson
 open MongoDB.Bson.Serialization
@@ -18,6 +16,7 @@ open Hangfire
 open Hangfire.Mongo
 open DotNetEnv
 open Saturn.Endpoint
+open api.Controllers.ProfileController
 open api.DailyJob.DailyJob
 open api.Controllers.LockCardController
 open api.Entities
@@ -202,6 +201,7 @@ let apiRouter =
     router {
         forward "" (lockCardRouter database)
         forward "" (dailyFastbreakRouter database)
+        forward "" (profileRouter database)
     }
 
 let appRouter =

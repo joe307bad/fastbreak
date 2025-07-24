@@ -15,7 +15,8 @@ import kotlinx.serialization.json.Json
 
 @Serializable
 data class Profile(
-    val userName: String
+    val userName: String,
+    val userId: String?
 )
 
 class ProfileRepository(authRepository: AuthRepository) {
@@ -42,7 +43,7 @@ class ProfileRepository(authRepository: AuthRepository) {
             client.post(_saveUserName) {
                 contentType(ContentType.Application.Json)
                 header("Authorization", "Bearer ${_authRepository.getUser()?.idToken}")
-                setBody(Profile(userName = userName))
+                setBody(Profile(userName = userName, userId = _authRepository.getUser()?.userId))
             }.body()
         } catch (e: Exception) {
             println("Error making POST to ${_saveUserName}: ${e.message}")

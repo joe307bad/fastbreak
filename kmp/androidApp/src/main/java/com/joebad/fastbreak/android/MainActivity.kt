@@ -1,6 +1,7 @@
 package com.joebad.fastbreak.android
 
 import AuthRepository
+import ProfileRepository
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -31,6 +32,7 @@ class MainActivity : ComponentActivity() {
 
         val kvault = KVault(applicationContext, "auth_secure_storage")
         val authRepository = AuthRepository(kvault)
+        val profileRepository = ProfileRepository(authRepository)
 
         val rootComponent = createRootComponent(authRepository)
         val themePreference = AndroidThemePreference(applicationContext)
@@ -59,6 +61,7 @@ class MainActivity : ComponentActivity() {
                             },
                             themePreference = themePreference,
                             authRepository = authRepository,
+                            profileRepository = profileRepository,
                             theme = theme
                         )
                     }

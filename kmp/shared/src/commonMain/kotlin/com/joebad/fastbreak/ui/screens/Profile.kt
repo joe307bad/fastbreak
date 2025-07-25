@@ -21,19 +21,17 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.joebad.fastbreak.ui.PhysicalButton
 import com.joebad.fastbreak.ui.theme.LocalColors
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 
 
 fun generateRandomUsername(): String {
@@ -50,17 +48,16 @@ fun ProfileScreen(
     userId: String,
     email: String,
     userName: String,
+    loading: Boolean? = false,
     onSaveUserName: (String) -> Unit
 ) {
     val colors = LocalColors.current
-    val coroutineScope = rememberCoroutineScope()
     val gmailUsername = email.substringBefore("@").replace("\"", "")
-    var randomUsername by remember { mutableStateOf(generateRandomUsername()) }
-    var isLoading by remember { mutableStateOf(false) }
+    var randomUsername by remember { mutableStateOf(if (userName != gmailUsername) userName else generateRandomUsername()) }
     
-    var selectedOption by remember { mutableStateOf(0) }
+    var selectedOption by remember { mutableStateOf(if (userName == gmailUsername) 0 else 1) }
     val usernameOptions = listOf(gmailUsername, randomUsername)
-    
+
     val selectedUsername = usernameOptions[selectedOption]
 
     Box(modifier = Modifier.fillMaxSize().padding(16.dp)) {
@@ -94,7 +91,8 @@ fun ProfileScreen(
                         Text(
                             text = "User ID:",
                             color = colors.onPrimary,
-                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 18.sp,
                             modifier = Modifier.width(100.dp)
                         )
                         Text(
@@ -105,28 +103,11 @@ fun ProfileScreen(
                         )
                     }
 
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(bottom = 20.dp),
-                        horizontalArrangement = Arrangement.Start
-                    ) {
-                        Text(
-                            text = "Email:",
-                            color = colors.onPrimary,
-                            fontSize = 16.sp,
-                            modifier = Modifier.width(100.dp)
-                        )
-                        Text(
-                            text = email.replace("\"", ""),
-                            color = colors.onPrimary,
-                            fontSize = 16.sp,
-                            fontFamily = FontFamily.Monospace
-                        )
-                    }
-                    
                     Text(
-                        text = "Choose Leaderboard display name:",
+                        text = "Leaderboard display name:",
                         color = colors.onPrimary,
                         fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
                         modifier = Modifier.padding(bottom = 8.dp, top = 16.dp)
                     )
                     
@@ -138,7 +119,6 @@ fun ProfileScreen(
                                     selected = (selectedOption == index),
                                     onClick = { 
                                         selectedOption = index
-                                        onSaveUserName(usernameOptions[index])
                                     }
                                 )
                                 .padding(vertical = 8.dp),
@@ -148,7 +128,6 @@ fun ProfileScreen(
                                 selected = (selectedOption == index),
                                 onClick = { 
                                     selectedOption = index
-                                    onSaveUserName(usernameOptions[index])
                                 },
                                 colors = RadioButtonDefaults.colors(
                                     selectedColor = colors.onPrimary,
@@ -167,9 +146,6 @@ fun ProfileScreen(
                                 OutlinedButton(
                                     onClick = { 
                                         randomUsername = generateRandomUsername()
-                                        if (selectedOption == 1) {
-                                            onSaveUserName(randomUsername)
-                                        }
                                     },
                                     colors = ButtonDefaults.outlinedButtonColors(
                                         contentColor = colors.onPrimary
@@ -196,18 +172,14 @@ fun ProfileScreen(
                     Spacer(modifier = Modifier.height(20.dp))
                     
                     PhysicalButton(
-                        onClick = { 
-                            isLoading = true
-                            coroutineScope.launch {
-                                delay(3000) // 3 seconds loading
-                                isLoading = false
-                            }
+                        onClick = {
+                            onSaveUserName(selectedUsername)
                         },
                         backgroundColor = colors.secondary,
                         contentColor = colors.onSecondary,
                         bottomBorderColor = colors.accent,
                         shape = RectangleShape,
-                        loading = isLoading,
+                        loading = loading,
                         modifier = Modifier.fillMaxWidth(),
                         textSize = 16
                     ) {

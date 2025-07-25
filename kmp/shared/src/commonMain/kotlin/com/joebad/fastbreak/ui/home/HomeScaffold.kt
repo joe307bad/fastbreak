@@ -20,6 +20,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
@@ -56,6 +57,7 @@ fun HomeScaffold(
     val activeChild = childStack.active
     val leaderboard =
         dailyFastbreak?.leaderboard?.dailyLeaderboards?.find { l -> l.dateCode == selectedDate }
+    val state = viewModel?.container?.stateFlow?.collectAsState()?.value;
 
     Scaffold(
         modifier = Modifier.background(color = colors.background),
@@ -156,7 +158,8 @@ fun HomeScaffold(
                                 ProfileScreen(
                                     userId = authedUser.userId,
                                     email = authedUser.email,
-                                    userName = "",
+                                    userName = authedUser.userName,
+                                    loading = state?.isSavingUserName,
                                     onSaveUserName = { n -> viewModel?.saveUserName(n) }
                                 )
                             }

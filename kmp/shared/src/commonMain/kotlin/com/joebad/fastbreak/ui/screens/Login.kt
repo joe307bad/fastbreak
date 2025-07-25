@@ -41,7 +41,8 @@ fun LoginScreen(goToHome: (user: AuthedUser) -> Unit, theme: Theme?) {
                                 email,
                                 exp,
                                 token,
-                                userId = sub
+                                userId = sub,
+                                userName = ""
                             )
                         )
                     }

@@ -1,5 +1,15 @@
-
+import com.joebad.fastbreak.data.dailyFastbreak.FastbreakSelectionState
+import com.joebad.fastbreak.getPlatform
 import com.liftric.kvault.KVault
+import io.ktor.client.HttpClient
+import io.ktor.client.call.body
+import io.ktor.client.plugins.HttpTimeout
+import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.client.request.get
+import io.ktor.client.request.header
+import io.ktor.http.ContentType
+import io.ktor.http.contentType
+import io.ktor.serialization.kotlinx.json.json
 import kotlinx.datetime.Clock
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -9,7 +19,14 @@ data class AuthedUser(
     val email: String,
     val exp: Long,
     val idToken: String,
-    val userId: String
+    val userId: String,
+    val userName: String
+)
+
+@Serializable
+data class UserApiResponse(
+    val userName: String? = null,
+    val lockedFastBreakCard: FastbreakSelectionState? = null
 )
 
 class AuthRepository(private val secureStorage: KVault) {
@@ -19,19 +36,45 @@ class AuthRepository(private val secureStorage: KVault) {
     }
 
     private val json = Json { ignoreUnknownKeys = true }
+    private val baseUrl = if (getPlatform().name == "iOS") "localhost" else "10.0.2.2"
 
-    /**
-     * Store authenticated user in secure storage
-     */
-    fun storeUser(user: AuthedUser) {
-        val userJson = json.encodeToString(user)
-        secureStorage.set(KEY_AUTHED_USER, userJson)
+    private val client = HttpClient {
+        install(ContentNegotiation) {
+            json(Json {
+                prettyPrint = true
+                isLenient = true
+                ignoreUnknownKeys = true
+            })
+        }
+        install(HttpTimeout) {
+            requestTimeoutMillis = 60_000
+        }
     }
 
-    /**
-     * Get the authenticated user from secure storage
-     * Returns null if no user is stored
-     */
+    suspend fun storeUser(user: AuthedUser): FastbreakSelectionState? {
+        try {
+            val response: UserApiResponse = client.get("http://$baseUrl:8085/api/profile/${user.userId}") {
+                contentType(ContentType.Application.Json)
+                header("Authorization", "Bearer ${user.idToken}")
+            }.body()
+
+            val userJson = json.encodeToString(
+                AuthedUser(
+                    user.email,
+                    user.exp,
+                    user.idToken,
+                    user.userId,
+                    response.userName ?: ""
+                )
+            )
+            secureStorage.set(KEY_AUTHED_USER, userJson)
+            return response.lockedFastBreakCard
+        } catch (e: Exception) {
+            println("Error fetching user data: ${e.message}")
+            throw e
+        }
+    }
+
     fun getUser(): AuthedUser? {
         val userJson = secureStorage.string(KEY_AUTHED_USER) ?: return null
         return try {
@@ -41,47 +84,13 @@ class AuthRepository(private val secureStorage: KVault) {
         }
     }
 
-    /**
-     * Check if the stored user is valid (exists and not expired)
-     */
-    fun hasValidUser(): Boolean {
-        val user = getUser() ?: return false
-        return !isUserExpired(user)
-    }
-
-    /**
-     * Check if the user's token is expired
-     */
     fun isUserExpired(user: AuthedUser?): Boolean {
-        if(user == null) return true
+        if (user == null) return true
 
         val currentTimeSeconds = Clock.System.now().epochSeconds
         return user.exp < currentTimeSeconds
     }
 
-    /**
-     * Update user if the current one is expired
-     * Returns true if an update was needed and performed
-     */
-    fun updateUserIfExpired(newUser: AuthedUser): Boolean {
-        val currentUser = getUser()
-
-        return when {
-            currentUser == null -> {
-                storeUser(newUser)
-                true
-            }
-            isUserExpired(currentUser) -> {
-                storeUser(newUser)
-                true
-            }
-            else -> false
-        }
-    }
-
-    /**
-     * Clear the stored user data
-     */
     fun clearUser() {
         secureStorage.deleteObject(KEY_AUTHED_USER)
     }

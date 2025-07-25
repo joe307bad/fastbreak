@@ -94,10 +94,6 @@ class FastbreakStateRepository(
         saveStateToDatabase(date, dailyFastbreak)
         enforceMaxDocumentsLimit()
 
-        if (response?.lockedCardForUser != null) {
-            val savedCard = response.lockedCardForUser;
-            persistence.saveSelections(savedCard.cardId, savedCard.selections, true, savedCard.date)
-        }
         return dailyFastbreak
     }
 

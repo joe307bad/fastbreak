@@ -22,6 +22,7 @@ import com.arkivanov.decompose.extensions.compose.subscribeAsState
 import com.joebad.fastbreak.ProtectedComponent
 import com.joebad.fastbreak.Theme
 import com.joebad.fastbreak.ThemePreference
+import com.joebad.fastbreak.data.dailyFastbreak.FastbreakSelectionState
 import com.joebad.fastbreak.data.dailyFastbreak.FastbreakStateRepository
 import com.joebad.fastbreak.data.dailyFastbreak.FastbreakViewModel
 import com.joebad.fastbreak.model.dtos.DailyFastbreak
@@ -40,7 +41,7 @@ fun ProtectedContent(
     onToggleTheme: (theme: Theme) -> Unit,
     themePreference: ThemePreference,
     authRepository: AuthRepository,
-    profileRepository: ProfileRepository,
+    lockedCard: FastbreakSelectionState? = null,
     onLogout: () -> Unit
 ) {
     val coroutineScope = rememberCoroutineScope()
@@ -67,6 +68,7 @@ fun ProtectedContent(
                 authRepository,
                 statSheetItems,
                 selectedDate,
+                lockedCard,
                 state?.lastLockedCardResults
             )
         } catch (e: Exception) {

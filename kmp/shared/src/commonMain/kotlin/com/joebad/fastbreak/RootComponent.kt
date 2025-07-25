@@ -6,6 +6,8 @@ import ProtectedContent
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.mutableStateOf
 import com.arkivanov.decompose.ComponentContext
 import com.arkivanov.decompose.DefaultComponentContext
 import com.arkivanov.decompose.DelicateDecomposeApi
@@ -26,6 +28,7 @@ import com.joebad.fastbreak.data.dailyFastbreak.FastbreakStateRepository
 import com.joebad.fastbreak.ui.screens.LoginScreen
 import com.joebad.fastbreak.ui.theme.LocalColors
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
 fun shouldEnforceLogin(authRepository: AuthRepository): Boolean {
@@ -113,13 +116,15 @@ class RootComponent(
             is Config.Login -> Child.Login(
                 LoginComponent(
                     componentContext = componentContext,
-                    onLoginClick = { navigation.replaceAll(Config.Protected) }
+                    onLoginClick = {
+                        navigation.replaceAll(Config.Protected)
+                    }
                 )
             )
 
             is Config.Protected -> Child.Protected(
                 ProtectedComponent(
-                    componentContext = componentContext
+                    componentContext = componentContext,
                 )
             )
         }
@@ -166,6 +171,7 @@ fun App(
     theme: Theme?
 ) {
     val colors = LocalColors.current;
+    val lockedCard: MutableState<FastbreakSelectionState?> = mutableStateOf(null)
 
 //    try {
 //        Database.delete("fastbreak")
@@ -184,8 +190,16 @@ fun App(
                 when (val instance = child.instance) {
                     is RootComponent.Child.Login -> LoginScreen(
                         goToHome = { authedUser ->
-                            authRepository.storeUser(authedUser)
-                            instance.component.onLoginClick()
+                            CoroutineScope(Dispatchers.Main).launch {
+                                try {
+                                    lockedCard.value = authRepository.storeUser(authedUser)
+                                    instance.component.onLoginClick()
+                                } catch (e: Exception) {
+                                    // Show error message instead of navigating
+                                    println("Login failed: ${e.message}")
+                                    // TODO: Show error UI to user
+                                }
+                            }
                         },
                         theme = theme
                     )
@@ -200,7 +214,7 @@ fun App(
                             authRepository.clearUser()
                             rootComponent.goToLogin()
                         },
-                        profileRepository = profileRepository
+                        lockedCard = lockedCard.value
                     )
                 }
             }

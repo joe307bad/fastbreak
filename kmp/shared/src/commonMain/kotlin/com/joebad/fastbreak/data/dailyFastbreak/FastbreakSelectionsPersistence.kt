@@ -8,8 +8,10 @@ import kotbase.Database
 import kotbase.Dictionary
 import kotbase.Expression
 import kotbase.MutableDocument
+import kotbase.Ordering
 import kotbase.QueryBuilder
 import kotbase.SelectResult
+import kotlinx.datetime.Clock
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -48,6 +50,7 @@ class FastbreakSelectionsPersistence(private val db: Database, private val authR
         document.setString("userId", authRepository?.getUser()?.userId)
         document.setString("date", date)
         document.setBoolean("locked", locked ?: false)
+        document.setLong("timestamp", Clock.System.now().toEpochMilliseconds())
 
         getCollectionSafe().save(document)
     }
@@ -59,7 +62,9 @@ class FastbreakSelectionsPersistence(private val db: Database, private val authR
             .where(
                 Expression.property("date").equalTo(Expression.string(day))
                     .and(Expression.property("userId").equalTo(Expression.string(authRepository?.getUser()?.userId)))
-            ).execute().firstOrNull()
+            )
+            .orderBy(Ordering.property("timestamp").descending())
+            .execute().firstOrNull()
 
         val fs = document?.getDictionary("fastbreak_selections");
         val cardId = fs?.getString("cardId");

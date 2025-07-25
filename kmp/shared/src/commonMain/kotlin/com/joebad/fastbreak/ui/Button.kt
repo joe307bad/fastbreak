@@ -1,3 +1,5 @@
+package com.joebad.fastbreak.ui
+
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
@@ -29,6 +31,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
@@ -49,16 +52,17 @@ fun PhysicalButton(
     borderColor: Color? = null,
     shape: Shape = RectangleShape,
     textSize: Int = 18,
-    loading: Boolean = false,
+    loading: Boolean? = false,
     zIndex: Float = 0f,
+    loadingColor: Color = MaterialTheme.colorScheme.onPrimary,
     content: @Composable () -> Unit,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
 
-    // If disabled, the button starts in the pressed position
+    // If disabled or loading, the button starts in the pressed position
     val translationY by animateFloatAsState(
-        targetValue = if (disabled || isPressed) pressDepth.value else 0f,
+        targetValue = if (disabled || (loading == true) || isPressed) pressDepth.value else 0f,
         label = "translationY"
     )
 
@@ -96,7 +100,7 @@ fun PhysicalButton(
                     if (borderColor != null) Modifier.border(
                         2.dp,
                         borderColor
-                    ) else Modifier.border(2.dp, finalBackgroundColor)
+                    ) else Modifier.border(2.dp, backgroundColor)
                 )
                 .then(
                     if (!disabled) Modifier.clickable(
@@ -125,12 +129,22 @@ fun PhysicalButton(
                     contentAlignment = Alignment.Center
                 ) {
                     Box(modifier = Modifier.fillMaxWidth()) {
-                        if (loading) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.align(Alignment.CenterStart).size(20.dp)
-                                    .offset(x = (-3).dp), strokeWidth = 3.dp
-                            )
-                        }
+                        // Loading icon positioned absolutely on the left
+                        val loadingAlpha by animateFloatAsState(
+                            targetValue = if (loading == true) 1f else 0f,
+                            label = "loadingAlpha"
+                        )
+                        
+                        CircularProgressIndicator(
+                            color = loadingColor,
+                            modifier = Modifier
+                                .align(Alignment.CenterStart)
+                                .size(20.dp)
+                                .graphicsLayer { alpha = loadingAlpha },
+                            strokeWidth = 3.dp
+                        )
+                        
+                        // Content always visible in center
                         Box(modifier = Modifier.align(Alignment.Center)) {
                             CompositionLocalProvider(
                                 LocalTextStyle provides TextStyle(

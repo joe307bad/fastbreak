@@ -1,6 +1,11 @@
 package com.joebad.fastbreak.utils
 
-import kotlinx.datetime.*
+import kotlinx.datetime.DateTimeUnit
+import kotlinx.datetime.DayOfWeek
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.isoDayNumber
+import kotlinx.datetime.plus
+import kotlinx.datetime.until
 
 object DateUtils {
     
@@ -29,22 +34,5 @@ object DateUtils {
             val daysSinceFirstMonday = firstMondayOfYear.until(this, DateTimeUnit.DAY)
             (daysSinceFirstMonday / 7) + 1
         }
-    }
-    
-    fun getDebugDate(debugMode: String): String {
-        val today = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date
-        val targetDate = when (debugMode) {
-            "yesterday" -> today.minus(1, DateTimeUnit.DAY)
-            "today" -> today
-            "tomorrow" -> today.plus(1, DateTimeUnit.DAY)
-            else -> today.minus(1, DateTimeUnit.DAY) // default to yesterday
-        }
-        return targetDate.toString().replace("-", "") // Convert to yyyyMMdd format
-    }
-    
-    fun getYesterdayDate(): String {
-        val yesterday = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date
-            .minus(1, DateTimeUnit.DAY)
-        return yesterday.toString().replace("-", "")
     }
 }

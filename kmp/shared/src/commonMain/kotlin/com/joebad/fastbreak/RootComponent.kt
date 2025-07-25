@@ -30,7 +30,7 @@ import kotlinx.coroutines.launch
 
 fun shouldEnforceLogin(authRepository: AuthRepository): Boolean {
     val authedUser = authRepository.getUser()
-    return authRepository.isUserExpired(authedUser) // ?: true; //!BuildKonfig.IS_DEBUG
+    return authRepository.isUserExpired(authedUser)
 }
 
 class LoginComponent(

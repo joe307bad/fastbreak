@@ -21,6 +21,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -29,7 +30,10 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.joebad.fastbreak.ui.PhysicalButton
 import com.joebad.fastbreak.ui.theme.LocalColors
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 
 fun generateRandomUsername(): String {
@@ -49,8 +53,10 @@ fun ProfileScreen(
     onSaveUserName: (String) -> Unit
 ) {
     val colors = LocalColors.current
+    val coroutineScope = rememberCoroutineScope()
     val gmailUsername = email.substringBefore("@").replace("\"", "")
     var randomUsername by remember { mutableStateOf(generateRandomUsername()) }
+    var isLoading by remember { mutableStateOf(false) }
     
     var selectedOption by remember { mutableStateOf(0) }
     val usernameOptions = listOf(gmailUsername, randomUsername)
@@ -188,6 +194,28 @@ fun ProfileScreen(
                     }
                     
                     Spacer(modifier = Modifier.height(20.dp))
+                    
+                    PhysicalButton(
+                        onClick = { 
+                            isLoading = true
+                            coroutineScope.launch {
+                                delay(3000) // 3 seconds loading
+                                isLoading = false
+                            }
+                        },
+                        backgroundColor = colors.secondary,
+                        contentColor = colors.onSecondary,
+                        bottomBorderColor = colors.accent,
+                        shape = RectangleShape,
+                        loading = isLoading,
+                        modifier = Modifier.fillMaxWidth(),
+                        textSize = 16
+                    ) {
+                        Text(
+                            text = "SAVE PROFILE",
+                            textAlign = TextAlign.Center
+                        )
+                    }
 
                 }
 

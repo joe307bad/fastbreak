@@ -102,19 +102,6 @@ fun LeaderboardScreen(scrollState: ScrollState, leaderboard: DailyLeaderboard?) 
                                         )
                                     }
                             }
-//                            Box(
-//                                modifier = Modifier
-//                                    .background(colors.accent, RoundedCornerShape(8.dp))
-//                                    .padding(
-//                                        horizontal = 8.dp,
-//                                        vertical = 4.dp
-//                                    )
-//                                    .fillMaxHeight()
-//                                    .width(60.dp),
-//                                contentAlignment = Alignment.Center
-//                            ) {
-
-//                            }
                         }
                         Column (modifier = Modifier.weight(1f).padding(start = 12.dp)) {
                             Text(

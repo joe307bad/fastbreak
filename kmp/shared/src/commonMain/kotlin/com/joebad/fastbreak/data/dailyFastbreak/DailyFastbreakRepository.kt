@@ -43,7 +43,6 @@ class FastbreakStateRepository(
     suspend fun getDailyFastbreakState(date: String, forceUpdate: Boolean = false): DailyFastbreak? {
         val now = Clock.System.now()
         val lastFetchedTime = getLastFetchedTime()
-//        delay(2000)
 
         // If forceUpdate is true, always fetch fresh data
         if (forceUpdate) {

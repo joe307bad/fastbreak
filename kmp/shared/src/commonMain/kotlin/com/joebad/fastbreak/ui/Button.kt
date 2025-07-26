@@ -85,9 +85,6 @@ fun PhysicalButton(
         )
 
         Surface(
-//            onClick = if (enabled && !disabled) onClick else {
-//                {}
-//            },
             modifier = Modifier
                 .fillMaxWidth()
                 .defaultMinSize(
@@ -114,7 +111,6 @@ fun PhysicalButton(
                     )
                 ),// Fix here
             shape = shape,
-//            interactionSource = interactionSource,
             color = finalBackgroundColor,
             contentColor = finalContentColor,
         ) {

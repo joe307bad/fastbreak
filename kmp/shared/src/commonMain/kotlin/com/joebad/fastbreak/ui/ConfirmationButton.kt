@@ -272,7 +272,6 @@ fun AnimatedBorderButton(
             Canvas(
                 modifier = Modifier
                     .matchParentSize()
-//                    .clickable(onClick = { onPressDown() })
                     .zIndex(3f)
             ) {
                 val canvasWidth = size.width

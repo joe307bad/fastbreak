@@ -157,14 +157,6 @@ class FastbreakViewModel(
                     )
                 )
 
-//                statSheetItemViewList.add(
-//                    StatSheetItemView(
-//                        statSheetType = StatSheetType.MonoSpace,
-//                        leftColumnText = winningPickStreak?.longest/current.toString(),
-//                        rightColumnText = "Days in a row with a winning pick"
-//                    )
-//                )
-
                 statSheetItemViewList.add(
                     StatSheetItemView(
                         statSheetType = StatSheetType.MonoSpace,

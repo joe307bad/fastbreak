@@ -157,22 +157,6 @@ fun ProtectedContent(
             )
         }
     ) {
-//
-//        Button(
-//            onClick = {
-//                scope.launch {
-//                    if (drawerState.isOpen) {
-//                        drawerState.close()
-//                    } else {
-//                        drawerState.open()
-//                    }
-//                }
-//            },
-//            modifier = Modifier.padding(top = 16.dp)
-//        ) {
-//            Text("Open menu")
-//        }
-
         HomeScaffold(
             component = component,
             scope = scope,

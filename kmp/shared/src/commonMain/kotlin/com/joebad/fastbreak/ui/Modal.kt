@@ -76,13 +76,6 @@ fun PerforatedDashedLine(
                 strokeWidth = thickness.toPx()
             )
 
-//            drawLine(
-//                color = highlightColor,
-//                start = Offset(currentX, y - thickness.toPx() / 2),
-//                end = Offset(currentX + dashPx, y - thickness.toPx() / 2),
-//                strokeWidth = (thickness.toPx() / 2)
-//            )
-
             currentX += dashPx + gapPx
         }
     }

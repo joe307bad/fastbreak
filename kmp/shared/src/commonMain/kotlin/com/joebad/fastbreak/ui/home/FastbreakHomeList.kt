@@ -24,9 +24,6 @@ fun FastbreakHomeList(dailyFastbreak: DailyFastbreak?, viewModel: FastbreakViewM
 //    val viewModel = FastbreakViewModel()
     val state by viewModel.container.stateFlow.collectAsState()
 
-    state.let {
-        println("FASTBREAK-LOG $state");
-    }
 
     if (dailyFastbreak?.fastbreakCard == null)
         throw Exception("DailyFastbreak is null");

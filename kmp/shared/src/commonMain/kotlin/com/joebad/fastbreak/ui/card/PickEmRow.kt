@@ -35,12 +35,6 @@ fun PickEmRow(title: String, description: String, points: String, correct: Boole
                 "TRIVIA" -> SmallCircle(color = colors.secondary)
                 else -> println("Unknown type")
             }
-//                        CupertinoIcon(
-//                            imageVector = CupertinoIcons.Filled.XmarkApp,
-//                            contentDescription = "Lock",
-//                            tint = Color.Red,
-//                            modifier = Modifier.padding(start = 10.dp).size(21.dp)
-//                        )
             Spacer(
                 modifier = Modifier.width(20.dp)
             )

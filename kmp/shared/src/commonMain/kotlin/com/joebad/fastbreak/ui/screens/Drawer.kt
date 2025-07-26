@@ -85,20 +85,6 @@ enum class StatSheetType {
     MonoSpace
 }
 
-//val statSheetItems = listOf(
-//    StatSheetItem(StatSheetType.Button, "2,486", "Yesterday's Fastbreak card total"),
-//    StatSheetItem(StatSheetType.MonoSpace, "1,900,065", "Current week total\nWeek 11"),
-//    StatSheetItem(StatSheetType.MonoSpace, "1,222,486", "Last week's total\nWeek 10"),
-//    StatSheetItem(
-//        StatSheetType.MonoSpace,
-//        "10,065",
-//        "Days in a row locking in your FastBreak card"
-//    ),
-//    StatSheetItem(StatSheetType.MonoSpace, "365", "Your highest Fastbreak card"),
-//    StatSheetItem(StatSheetType.MonoSpace, "123", "Days in a row with a winning pick"),
-//    StatSheetItem(StatSheetType.MonoSpace, "34", "Number of perfect Fastbreak cards"),
-//    StatSheetItem(StatSheetType.MonoSpace, "87", "Number of weekly wins"),
-//)
 
 @Composable
 fun StatSheetRow(
@@ -132,41 +118,6 @@ fun StatSheetRow(
 
                             )
                     }
-//                    Box(
-//                        modifier = Modifier
-//                            .background(
-//                                colors.secondary,
-//                                RoundedCornerShape(8.dp)
-//                            )
-//                            .height(45.dp)
-//                            .fillMaxWidth()
-//                            .zIndex(2f),
-//                        contentAlignment = Alignment.Center
-//                    ) {
-//                        Text(
-//                            text = leftColumnText,
-//                            color = colors.onSecondary,
-//                            fontFamily = FontFamily.Monospace,
-//
-//                            )
-//                    }
-//                    Box(
-//                        modifier = Modifier
-//                            .zIndex(1f)
-//                            .width(98.dp)
-//                            .offset(y = (-1).dp)
-//                            .align(Alignment.BottomCenter)
-////                    .offset(y = (-13).dp)
-//                            .background(
-//                                darken(
-//                                    colors.secondary,
-//                                    0.7f
-//                                ),
-//                                shape = RoundedCornerShape(bottomStart = 8.dp, bottomEnd = 8.dp)
-//                            )
-//                    ) {
-//                        Spacer(modifier = Modifier.height(15.dp))
-//                    }
                 }
 
                 StatSheetType.MonoSpace -> {

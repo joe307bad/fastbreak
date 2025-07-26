@@ -199,7 +199,6 @@ fun FastbreakCard(
 
                 AnimatedLockIcon(
                     locked = locked,
-                    color = colors.text,
                     size = 17.dp
                 )
                 Spacer(modifier = Modifier.height(10.dp))
@@ -216,52 +215,7 @@ fun FastbreakCard(
                     )
                 }
             }
-//            Row {
-//                Row(
-//                    modifier = Modifier.fillMaxWidth()
-//                ) {
-//                    Box(
-//                        modifier = Modifier
-//                            .weight(1f),
-//                        contentAlignment = Alignment.Center
-//                    ) {
-//                        PhysicalButton(
-//                            bottomBorderColor = darken(colors.secondary, 0.7f),
-//                            onClick = { onDismiss() },
-//                            elevation = 8.dp,
-//                            pressDepth = 4.dp,
-//                            backgroundColor = colors.secondary
-//                        ) {
-//                            Text(
-//                                "LOCK CARD",
-//                                color = colors.onSecondary,
-//                                fontWeight = FontWeight.Bold
-//                            )
-//                        }
-//                    }
-//                    Spacer(modifier = Modifier.width(5.dp))
-//                    Box(
-//                        modifier = Modifier
-//                            .weight(1f),
-//                        contentAlignment = Alignment.Center
-//                    ) {
-//                        PhysicalButton(
-//                            bottomBorderColor = colors.accent,
-//                            onClick = { onDismiss() },
-//                            elevation = 8.dp,
-//                            pressDepth = 4.dp,
-//                            borderColor = colors.accent,
-//                            backgroundColor = colors.background
-//                        ) {
-//                            Text("CANCEL", color = colors.onPrimary, fontWeight = FontWeight.Bold)
-//                        }
-//                    }
-//                }
-//            }
         }
     )
 }
 
-fun Text(totalPoints: Int, style: TextStyle) {
-
-}

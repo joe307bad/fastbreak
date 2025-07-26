@@ -22,6 +22,7 @@ data class Profile(
 class ProfileRepository(authRepository: AuthRepository) {
 
     private val _authRepository = authRepository;
+    private val json = Json { ignoreUnknownKeys = true }
     private val _baseUrl = if (getPlatform().name == "iOS") "localhost" else "10.0.2.2"
     private val _saveUserName = "http://${_baseUrl}:8085/api/profile"
 
@@ -40,6 +41,7 @@ class ProfileRepository(authRepository: AuthRepository) {
 
     suspend fun saveUserName(userName: String): Unit? {
         return try {
+            _authRepository.updateUserName(userName);
             client.post(_saveUserName) {
                 contentType(ContentType.Application.Json)
                 header("Authorization", "Bearer ${_authRepository.getUser()?.idToken}")

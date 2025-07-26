@@ -3,6 +3,7 @@ module api.Controllers.LockCardController
 open System
 open Giraffe
 open MongoDB.Driver
+open MongoDB.Bson.Serialization.Attributes
 open Saturn.Endpoint
 open api.Entities.FastbreakSelections
 open api.Utils.deserializeBody
@@ -13,6 +14,12 @@ type GoogleUser = { subject: string }
 
 type LockedCardResponse = { id: string }
 
+[<BsonIgnoreExtraElements>]
+type UserName =
+    { userId: string
+      userName: string
+      updatedAt: DateTime }
+
 let lockCardHandler (database: IMongoDatabase) : HttpHandler =
     fun next ctx ->
         task {
@@ -22,6 +29,7 @@ let lockCardHandler (database: IMongoDatabase) : HttpHandler =
             return!
                 match userId with
                 | Some userId ->
+                    
                     let collection: IMongoCollection<FastbreakSelectionState> =
                             database.GetCollection<FastbreakSelectionState>("locked-fastbreak-cards")
 
@@ -46,8 +54,6 @@ let lockCardHandler (database: IMongoDatabase) : HttpHandler =
                     Successful.ok (json response) next ctx
                 | None -> Successful.ok (json {| error = "Error locking card" |}) next ctx
         }
-
-
 
 let getLockCardHandler (database: IMongoDatabase) userId : HttpHandler =
     fun next ctx ->

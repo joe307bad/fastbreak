@@ -192,7 +192,7 @@ fun App(
                         goToHome = { authedUser ->
                             CoroutineScope(Dispatchers.Main).launch {
                                 try {
-                                    lockedCard.value = authRepository.storeUser(authedUser)
+                                    lockedCard.value = authRepository.getUserAndStore(authedUser)
                                     instance.component.onLoginClick()
                                 } catch (e: Exception) {
                                     // Show error message instead of navigating

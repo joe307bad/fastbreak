@@ -1,4 +1,3 @@
-
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -31,6 +30,7 @@ import androidx.compose.ui.zIndex
 import com.joebad.fastbreak.Theme
 import com.joebad.fastbreak.ThemePreference
 import com.joebad.fastbreak.ui.PhysicalButton
+import com.joebad.fastbreak.ui.Title
 import com.joebad.fastbreak.ui.theme.LocalColors
 import com.joebad.fastbreak.ui.theme.darken
 import kotlinx.datetime.Instant
@@ -94,6 +94,13 @@ fun StatSheetRow(
     onClick: (Boolean) -> Unit
 ) {
     val colors = LocalColors.current;
+
+    if (leftColumnText == "null") {
+        return Row(
+            content = {}
+        );
+    }
+
     Row(
         modifier = Modifier.height(50.dp),
         verticalAlignment = Alignment.CenterVertically

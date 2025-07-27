@@ -50,7 +50,8 @@ fun HomeScaffold(
     viewModel: FastbreakViewModel?,
     scrollState: ScrollState,
     selectedDate: String,
-    authedUser: AuthedUser?
+    authedUser: AuthedUser?,
+    error: String?
 ) {
     val colors = LocalColors.current;
     val childStack by component.stack.subscribeAsState()
@@ -145,7 +146,8 @@ fun HomeScaffold(
                                 showModal,
                                 dailyFastbreak,
                                 viewModel,
-                                selectedDate
+                                selectedDate,
+                                error
                             )
                         }
 

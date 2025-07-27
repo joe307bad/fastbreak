@@ -7,7 +7,9 @@ import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import com.arkivanov.decompose.ComponentContext
 import com.arkivanov.decompose.DefaultComponentContext
 import com.arkivanov.decompose.DelicateDecomposeApi
@@ -39,7 +41,18 @@ fun shouldEnforceLogin(authRepository: AuthRepository): Boolean {
 class LoginComponent(
     componentContext: ComponentContext,
     val onLoginClick: () -> Unit
-) : ComponentContext by componentContext
+) : ComponentContext by componentContext {
+    private var _error by mutableStateOf<String?>(null)
+    val error: String? get() = _error
+    
+    fun setError(message: String) {
+        _error = message
+    }
+    
+    fun clearError() {
+        _error = null
+    }
+}
 
 class ProtectedComponent(
     componentContext: ComponentContext,
@@ -192,16 +205,16 @@ fun App(
                         goToHome = { authedUser ->
                             CoroutineScope(Dispatchers.Main).launch {
                                 try {
+                                    instance.component.clearError()
                                     lockedCard.value = authRepository.getUserAndStore(authedUser)
                                     instance.component.onLoginClick()
                                 } catch (e: Exception) {
-                                    // Show error message instead of navigating
-                                    println("Login failed: ${e.message}")
-                                    // TODO: Show error UI to user
+                                    instance.component.setError("Login failed")
                                 }
                             }
                         },
-                        theme = theme
+                        theme = theme,
+                        error = instance.component.error
                     )
 
                     is RootComponent.Child.Protected ->

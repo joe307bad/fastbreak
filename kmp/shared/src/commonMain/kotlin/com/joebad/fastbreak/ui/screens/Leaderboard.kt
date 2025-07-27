@@ -26,6 +26,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.joebad.fastbreak.model.dtos.DailyLeaderboard
+import com.joebad.fastbreak.ui.Title
 import com.joebad.fastbreak.ui.theme.LocalColors
 import io.github.alexzhirkevich.cupertino.icons.CupertinoIcons
 import io.github.alexzhirkevich.cupertino.icons.filled.Trophy

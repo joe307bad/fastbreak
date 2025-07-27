@@ -22,7 +22,11 @@ tasks {
 }
 
 kotlin {
-    androidTarget()
+    androidTarget {
+        compilerOptions {
+            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21)
+        }
+    }
     iosArm64()
     iosX64()
     iosSimulatorArm64()
@@ -186,4 +190,8 @@ tasks.named("preBuild") {
 compose.resources {
     publicResClass = true
     generateResClass = always
+}
+
+tasks.withType<Copy> {
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }

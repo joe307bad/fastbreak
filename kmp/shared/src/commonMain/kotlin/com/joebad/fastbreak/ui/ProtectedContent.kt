@@ -58,6 +58,7 @@ fun ProtectedContent(
 
     val syncData: suspend (forceUpdate: Boolean) -> Unit = { forceUpdate ->
         try {
+            error = null // Clear previous errors
             val state = dailyFastbreakRepository.getDailyFastbreakState(selectedDate, forceUpdate)
             dailyFastbreak = state
             val statSheetItems = state?.statSheet?.items
@@ -72,7 +73,16 @@ fun ProtectedContent(
                 state?.lastLockedCardResults
             )
         } catch (e: Exception) {
-            error = "Failed to fetch state: ${e.message}"
+            // Enhanced error handling for better user experience
+            error = when {
+                e.message?.contains("network", ignoreCase = true) == true -> "Network connection failed. Please check your internet connection."
+                e.message?.contains("timeout", ignoreCase = true) == true -> "Request timed out. Please try again."
+                e.message?.contains("unauthorized", ignoreCase = true) == true -> "Authentication failed. Please log in again."
+                else -> "Failed to fetch data: ${e.message ?: "Unknown error"}"
+            }
+            // Reset state on error
+            dailyFastbreak = null
+            viewModel = null
         }
     }
 
@@ -170,7 +180,8 @@ fun ProtectedContent(
             viewModel = viewModel,
             scrollState = scrollState,
             selectedDate = selectedDate,
-            authedUser = authRepository.getUser()
+            authedUser = authRepository.getUser(),
+            error = error
         )
     }
 }

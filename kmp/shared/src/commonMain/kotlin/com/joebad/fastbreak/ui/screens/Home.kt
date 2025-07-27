@@ -1,3 +1,4 @@
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Spacer
@@ -15,7 +16,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import com.joebad.fastbreak.data.dailyFastbreak.FastbreakViewModel
 import com.joebad.fastbreak.model.dtos.DailyFastbreak
+import com.joebad.fastbreak.ui.FABWithExactShapeBorder
+import com.joebad.fastbreak.ui.RoundedBottomHeaderBox
+import com.joebad.fastbreak.ui.home.ErrorDailyFastbreak
 import com.joebad.fastbreak.ui.home.FastbreakHomeList
+import com.joebad.fastbreak.ui.home.LoadingDailyFastbreak
 import com.joebad.fastbreak.ui.home.hasActiveItems
 import com.joebad.fastbreak.utils.DateUtils
 import kotlinx.datetime.LocalDate
@@ -28,7 +33,8 @@ fun HomeScreen(
     showModal: MutableState<Boolean>,
     dailyFastbreak: DailyFastbreak?,
     fastbreakViewModel: FastbreakViewModel?,
-    selectedDate: String
+    selectedDate: String,
+    error: String?
 ) {
 
     val totalPoints = fastbreakViewModel?.container?.stateFlow?.collectAsState()?.value?.totalPoints;
@@ -59,10 +65,14 @@ fun HomeScreen(
                 Spacer(
                     modifier = Modifier.height(130.dp)
                 )
-                if (dailyFastbreak == null || fastbreakViewModel == null)
+                if (error != null) {
+                    // Show error message instead of loading
+                    ErrorDailyFastbreak(error)
+                } else if (dailyFastbreak == null || fastbreakViewModel == null) {
                     LoadingDailyFastbreak()
-                else
+                } else {
                     FastbreakHomeList(dailyFastbreak, fastbreakViewModel)
+                }
             }
         }
         Box(modifier = Modifier.zIndex(1f)) {

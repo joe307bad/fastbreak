@@ -4,8 +4,8 @@ import AuthedUser
 import com.joebad.fastbreak.model.dtos.DailyResponse
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
-import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.plugins.HttpTimeout
+import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.request.parameter
@@ -37,16 +37,11 @@ val client = HttpClient {
     }
 }
 
-suspend fun getDailyFastbreak(url: String, userId: String? = ""): DailyResponse? {
-    return try {
-        client.get {
-            url(url)
-            parameter("userId", userId)
-        }.body<DailyResponse>()
-    } catch (e: Exception) {
-        println("Error fetching data: ${e.message}")
-        null
-    }
+suspend fun getDailyFastbreak(url: String, userId: String? = ""): DailyResponse {
+    return client.get {
+        url(url)
+        parameter("userId", userId)
+    }.body<DailyResponse>()
 }
 
 

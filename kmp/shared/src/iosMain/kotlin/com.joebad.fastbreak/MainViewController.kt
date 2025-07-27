@@ -1,6 +1,7 @@
 package com.joebad.fastbreak
 
 import AuthRepository
+import ProfileRepository
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -22,6 +23,7 @@ fun MainViewController() = ComposeUIViewController {
 
     val kvault = KVault("auth_secure_storage")
     val authRepository = AuthRepository(kvault)
+    val profileRepository = ProfileRepository(authRepository)
 
     LaunchedEffect(Unit) {
         theme = themePreference.getTheme()
@@ -37,8 +39,9 @@ fun MainViewController() = ComposeUIViewController {
                 }
             },
             themePreference = themePreference,
-            authRepository,
-            theme
+            authRepository = authRepository,
+            profileRepository = profileRepository,
+            theme = theme
         )
     }
 }

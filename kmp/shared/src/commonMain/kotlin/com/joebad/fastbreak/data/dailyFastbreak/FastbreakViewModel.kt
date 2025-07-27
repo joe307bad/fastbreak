@@ -194,13 +194,13 @@ class FastbreakViewModel(
         userAnswer: String,
         points: Int,
         description: String,
-        type: String
+        type: String,
+        date: String?
     ) =
         intent {
             if (state.locked == true) {
                 return@intent;
             }
-
 
             val currentSelections = state.selections
             val existingSelectionIndex = currentSelections.indexOfFirst { it._id == selectionId }
@@ -214,7 +214,6 @@ class FastbreakViewModel(
             )
 
             if (existingSelectionIndex != -1) {
-
                 val previousSelection = currentSelections[existingSelectionIndex];
 
                 if (previousSelection.userAnswer == userAnswer) {
@@ -314,6 +313,5 @@ class FastbreakViewModel(
             }
         }
     }
-
 }
 

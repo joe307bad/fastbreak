@@ -8,6 +8,10 @@ open api.Entities.EmptyFastbreakCard
 open MongoDB.Driver
 open api.Entities.ScheduleEntity
 open System.Globalization
+let ensureIso8601WithSeconds (dateString: string) =
+    let parsedDate = DateTimeOffset.Parse(dateString)
+    parsedDate.ToString("yyyy-MM-ddTHH:mm:sszzz")
+
 let formatDateParts (isoDateString: string) =
     let dateUtc = DateTimeOffset.Parse(isoDateString)
 
@@ -97,6 +101,7 @@ let getTomorrowsSchedulesHandler (schedule: Schedule seq) : Task<EmptyFastbreakC
                                     |> Option.defaultValue null
                                   awayTeam = awayTeam.displayName
                                   awayTeamSubtitle = null
+                                  date = ensureIso8601WithSeconds event.date
                                   dateLine1 = dayOfWeek
                                   dateLine2 = monthDay
                                   dateLine3 = time

@@ -56,7 +56,7 @@ class FastbreakStateRepository(
         return if (lastFetchedTime == null) {
             // No previous fetch, always fetch
             fetchAndStoreState(date)
-        } else if (nowUtc >= todayAt4amET && lastFetchedTime < todayAt4amET) {
+        } else if (todayAt4amET in (lastFetchedTime + 1)..nowUtc) {
             // Current time is past 4am ET and last fetch was before 4am ET today
             fetchAndStoreState(date)
         } else {

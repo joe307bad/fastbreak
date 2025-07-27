@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -13,22 +14,59 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.joebad.fastbreak.data.dailyFastbreak.FastbreakViewModel
 import com.joebad.fastbreak.model.dtos.DailyFastbreak
+import com.joebad.fastbreak.model.dtos.EmptyFastbreakCardItem
 import com.joebad.fastbreak.ui.CardWithBadge
 import com.joebad.fastbreak.ui.TeamCard
 import com.joebad.fastbreak.ui.theme.LocalColors
+import kotlinx.datetime.Clock
+import kotlinx.datetime.Instant
+
+// Extract logic to efficiently check if there are items to take action against
+fun getActiveItems(fastbreakCard: List<EmptyFastbreakCardItem>): List<EmptyFastbreakCardItem> {
+    val currentTime = Clock.System.now()
+    return fastbreakCard.filter { item ->
+        item.date?.let { dateString ->
+            try {
+                val itemTime = Instant.parse(dateString)
+                itemTime > currentTime
+            } catch (e: Exception) {
+                true
+            }
+        } ?: true
+    }
+}
+
+fun hasActiveItems(fastbreakCard: List<EmptyFastbreakCardItem>?): Boolean {
+    return fastbreakCard?.let { getActiveItems(it).isNotEmpty() } ?: false
+}
 
 @Composable
 fun FastbreakHomeList(dailyFastbreak: DailyFastbreak?, viewModel: FastbreakViewModel) {
     val colors = LocalColors.current;
-
-//    val viewModel = FastbreakViewModel()
     val state by viewModel.container.stateFlow.collectAsState()
-
 
     if (dailyFastbreak?.fastbreakCard == null)
         throw Exception("DailyFastbreak is null");
 
-    for (item in dailyFastbreak.fastbreakCard) {
+    val activeItems = getActiveItems(dailyFastbreak.fastbreakCard)
+
+    if (activeItems.isEmpty()) {
+        CardWithBadge(
+            badgeText = "CHECK BACK TOMORROW",
+            modifier = Modifier.padding(bottom = 30.dp),
+            content = {
+                Text(
+                    text = "There are no more selections available for today.",
+                    color = colors.onPrimary,
+                    modifier = Modifier.padding(vertical = 4.dp, horizontal = 8.dp)
+                )
+            },
+            badgeColor = colors.secondary,
+            badgeTextColor = colors.onSecondary,
+            points = ""
+        )
+    } else {
+        for (item in activeItems) {
         when (item.type) {
             "FEATURED-PICK-EM" ->
                 CardWithBadge(
@@ -52,7 +90,8 @@ fun FastbreakHomeList(dailyFastbreak: DailyFastbreak?, viewModel: FastbreakViewM
                                     answer,
                                     item.points,
                                     "$answer to win against $userLoser",
-                                    "FEATURED PICK-EM"
+                                    "FEATURED PICK-EM",
+                                    item.date
                                 )
                             }
                         )
@@ -85,7 +124,8 @@ fun FastbreakHomeList(dailyFastbreak: DailyFastbreak?, viewModel: FastbreakViewM
                                     answer,
                                     item.points,
                                     "$answer to win against $userLoser",
-                                    "PICK-EM"
+                                    "PICK-EM",
+                                    item.date
                                 )
                             }
                         )
@@ -115,7 +155,8 @@ fun FastbreakHomeList(dailyFastbreak: DailyFastbreak?, viewModel: FastbreakViewM
                                         answer,
                                         item.points,
                                         "${item.question} - $answer",
-                                        "TRIVIA"
+                                        "TRIVIA",
+                                        item.date
                                     )
                                 }
                             )
@@ -143,7 +184,8 @@ fun FastbreakHomeList(dailyFastbreak: DailyFastbreak?, viewModel: FastbreakViewM
                                         answer,
                                         item.points,
                                         "${item.question} - $answer",
-                                        "TRIVIA"
+                                        "TRIVIA",
+                                        item.date
                                     )
                                 }
                             )
@@ -156,7 +198,7 @@ fun FastbreakHomeList(dailyFastbreak: DailyFastbreak?, viewModel: FastbreakViewM
 
             else -> println("Unknown Type")
         }
-    }
+    } }
     Spacer(
         modifier = Modifier.height(100.dp)
     )

@@ -16,6 +16,7 @@ import androidx.compose.ui.zIndex
 import com.joebad.fastbreak.data.dailyFastbreak.FastbreakViewModel
 import com.joebad.fastbreak.model.dtos.DailyFastbreak
 import com.joebad.fastbreak.ui.home.FastbreakHomeList
+import com.joebad.fastbreak.ui.home.hasActiveItems
 import com.joebad.fastbreak.utils.DateUtils
 import kotlinx.datetime.LocalDate
 
@@ -77,8 +78,7 @@ fun HomeScreen(
                 .fillMaxSize()
                 .zIndex(3f)
         ) {
-
-            if (dailyFastbreak != null && totalPoints != null)
+            if (dailyFastbreak != null && totalPoints != null && hasActiveItems(dailyFastbreak.fastbreakCard))
                 Box(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)

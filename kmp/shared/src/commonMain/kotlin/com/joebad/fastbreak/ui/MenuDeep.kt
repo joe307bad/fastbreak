@@ -8,7 +8,7 @@ import androidx.compose.ui.graphics.vector.path
 import androidx.compose.ui.unit.dp
 import com.joebad.fastbreak.ui.theme.LocalColors
 
-public val MenuDeep: ImageVector
+val MenuDeep: ImageVector
 	@Composable
 	get() {
 		val colors = LocalColors.current

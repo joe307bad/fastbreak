@@ -20,7 +20,8 @@ type EmptyFastbreakCardItem =
       answer2: string
       answer3: string
       answer4: string
-      correctAnswer: string }
+      correctAnswer: string
+      date: string }
 
 [<BsonIgnoreExtraElements>]
 type EmptyFastbreakCard =

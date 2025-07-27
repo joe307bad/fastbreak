@@ -14,6 +14,7 @@ data class EmptyFastbreakCardItem(
     val homeTeamSubtitle: String? = null,
     val awayTeam: String? = null,
     val awayTeamSubtitle: String? = null,
+    val date: String? = null,
     val dateLine1: String? = null,
     val dateLine2: String? = null,
     val dateLine3: String? = null,

@@ -26,6 +26,7 @@ data class AuthedUser(
 
 @Serializable
 data class UserApiResponse(
+    val userId: String,
     val userName: String,
     val lockedFastBreakCard: FastbreakSelectionState? = null
 )
@@ -85,7 +86,7 @@ class AuthRepository(private val secureStorage: KVault) {
                     user.email,
                     user.exp,
                     user.idToken,
-                    user.userId,
+                    response.userId,
                     response.userName
                 )
             )

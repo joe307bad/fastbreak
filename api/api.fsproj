@@ -21,6 +21,7 @@
     <Compile Include="Utils\googleAuthPipeline.fs" />
     <Compile Include="Utils\deserializeBody.fs" />
     <Compile Include="Utils\generateRandomUsername.fs" />
+    <Compile Include="Utils\profile.fs" />
     <Compile Include="Controllers\DailyFastbreakController.fs" />
     <Compile Include="Controllers\LockCardController.fs" />
     <Compile Include="Controllers\ProfileController.fs" />

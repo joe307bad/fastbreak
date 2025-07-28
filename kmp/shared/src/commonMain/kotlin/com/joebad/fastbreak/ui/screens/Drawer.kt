@@ -1,3 +1,4 @@
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -228,15 +229,23 @@ fun DrawerContent(
                         style = MaterialTheme.typography.h6
                     )
                     Spacer(modifier = Modifier.height(10.dp))
-                    LazyColumn {
-                        items(statSheetItems ?: emptyList()) { item ->
-                            StatSheetRow(
-                                item.statSheetType,
-                                item.leftColumnText,
-                                item.rightColumnText,
-                                onClick = { isButton -> if (isButton) onShowLastweeksFastbreakCard() }
-                            );
-                            Spacer(modifier = Modifier.height(10.dp))
+                    if (statSheetItems?.any { i -> i.leftColumnText == "null" } == true) {
+                        Text(
+                            text = "No Stat Sheet found. Check back tomorrow.",
+                            color = colors.onPrimary,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    } else if (!statSheetItems.isNullOrEmpty()) {
+                        LazyColumn {
+                            items(statSheetItems) { item ->
+                                StatSheetRow(
+                                    item.statSheetType,
+                                    item.leftColumnText,
+                                    item.rightColumnText,
+                                    onClick = { isButton -> if (isButton) onShowLastweeksFastbreakCard() }
+                                );
+                                Spacer(modifier = Modifier.height(10.dp))
+                            }
                         }
                     }
                 }

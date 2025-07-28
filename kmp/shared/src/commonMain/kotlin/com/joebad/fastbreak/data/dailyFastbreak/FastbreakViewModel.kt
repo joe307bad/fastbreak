@@ -14,6 +14,8 @@ import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
+import kotlinx.datetime.Clock
+import kotlinx.datetime.Instant
 import kotlinx.serialization.Serializable
 import org.orbitmvi.orbit.Container
 import org.orbitmvi.orbit.ContainerHost
@@ -200,6 +202,19 @@ class FastbreakViewModel(
         intent {
             if (state.locked == true) {
                 return@intent;
+            }
+            
+            // Check if the date is in the past - if so, don't allow selection
+            date?.let { dateString ->
+                try {
+                    val selectionTime = Instant.parse(dateString)
+                    val currentTime = Clock.System.now()
+                    if (selectionTime <= currentTime) {
+                        return@intent
+                    }
+                } catch (e: Exception) {
+                    // If date parsing fails, allow the selection to proceed
+                }
             }
 
             val currentSelections = state.selections

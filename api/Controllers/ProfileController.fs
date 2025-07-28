@@ -6,16 +6,16 @@ open MongoDB.Bson.Serialization.Attributes
 open MongoDB.Driver
 open Saturn.Endpoint
 open api.Entities.FastbreakSelections
-open api.Utils.generateRandomUsername
-open api.Utils.tryGetSubject
 open api.Utils.deserializeBody
+open api.Utils.generateRandomUsername
+open api.Utils.profile
+open api.Utils.tryGetSubject
 open api.Utils.googleAuthPipeline
 
-type Profile = { userName: string; userId: string }
-
 [<BsonIgnoreExtraElements>]
-type UserName =
+type Profile =
     { userId: string
+      googleId: string
       userName: string
       updatedAt: DateTime }
 
@@ -23,44 +23,54 @@ type SaveResponse = { success: bool; message: string }
 
 type ProfileResponse =
     { userName: string
+      userId: string
       lockedFastBreakCard: FastbreakSelectionState option }
 
-let saveUserNameHandler (database: IMongoDatabase) : HttpHandler =
+let saveProfileHandler (database: IMongoDatabase) : HttpHandler =
     fun next ctx ->
         task {
             let! profile = deserializeBody<Profile> ctx
-            let userId = tryGetSubject ctx
+            let googleId = tryGetSubject ctx
 
             return!
-                match userId with
+                match googleId with
                 | Some authUserId ->
-                    if profile.userId = authUserId then
-                        let collection: IMongoCollection<UserName> =
-                            database.GetCollection<UserName>("userNames")
+                    match getUserIdFromProfile database authUserId |> Async.AwaitTask |> Async.RunSynchronously with
+                    | Some userId ->
+                        if profile.userId = userId then
+                            let collection: IMongoCollection<Profile> =
+                                database.GetCollection<Profile>("profiles")
 
-                        let filter = Builders<UserName>.Filter.Eq((fun x -> x.userId), authUserId)
+                            let filter = Builders<Profile>.Filter.Eq((_.userId), userId)
 
-                        let update =
-                            Builders<UserName>.Update
-                                .Set((fun x -> x.userName), profile.userName)
-                                .Set((fun x -> x.updatedAt), DateTime.Now)
-                                .SetOnInsert((fun x -> x.userId), authUserId)
+                            let update =
+                                Builders<Profile>.Update
+                                    .Set((_.userName), profile.userName)
+                                    .Set((_.updatedAt), DateTime.Now)
+                                    .Set((_.googleId), authUserId)
+                                    .SetOnInsert((_.userId), userId)
 
-                        let updateOptions = UpdateOptions(IsUpsert = true)
+                            let updateOptions = UpdateOptions(IsUpsert = true)
 
-                        let result = collection.UpdateOne(filter, update, updateOptions)
+                            let result = collection.UpdateOne(filter, update, updateOptions)
 
-                        let response =
-                            { success = true
-                              message = "Username saved successfully" }
+                            let response =
+                                { success = true
+                                  message = "Profile saved successfully" }
 
-                        Successful.ok (json response) next ctx
-                    else
+                            Successful.ok (json response) next ctx
+                        else
+                            let response =
+                                { success = false
+                                  message = "Profile ID mismatch" }
+
+                            RequestErrors.BAD_REQUEST (json response) next ctx
+                    | None ->
                         let response =
                             { success = false
-                              message = "User ID mismatch" }
+                              message = "Authentication required" }
 
-                        RequestErrors.BAD_REQUEST (json response) next ctx
+                        RequestErrors.FORBIDDEN (json response) next ctx
                 | None ->
                     let response =
                         { success = false
@@ -80,37 +90,40 @@ let initializeProfileHandler (database: IMongoDatabase) requestedUserId : HttpHa
                 | Some userId ->
                     if requestedUserId = userId then
                         
-                        // Check if username exists for this user
-                        let userNamesCollection: IMongoCollection<UserName> =
-                            database.GetCollection<UserName>("userNames")
+                        let userNamesCollection: IMongoCollection<Profile> =
+                            database.GetCollection<Profile>("profiles")
                         
-                        let userFilter = Builders<UserName>.Filter.Eq((fun x -> x.userId), userId)
+                        let userFilter = Builders<Profile>.Filter.Eq((_.googleId), userId)
                         let userNameDoc = userNamesCollection.Find(userFilter).ToList()
                         let randomUserName = generateRandomUsername()
+                        let newUserId = Guid.NewGuid().ToString()
                         
-                        // If no username exists, create one
                         if userNameDoc.Count = 0 then
                             let newUserName = {
-                                userId = userId
+                                userId = newUserId
+                                googleId = userId
                                 userName = randomUserName
                                 updatedAt = DateTime.Now
                             }
                             userNamesCollection.InsertOne(newUserName)  
 
                         let lockedFastBreakCard =
-                            database
-                                .GetCollection<FastbreakSelectionState>("locked-fastbreak-cards")
-                                .Find(
-                                    Builders<FastbreakSelectionState>.Filter
-                                        .And(Builders<FastbreakSelectionState>.Filter.Eq(_.userId, userId))
-                                )
-                                .Sort(Builders<FastbreakSelectionState>.Sort.Descending("createdAt"))
-                                .FirstOrDefaultAsync()
-                            |> Async.AwaitTask
-                            |> Async.RunSynchronously
-                            |> Option.ofObj
+                            if userNameDoc.Count > 0 then
+                                database
+                                    .GetCollection<FastbreakSelectionState>("locked-fastbreak-cards")
+                                    .Find(
+                                        Builders<FastbreakSelectionState>.Filter
+                                            .And(Builders<FastbreakSelectionState>.Filter.Eq(_.userId, userNameDoc[0].userId))
+                                    )
+                                    .Sort(Builders<FastbreakSelectionState>.Sort.Descending("createdAt"))
+                                    .FirstOrDefaultAsync()
+                                |> Async.AwaitTask
+                                |> Async.RunSynchronously
+                                |> Option.ofObj
+                            else None
                         let response =
-                            { userName = if userNameDoc.Count = 0 then randomUserName else userNameDoc[0].userName
+                            { userId = if userNameDoc.Count = 0 then newUserId else userNameDoc[0].userId
+                              userName = if userNameDoc.Count = 0 then randomUserName else userNameDoc[0].userName
                               lockedFastBreakCard = lockedFastBreakCard }
 
                         Successful.ok (json response) next ctx
@@ -131,6 +144,6 @@ let initializeProfileHandler (database: IMongoDatabase) requestedUserId : HttpHa
 let profileRouter database =
     router { 
         pipe_through googleAuthPipeline
-        post "/profile" (saveUserNameHandler database)
+        post "/profile" (saveProfileHandler database)
         postf "/profile/initialize/%s"  (fun userId -> requireGoogleAuth >=> (initializeProfileHandler database userId))
     }

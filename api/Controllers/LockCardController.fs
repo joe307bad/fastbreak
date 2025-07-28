@@ -1,11 +1,13 @@
 module api.Controllers.LockCardController
 
 open System
+open System.Threading.Tasks
 open Giraffe
 open MongoDB.Driver
 open MongoDB.Bson.Serialization.Attributes
 open Saturn.Endpoint
 open api.Entities.FastbreakSelections
+open api.Utils.profile
 open api.Utils.deserializeBody
 open api.Utils.tryGetSubject
 open api.Utils.googleAuthPipeline
@@ -24,7 +26,12 @@ let lockCardHandler (database: IMongoDatabase) : HttpHandler =
     fun next ctx ->
         task {
             let! state = deserializeBody<FastbreakSelectionState> ctx
-            let userId = tryGetSubject ctx;
+            let googleId = tryGetSubject ctx
+            
+            let! userId = 
+                match googleId with
+                | Some gId -> getUserIdFromProfile database gId
+                | None -> Task.FromResult(None)
 
             return!
                 match userId with

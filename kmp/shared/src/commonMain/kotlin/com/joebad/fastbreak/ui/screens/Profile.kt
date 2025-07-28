@@ -1,4 +1,3 @@
-
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -36,10 +35,23 @@ import com.joebad.fastbreak.ui.theme.LocalColors
 
 
 fun generateRandomUsername(): String {
-    val adjectives = listOf("cool", "fast", "bright", "smart", "bold", "swift", "wild", "calm", "brave", "wise")
-    val nouns = listOf("tiger", "eagle", "wolf", "lion", "bear", "shark", "hawk", "fox", "deer", "owl")
-    val verbs = listOf("runs", "jumps", "flies", "swims", "climbs", "dives", "soars", "leaps", "glides", "races")
-    
+    val adjectives =
+        listOf("cool", "fast", "bright", "smart", "bold", "swift", "wild", "calm", "brave", "wise")
+    val nouns =
+        listOf("tiger", "eagle", "wolf", "lion", "bear", "shark", "hawk", "fox", "deer", "owl")
+    val verbs = listOf(
+        "runs",
+        "jumps",
+        "flies",
+        "swims",
+        "climbs",
+        "dives",
+        "soars",
+        "leaps",
+        "glides",
+        "races"
+    )
+
     val randomNumber = (1000..9999).random()
     return "${adjectives.random()}-${nouns.random()}-${verbs.random()}-$randomNumber"
 }
@@ -55,7 +67,7 @@ fun ProfileScreen(
     val colors = LocalColors.current
     val gmailUsername = email.substringBefore("@").replace("\"", "")
     var randomUsername by remember { mutableStateOf(if (userName != gmailUsername) userName else generateRandomUsername()) }
-    
+
     var selectedOption by remember { mutableStateOf(if (userName == gmailUsername) 0 else 1) }
     val usernameOptions = listOf(gmailUsername, randomUsername)
 
@@ -85,40 +97,35 @@ fun ProfileScreen(
                     verticalArrangement = Arrangement.Top,
                     horizontalAlignment = Alignment.Start
                 ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
-                        horizontalArrangement = Arrangement.Start
-                    ) {
-                        Text(
-                            text = "User ID:",
-                            color = colors.onPrimary,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 18.sp,
-                            modifier = Modifier.width(100.dp)
-                        )
-                        Text(
-                            text = userId,
-                            color = colors.onPrimary,
-                            fontSize = 16.sp,
-                            fontFamily = FontFamily.Monospace
-                        )
-                    }
+                    Text(
+                        text = "User ID:",
+                        color = colors.onPrimary,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 18.sp,
+                        modifier = Modifier.width(100.dp).padding(bottom = 20.dp)
+                    )
+                    Text(
+                        text = userId,
+                        color = colors.onPrimary,
+                        fontSize = 16.sp,
+                        fontFamily = FontFamily.Monospace
+                    )
 
                     Text(
                         text = "Leaderboard display name:",
                         color = colors.onPrimary,
                         fontSize = 18.sp,
                         fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(bottom = 8.dp, top = 16.dp)
+                        modifier = Modifier.padding(bottom = 8.dp, top = 40.dp)
                     )
-                    
+
                     usernameOptions.forEachIndexed { index, option ->
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .selectable(
                                     selected = (selectedOption == index),
-                                    onClick = { 
+                                    onClick = {
                                         selectedOption = index
                                     }
                                 )
@@ -127,7 +134,7 @@ fun ProfileScreen(
                         ) {
                             RadioButton(
                                 selected = (selectedOption == index),
-                                onClick = { 
+                                onClick = {
                                     selectedOption = index
                                 },
                                 colors = RadioButtonDefaults.colors(
@@ -145,7 +152,7 @@ fun ProfileScreen(
                             )
                             if (index == 1) {
                                 OutlinedButton(
-                                    onClick = { 
+                                    onClick = {
                                         randomUsername = generateRandomUsername()
                                     },
                                     colors = ButtonDefaults.outlinedButtonColors(
@@ -153,7 +160,9 @@ fun ProfileScreen(
                                     ),
                                     shape = RectangleShape,
                                     modifier = Modifier.size(width = 80.dp, height = 32.dp),
-                                    contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)
+                                    contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                                        0.dp
+                                    )
                                 ) {
                                     Box(
                                         contentAlignment = Alignment.Center,
@@ -169,9 +178,9 @@ fun ProfileScreen(
                             }
                         }
                     }
-                    
+
                     Spacer(modifier = Modifier.height(20.dp))
-                    
+
                     PhysicalButton(
                         onClick = {
                             onSaveUserName(selectedUsername)

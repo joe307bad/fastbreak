@@ -204,8 +204,13 @@ let apiRouter =
         forward "" (profileRouter database)
     }
 
+let healthHandler: HttpHandler =
+    fun next ctx ->
+        ctx.WriteJsonAsync({| status = "healthy"; timestamp = DateTime.UtcNow |})
+
 let appRouter =
     router {
+        get "/" healthHandler
         forward "/api" apiRouter
     }
 

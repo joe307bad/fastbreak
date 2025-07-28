@@ -33,7 +33,6 @@ import io.github.alexzhirkevich.cupertino.icons.filled.LockOpen
  *
  * @param locked Boolean state determining whether to show the locked or unlocked icon
  * @param modifier Modifier for customizing the component's layout
- * @param color The color to tint the icon
  * @param size The size of the icon in dp
  */
 @OptIn(ExperimentalAnimationApi::class)
@@ -41,7 +40,6 @@ import io.github.alexzhirkevich.cupertino.icons.filled.LockOpen
 fun AnimatedLockIcon(
     locked: Boolean,
     modifier: Modifier = Modifier,
-    color: Color = Color.Unspecified,
     size: Dp = 24.dp
 ) {
     val colors = LocalColors.current;

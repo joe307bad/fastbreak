@@ -1,46 +1,23 @@
+package com.joebad.fastbreak.data.dailyFastbreak
+
+import AuthedUser
+import com.joebad.fastbreak.model.dtos.DailyResponse
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
+import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.request.get
+import io.ktor.client.request.header
+import io.ktor.client.request.parameter
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
+import io.ktor.client.request.url
 import io.ktor.http.ContentType
 import io.ktor.http.contentType
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
-
-@Serializable
-data class LeaderboardItem(val id: String, val user: String, val points: Int)
-
-
-@Serializable
-data class EmptyFastbreakCardItem(
-    val id: String,
-    val type: String,
-    val homeTeam: String? = null,
-    val homeTeamSubtitle: String? = null,
-    val awayTeam: String? = null,
-    val awayTeamSubtitle: String? = null,
-    val dateLine1: String? = null,
-    val dateLine2: String? = null,
-    val dateLine3: String? = null,
-    val points: Int,
-    val question: String? = null,
-    val answer1: String? = null,
-    val answer2: String? = null,
-    val answer3: String? = null,
-    val answer4: String? = null,
-    val correctAnswer: String? = null
-)
-
-
-@Serializable
-data class DailyFastbreak(
-    val leaderboard: List<LeaderboardItem>,
-    val fastbreakCard: List<EmptyFastbreakCardItem>
-)
 
 @Serializable
 data class LockCardResponse(
@@ -55,27 +32,28 @@ val client = HttpClient {
             ignoreUnknownKeys = true
         })
     }
+    install(HttpTimeout) {
+        requestTimeoutMillis = 60_000
+    }
 }
 
-suspend fun getDailyFastbreak(url: String): DailyFastbreak? {
-    return try {
-        client.get(url).body<DailyFastbreak>()
-    } catch (e: Exception) {
-        println("Error fetching data: ${e.message}")
-        null
-    } finally {
-        client.close()
-    }
+suspend fun getDailyFastbreak(url: String, userId: String? = ""): DailyResponse {
+    return client.get {
+        url(url)
+        parameter("userId", userId)
+    }.body<DailyResponse>()
 }
 
 
 suspend fun lockDailyFastbreakCard(
     url: String,
-    fastbreakSelectionState: FastbreakSelectionState
+    fastbreakSelectionState: FastbreakSelectionState,
+    authedUser: AuthedUser
 ): LockCardResponse? {
     return try {
         client.post(url) {
             contentType(ContentType.Application.Json)
+            header("Authorization", "Bearer ${authedUser.idToken}")
             setBody(fastbreakSelectionState)
         }.body<LockCardResponse>()
     } catch (e: Exception) {

@@ -1,4 +1,3 @@
-
 import com.codingfeline.buildkonfig.compiler.FieldSpec.Type.STRING
 import org.jetbrains.kotlin.konan.properties.Properties
 
@@ -6,6 +5,7 @@ plugins {
     alias(libs.plugins.kotlinMultiplatform)
     alias(libs.plugins.androidLibrary)
     alias(libs.plugins.jetbrainsCompose)
+//    alias(libs.plugins.composeResources)
     alias(libs.plugins.compose.compiler)
     id("com.codingfeline.buildkonfig")
     kotlin("plugin.serialization") version "2.1.0"
@@ -22,7 +22,11 @@ tasks {
 }
 
 kotlin {
-    androidTarget()
+    androidTarget {
+        compilerOptions {
+            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21)
+        }
+    }
     iosArm64()
     iosX64()
     iosSimulatorArm64()
@@ -33,48 +37,53 @@ kotlin {
         homepage = "https://joebad.com/"
         ios.deploymentTarget = "14.1"
         podfile = project.file("../iosApp/Podfile")
-        pod("CouchbaseLite") {
-            version = libs.versions.couchbase.lite.c.get()
-            linkOnly = true
-        }
+        pod("CouchbaseLite", version = "3.1.9", linkOnly = true)
 
         pod("GoogleSignIn", linkOnly = true)
         pod("FirebaseCore", linkOnly = true)
     }
 
     sourceSets {
-        commonMain.dependencies {
-            api(libs.kotbase)
-            implementation(compose.runtime)
-            implementation(compose.foundation)
-            implementation(compose.material)
-            implementation(compose.ui)
-            implementation(compose.components.resources)
-            implementation(compose.components.uiToolingPreview)
-            implementation("com.arkivanov.decompose:decompose:3.2.2")
-            implementation("com.arkivanov.decompose:extensions-compose:3.2.2")
-            implementation("com.arkivanov.decompose:extensions-compose-experimental:3.2.2")
-            implementation(libs.cupertino.adaptive)
-            implementation(libs.cupertino.iconsExtended)
-            implementation(libs.kotbase)
-            implementation("io.github.mirzemehdi:kmpauth-google:2.0.0")
-            implementation("io.github.mirzemehdi:kmpauth-uihelper:2.0.0")
-            implementation ("com.google.guava:guava:27.0.1-android")
-            implementation("com.google.accompanist:accompanist-systemuicontroller:0.34.0")
-            implementation("androidx.datastore:datastore-preferences:1.1.3")
 
-            implementation("io.ktor:ktor-client-cio:2.3.6")
+        commonMain {
+            dependencies {
+                api(libs.kotbase)
+                implementation(compose.runtime)
+                implementation(compose.foundation)
+                implementation(compose.material)
+                implementation(compose.ui)
+                @OptIn(org.jetbrains.compose.ExperimentalComposeLibrary::class)
+                implementation(compose.components.resources)
+                implementation(compose.components.uiToolingPreview)
+                implementation("com.arkivanov.decompose:decompose:3.2.2")
+                implementation("com.arkivanov.decompose:extensions-compose:3.2.2")
+                implementation("com.arkivanov.decompose:extensions-compose-experimental:3.2.2")
+                implementation(libs.cupertino.adaptive)
+                implementation(libs.cupertino.iconsExtended)
+                implementation(libs.kotbase)
+                implementation("io.github.mirzemehdi:kmpauth-google:2.0.0")
+                implementation("io.github.mirzemehdi:kmpauth-uihelper:2.0.0")
+                implementation("com.google.guava:guava:27.0.1-android")
+                implementation("com.google.accompanist:accompanist-systemuicontroller:0.34.0")
+                implementation("androidx.datastore:datastore-preferences:1.1.3")
 
-            implementation("io.ktor:ktor-client-serialization:2.3.6")
-            implementation("io.ktor:ktor-client-content-negotiation:2.3.6")
-            implementation("io.ktor:ktor-serialization-kotlinx-json:2.3.6")
+                implementation("io.ktor:ktor-client-cio:2.3.6")
 
-            implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.0")
-            implementation("org.orbit-mvi:orbit-core:9.0.0")
-            implementation("org.orbit-mvi:orbit-compose:9.0.0")
+                implementation("io.ktor:ktor-client-serialization:2.3.6")
+                implementation("io.ktor:ktor-client-content-negotiation:2.3.6")
+                implementation("io.ktor:ktor-serialization-kotlinx-json:2.3.6")
 
-            implementation("com.eygraber:compose-placeholder-material3:1.0.10")
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.0")
+                implementation("org.orbit-mvi:orbit-core:9.0.0")
+                implementation("org.orbit-mvi:orbit-compose:9.0.0")
 
+                implementation("com.appstractive:jwt-kt:1.1.0")
+
+                implementation("com.liftric:kvault:1.12.0")
+                implementation("org.jetbrains.skiko:skiko:0.7.85")
+                implementation("com.squareup.okio:okio:3.6.0") // or latest
+            }
+            resources.srcDirs("src/commonMain/composeResources")
         }
 
         val iosX64Main by getting
@@ -86,8 +95,13 @@ kotlin {
             iosArm64Main.dependsOn(this)
             iosSimulatorArm64Main.dependsOn(this)
 
-            resources.srcDirs("src/commonMain/resources")
+            resources.srcDirs("src/commonMain/composeResources")
         }
+
+//        val androidMain by creating {
+//            dependsOn(commonMain.get())
+//            resources.srcDirs("src/commonMain/resources", "src/commonMain/composeResources")
+//        }
 
         androidMain.dependencies {
             implementation(libs.compose.ui.tooling.preview)
@@ -101,7 +115,7 @@ android {
     namespace = "com.joebad.fastbreak"
     compileSdk = 34
     defaultConfig {
-        minSdk = 24
+        minSdk = 26
     }
     packaging.resources.excludes += "/META-INF/{AL2.0,LGPL2.1}"
     compileOptions {
@@ -122,6 +136,8 @@ dependencies {
     implementation(libs.androidx.core.i18n)
     implementation(libs.androidx.ui.android)
     implementation(libs.androidx.compiler)
+    implementation(compose.components.resources)
+    implementation(libs.androidx.ui.graphics.android)
 }
 
 buildkonfig {
@@ -137,15 +153,27 @@ buildkonfig {
         }
 
         buildConfigField(STRING, "GOOGLE_AUTH_SERVER_ID", apiKey)
-        buildConfigField(com.codingfeline.buildkonfig.compiler.FieldSpec.Type.BOOLEAN, "IS_DEBUG", "false")
+        buildConfigField(
+            com.codingfeline.buildkonfig.compiler.FieldSpec.Type.BOOLEAN,
+            "IS_DEBUG",
+            "false"
+        )
     }
 
     targetConfigs {
         create("android") {
-            buildConfigField(com.codingfeline.buildkonfig.compiler.FieldSpec.Type.BOOLEAN, "IS_DEBUG", "true")
+            buildConfigField(
+                com.codingfeline.buildkonfig.compiler.FieldSpec.Type.BOOLEAN,
+                "IS_DEBUG",
+                "true"
+            )
         }
         create("ios") {
-            buildConfigField(com.codingfeline.buildkonfig.compiler.FieldSpec.Type.BOOLEAN, "IS_DEBUG", "true")
+            buildConfigField(
+                com.codingfeline.buildkonfig.compiler.FieldSpec.Type.BOOLEAN,
+                "IS_DEBUG",
+                "true"
+            )
         }
     }
 }
@@ -157,4 +185,13 @@ tasks.register<Copy>("copyFontsToAndroidAssets") {
 
 tasks.named("preBuild") {
     dependsOn("copyFontsToAndroidAssets")
+}
+
+compose.resources {
+    publicResClass = true
+    generateResClass = always
+}
+
+tasks.withType<Copy> {
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }

@@ -1,10 +1,21 @@
+package com.joebad.fastbreak.data.dailyFastbreak
 
+import AuthRepository
+import ProfileRepository
+import StatSheetItemView
+import StatSheetType
+import com.joebad.fastbreak.model.dtos.FastbreakSelectionsResult
+import com.joebad.fastbreak.model.dtos.StatSheetItem
+import getRandomId
+import getWeekNumber
 import kotbase.Database
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
+import kotlinx.datetime.Clock
+import kotlinx.datetime.Instant
 import kotlinx.serialization.Serializable
 import org.orbitmvi.orbit.Container
 import org.orbitmvi.orbit.ContainerHost
@@ -12,7 +23,7 @@ import org.orbitmvi.orbit.container
 
 @Serializable
 data class FastbreakSelection(
-    val id: String,
+    val _id: String,
     val userAnswer: String,
     val points: Int,
     val description: String,
@@ -23,8 +34,13 @@ data class FastbreakSelection(
 data class FastbreakSelectionState(
     val selections: List<FastbreakSelection> = emptyList(),
     val totalPoints: Int = 0,
-    val id: String? = getRandomId(),
-    val locked: Boolean? = false
+    val cardId: String = getRandomId(),
+    val locked: Boolean? = false,
+    val date: String,
+    val statSheetItems: List<StatSheetItemView> = emptyList(),
+    val results: FastbreakSelectionsResult? = null,
+    val lastLockedCardResults: FastbreakSelectionState? = null,
+    val isSavingUserName: Boolean = false
 )
 
 sealed class FastbreakSideEffect {
@@ -38,17 +54,46 @@ sealed class FastbreakSideEffect {
 
 class FastbreakViewModel(
     database: Database,
-    onLock: (state: FastbreakSelectionState) -> Unit
+    onLock: (state: FastbreakSelectionState) -> Unit,
+    date: String,
+    authRepository: AuthRepository,
+    statSheetItems: StatSheetItem?,
+    selectedDate: String?,
+    lastLockedCard: FastbreakSelectionState?,
+    lastLockedCardWithResults: FastbreakSelectionState?
 ) : ContainerHost<FastbreakSelectionState, FastbreakSideEffect>, CoroutineScope by MainScope() {
 
-    private val persistence = FastbreakSelectionsPersistence(database)
-
+    private val persistence = FastbreakSelectionsPersistence(database, authRepository)
+    private val _profileRepository = ProfileRepository(authRepository)
     override val container: Container<FastbreakSelectionState, FastbreakSideEffect> = container(
-        initialState = FastbreakSelectionState()
+        initialState = FastbreakSelectionState(
+            date = date,
+            locked = lastLockedCard?.date == selectedDate
+        )
     )
 
     init {
-        loadSavedSelections()
+        launch {
+            if (lastLockedCard != null && lastLockedCard.date == selectedDate) {
+                try {
+                    persistence.saveSelections(
+                        lastLockedCard.cardId,
+                        lastLockedCard.selections,
+                        true,
+                        lastLockedCard.date
+                    )
+                } catch (e: Exception) {
+                    println(e)
+                }
+            }
+            loadSavedSelections()
+        }
+        setStatSheetItems(
+            statSheetItems,
+            lastLockedCardWithResults?.results?.totalPoints.toString(),
+            lastLockedCardWithResults?.date
+        );
+        setlastLockedCardResults(lastLockedCardWithResults)
         container.sideEffectFlow
             .onEach { sideEffect ->
                 when (sideEffect) {
@@ -57,6 +102,82 @@ class FastbreakViewModel(
                 }
             }
             .launchIn(MainScope())
+    }
+
+    private fun setlastLockedCardResults(lastLockedCardResults: FastbreakSelectionState?) {
+        intent {
+            reduce {
+                state.copy(lastLockedCardResults = lastLockedCardResults)
+            }
+        }
+    }
+
+    private fun setStatSheetItems(
+        statSheetItems: StatSheetItem?,
+        lastCardPoints: String?,
+        lastCardDate: String?
+    ) {
+        intent {
+            reduce {
+                val statSheetItemViewList = mutableListOf<StatSheetItemView>()
+
+                val currentWeek = statSheetItems?.currentWeek;
+                val lastWeek = statSheetItems?.lastWeek;
+                val highest = statSheetItems?.highestFastbreakCardEver;
+                val streak = statSheetItems?.lockedCardStreak;
+
+
+                statSheetItemViewList.add(
+                    StatSheetItemView(
+                        statSheetType = StatSheetType.Button,
+                        leftColumnText = lastCardPoints ?: "",
+                        rightColumnText = "My Fastbreak card results\nfor $lastCardDate"
+                    )
+                )
+
+                statSheetItemViewList.add(
+                    StatSheetItemView(
+                        statSheetType = StatSheetType.MonoSpace,
+                        leftColumnText = currentWeek?.total.toString(),
+                        rightColumnText = "Current week's total\nWeek ${getWeekNumber(currentWeek?.days?.first()?.dateCode)}"
+                    )
+                )
+
+                statSheetItemViewList.add(
+                    StatSheetItemView(
+                        statSheetType = StatSheetType.MonoSpace,
+                        leftColumnText = lastWeek?.total.toString(),
+                        rightColumnText = "Last week's total\nWeek ${getWeekNumber(lastWeek?.days?.first()?.dateCode)}"
+                    )
+                )
+
+                statSheetItemViewList.add(
+                    StatSheetItemView(
+                        statSheetType = StatSheetType.MonoSpace,
+                        leftColumnText = highest?.points.toString(),
+                        rightColumnText = "My highest Fastbreak card ever\n${highest?.date}"
+                    )
+                )
+
+                statSheetItemViewList.add(
+                    StatSheetItemView(
+                        statSheetType = StatSheetType.MonoSpace,
+                        leftColumnText = streak?.current.toString(),
+                        rightColumnText = "My current locked Fastbreak card streak"
+                    )
+                )
+
+                statSheetItemViewList.add(
+                    StatSheetItemView(
+                        statSheetType = StatSheetType.MonoSpace,
+                        leftColumnText = streak?.longest.toString(),
+                        rightColumnText = "My longest locked Fastbreak card streak"
+                    )
+                )
+
+                state.copy(statSheetItems = statSheetItemViewList)
+            }
+        }
     }
 
     fun lockCard() {
@@ -75,19 +196,32 @@ class FastbreakViewModel(
         userAnswer: String,
         points: Int,
         description: String,
-        type: String
+        type: String,
+        date: String?
     ) =
         intent {
             if (state.locked == true) {
                 return@intent;
             }
-
+            
+            // Check if the date is in the past - if so, don't allow selection
+            date?.let { dateString ->
+                try {
+                    val selectionTime = Instant.parse(dateString)
+                    val currentTime = Clock.System.now()
+                    if (selectionTime <= currentTime) {
+                        return@intent
+                    }
+                } catch (e: Exception) {
+                    // If date parsing fails, allow the selection to proceed
+                }
+            }
 
             val currentSelections = state.selections
-            val existingSelectionIndex = currentSelections.indexOfFirst { it.id == selectionId }
+            val existingSelectionIndex = currentSelections.indexOfFirst { it._id == selectionId }
 
             val selection = FastbreakSelection(
-                id = selectionId,
+                _id = selectionId,
                 userAnswer = userAnswer,
                 points = points,
                 description = description,
@@ -95,7 +229,6 @@ class FastbreakViewModel(
             )
 
             if (existingSelectionIndex != -1) {
-
                 val previousSelection = currentSelections[existingSelectionIndex];
 
                 if (previousSelection.userAnswer == userAnswer) {
@@ -139,7 +272,12 @@ class FastbreakViewModel(
         launch {
             try {
                 val state = container.stateFlow.value;
-                persistence.saveSelections(state.id ?: "", state.selections, state.locked);
+                persistence.saveSelections(
+                    state.cardId ?: "",
+                    state.selections,
+                    state.locked,
+                    state.date
+                );
             } catch (e: Exception) {
                 println(e)
             }
@@ -149,14 +287,15 @@ class FastbreakViewModel(
     private fun loadSavedSelections() {
         launch {
             try {
-                val savedSelections = persistence.loadTodaySelections()
+                val state = container.stateFlow.value;
+                val savedSelections = persistence.loadSelections(state.date)
                 if (savedSelections != null) {
                     intent {
                         reduce {
                             state.copy(
-                                id = savedSelections.id,
+                                cardId = savedSelections.cardId,
                                 selections = savedSelections.selectionDtos,
-                                totalPoints = savedSelections.selectionDtos.sumOf { it.points },
+                                totalPoints = if (savedSelections.selectionDtos.isEmpty()) 0 else savedSelections.selectionDtos.sumOf { it.points },
                                 locked = savedSelections.locked
                             )
                         }
@@ -167,4 +306,27 @@ class FastbreakViewModel(
             }
         }
     }
+
+    fun saveUserName(userName: String) {
+        intent {
+            reduce {
+                state.copy(isSavingUserName = true)
+            }
+        }
+
+        launch {
+            try {
+                _profileRepository.saveUserName(userName)
+            } catch (e: Exception) {
+                println(e.message)
+            } finally {
+                intent {
+                    reduce {
+                        state.copy(isSavingUserName = false)
+                    }
+                }
+            }
+        }
+    }
 }
+

@@ -1,63 +1,109 @@
 
-import androidx.compose.animation.ExperimentalAnimationApi
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.material.BottomNavigation
-import androidx.compose.material.BottomNavigationItem
 import androidx.compose.material.DrawerValue
-import androidx.compose.material.Icon
 import androidx.compose.material.ModalDrawer
-import androidx.compose.material.Text
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.List
-import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.rememberDrawerState
-import androidx.compose.material3.FabPosition
-import androidx.compose.material3.FloatingActionButtonDefaults
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.zIndex
-import com.arkivanov.decompose.ExperimentalDecomposeApi
-import com.arkivanov.decompose.extensions.compose.stack.Children
 import com.arkivanov.decompose.extensions.compose.subscribeAsState
 import com.joebad.fastbreak.ProtectedComponent
 import com.joebad.fastbreak.Theme
 import com.joebad.fastbreak.ThemePreference
+import com.joebad.fastbreak.data.dailyFastbreak.FastbreakSelectionState
+import com.joebad.fastbreak.data.dailyFastbreak.FastbreakStateRepository
+import com.joebad.fastbreak.data.dailyFastbreak.FastbreakViewModel
+import com.joebad.fastbreak.model.dtos.DailyFastbreak
+import com.joebad.fastbreak.onLock
+import com.joebad.fastbreak.ui.SimpleBottomSheetExample
+import com.joebad.fastbreak.ui.help.HelpData
+import com.joebad.fastbreak.ui.help.HelpPage
 import com.joebad.fastbreak.ui.theme.LocalColors
+import io.ktor.client.HttpClient
+import kotbase.Database
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.IO
 import kotlinx.coroutines.launch
-import kotlinx.datetime.Clock
-import kotlinx.datetime.TimeZone
-import kotlinx.datetime.toLocalDateTime
 import kotlin.math.min
 
-@OptIn(ExperimentalAnimationApi::class, ExperimentalDecomposeApi::class)
 @Composable
 fun ProtectedContent(
     component: ProtectedComponent,
     onToggleTheme: (theme: Theme) -> Unit,
     themePreference: ThemePreference,
-    dailyFastbreak: DailyFastbreak?,
-    viewModel: FastbreakViewModel
+    authRepository: AuthRepository,
+    lockedCard: FastbreakSelectionState? = null,
+    onLogout: () -> Unit
 ) {
+    val coroutineScope = rememberCoroutineScope()
+    var dailyFastbreak by remember { mutableStateOf<DailyFastbreak?>(null) }
+    var viewModel by remember { mutableStateOf<FastbreakViewModel?>(null) }
+    var error by remember { mutableStateOf<String?>(null) }
+    var showBottomSheet by remember { mutableStateOf(false) }
+    var bottomSheetHelpPage by remember { mutableStateOf(HelpPage.HOME) }
+    
+    val openHelpSheet = { helpPage: HelpPage ->
+        bottomSheetHelpPage = helpPage
+        showBottomSheet = true
+    }
 
-    val locked = viewModel.container.stateFlow.collectAsState().value.locked ?: false;
+    val selectedDate = "20250728"
+
+    val db = remember { Database("fastbreak") }
+    val httpClient = remember { HttpClient() }
+    val dailyFastbreakRepository =
+        remember { FastbreakStateRepository(db, httpClient, authRepository) }
+
+    val syncData: suspend (forceUpdate: Boolean) -> Unit = { forceUpdate ->
+        try {
+            error = null // Clear previous errors
+            val state = dailyFastbreakRepository.getDailyFastbreakState(selectedDate, forceUpdate)
+            dailyFastbreak = state
+            val statSheetItems = state?.statSheet?.items
+            viewModel = FastbreakViewModel(
+                db,
+                { newState -> onLock(dailyFastbreakRepository, coroutineScope, newState) },
+                selectedDate,
+                authRepository,
+                statSheetItems,
+                selectedDate,
+                lockedCard,
+                state?.lastLockedCardResults
+            )
+        } catch (e: Exception) {
+            // Enhanced error handling for better user experience
+            error = when {
+                e.message?.contains("network", ignoreCase = true) == true -> "Network connection failed. Please check your internet connection."
+                e.message?.contains("timeout", ignoreCase = true) == true -> "Request timed out. Please try again."
+                e.message?.contains("unauthorized", ignoreCase = true) == true -> "Authentication failed. Please log in again."
+                else -> "Failed to fetch data: ${e.message ?: "Unknown error"}"
+            }
+            // Reset state on error
+            dailyFastbreak = null
+            viewModel = null
+        }
+    }
+
+    LaunchedEffect(key1 = selectedDate) {
+        coroutineScope.launch(Dispatchers.IO) {
+            syncData(false)
+        }
+    }
+
+    val state = viewModel?.container?.stateFlow?.collectAsState()?.value;
+    val locked = state?.locked ?: false;
     val childStack by component.stack.subscribeAsState()
     val activeChild = childStack.active
     val drawerState = rememberDrawerState(DrawerValue.Closed)
@@ -80,121 +126,93 @@ fun ProtectedContent(
         label = "Text Fade Animation"
     )
 
-    val today = Clock.System.now()
-        .toLocalDateTime(TimeZone.currentSystemDefault())
-        .date
-        .toString()
-
     BlurredScreen(
         locked = true,
         onLocked = { },
         showLastweeksFastbreakCard.value,
         onDismiss = { showLastweeksFastbreakCard.value = false },
-        date = "2025-10-11",
+        date = null,
         hideLockCardButton = true,
-        title = "Yesterday's Fastbreak Card",
+        title = "Fastbreak Card Results",
         showCloseButton = true,
+        fastbreakViewModel = viewModel,
+        fastbreakResultsCard = true,
+        onShowHelp = { openHelpSheet(HelpPage.FASTBREAK_RESULTS_CARD) },
+        showHelpButton = true
     )
     BlurredScreen(
         locked,
-        onLocked = { viewModel.lockCard() },
+        onLocked = { viewModel?.lockCard() },
         showModal.value,
         onDismiss = { showModal.value = false },
-        date = today,
-        fastbreakViewModel = viewModel
+        date = selectedDate,
+        fastbreakViewModel = viewModel,
+        onShowHelp = { openHelpSheet(HelpPage.DAILY_FASTBREAK_CARD) },
+        showHelpButton = true
     )
     ModalDrawer(
         modifier = Modifier.background(color = colors.background)
             .then(if (showModal.value) Modifier.blur(16.dp) else Modifier),
         drawerState = drawerState,
         drawerContent = {
+//            ThemeSelector(themePreference = themePreference, onToggleTheme = onToggleTheme)
             DrawerContent(
                 onShowLastweeksFastbreakCard = { showLastweeksFastbreakCard.value = true },
                 themePreference = themePreference,
-                onToggleTheme = onToggleTheme
-            )
-        }
-    ) {
-        Scaffold(
-            modifier = Modifier.background(color = colors.background),
-            floatingActionButtonPosition = FabPosition.Center,
-            bottomBar = {
-                BottomNavigation(backgroundColor = colors.primary) {
-                    BottomNavigationItem(
-                        icon = {
-                            Icon(
-                                Icons.Default.Home,
-                                tint = colors.onPrimary,
-                                contentDescription = "Home"
-                            )
-                        },
-                        label = { Text("Home", color = colors.onPrimary) },
-                        selected = activeChild::class == ProtectedComponent.Child.Home::class,
-                        onClick = { component.selectTab(ProtectedComponent.Config.Home) }
-                    )
-                    BottomNavigationItem(
-                        icon = {
-                            Icon(
-                                Icons.AutoMirrored.Filled.List,
-                                tint = colors.onPrimary,
-                                contentDescription = "Leaderboard"
-                            )
-                        },
-                        label = { Text("Leaderboard", color = colors.onPrimary) },
-                        selected = activeChild::class == ProtectedComponent.Child.Leaderboard::class,
-                        onClick = { component.selectTab(ProtectedComponent.Config.Leaderboard) }
-                    )
-                }
-            }
-        ) { paddingValues ->
-            Box(modifier = Modifier.padding(paddingValues).background(color = colors.background)) {
-                Children(
-                    stack = childStack,
-                ) { child ->
-                    SmallFloatingActionButton(
-                        onClick = {
-                            scope.launch {
-                                if (drawerState.isOpen) {
-                                    drawerState.close()
-                                } else {
-                                    drawerState.open()
-                                }
-                            }
-                        },
-                        modifier = Modifier
-                            .padding(16.dp)
-                            .offset(x = (-5).dp, y = 0.dp)
-                            .zIndex(3f),
-                        containerColor = colors.primary,
-                        elevation = FloatingActionButtonDefaults.elevation(0.dp)
-                    ) {
-                        Icon(
-                            tint = colors.onPrimary,
-                            imageVector = MenuDeep,
-                            contentDescription = "Menu",
-                            modifier = Modifier.graphicsLayer(scaleX = -1f)
-                        )
-                    }
-                    Column(modifier = Modifier.zIndex(2f)) {
-                        when (child.instance) {
-                            is ProtectedComponent.Child.Home -> {
-                                HomeScreen(
-                                    locked,
-                                    listState,
-                                    animatedAlpha,
-                                    showModal,
-                                    dailyFastbreak,
-                                    viewModel
-                                )
-                            }
-
-                            is ProtectedComponent.Child.Leaderboard -> {
-                                LeaderboardScreen(scrollState)
+                onToggleTheme = onToggleTheme,
+                goToSettings = {
+                    scope.launch {
+                        launch { drawerState.close() }
+                        launch {
+                            if (activeChild.instance != ProtectedComponent.Child.Settings) {
+                                component.goToSettings()
                             }
                         }
                     }
-                }
-            }
+                },
+                statSheetItems = state?.statSheetItems,
+                lastFetchedDate = dailyFastbreak?.lastFetchedDate ?: 0,
+                onSync = {
+                    scope.launch(Dispatchers.IO) {
+                        syncData(true)
+                    }
+                },
+                username = authRepository.getUser()?.userName ?: "",
+                onShowStatSheetHelp = { openHelpSheet(HelpPage.STAT_SHEET) }
+            )
         }
+    ) {
+        HomeScaffold(
+            component = component,
+            scope = scope,
+            drawerState = drawerState,
+            onLogout = onLogout,
+            locked = locked,
+            listState = listState,
+            animatedAlpha = animatedAlpha,
+            showModal = showModal,
+            dailyFastbreak = dailyFastbreak,
+            viewModel = viewModel,
+            scrollState = scrollState,
+            selectedDate = selectedDate,
+            authedUser = authRepository.getUser(),
+            error = error,
+            themePreference = themePreference,
+            onToggleTheme = onToggleTheme,
+            onSync = {
+                scope.launch(Dispatchers.IO) {
+                    syncData(true)
+                }
+            },
+            showBottomSheet = showBottomSheet,
+            onDismissBottomSheet = { showBottomSheet = false },
+            onShowHelp = openHelpSheet
+        )
+        
+        SimpleBottomSheetExample(
+            showBottomSheet = showBottomSheet,
+            onDismiss = { showBottomSheet = false },
+            helpContent = HelpData.getHelpContent(bottomSheetHelpPage)
+        )
     }
 }

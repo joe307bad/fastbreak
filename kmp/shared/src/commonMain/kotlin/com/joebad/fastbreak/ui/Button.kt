@@ -1,3 +1,5 @@
+package com.joebad.fastbreak.ui
+
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
@@ -17,7 +19,6 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.LocalTextStyle
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -29,42 +30,68 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
+import com.joebad.fastbreak.ui.theme.LocalColors
 
 @Composable
 fun PhysicalButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     disabled: Boolean = false, // New Disabled prop
+    destructive: Boolean = false, // New Destructive prop
     elevation: Dp = 6.dp,
     pressDepth: Dp = 3.dp,
-    backgroundColor: Color = MaterialTheme.colorScheme.primary,
-    contentColor: Color = MaterialTheme.colorScheme.onPrimary,
-    bottomBorderColor: Color = MaterialTheme.colorScheme.primaryContainer,
+    backgroundColor: Color? = null,
+    contentColor: Color? = null,
+    bottomBorderColor: Color? = null,
     borderColor: Color? = null,
     shape: Shape = RectangleShape,
     textSize: Int = 18,
-    loading: Boolean = false,
+    loading: Boolean? = false,
     zIndex: Float = 0f,
+    loadingColor: Color? = null,
     content: @Composable () -> Unit,
 ) {
+    val colors = LocalColors.current
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
 
-    // If disabled, the button starts in the pressed position
+    // If disabled or loading, the button starts in the pressed position
     val translationY by animateFloatAsState(
-        targetValue = if (disabled || isPressed) pressDepth.value else 0f,
+        targetValue = if (disabled || (loading == true) || isPressed) pressDepth.value else 0f,
         label = "translationY"
     )
 
-    // Apply different styles when disabled
-    val finalBackgroundColor = if (disabled) Color.LightGray else backgroundColor
-    val finalContentColor = if (disabled) Color.Black else contentColor
+    // Apply different styles when disabled or destructive
+    val finalBackgroundColor = when {
+        disabled -> Color.LightGray
+        destructive -> Color.Transparent // Transparent background for outlined look
+        else -> backgroundColor ?: colors.secondary
+    }
+    val finalContentColor = when {
+        disabled -> Color.Black
+        destructive -> colors.error // Use error color for destructive text
+        else -> contentColor ?: colors.onSecondary
+    }
+    val finalBorderColor = when {
+        destructive -> colors.error // Use error color for destructive border
+        borderColor != null -> borderColor
+        else -> backgroundColor ?: colors.accent
+    }
+    val finalBottomBorderColor = when {
+        destructive -> colors.error // Use error color for destructive bottom border
+        else -> bottomBorderColor ?: colors.accent
+    }
+    val finalLoadingColor = when {
+        destructive -> colors.error // Use error color for destructive loading indicator
+        else -> loadingColor ?: colors.onSecondary
+    }
 
     BoxWithConstraints(
         modifier = modifier.fillMaxWidth().padding(bottom = 2.dp).zIndex(zIndex),
@@ -76,14 +103,11 @@ fun PhysicalButton(
                 .height(elevation)
                 .offset(y = 23.dp)
                 .clip(shape)
-                .background(bottomBorderColor)
+                .background(finalBottomBorderColor)
                 .zIndex(2f)
         )
 
         Surface(
-//            onClick = if (enabled && !disabled) onClick else {
-//                {}
-//            },
             modifier = Modifier
                 .fillMaxWidth()
                 .defaultMinSize(
@@ -92,12 +116,7 @@ fun PhysicalButton(
                 )
                 .offset(y = translationY.dp)
                 .zIndex(3f)
-                .then(
-                    if (borderColor != null) Modifier.border(
-                        2.dp,
-                        borderColor
-                    ) else Modifier.border(2.dp, finalBackgroundColor)
-                )
+                .border(2.dp, finalBorderColor)
                 .then(
                     if (!disabled) Modifier.clickable(
                         interactionSource = interactionSource,
@@ -110,7 +129,6 @@ fun PhysicalButton(
                     )
                 ),// Fix here
             shape = shape,
-//            interactionSource = interactionSource,
             color = finalBackgroundColor,
             contentColor = finalContentColor,
         ) {
@@ -125,12 +143,22 @@ fun PhysicalButton(
                     contentAlignment = Alignment.Center
                 ) {
                     Box(modifier = Modifier.fillMaxWidth()) {
-                        if (loading) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.align(Alignment.CenterStart).size(20.dp)
-                                    .offset(x = (-3).dp), strokeWidth = 3.dp
-                            )
-                        }
+                        // Loading icon positioned absolutely on the left
+                        val loadingAlpha by animateFloatAsState(
+                            targetValue = if (loading == true) 1f else 0f,
+                            label = "loadingAlpha"
+                        )
+                        
+                        CircularProgressIndicator(
+                            color = finalLoadingColor,
+                            modifier = Modifier
+                                .align(Alignment.CenterStart)
+                                .size(20.dp)
+                                .graphicsLayer { alpha = loadingAlpha },
+                            strokeWidth = 3.dp
+                        )
+                        
+                        // Content always visible in center
                         Box(modifier = Modifier.align(Alignment.Center)) {
                             CompositionLocalProvider(
                                 LocalTextStyle provides TextStyle(

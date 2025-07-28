@@ -25,12 +25,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.joebad.fastbreak.model.dtos.DailyLeaderboard
+import com.joebad.fastbreak.ui.Title
 import com.joebad.fastbreak.ui.theme.LocalColors
 import io.github.alexzhirkevich.cupertino.icons.CupertinoIcons
 import io.github.alexzhirkevich.cupertino.icons.filled.Trophy
 
 @Composable
-fun LeaderboardScreen(scrollState: ScrollState) {
+fun LeaderboardScreen(scrollState: ScrollState, leaderboard: DailyLeaderboard?) {
     val colors = LocalColors.current;
     Box(modifier = Modifier.fillMaxSize().padding(16.dp)) {
         Column(
@@ -43,11 +45,11 @@ fun LeaderboardScreen(scrollState: ScrollState) {
             Spacer(modifier = Modifier.height(8.dp))
             Text(
                 color = colors.text,
-                text = "Results from Week 10 (Sept. 6th - Sept. 13th)",
+                text = "Highest Fastbreak cards for ${leaderboard?.dateCode}",
                 textAlign = TextAlign.Center
             )
             Spacer(modifier = Modifier.height(10.dp))
-            repeat(100) { index ->
+            leaderboard?.entries?.forEachIndexed { index, entry ->
                 val place = index + 1;
                 Row(modifier = Modifier.fillMaxWidth()) {
                     Row(
@@ -56,7 +58,6 @@ fun LeaderboardScreen(scrollState: ScrollState) {
                     ) {
                         Column(
                             modifier = Modifier.fillMaxHeight()
-                                .width(80.dp)
                         ) {
                             Column(
                                 modifier = Modifier.fillMaxHeight().width(60.dp),
@@ -78,7 +79,9 @@ fun LeaderboardScreen(scrollState: ScrollState) {
                                         Icon(
                                             CupertinoIcons.Filled.Trophy,
                                             tint = colors.onSecondary,
-                                            contentDescription = "Trophy"
+                                            contentDescription = "Trophy",
+                                            modifier = Modifier
+                                                .width(60.dp)
                                         )
                                     }
                                 else
@@ -100,31 +103,19 @@ fun LeaderboardScreen(scrollState: ScrollState) {
                                         )
                                     }
                             }
-//                            Box(
-//                                modifier = Modifier
-//                                    .background(colors.accent, RoundedCornerShape(8.dp))
-//                                    .padding(
-//                                        horizontal = 8.dp,
-//                                        vertical = 4.dp
-//                                    )
-//                                    .fillMaxHeight()
-//                                    .width(60.dp),
-//                                contentAlignment = Alignment.Center
-//                            ) {
-
-//                            }
                         }
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Column (modifier = Modifier.weight(1f)) {
+                        Column (modifier = Modifier.weight(1f).padding(start = 12.dp)) {
                             Text(
-                                text = "joebad",
+                                text = entry.userId,
                                 color = colors.text,
                                 fontSize = 20.sp,
+                                maxLines = 1,
+                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                             )
                         }
-                        Column {
+                        Column (modifier = Modifier.padding(start = 16.dp)) {
                             Text(
-                                text = "1,023",
+                                text = "${entry.points}",
                                 color = colors.text,
                                 fontFamily = FontFamily.Monospace,
                                 fontSize = 18.sp,

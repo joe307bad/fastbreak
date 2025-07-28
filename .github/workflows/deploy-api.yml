@@ -1,0 +1,108 @@
+name: Deploy API and Build KMP
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'api/**'
+      - 'kmp/**'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'api/**'
+      - 'kmp/**'
+    types: [closed]
+
+jobs:
+  build-kmp:
+    name: Build KMP
+    runs-on: ubuntu-latest
+    if: contains(github.event.head_commit.modified, 'kmp/') || contains(github.event.pull_request.changed_files.*.filename, 'kmp/')
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Setup Gradle
+        uses: gradle/gradle-build-action@v3
+
+      - name: Generate build info
+        id: build_info
+        run: |
+          echo "timestamp=$(date +'%Y%m%d_%H%M%S')" >> $GITHUB_OUTPUT
+          echo "build_number=${{ github.run_number }}" >> $GITHUB_OUTPUT
+          echo "short_sha=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+
+      - name: Build KMP project
+        run: |
+          cd kmp
+          ./gradlew build --no-daemon
+
+      - name: Build Android APK
+        run: |
+          cd kmp
+          ./gradlew :androidApp:assembleRelease --no-daemon
+
+      - name: Create artifact archive
+        run: |
+          mkdir -p artifacts
+          cp kmp/androidApp/build/outputs/apk/release/*.apk artifacts/ || true
+          cp kmp/shared/build/libs/*.jar artifacts/ || true
+          
+          # Create build info file
+          echo "Build Number: ${{ steps.build_info.outputs.build_number }}" > artifacts/build_info.txt
+          echo "Timestamp: ${{ steps.build_info.outputs.timestamp }}" >> artifacts/build_info.txt
+          echo "Commit: ${{ steps.build_info.outputs.short_sha }}" >> artifacts/build_info.txt
+          echo "Branch: ${{ github.ref_name }}" >> artifacts/build_info.txt
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: fastbreak-kmp-${{ steps.build_info.outputs.timestamp }}-build${{ steps.build_info.outputs.build_number }}
+          path: artifacts/
+          retention-days: 30
+
+  deploy:
+    name: Deploy API
+    runs-on: ubuntu-latest
+    if: contains(github.event.head_commit.modified, 'api/') || contains(github.event.pull_request.changed_files.*.filename, 'api/')
+    env:
+      MONGO_IP: ${{ secrets.MONGO_IP }}
+      MONGO_DB: ${{ secrets.MONGO_DB }}
+      MONGO_USER: ${{ secrets.MONGO_USER }}
+      MONGO_PASS: ${{ secrets.MONGO_PASS }}
+      ENABLE_SCHEDULE_PULLER: 1
+      ENABLE_DAILY_JOB: 1
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Fly CLI
+        uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - name: Make envfile
+        uses: SpicyPizza/create-envfile@v1.3
+        with:
+          envkey_MONGO_IP: ${{ secrets.MONGO_IP }}
+          envkey_MONGO_DB: ${{ secrets.MONGO_DB }}
+          envkey_MONGO_USER: ${{ secrets.MONGO_USER }}
+          envkey_MONGO_PASS: ${{ secrets.MONGO_PASS }}
+          envkey_ENABLE_SCHEDULE_PULLER: 1
+          envkey_ENABLE_DAILY_JOB: 1
+
+      - name: Deploy to Fly.io
+        run: |
+          cd api
+          flyctl deploy --remote-only
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+          

@@ -1,6 +1,5 @@
-module ScheduleEntity
+module api.Entities.ScheduleEntity
 
-open MongoDB.Bson
 open MongoDB.Bson.Serialization.Attributes
 
 [<BsonIgnoreExtraElements>]

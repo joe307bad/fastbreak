@@ -115,19 +115,6 @@ fun SelectableRow(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             // TODO make this the state crest of the team, since logos are trademarked
-//            Box(
-//                modifier = Modifier
-//                    .size(40.dp)
-//                    .background(Color.LightGray)
-//                    .clip(CircleShape),
-//                contentAlignment = Alignment.Center
-//            ) {
-//                Icon(
-//                    imageVector = Icons.Default.Person,
-//                    contentDescription = "Icon",
-//                    modifier = Modifier.size(24.dp)
-//                )
-//            }
 
             Column(modifier = Modifier.weight(1f)) {
                 Text(text = text, style = MaterialTheme.typography.subtitle1, color = colors.text)

@@ -69,6 +69,9 @@ fun AnimatedBorderButton(
     locked: Boolean = false,
     unlockText: String = "Lock Card",
     lockedText: String = "Card Locked",
+    enableLocking: Boolean? = true,
+    onPressDown: () -> Unit = {},
+    fullWidth: Boolean = false,
     content: @Composable ((isLocked: Boolean) -> Unit)? = null
 ) {
     val colors = LocalColors.current
@@ -101,8 +104,13 @@ fun AnimatedBorderButton(
         label = "scale"
     )
 
-    LaunchedEffect(isPressed) {
+    LaunchedEffect(isPressed, enableLocking) {
+
         if (isPressed && !animationCompleted) {
+            if (enableLocking == false) {
+                onPressDown();
+                return@LaunchedEffect;
+            }
             animationProgress.snapTo(0f)
             lockIconOffsetX.snapTo(-50f)
             lockIconAlpha.snapTo(1f)
@@ -116,16 +124,19 @@ fun AnimatedBorderButton(
             )
 
             hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
-            animationCompleted = true
-            onLocked()
 
-            lockIconOffsetX.animateTo(
-                targetValue = 0f,
-                animationSpec = tween(
-                    durationMillis = 300,
-                    easing = LinearEasing
+            if (enableLocking == true) {
+                animationCompleted = true
+                onLocked()
+
+                lockIconOffsetX.animateTo(
+                    targetValue = 0f,
+                    animationSpec = tween(
+                        durationMillis = 300,
+                        easing = LinearEasing
+                    )
                 )
-            )
+            }
 
         } else if (!isPressed && !animationCompleted) {
             animationProgress.snapTo(0f)
@@ -146,7 +157,7 @@ fun AnimatedBorderButton(
 
     Box(
         modifier = Modifier
-            .width(width.dp)
+            .let { if (fullWidth) it.fillMaxWidth() else it.width(width.dp) }
             .height(height.dp)
     ) {
         Box(

@@ -1,32 +1,41 @@
 open System
 open System.Linq.Expressions
-open System.Text.Json
-open System.Text.Json.Serialization
 open Hangfire.Mongo.Migration.Strategies
+open MongoDB.Bson
 open MongoDB.Bson.Serialization
+open MongoDB.Bson.Serialization.Serializers
 open MongoDB.Driver
 open Saturn
-open ScheduleController
-open Google.Apis.Auth
-open Microsoft.AspNetCore.Http
-open System.Threading.Tasks
+open Newtonsoft.Json
+open Newtonsoft.Json.Serialization
 open Giraffe
+open api.Controllers.DailyFastbreakController
 open Microsoft.AspNetCore.Builder
 open Microsoft.Extensions.DependencyInjection
 open Hangfire
 open Hangfire.Mongo
 open DotNetEnv
 open Saturn.Endpoint
-open SchedulePuller
-open api.Todos
+open api.Controllers.ProfileController
+open api.DailyJob.DailyJob
+open api.Controllers.LockCardController
+open api.Entities
+open api.Entities.FastbreakSelections
+open api.Entities.StatSheet
 
 Env.Load() |> ignore
 
-let enablePullTomorrowsSchedule =
-    match Environment.GetEnvironmentVariable "ENABLE_PULL_TOMORROWS_SCHEDULE" with
+let enableDailyJob =
+    match Environment.GetEnvironmentVariable "ENABLE_DAILY_JOB" with
     | "1" -> true
     | "0" -> false
-    | null -> false // Default value if env var is not set
+    | null -> false
+    | _ -> false
+let enableSchedulePuller =
+    match Environment.GetEnvironmentVariable "ENABLE_SCHEDULE_PULLER" with
+    | "1" -> true
+    | "0" -> false
+    | null -> false
     | _ -> false
 
 let mongoUser = Environment.GetEnvironmentVariable "MONGO_USER"
@@ -34,46 +43,75 @@ let mongoPass = Environment.GetEnvironmentVariable "MONGO_PASS"
 let mongoIp = Environment.GetEnvironmentVariable "MONGO_IP"
 let mongoDb = Environment.GetEnvironmentVariable "MONGO_DB"
 
-let validateGoogleToken (idToken: string) =
-    task {
-        try
-            let! payload = GoogleJsonWebSignature.ValidateAsync(idToken)
-            return Some payload
-        with ex ->
-            return None
-    }
+type OptionSerializer<'T>() =
+    inherit SerializerBase<'T option>()
+    
+    override _.Serialize(context, _, value) =
+        match value with
+        | Some v -> 
+            BsonSerializer.Serialize(context.Writer, typeof<'T>, v)
+        | None -> 
+            context.Writer.WriteNull()
+    
+    override _.Deserialize(context, _) =
+        if context.Reader.CurrentBsonType = BsonType.Null then
+            context.Reader.ReadNull()
+            None
+        else
+            Some(BsonSerializer.Deserialize<'T>(context.Reader))
 
-let requireGoogleAuth: HttpFunc -> HttpContext -> Task<HttpContext option> =
-    fun next ctx ->
-        task {
-            match ctx.Request.Headers.TryGetValue("Authorization") with
-            | true, values when values.Count > 0 ->
-                let token = values.[0].Replace("Bearer ", "").Trim()
-                let! payloadOpt = validateGoogleToken token
+type OptionJsonConverter() =
+    inherit JsonConverter()
+    
+    override _.CanConvert(objectType) =
+        objectType.IsGenericType && objectType.GetGenericTypeDefinition() = typedefof<_ option>
+    
+    override _.WriteJson(writer, value, serializer) =
+        match value with
+        | null -> writer.WriteNull()
+        | _ ->
+            let optionValue = value.GetType().GetProperty("Value").GetValue(value)
+            if isNull optionValue then
+                writer.WriteNull()
+            else
+                serializer.Serialize(writer, optionValue)
+    
+    override _.ReadJson(reader, objectType, existingValue, serializer) =
+        if reader.TokenType = JsonToken.Null then
+            null
+        else
+            let innerType = objectType.GetGenericArguments().[0]
+            let value = serializer.Deserialize(reader, innerType)
+            let someMethod = objectType.GetMethod("Some")
+            someMethod.Invoke(null, [| value |])
 
-                match payloadOpt with
-                | Some payload ->
-                    ctx.Items.["GoogleUser"] <- payload
-                    return! next ctx
-                | None ->
-                    ctx.SetStatusCode 401
-                    ctx.WriteJsonAsync("Token invalid") |> ignore
-                    return Some(ctx)
-            | _ ->
-                ctx.SetStatusCode 404
-                ctx.WriteJsonAsync("Not foiuhiuhund") |> ignore
-                return Some(ctx)
-        }
+type SafeArrayJsonConverter() =
+    inherit JsonConverter()
+    
+    override _.CanConvert(objectType) =
+        objectType.IsArray
+    
+    override _.WriteJson(writer, value, serializer) =
+        match value with
+        | null -> 
+            writer.WriteStartArray()
+            writer.WriteEndArray()
+        | _ -> 
+            let tempConverter = serializer.Converters |> Seq.find (fun c -> c.GetType() = typeof<SafeArrayJsonConverter>)
+            serializer.Converters.Remove(tempConverter) |> ignore
+            serializer.Serialize(writer, value)
+            serializer.Converters.Add(tempConverter)
+    
+    override _.ReadJson(reader, objectType, existingValue, serializer) =
+        if reader.TokenType = JsonToken.Null then
+            System.Array.CreateInstance(objectType.GetElementType(), 0)
+        else
+            serializer.Deserialize(reader, objectType)
 
-
-
-let api = pipeline { set_header "x-pipeline-type" "API" }
-
-let googleAuthPipeline =
-    pipeline {
-        plug requireGoogleAuth
-        set_header "x-pipeline-type" "API"
-    }
+BsonSerializer.RegisterSerializer(typeof<FastbreakSelectionsResult option>, OptionSerializer<FastbreakSelectionsResult>())
+BsonSerializer.RegisterSerializer(typeof<int option>, OptionSerializer<int>())
+BsonSerializer.RegisterSerializer(typeof<bool option>, OptionSerializer<bool>())
+BsonSerializer.RegisterSerializer(typeof<FastbreakCard option>, OptionSerializer<FastbreakCard>())
 
 BsonClassMap.RegisterClassMap<ScheduleEntity.Event>(fun cm ->
     cm.AutoMap()
@@ -105,7 +143,7 @@ let mongoStorage =
         )
     )
 
-let database = mongoClient.GetDatabase("fastbreak")
+let database: IMongoDatabase = mongoClient.GetDatabase("fastbreak")
 
 let configureHangfire (services: IServiceCollection) =
     services.AddHangfire(fun config -> config.UseStorage(mongoStorage) |> ignore)
@@ -114,28 +152,42 @@ let configureHangfire (services: IServiceCollection) =
     services.AddHangfireServer() |> ignore
     services
 
-type JobRunner =
-    static member LogJob() =
-        if enablePullTomorrowsSchedule then
-            pullTomorrowsSchedule (database)
-            printfn $"Tomorrows schedule pulled at %A{DateTime.UtcNow}"
-        else
-            printfn $"Disabled | Pulling tomorrows schedule | %A{DateTime.UtcNow}"
+let getEasternTime (addDays) =
+    let utcNow = DateTime.UtcNow.AddDays(addDays)
+    let easternZone = TimeZoneInfo.FindSystemTimeZoneById("Eastern Standard Time")
+    let easternTime = TimeZoneInfo.ConvertTimeFromUtc(utcNow, easternZone)
 
-        printfn $"Daily job executed at %A{DateTime.UtcNow}"
+    let formatted = easternTime.ToString("yyyyMMdd")
+    let dateTime = easternTime
+    
+    (formatted, dateTime)
+
+type JobRunner =
+    static member DailyJob() =
+        if enableDailyJob then
+            dailyJob enableSchedulePuller database
+        else
+            let (_, now) = getEasternTime (0);
+            printf $"Daily job did not run at %A{now} because its disabled\n"
 
 let scheduleJobs () =
     let methodCall: Expression<Action<JobRunner>> =
         Expression.Lambda<Action<JobRunner>>(
-            Expression.Call(typeof<JobRunner>.GetMethod("LogJob")),
+            Expression.Call(typeof<JobRunner>.GetMethod("DailyJob")),
             Expression.Parameter(typeof<JobRunner>, "x")
         )
 
-    RecurringJob.AddOrUpdate("every-second-job-3", methodCall, "*/1 * * * *")
+    RecurringJob.AddOrUpdate("daily-job", methodCall, "*/1 * * * *")
 
 let configureApp (app: IApplicationBuilder) =
     app.UseHangfireDashboard() |> ignore
     scheduleJobs ()
+    let immediateJobCall: Expression<Action<JobRunner>> =
+        Expression.Lambda<Action<JobRunner>>(
+            Expression.Call(typeof<JobRunner>.GetMethod("DailyJob")),
+            Expression.Parameter(typeof<JobRunner>, "x")
+        )
+    BackgroundJob.Enqueue(immediateJobCall) |> ignore
     app
 
 let endpointPipe =
@@ -144,36 +196,37 @@ let endpointPipe =
         plug head
         plug requestId
     }
-
-let defaultRouter =
+    
+let apiRouter =
     router {
-        // Public API routes
-        forward
-            "/api"
-            (router {
-                pipe_through api
-                forward "/schedule" (scheduleController database)
-                
-                // Protected routes - nested under the same /api path
-                forward
-                    "/auth"
-                    (router {
-                        pipe_through googleAuthPipeline
-                        get "/todos1" Find
-                    })
-            })
+        forward "" (lockCardRouter database)
+        forward "" (dailyFastbreakRouter database)
+        forward "" (profileRouter database)
     }
 
-let app =
-    JsonSerializerOptions(
-        PropertyNameCaseInsensitive = true,
-        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
-    )
-    |> ignore
+let healthHandler: HttpHandler =
+    fun next ctx ->
+        ctx.WriteJsonAsync({| status = "healthy"; timestamp = DateTime.UtcNow |})
 
+let appRouter =
+    router {
+        get "/" healthHandler
+        forward "/api" apiRouter
+    }
+
+let configureJson (services: IServiceCollection) =
+    let jsonSettings = JsonSerializerSettings()
+    jsonSettings.Converters.Add(OptionJsonConverter())
+    jsonSettings.Converters.Add(SafeArrayJsonConverter())
+    jsonSettings.NullValueHandling <- NullValueHandling.Include
+    jsonSettings.ContractResolver <- CamelCasePropertyNamesContractResolver()
+    services.AddSingleton<Json.ISerializer>(NewtonsoftJson.Serializer(jsonSettings))
+
+let app =
     application {
-        use_endpoint_router defaultRouter
-        service_config configureHangfire
+        url "http://0.0.0.0:8085"
+        use_endpoint_router appRouter
+        service_config (configureHangfire >> configureJson)
         use_developer_exceptions
         app_config configureApp
     }

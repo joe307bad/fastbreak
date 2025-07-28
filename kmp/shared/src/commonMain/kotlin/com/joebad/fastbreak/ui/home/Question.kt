@@ -29,7 +29,6 @@ fun QuestionComponent(
     selectedAnswer: String? = null,
     onAnswerSelected: (String) -> Unit
 ) {
-//    var selectedAnswer by remember { mutableStateOf<String?>(null) }
     val colors = LocalColors.current;
 
     Column {
@@ -43,7 +42,6 @@ fun QuestionComponent(
         val answers = when (question) {
             is Question.TrueFalse -> listOf("True", "False")
             is Question.MultipleChoice -> question.choices
-            else -> emptyList()
         }
 
         Row(
@@ -99,7 +97,6 @@ fun QuestionComponent(
                     }
                 }
 
-                else -> {}
             }
         }
     }

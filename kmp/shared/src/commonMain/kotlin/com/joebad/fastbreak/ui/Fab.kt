@@ -1,3 +1,5 @@
+package com.joebad.fastbreak.ui
+
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -35,7 +37,7 @@ import io.github.alexzhirkevich.cupertino.icons.CupertinoIcons
 import io.github.alexzhirkevich.cupertino.icons.filled.LockOpen
 
 @Composable
-fun FABWithExactShapeBorder(locked: Boolean, showModal: () -> Unit, totalPoints: Int) {
+fun FABWithExactShapeBorder(locked: Boolean, showModal: () -> Unit, totalPoints: Int?) {
     val colors = LocalColors.current
 
     val infiniteTransition = rememberInfiniteTransition()

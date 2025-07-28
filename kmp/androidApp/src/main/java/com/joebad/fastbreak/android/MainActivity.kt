@@ -1,5 +1,7 @@
 package com.joebad.fastbreak.android
 
+import AuthRepository
+import ProfileRepository
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -20,6 +22,7 @@ import com.joebad.fastbreak.Theme
 import com.joebad.fastbreak.createRootComponent
 import com.joebad.fastbreak.initFontLoader
 import com.joebad.fastbreak.ui.theme.AppTheme
+import com.liftric.kvault.KVault
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
@@ -27,7 +30,11 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         initFontLoader(applicationContext)
 
-        val rootComponent = createRootComponent()
+        val kvault = KVault(applicationContext, "auth_secure_storage")
+        val authRepository = AuthRepository(kvault)
+        val profileRepository = ProfileRepository(authRepository)
+
+        val rootComponent = createRootComponent(authRepository)
         val themePreference = AndroidThemePreference(applicationContext)
 
         setContent {
@@ -52,7 +59,10 @@ class MainActivity : ComponentActivity() {
                                     themePreference.saveTheme(selectedTheme)
                                 }
                             },
-                            themePreference = themePreference
+                            themePreference = themePreference,
+                            authRepository = authRepository,
+                            profileRepository = profileRepository,
+                            theme = theme
                         )
                     }
                 }

@@ -1,6 +1,7 @@
 package com.joebad.fastbreak
 
-import Theme
+import AuthRepository
+import ProfileRepository
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -9,6 +10,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.window.ComposeUIViewController
 import com.joebad.fastbreak.ui.theme.AppTheme
+import com.liftric.kvault.KVault
 import kotlinx.coroutines.launch
 
 fun MainViewController() = ComposeUIViewController {
@@ -19,20 +21,27 @@ fun MainViewController() = ComposeUIViewController {
     val themePreference = IosThemePreference()
     val coroutineScope = rememberCoroutineScope()
 
+    val kvault = KVault("auth_secure_storage")
+    val authRepository = AuthRepository(kvault)
+    val profileRepository = ProfileRepository(authRepository)
+
     LaunchedEffect(Unit) {
         theme = themePreference.getTheme()
     }
 
     AppTheme(isDarkTheme = theme == Theme.Dark) {
         App(
-            rootComponent = createRootComponent(),
+            rootComponent = createRootComponent(authRepository),
             onToggleTheme = { selectedTheme ->
                 theme = selectedTheme
                 coroutineScope.launch {
                     themePreference.saveTheme(selectedTheme)
                 }
             },
-            themePreference = themePreference
+            themePreference = themePreference,
+            authRepository = authRepository,
+            profileRepository = profileRepository,
+            theme = theme
         )
     }
 }

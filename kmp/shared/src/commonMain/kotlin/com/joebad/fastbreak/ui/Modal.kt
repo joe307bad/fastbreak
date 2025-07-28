@@ -1,4 +1,3 @@
-
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -32,6 +31,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
+import com.joebad.fastbreak.data.dailyFastbreak.FastbreakViewModel
 import com.joebad.fastbreak.ui.theme.LocalColors
 import kotlin.random.Random
 
@@ -75,13 +75,6 @@ fun PerforatedDashedLine(
                 strokeWidth = thickness.toPx()
             )
 
-//            drawLine(
-//                color = highlightColor,
-//                start = Offset(currentX, y - thickness.toPx() / 2),
-//                end = Offset(currentX + dashPx, y - thickness.toPx() / 2),
-//                strokeWidth = (thickness.toPx() / 2)
-//            )
-
             currentX += dashPx + gapPx
         }
     }
@@ -123,11 +116,14 @@ fun BlurredScreen(
     onLocked: () -> Unit,
     open: Boolean,
     onDismiss: () -> Unit,
-    date: String,
+    date: String?,
     hideLockCardButton: Boolean = false,
     title: String = "My Daily Fastbreak Card",
     showCloseButton: Boolean = false,
-    fastbreakViewModel: FastbreakViewModel? = null
+    fastbreakViewModel: FastbreakViewModel? = null,
+    fastbreakResultsCard: Boolean = false,
+    onShowHelp: (() -> Unit)? = null,
+    showHelpButton: Boolean? = false
 ) {
     val colors = LocalColors.current;
     AnimatedVisibility(
@@ -146,17 +142,33 @@ fun BlurredScreen(
             Card(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(top = 20.dp, start = 20.dp, end = 20.dp, bottom = if(hideLockCardButton) 20.dp else 90.dp)
+                    .padding(
+                        top = 20.dp,
+                        start = 20.dp,
+                        end = 20.dp,
+                        bottom = if (hideLockCardButton) 20.dp else 90.dp
+                    )
                     .border(1.dp, colors.accent, RoundedCornerShape(16.dp))
                     .clickable(onClick = { }, indication = null, interactionSource = null),
                 shape = RoundedCornerShape(16.dp)
             ) {
-                FastbreakCard(title, date, locked, onDismiss, showCloseButton, fastbreakViewModel)
+                FastbreakCard(
+                    title,
+                    date,
+                    locked,
+                    onDismiss,
+                    showCloseButton,
+                    fastbreakViewModel,
+                    fastbreakResultsCard,
+                    onShowHelp,
+                    showHelpButton
+                )
             }
             if (!hideLockCardButton) {
                 Column(modifier = Modifier.padding(20.dp).align(Alignment.BottomCenter)) {
                     AnimatedBorderButton(
                         locked = locked,
+                        enableLocking = true,
                         onLocked = onLocked,
                         borderColor = colors.accent, //darken(colors.accent, 0.7f),
                         bottomBorderColor = colors.accent //darken(colors.accent, 0.7f)

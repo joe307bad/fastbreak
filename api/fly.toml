@@ -1,63 +1,49 @@
-# fly.toml app configuration file
-app = "fastbreak-api"
-primary_region = "iad"  # Washington D.C. region for lower latency
+# fly.toml app configuration file generated for fastbreak-api on 2025-07-28T16:16:29-04:00
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
 
-[build]
-  dockerfile = "Dockerfile"
+app = 'fastbreak-api'
+primary_region = 'iad'
 
 [env]
-  ASPNETCORE_ENVIRONMENT = "Production"
-  ASPNETCORE_URLS = "http://*:8085"
+  ASPNETCORE_ENVIRONMENT = 'Production'
+  ASPNETCORE_URLS = 'http://*:8085'
 
-# Most cost-effective VM configuration
+[http_service]
+  internal_port = 8085
+  force_https = true
+  auto_stop_machines = 'stop'
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = ['app']
+
+[[services]]
+  protocol = 'tcp'
+  internal_port = 8085
+
+  [[services.ports]]
+    port = 80
+    handlers = ['http']
+
+  [[services.ports]]
+    port = 443
+    handlers = ['tls', 'http']
+
+  [[services.tcp_checks]]
+    interval = '15s'
+    timeout = '2s'
+    grace_period = '30s'
+
+  [[services.http_checks]]
+    interval = '30s'
+    timeout = '10s'
+    grace_period = '30s'
+    method = 'GET'
+    path = '/'
+    protocol = 'http'
+
 [[vm]]
   cpu_kind = 'shared'
   cpus = 2
   memory_mb = 4096
-
-# HTTP service configuration
-[[services]]
-  internal_port = 8085
-  protocol = "tcp"
-
-  [[services.ports]]
-    handlers = ["http"]
-    port = 80
-
-  [[services.ports]]
-    handlers = ["tls", "http"]
-    port = 443
-
-  # Health check configuration
-  [[services.tcp_checks]]
-    grace_period = "30s"
-    interval = "15s"
-    restart_limit = 0
-    timeout = "2s"
-
-  [[services.http_checks]]
-    interval = "30s"
-    grace_period = "30s"
-    method = "GET"
-    path = "/"
-    protocol = "http"
-    restart_limit = 0
-    timeout = "10s"
-
-# Auto-stop configuration to save costs
-[processes]
-  web = "dotnet api.dll"
-
-# Scale configuration for cost optimization
-[[services.concurrency]]
-  type = "connections"
-  hard_limit = 100
-  soft_limit = 80
-
-# Auto-scaling configuration (minimum instances for cost savings)
-[http_service.auto_stop_machines]
-  enabled = true
-  min_machines_running = 0  # Allow scaling to zero when not in use
-
-[http_service.auto_start_machines]
-  enabled = true

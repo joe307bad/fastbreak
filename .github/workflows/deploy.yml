@@ -9,7 +9,6 @@ jobs:
   build-kmp:
     name: Build KMP
     runs-on: ubuntu-latest
-    if: github.event.pull_request.merged == true
     
     steps:
       - name: Checkout code
@@ -63,7 +62,6 @@ jobs:
   deploy:
     name: Deploy API
     runs-on: ubuntu-latest
-    if: github.event.pull_request.merged == true
     env:
       MONGO_IP: ${{ secrets.MONGO_IP }}
       MONGO_DB: ${{ secrets.MONGO_DB }}

@@ -19,7 +19,6 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.LocalTextStyle
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -38,25 +37,28 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
+import com.joebad.fastbreak.ui.theme.LocalColors
 
 @Composable
 fun PhysicalButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     disabled: Boolean = false, // New Disabled prop
+    destructive: Boolean = false, // New Destructive prop
     elevation: Dp = 6.dp,
     pressDepth: Dp = 3.dp,
-    backgroundColor: Color = MaterialTheme.colorScheme.primary,
-    contentColor: Color = MaterialTheme.colorScheme.onPrimary,
-    bottomBorderColor: Color = MaterialTheme.colorScheme.primaryContainer,
+    backgroundColor: Color? = null,
+    contentColor: Color? = null,
+    bottomBorderColor: Color? = null,
     borderColor: Color? = null,
     shape: Shape = RectangleShape,
     textSize: Int = 18,
     loading: Boolean? = false,
     zIndex: Float = 0f,
-    loadingColor: Color = MaterialTheme.colorScheme.onPrimary,
+    loadingColor: Color? = null,
     content: @Composable () -> Unit,
 ) {
+    val colors = LocalColors.current
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
 
@@ -66,9 +68,30 @@ fun PhysicalButton(
         label = "translationY"
     )
 
-    // Apply different styles when disabled
-    val finalBackgroundColor = if (disabled) Color.LightGray else backgroundColor
-    val finalContentColor = if (disabled) Color.Black else contentColor
+    // Apply different styles when disabled or destructive
+    val finalBackgroundColor = when {
+        disabled -> Color.LightGray
+        destructive -> Color.Transparent // Transparent background for outlined look
+        else -> backgroundColor ?: colors.secondary
+    }
+    val finalContentColor = when {
+        disabled -> Color.Black
+        destructive -> colors.error // Use error color for destructive text
+        else -> contentColor ?: colors.onSecondary
+    }
+    val finalBorderColor = when {
+        destructive -> colors.error // Use error color for destructive border
+        borderColor != null -> borderColor
+        else -> backgroundColor ?: colors.accent
+    }
+    val finalBottomBorderColor = when {
+        destructive -> colors.error // Use error color for destructive bottom border
+        else -> bottomBorderColor ?: colors.accent
+    }
+    val finalLoadingColor = when {
+        destructive -> colors.error // Use error color for destructive loading indicator
+        else -> loadingColor ?: colors.onSecondary
+    }
 
     BoxWithConstraints(
         modifier = modifier.fillMaxWidth().padding(bottom = 2.dp).zIndex(zIndex),
@@ -80,7 +103,7 @@ fun PhysicalButton(
                 .height(elevation)
                 .offset(y = 23.dp)
                 .clip(shape)
-                .background(bottomBorderColor)
+                .background(finalBottomBorderColor)
                 .zIndex(2f)
         )
 
@@ -93,12 +116,7 @@ fun PhysicalButton(
                 )
                 .offset(y = translationY.dp)
                 .zIndex(3f)
-                .then(
-                    if (borderColor != null) Modifier.border(
-                        2.dp,
-                        borderColor
-                    ) else Modifier.border(2.dp, backgroundColor)
-                )
+                .border(2.dp, finalBorderColor)
                 .then(
                     if (!disabled) Modifier.clickable(
                         interactionSource = interactionSource,
@@ -132,7 +150,7 @@ fun PhysicalButton(
                         )
                         
                         CircularProgressIndicator(
-                            color = loadingColor,
+                            color = finalLoadingColor,
                             modifier = Modifier
                                 .align(Alignment.CenterStart)
                                 .size(20.dp)

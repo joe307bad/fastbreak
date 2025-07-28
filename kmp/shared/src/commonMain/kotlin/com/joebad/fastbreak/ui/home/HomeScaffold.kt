@@ -1,9 +1,14 @@
+
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.material.BottomNavigation
 import androidx.compose.material.BottomNavigationItem
@@ -22,6 +27,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
@@ -29,9 +37,17 @@ import androidx.compose.ui.zIndex
 import com.arkivanov.decompose.extensions.compose.stack.Children
 import com.arkivanov.decompose.extensions.compose.subscribeAsState
 import com.joebad.fastbreak.ProtectedComponent
+import com.joebad.fastbreak.Theme
+import com.joebad.fastbreak.ThemePreference
 import com.joebad.fastbreak.data.dailyFastbreak.FastbreakViewModel
 import com.joebad.fastbreak.model.dtos.DailyFastbreak
+import com.joebad.fastbreak.ui.SimpleBottomSheetExample
+import com.joebad.fastbreak.ui.help.HelpData
+import com.joebad.fastbreak.ui.help.HelpPage
 import com.joebad.fastbreak.ui.theme.LocalColors
+import io.github.alexzhirkevich.cupertino.CupertinoIcon
+import io.github.alexzhirkevich.cupertino.icons.CupertinoIcons
+import io.github.alexzhirkevich.cupertino.icons.outlined.QuestionmarkCircle
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
@@ -51,14 +67,27 @@ fun HomeScaffold(
     scrollState: ScrollState,
     selectedDate: String,
     authedUser: AuthedUser?,
-    error: String?
+    error: String?,
+    onSync: () -> Unit,
+    themePreference: ThemePreference,
+    onToggleTheme: (theme: Theme) -> Unit
 ) {
     val colors = LocalColors.current;
+    var showBottomSheet by remember { mutableStateOf(false) }
     val childStack by component.stack.subscribeAsState()
     val activeChild = childStack.active
     val leaderboard =
         dailyFastbreak?.leaderboard?.dailyLeaderboards?.find { l -> l.dateCode == selectedDate }
     val state = viewModel?.container?.stateFlow?.collectAsState()?.value;
+    
+    val currentHelpPage = when (activeChild.instance) {
+        is ProtectedComponent.Child.Home -> HelpPage.HOME
+        is ProtectedComponent.Child.Leaderboard -> HelpPage.LEADERBOARD
+        is ProtectedComponent.Child.Profile -> HelpPage.PROFILE
+        is ProtectedComponent.Child.Settings -> HelpPage.SETTINGS
+        else -> HelpPage.HOME
+    }
+    val helpContent = HelpData.getHelpContent(currentHelpPage)
 
     Scaffold(
         modifier = Modifier.background(color = colors.background),
@@ -104,38 +133,18 @@ fun HomeScaffold(
             }
         }
     ) { paddingValues ->
-        Box(modifier = Modifier.padding(paddingValues).background(color = colors.background)) {
+        Box(
+            modifier = Modifier.padding(paddingValues).fillMaxWidth()
+                .background(color = colors.background)
+        ) {
             Children(
                 stack = childStack,
             ) { child ->
-                SmallFloatingActionButton(
-                    onClick = {
-                        scope.launch {
-                            if (drawerState.isOpen) {
-                                drawerState.close()
-                            } else {
-                                drawerState.open()
-                            }
-                        }
-                    },
-                    modifier = Modifier
-                        .padding(16.dp)
-                        .offset(x = (-5).dp, y = 0.dp)
-                        .zIndex(3f),
-                    containerColor = colors.primary,
-                    elevation = FloatingActionButtonDefaults.elevation(0.dp)
-                ) {
-                    Icon(
-                        tint = colors.onPrimary,
-                        imageVector = MenuDeep,
-                        contentDescription = "Menu",
-                        modifier = Modifier.graphicsLayer(scaleX = -1f)
-                    )
-                }
+
                 Column(modifier = Modifier.zIndex(2f)) {
                     when (child.instance) {
                         is ProtectedComponent.Child.Settings -> {
-                            SettingsScreen(onLogout = onLogout)
+                            SettingsScreen(dailyFastbreak?.lastFetchedDate ?: 0, onSync, themePreference, onToggleTheme)
                         }
 
                         is ProtectedComponent.Child.Home -> {
@@ -162,13 +171,65 @@ fun HomeScaffold(
                                     email = authedUser.email,
                                     userName = authedUser.userName,
                                     loading = state?.isSavingUserName,
-                                    onSaveUserName = { n -> viewModel?.saveUserName(n) }
+                                    onSaveUserName = { n -> viewModel?.saveUserName(n) },
+                                    logout = { onLogout() }
                                 )
                             }
                         }
                     }
                 }
+
+                Row(modifier = Modifier.fillMaxWidth().zIndex(5f)) {
+                    SmallFloatingActionButton(
+                        onClick = {
+                            scope.launch {
+                                if (drawerState.isOpen) {
+                                    drawerState.close()
+                                } else {
+                                    drawerState.open()
+                                }
+                            }
+                        },
+                        modifier = Modifier
+                            .padding(16.dp)
+                            .offset(x = (-5).dp, y = 0.dp)
+                            .zIndex(3f),
+                        containerColor = colors.primary,
+                        elevation = FloatingActionButtonDefaults.elevation(0.dp)
+                    ) {
+                        Icon(
+                            tint = colors.onPrimary,
+                            imageVector = MenuDeep,
+                            contentDescription = "Menu",
+                            modifier = Modifier.graphicsLayer(scaleX = -1f)
+                        )
+                    }
+                    Spacer(modifier = Modifier.weight(1f))
+                    SmallFloatingActionButton(
+                        onClick = {
+                            showBottomSheet = true
+                        },
+                        modifier = Modifier
+                            .offset(x = 5.dp, y = 0.dp)
+                            .padding(16.dp)
+                            .zIndex(5f),
+                        containerColor = colors.primary,
+                        elevation = FloatingActionButtonDefaults.elevation(0.dp)
+                    ) {
+                        CupertinoIcon(
+                            imageVector = CupertinoIcons.Outlined.QuestionmarkCircle,
+                            contentDescription = "How to play",
+                            tint = colors.text,
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
+                }
             }
+            SimpleBottomSheetExample(
+                showBottomSheet = showBottomSheet,
+                onDismiss = { showBottomSheet = false },
+                helpContent = helpContent
+            )
         }
     }
 }

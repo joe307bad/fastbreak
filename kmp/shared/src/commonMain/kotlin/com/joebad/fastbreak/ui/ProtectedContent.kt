@@ -163,7 +163,7 @@ fun ProtectedContent(
                         syncData(true)
                     }
                 },
-                username = authRepository.getUser()?.email ?: ""
+                username = authRepository.getUser()?.userName ?: ""
             )
         }
     ) {
@@ -181,7 +181,14 @@ fun ProtectedContent(
             scrollState = scrollState,
             selectedDate = selectedDate,
             authedUser = authRepository.getUser(),
-            error = error
+            error = error,
+            themePreference = themePreference,
+            onToggleTheme = onToggleTheme,
+            onSync = {
+                scope.launch(Dispatchers.IO) {
+                    syncData(true)
+                }
+            },
         )
     }
 }

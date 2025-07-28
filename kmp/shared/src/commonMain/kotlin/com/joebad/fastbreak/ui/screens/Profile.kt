@@ -62,7 +62,8 @@ fun ProfileScreen(
     email: String,
     userName: String,
     loading: Boolean? = false,
-    onSaveUserName: (String) -> Unit
+    onSaveUserName: (String) -> Unit,
+    logout: () -> Unit
 ) {
     val colors = LocalColors.current
     val gmailUsername = email.substringBefore("@").replace("\"", "")
@@ -185,13 +186,8 @@ fun ProfileScreen(
                         onClick = {
                             onSaveUserName(selectedUsername)
                         },
-                        backgroundColor = colors.secondary,
-                        contentColor = colors.onSecondary,
-                        bottomBorderColor = colors.accent,
-                        shape = RectangleShape,
                         loading = loading,
-                        modifier = Modifier.fillMaxWidth(),
-                        textSize = 16
+                        modifier = Modifier.fillMaxWidth()
                     ) {
                         Text(
                             text = "SAVE PROFILE",
@@ -199,8 +195,29 @@ fun ProfileScreen(
                         )
                     }
 
+
                 }
 
+
+            }
+
+        }
+
+        Box(modifier = Modifier.align(Alignment.BottomCenter)) {
+
+            PhysicalButton(
+                destructive = true,
+                onClick = {
+                    logout()
+                },
+                shape = RectangleShape,
+                modifier = Modifier.fillMaxWidth(),
+                textSize = 16
+            ) {
+                Text(
+                    text = "LOGOUT",
+                    textAlign = TextAlign.Center
+                )
             }
         }
     }

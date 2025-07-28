@@ -2,6 +2,7 @@ module api.Entities.Leaderboard
 
 type LeaderboardEntry = {
     userId: string
+    userName: string
     points: int
 }
 

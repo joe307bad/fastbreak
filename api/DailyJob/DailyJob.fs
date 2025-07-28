@@ -71,7 +71,7 @@ let dailyJob enableSchedulePuller database =
                 .ToList()
             |> Seq.toList
 
-        let leaderboards = calculateLeaderboard statSheets mondayId
+        let leaderboards = calculateLeaderboard database statSheets mondayId |> Async.AwaitTask |> Async.RunSynchronously
 
         database
             .GetCollection<Leaderboard>("leaderboards")

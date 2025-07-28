@@ -38,7 +38,7 @@ class AuthRepository(private val secureStorage: KVault) {
     }
 
     private val json = Json { ignoreUnknownKeys = true }
-    private val baseUrl = if (getPlatform().name == "iOS") "localhost" else "10.0.2.2"
+    private val baseUrl = if (getPlatform().name == "iOS") "localhost" else "fastbreak-api.fly.dev"
 
     private val client = HttpClient {
         install(ContentNegotiation) {

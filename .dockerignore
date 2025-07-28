@@ -1,0 +1,58 @@
+# flyctl launch added from .gitignore
+**/*.iml
+**/.gradle
+**/.idea
+**/.DS_Store
+**/build
+**/captures
+**/.externalNativeBuild
+**/.cxx
+**/local.properties
+**/xcuserdata
+**/.claude
+
+# flyctl launch added from .idea/.gitignore
+# Default ignored files
+.idea/shelf
+.idea/workspace.xml
+
+# flyctl launch added from api/.gitignore
+api/**/bin
+api/**/obj
+api/**/.env
+
+# flyctl launch added from api/.idea/.idea.api.dir/.idea/.gitignore
+# Default ignored files
+api/.idea/.idea.api.dir/.idea/shelf
+api/.idea/.idea.api.dir/.idea/workspace.xml
+# Rider ignored files
+api/.idea/.idea.api.dir/.idea/projectSettingsUpdater.xml
+api/.idea/.idea.api.dir/.idea/contentModel.xml
+api/.idea/.idea.api.dir/.idea/.idea.api.iml
+api/.idea/.idea.api.dir/.idea/modules.xml
+# Editor-based HTTP Client requests
+api/.idea/.idea.api.dir/.idea/httpRequests
+# Datasource local storage ignored files
+api/.idea/.idea.api.dir/.idea/dataSources
+api/.idea/.idea.api.dir/.idea/dataSources.local.xml
+
+# flyctl launch added from kmp/.gitignore
+kmp/**/kotlin-js-store/**/*
+kmp/**/.kotlin
+kmp/iosApp/Pods
+kmp/iosApp/CouchbaseLite.xcframework
+kmp/shared/shared.podspec
+kmp/androidApp/src/main/assets/font/CodeBold.otf
+
+# flyctl launch added from kmp/.idea/.gitignore
+# Default ignored files
+kmp/.idea/shelf
+kmp/.idea/workspace.xml
+
+# flyctl launch added from mock/.idea/.gitignore
+# Default ignored files
+mock/.idea/shelf
+mock/.idea/workspace.xml
+# Editor-based HTTP Client requests
+mock/.idea/httpRequests
+fly.toml

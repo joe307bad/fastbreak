@@ -4,22 +4,12 @@ on:
   push:
     branches:
       - main
-    paths:
-      - 'api/**'
-      - 'kmp/**'
-  pull_request:
-    branches:
-      - main
-    paths:
-      - 'api/**'
-      - 'kmp/**'
-    types: [closed]
 
 jobs:
   build-kmp:
     name: Build KMP
     runs-on: ubuntu-latest
-    if: contains(github.event.head_commit.modified, 'kmp/') || contains(github.event.pull_request.changed_files.*.filename, 'kmp/')
+    if: github.event.pull_request.merged == true
     
     steps:
       - name: Checkout code
@@ -73,7 +63,7 @@ jobs:
   deploy:
     name: Deploy API
     runs-on: ubuntu-latest
-    if: contains(github.event.head_commit.modified, 'api/') || contains(github.event.pull_request.changed_files.*.filename, 'api/')
+    if: github.event.pull_request.merged == true
     env:
       MONGO_IP: ${{ secrets.MONGO_IP }}
       MONGO_DB: ${{ secrets.MONGO_DB }}

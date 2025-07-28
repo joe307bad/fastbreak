@@ -18,6 +18,8 @@ import androidx.compose.material.Text
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.FloatingActionButtonDefaults
+import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -30,6 +32,9 @@ import com.joebad.fastbreak.ui.PhysicalButton
 import com.joebad.fastbreak.ui.Title
 import com.joebad.fastbreak.ui.theme.LocalColors
 import com.joebad.fastbreak.ui.theme.darken
+import io.github.alexzhirkevich.cupertino.CupertinoIcon
+import io.github.alexzhirkevich.cupertino.icons.CupertinoIcons
+import io.github.alexzhirkevich.cupertino.icons.outlined.QuestionmarkCircle
 import kotlinx.datetime.Instant
 import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.TimeZone
@@ -162,7 +167,8 @@ fun DrawerContent(
     statSheetItems: List<StatSheetItemView>?,
     lastFetchedDate: Long,
     onSync: () -> Unit,
-    username: String
+    username: String,
+    onShowStatSheetHelp: () -> Unit
 ) {
     val colors = LocalColors.current;
     Column(
@@ -219,11 +225,30 @@ fun DrawerContent(
                     modifier = Modifier.padding(horizontal = 10.dp).weight(1f).fillMaxWidth()
                 ) {
                     Spacer(modifier = Modifier.height(10.dp))
-                    Text(
-                        text = "My Stat Sheet",
-                        color = colors.text,
-                        style = MaterialTheme.typography.h6
-                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "My Stat Sheet",
+                            color = colors.text,
+                            style = MaterialTheme.typography.h6,
+                            modifier = Modifier.weight(1f)
+                        )
+                        SmallFloatingActionButton(
+                            onClick = onShowStatSheetHelp,
+                            modifier = Modifier.padding(start = 8.dp),
+                            containerColor = colors.primary,
+                            elevation = FloatingActionButtonDefaults.elevation(0.dp)
+                        ) {
+                            CupertinoIcon(
+                                imageVector = CupertinoIcons.Outlined.QuestionmarkCircle,
+                                contentDescription = "Stat Sheet Help",
+                                tint = colors.text,
+                                modifier = Modifier.width(16.dp).height(16.dp)
+                            )
+                        }
+                    }
                     Spacer(modifier = Modifier.height(10.dp))
                     if (statSheetItems.isNullOrEmpty() || statSheetItems.any { i -> i.leftColumnText == "null" }) {
                         Text(

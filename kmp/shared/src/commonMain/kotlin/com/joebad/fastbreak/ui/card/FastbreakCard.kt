@@ -1,3 +1,4 @@
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -40,7 +41,9 @@ fun FastbreakCard(
     onDismiss: () -> Unit,
     showCloseButton: Boolean = false,
     fastbreakViewModel: FastbreakViewModel? = null,
-    fastbreakResultsCard: Boolean = false
+    fastbreakResultsCard: Boolean = false,
+    onShowHelp: (() -> Unit)? = null,
+    showHelpButton: Boolean? = false,
 ) {
     val colors = LocalColors.current;
     val state = fastbreakViewModel?.container?.stateFlow?.collectAsState()?.value;
@@ -48,16 +51,21 @@ fun FastbreakCard(
         header = {
             Column {
                 Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp)) {
-                    Text(
-                        title,
-                        style = TextStyle(
-                            fontFamily = FontFamily.Monospace,
-                            fontSize = 20.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = colors.onPrimary,
-                        ),
-                        modifier = Modifier.padding(top = 20.dp)
-                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(top = 20.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            title,
+                            style = TextStyle(
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 20.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = colors.onPrimary,
+                            ),
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
                     Spacer(
                         modifier = Modifier.height(20.dp)
                     )
@@ -190,6 +198,20 @@ fun FastbreakCard(
                         Text(
                             "CLOSE",
                             modifier = Modifier.padding(10.dp).clickable(onClick = { onDismiss() }),
+                            style = TextStyle(
+                                fontFamily = FontFamily.Monospace,
+                                color = colors.text
+                            )
+                        )
+
+                    if (showHelpButton == true)
+                        Text(
+                            "${if (showCloseButton) " | " else ""} HELP",
+                            modifier = Modifier.padding(10.dp).clickable(onClick = {
+                                if (onShowHelp != null) {
+                                    onShowHelp()
+                                }
+                            }),
                             style = TextStyle(
                                 fontFamily = FontFamily.Monospace,
                                 color = colors.text

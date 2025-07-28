@@ -1,4 +1,3 @@
-
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -122,7 +121,9 @@ fun BlurredScreen(
     title: String = "My Daily Fastbreak Card",
     showCloseButton: Boolean = false,
     fastbreakViewModel: FastbreakViewModel? = null,
-    fastbreakResultsCard: Boolean = false
+    fastbreakResultsCard: Boolean = false,
+    onShowHelp: (() -> Unit)? = null,
+    showHelpButton: Boolean? = false
 ) {
     val colors = LocalColors.current;
     AnimatedVisibility(
@@ -141,12 +142,27 @@ fun BlurredScreen(
             Card(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(top = 20.dp, start = 20.dp, end = 20.dp, bottom = if(hideLockCardButton) 20.dp else 90.dp)
+                    .padding(
+                        top = 20.dp,
+                        start = 20.dp,
+                        end = 20.dp,
+                        bottom = if (hideLockCardButton) 20.dp else 90.dp
+                    )
                     .border(1.dp, colors.accent, RoundedCornerShape(16.dp))
                     .clickable(onClick = { }, indication = null, interactionSource = null),
                 shape = RoundedCornerShape(16.dp)
             ) {
-                FastbreakCard(title, date, locked, onDismiss, showCloseButton, fastbreakViewModel, fastbreakResultsCard)
+                FastbreakCard(
+                    title,
+                    date,
+                    locked,
+                    onDismiss,
+                    showCloseButton,
+                    fastbreakViewModel,
+                    fastbreakResultsCard,
+                    onShowHelp,
+                    showHelpButton
+                )
             }
             if (!hideLockCardButton) {
                 Column(modifier = Modifier.padding(20.dp).align(Alignment.BottomCenter)) {

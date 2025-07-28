@@ -27,9 +27,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
@@ -41,7 +38,6 @@ import com.joebad.fastbreak.Theme
 import com.joebad.fastbreak.ThemePreference
 import com.joebad.fastbreak.data.dailyFastbreak.FastbreakViewModel
 import com.joebad.fastbreak.model.dtos.DailyFastbreak
-import com.joebad.fastbreak.ui.SimpleBottomSheetExample
 import com.joebad.fastbreak.ui.help.HelpData
 import com.joebad.fastbreak.ui.help.HelpPage
 import com.joebad.fastbreak.ui.theme.LocalColors
@@ -70,10 +66,12 @@ fun HomeScaffold(
     error: String?,
     onSync: () -> Unit,
     themePreference: ThemePreference,
-    onToggleTheme: (theme: Theme) -> Unit
+    onToggleTheme: (theme: Theme) -> Unit,
+    showBottomSheet: Boolean,
+    onDismissBottomSheet: () -> Unit,
+    onShowHelp: (HelpPage) -> Unit
 ) {
     val colors = LocalColors.current;
-    var showBottomSheet by remember { mutableStateOf(false) }
     val childStack by component.stack.subscribeAsState()
     val activeChild = childStack.active
     val leaderboard =
@@ -207,7 +205,7 @@ fun HomeScaffold(
                     Spacer(modifier = Modifier.weight(1f))
                     SmallFloatingActionButton(
                         onClick = {
-                            showBottomSheet = true
+                            onShowHelp(currentHelpPage)
                         },
                         modifier = Modifier
                             .offset(x = 5.dp, y = 0.dp)
@@ -225,11 +223,6 @@ fun HomeScaffold(
                     }
                 }
             }
-            SimpleBottomSheetExample(
-                showBottomSheet = showBottomSheet,
-                onDismiss = { showBottomSheet = false },
-                helpContent = helpContent
-            )
         }
     }
 }

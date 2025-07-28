@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -43,11 +42,7 @@ fun SimpleBottomSheetExample(
                     .padding(16.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Text(
-                    text = helpContent.title,
-                    color = colors.text,
-                    style = MaterialTheme.typography.headlineSmall
-                )
+                Title(helpContent.title)
 
                 Spacer(modifier = Modifier.height(16.dp))
 

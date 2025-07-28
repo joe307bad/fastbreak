@@ -27,6 +27,9 @@ import com.joebad.fastbreak.data.dailyFastbreak.FastbreakStateRepository
 import com.joebad.fastbreak.data.dailyFastbreak.FastbreakViewModel
 import com.joebad.fastbreak.model.dtos.DailyFastbreak
 import com.joebad.fastbreak.onLock
+import com.joebad.fastbreak.ui.SimpleBottomSheetExample
+import com.joebad.fastbreak.ui.help.HelpData
+import com.joebad.fastbreak.ui.help.HelpPage
 import com.joebad.fastbreak.ui.theme.LocalColors
 import io.ktor.client.HttpClient
 import kotbase.Database
@@ -48,6 +51,13 @@ fun ProtectedContent(
     var dailyFastbreak by remember { mutableStateOf<DailyFastbreak?>(null) }
     var viewModel by remember { mutableStateOf<FastbreakViewModel?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
+    var showBottomSheet by remember { mutableStateOf(false) }
+    var bottomSheetHelpPage by remember { mutableStateOf(HelpPage.HOME) }
+    
+    val openHelpSheet = { helpPage: HelpPage ->
+        bottomSheetHelpPage = helpPage
+        showBottomSheet = true
+    }
 
     val selectedDate = "20250728"
 
@@ -126,7 +136,9 @@ fun ProtectedContent(
         title = "Fastbreak Card Results",
         showCloseButton = true,
         fastbreakViewModel = viewModel,
-        fastbreakResultsCard = true
+        fastbreakResultsCard = true,
+        onShowHelp = { openHelpSheet(HelpPage.FASTBREAK_RESULTS_CARD) },
+        showHelpButton = true
     )
     BlurredScreen(
         locked,
@@ -134,7 +146,9 @@ fun ProtectedContent(
         showModal.value,
         onDismiss = { showModal.value = false },
         date = selectedDate,
-        fastbreakViewModel = viewModel
+        fastbreakViewModel = viewModel,
+        onShowHelp = { openHelpSheet(HelpPage.DAILY_FASTBREAK_CARD) },
+        showHelpButton = true
     )
     ModalDrawer(
         modifier = Modifier.background(color = colors.background)
@@ -163,7 +177,8 @@ fun ProtectedContent(
                         syncData(true)
                     }
                 },
-                username = authRepository.getUser()?.userName ?: ""
+                username = authRepository.getUser()?.userName ?: "",
+                onShowStatSheetHelp = { openHelpSheet(HelpPage.STAT_SHEET) }
             )
         }
     ) {
@@ -189,6 +204,15 @@ fun ProtectedContent(
                     syncData(true)
                 }
             },
+            showBottomSheet = showBottomSheet,
+            onDismissBottomSheet = { showBottomSheet = false },
+            onShowHelp = openHelpSheet
+        )
+        
+        SimpleBottomSheetExample(
+            showBottomSheet = showBottomSheet,
+            onDismiss = { showBottomSheet = false },
+            helpContent = HelpData.getHelpContent(bottomSheetHelpPage)
         )
     }
 }

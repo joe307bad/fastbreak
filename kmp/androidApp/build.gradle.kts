@@ -32,21 +32,27 @@ android {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
     }
-    
+
     signingConfigs {
-        release {
-            keyAlias project.findProperty("RELEASE_KEY_ALIAS")?.toString()
-            keyPassword project.findProperty("RELEASE_KEY_PASSWORD")?.toString()
-            storeFile project.findProperty("RELEASE_STORE_FILE")?.toString()?.let { file(it) }
-            storePassword project.findProperty("RELEASE_STORE_PASSWORD")?.toString()
+        create("release") {
+            keyAlias = project.findProperty("RELEASE_KEY_ALIAS")?.toString()
+            keyPassword = project.findProperty("RELEASE_KEY_PASSWORD")?.toString()
+            storeFile = project.findProperty("RELEASE_STORE_FILE")?.toString()?.let { file(it) }
+            storePassword = project.findProperty("RELEASE_STORE_PASSWORD")?.toString()
         }
     }
-    
+
     buildTypes {
-        release {
-            signingConfig signingConfigs.release
+        getByName("release") {
+            signingConfig = signingConfigs.getByName("release")
+            isMinifyEnabled = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
         }
     }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_21
         targetCompatibility = JavaVersion.VERSION_21

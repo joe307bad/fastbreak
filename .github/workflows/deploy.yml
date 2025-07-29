@@ -34,7 +34,7 @@ jobs:
         run: |
           cat > kmp/local.properties << EOF
           GOOGLE_AUTH_SERVER_ID=${{ secrets.GOOGLE_AUTH_SERVER_ID }}
-          RELEASE_STORE_FILE=./keystore.jks
+          RELEASE_STORE_FILE=../keystore.jks
           RELEASE_KEY_ALIAS=${{ secrets.RELEASE_KEY_ALIAS }}
           RELEASE_KEY_PASSWORD=${{ secrets.RELEASE_KEY_PASSWORD }}
           RELEASE_STORE_PASSWORD=${{ secrets.RELEASE_STORE_PASSWORD }}
@@ -43,11 +43,6 @@ jobs:
       - name: Create keystore
         run: |
           echo "${{ secrets.RELEASE_KEYSTORE }}" | base64 -d > kmp/keystore.jks
-
-      - name: Build KMP project
-        run: |
-          cd kmp
-          ./gradlew build --no-daemon
 
       - name: Build Android APK
         run: |

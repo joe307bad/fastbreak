@@ -30,6 +30,10 @@ jobs:
           echo "build_number=${{ github.run_number }}" >> $GITHUB_OUTPUT
           echo "short_sha=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
 
+      - name: Create local.properties
+        run: |
+          echo "GOOGLE_AUTH_SERVER_ID=${{ secrets.GOOGLE_AUTH_SERVER_ID }}" > kmp/local.properties
+
       - name: Build KMP project
         run: |
           cd kmp

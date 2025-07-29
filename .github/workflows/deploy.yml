@@ -30,6 +30,10 @@ jobs:
           echo "build_number=${{ github.run_number }}" >> $GITHUB_OUTPUT
           echo "short_sha=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
 
+      - name: Create local.properties
+        run: |
+          echo "GOOGLE_AUTH_SERVER_ID=${{ secrets.GOOGLE_AUTH_SERVER_ID }}" > kmp/local.properties
+
       - name: Build KMP project
         run: |
           cd kmp
@@ -86,6 +90,7 @@ jobs:
           envkey_MONGO_PASS: ${{ secrets.MONGO_PASS }}
           envkey_ENABLE_SCHEDULE_PULLER: 1
           envkey_ENABLE_DAILY_JOB: 1
+          directory: api
 
       - name: Deploy to Fly.io
         run: |

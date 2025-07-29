@@ -36,6 +36,13 @@ import kotbase.Database
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.launch
+import kotlinx.datetime.Clock
+import kotlinx.datetime.DateTimeUnit
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.format
+import kotlinx.datetime.minus
+import kotlinx.datetime.toLocalDateTime
 import kotlin.math.min
 
 @Composable
@@ -53,13 +60,20 @@ fun ProtectedContent(
     var error by remember { mutableStateOf<String?>(null) }
     var showBottomSheet by remember { mutableStateOf(false) }
     var bottomSheetHelpPage by remember { mutableStateOf(HelpPage.HOME) }
-    
+
     val openHelpSheet = { helpPage: HelpPage ->
         bottomSheetHelpPage = helpPage
         showBottomSheet = true
     }
 
-    val selectedDate = "20250728"
+//    val selectedDate = "20250728"
+    val selectedDate = Clock.System.now().toLocalDateTime(TimeZone.of("America/New_York")).let {
+        if (it.hour >= 5) it.date else it.date.minus(
+            1,
+            DateTimeUnit.DAY
+        )
+    }.format(
+        LocalDate.Format { year(); monthNumber(); dayOfMonth() })
 
     val db = remember { Database("fastbreak") }
     val httpClient = remember { HttpClient() }
@@ -85,9 +99,21 @@ fun ProtectedContent(
         } catch (e: Exception) {
             // Enhanced error handling for better user experience
             error = when {
-                e.message?.contains("network", ignoreCase = true) == true -> "Network connection failed. Please check your internet connection."
-                e.message?.contains("timeout", ignoreCase = true) == true -> "Request timed out. Please try again."
-                e.message?.contains("unauthorized", ignoreCase = true) == true -> "Authentication failed. Please log in again."
+                e.message?.contains(
+                    "network",
+                    ignoreCase = true
+                ) == true -> "Network connection failed. Please check your internet connection."
+
+                e.message?.contains(
+                    "timeout",
+                    ignoreCase = true
+                ) == true -> "Request timed out. Please try again."
+
+                e.message?.contains(
+                    "unauthorized",
+                    ignoreCase = true
+                ) == true -> "Authentication failed. Please log in again."
+
                 else -> "Failed to fetch data: ${e.message ?: "Unknown error"}"
             }
             // Reset state on error
@@ -208,7 +234,7 @@ fun ProtectedContent(
             onDismissBottomSheet = { showBottomSheet = false },
             onShowHelp = openHelpSheet
         )
-        
+
         SimpleBottomSheetExample(
             showBottomSheet = showBottomSheet,
             onDismiss = { showBottomSheet = false },

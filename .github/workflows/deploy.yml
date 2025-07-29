@@ -90,6 +90,7 @@ jobs:
           envkey_MONGO_PASS: ${{ secrets.MONGO_PASS }}
           envkey_ENABLE_SCHEDULE_PULLER: 1
           envkey_ENABLE_DAILY_JOB: 1
+          directory: api
 
       - name: Deploy to Fly.io
         run: |

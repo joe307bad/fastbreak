@@ -30,10 +30,17 @@ jobs:
           echo "build_number=${{ github.run_number }}" >> $GITHUB_OUTPUT
           echo "short_sha=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
 
-      - name: Create local.properties
+      - name: Writing to gradle.properties
         run: |
           cat > kmp/local.properties << EOF
           GOOGLE_AUTH_SERVER_ID=${{ secrets.GOOGLE_AUTH_SERVER_ID }}
+          EOF
+
+      - name: Configure signing properties
+        run: |
+          cat >> kmp/gradle.properties << EOF
+          
+          # Release signing configuration (from CI secrets)
           RELEASE_STORE_FILE=../keystore.jks
           RELEASE_KEY_ALIAS=${{ secrets.RELEASE_KEY_ALIAS }}
           RELEASE_KEY_PASSWORD=${{ secrets.RELEASE_KEY_PASSWORD }}
@@ -66,41 +73,4 @@ jobs:
         with:
           name: fastbreak-kmp-${{ steps.build_info.outputs.timestamp }}-build${{ steps.build_info.outputs.build_number }}
           path: artifacts/
-          retention-days: 30
-
-  deploy:
-    name: Deploy API
-    runs-on: ubuntu-latest
-    env:
-      MONGO_IP: ${{ secrets.MONGO_IP }}
-      MONGO_DB: ${{ secrets.MONGO_DB }}
-      MONGO_USER: ${{ secrets.MONGO_USER }}
-      MONGO_PASS: ${{ secrets.MONGO_PASS }}
-      ENABLE_SCHEDULE_PULLER: 1
-      ENABLE_DAILY_JOB: 1
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Fly CLI
-        uses: superfly/flyctl-actions/setup-flyctl@master
-
-      - name: Make envfile
-        uses: SpicyPizza/create-envfile@v1.3
-        with:
-          envkey_MONGO_IP: ${{ secrets.MONGO_IP }}
-          envkey_MONGO_DB: ${{ secrets.MONGO_DB }}
-          envkey_MONGO_USER: ${{ secrets.MONGO_USER }}
-          envkey_MONGO_PASS: ${{ secrets.MONGO_PASS }}
-          envkey_ENABLE_SCHEDULE_PULLER: 1
-          envkey_ENABLE_DAILY_JOB: 1
-          directory: api
-
-      - name: Deploy to Fly.io
-        run: |
-          cd api
-          flyctl deploy --remote-only
-        env:
-          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
-          
+          retention-days: 30       

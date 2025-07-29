@@ -1,4 +1,4 @@
-name: Deploy API and Build KMP
+name: Build KMP
 
 on:
   push:
@@ -29,6 +29,12 @@ jobs:
           echo "timestamp=$(date +'%Y%m%d_%H%M%S')" >> $GITHUB_OUTPUT
           echo "build_number=${{ github.run_number }}" >> $GITHUB_OUTPUT
           echo "short_sha=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+
+      - name: Writing to local.properties
+        run: |
+          cat > kmp/local.properties << EOF
+          GOOGLE_AUTH_SERVER_ID=${{ secrets.GOOGLE_AUTH_SERVER_ID }}
+          EOF
 
       - name: Configure signing properties
         run: |

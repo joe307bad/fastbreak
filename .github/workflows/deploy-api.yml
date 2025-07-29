@@ -1,4 +1,4 @@
-name: Deploy API and Build KMP
+name: Deploy API
 
 on:
   push:

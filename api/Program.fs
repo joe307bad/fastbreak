@@ -177,7 +177,7 @@ let scheduleJobs () =
             Expression.Parameter(typeof<JobRunner>, "x")
         )
 
-    RecurringJob.AddOrUpdate("daily-job", methodCall, "*/1 * * * *")
+    RecurringJob.AddOrUpdate("daily-job", methodCall, "0 */8 * * *");
 
 let configureApp (app: IApplicationBuilder) =
     app.UseHangfireDashboard() |> ignore

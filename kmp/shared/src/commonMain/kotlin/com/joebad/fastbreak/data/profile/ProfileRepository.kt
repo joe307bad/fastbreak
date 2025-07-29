@@ -24,7 +24,7 @@ class ProfileRepository(authRepository: AuthRepository) {
     private val _authRepository = authRepository;
     private val json = Json { ignoreUnknownKeys = true }
     private val _baseUrl = if (getPlatform().name == "iOS") "localhost" else "fastbreak-api.fly.dev"
-    private val _saveUserName = "http://${_baseUrl}:8085/api/profile"
+    private val _saveUserName = "http://${_baseUrl}/api/profile"
 
     val client = HttpClient {
         install(ContentNegotiation) {

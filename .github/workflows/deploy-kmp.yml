@@ -30,17 +30,12 @@ jobs:
           echo "build_number=${{ github.run_number }}" >> $GITHUB_OUTPUT
           echo "short_sha=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
 
-      - name: Writing to gradle.properties
-        run: |
-          cat > kmp/local.properties << EOF
-          GOOGLE_AUTH_SERVER_ID=${{ secrets.GOOGLE_AUTH_SERVER_ID }}
-          EOF
-
       - name: Configure signing properties
         run: |
           cat >> kmp/gradle.properties << EOF
           
           # Release signing configuration (from CI secrets)
+          GOOGLE_AUTH_SERVER_ID=${{ secrets.GOOGLE_AUTH_SERVER_ID }}
           RELEASE_STORE_FILE=../keystore.jks
           RELEASE_KEY_ALIAS=${{ secrets.RELEASE_KEY_ALIAS }}
           RELEASE_KEY_PASSWORD=${{ secrets.RELEASE_KEY_PASSWORD }}

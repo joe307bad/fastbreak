@@ -1,4 +1,3 @@
-
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -79,7 +78,8 @@ fun FastbreakCard(
                             )
                         )
                         Text(
-                            if (fastbreakResultsCard) state?.lastLockedCardResults?.date ?: "" else date ?: "",
+                            if (fastbreakResultsCard) state?.lastLockedCardResults?.date
+                                ?: "" else date ?: "",
                             style = TextStyle(
                                 fontFamily = FontFamily.Monospace, fontSize = 17.sp,
                                 color = colors.onPrimary,
@@ -194,29 +194,36 @@ fun FastbreakCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Box(modifier = Modifier.weight(1f)) {
-                    if (showCloseButton)
-                        Text(
-                            "CLOSE",
-                            modifier = Modifier.padding(10.dp).clickable(onClick = { onDismiss() }),
-                            style = TextStyle(
-                                fontFamily = FontFamily.Monospace,
-                                color = colors.text
+                    Row {
+                        if (showCloseButton)
+                            Text(
+                                "CLOSE",
+                                modifier = Modifier.padding(
+                                    end = 0.dp,
+                                    start = 10.dp,
+                                    top = 10.dp,
+                                    bottom = 10.dp
+                                ).clickable(onClick = { onDismiss() }),
+                                style = TextStyle(
+                                    fontFamily = FontFamily.Monospace,
+                                    color = colors.text
+                                )
                             )
-                        )
 
-                    if (showHelpButton == true)
-                        Text(
-                            "${if (showCloseButton) " | " else ""} HELP",
-                            modifier = Modifier.padding(10.dp).clickable(onClick = {
-                                if (onShowHelp != null) {
-                                    onShowHelp()
-                                }
-                            }),
-                            style = TextStyle(
-                                fontFamily = FontFamily.Monospace,
-                                color = colors.text
+                        if (showHelpButton == true)
+                            Text(
+                                "${if (showCloseButton) " | " else ""} HELP",
+                                modifier = Modifier.padding(10.dp).clickable(onClick = {
+                                    if (onShowHelp != null) {
+                                        onShowHelp()
+                                    }
+                                }),
+                                style = TextStyle(
+                                    fontFamily = FontFamily.Monospace,
+                                    color = colors.text
+                                )
                             )
-                        )
+                    }
                 }
 
                 AnimatedLockIcon(

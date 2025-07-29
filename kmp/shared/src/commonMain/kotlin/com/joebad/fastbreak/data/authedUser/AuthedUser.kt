@@ -76,7 +76,7 @@ class AuthRepository(private val secureStorage: KVault) {
     suspend fun getUserAndStore(user: AuthedUser): FastbreakSelectionState? {
         try {
             val response: UserApiResponse =
-                client.post("http://$baseUrl/api/profile/initialize/${user.userId}") {
+                client.post("https://$baseUrl/api/profile/initialize/${user.userId}") {
                     contentType(ContentType.Application.Json)
                     header("Authorization", "Bearer ${user.idToken}")
                 }.body()

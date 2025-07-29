@@ -33,6 +33,14 @@ jobs:
       - name: Create local.properties
         run: |
           echo "GOOGLE_AUTH_SERVER_ID=${{ secrets.GOOGLE_AUTH_SERVER_ID }}" > kmp/local.properties
+          echo "RELEASE_STORE_FILE=../keystore.jks" >> kmp/local.properties
+          echo "RELEASE_KEY_ALIAS=${{ secrets.RELEASE_KEY_ALIAS }}" >> kmp/local.properties
+          echo "RELEASE_KEY_PASSWORD=${{ secrets.RELEASE_KEY_PASSWORD }}" >> kmp/local.properties
+          echo "RELEASE_STORE_PASSWORD=${{ secrets.RELEASE_STORE_PASSWORD }}" >> kmp/local.properties
+
+      - name: Create keystore
+        run: |
+          echo "${{ secrets.RELEASE_KEYSTORE }}" | base64 -d > kmp/keystore.jks
 
       - name: Build KMP project
         run: |

@@ -37,6 +37,7 @@ jobs:
         run: |
           cat > kmp/local.properties << EOF
           GOOGLE_AUTH_SERVER_ID=${{ secrets.GOOGLE_AUTH_SERVER_ID }}
+          API_BASE_URL=${{ secrets.API_BASE_URL }}
           EOF
 
       - name: Configure signing properties

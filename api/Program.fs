@@ -146,8 +146,10 @@ let mongoStorage =
 let database: IMongoDatabase = mongoClient.GetDatabase("fastbreak")
 
 let configureHangfire (services: IServiceCollection) =
-    services.AddHangfire(fun config -> config.UseStorage(mongoStorage) |> ignore)
-    |> ignore
+    services.AddHangfire(fun config -> 
+        config.UseStorage(mongoStorage) |> ignore
+        config.UseFilter(new Hangfire.AutomaticRetryAttribute(Attempts = 3)) |> ignore
+    ) |> ignore
 
     services.AddHangfireServer() |> ignore
     services
@@ -169,15 +171,87 @@ type JobRunner =
         else
             let (_, now) = getEasternTime (0);
             printf $"Daily job did not run at %A{now} because its disabled\n"
+    
+    static member FastbreakCardResultsJob() =
+        let (_, now) = getEasternTime (0)
+        try
+            api.DailyJob.CalculateFastbreakCardResults.calculateFastbreakCardResults database |> ignore
+            printf $"Fastbreak card results job completed at %A{now}\n"
+        with ex ->
+            printf $"Fastbreak card results job failed at %A{now} with error {ex.Message}\n"
+    
+    static member StatSheetsJob() =
+        let (_, now) = getEasternTime (0)
+        try
+            let (twoDaysAgo, _) = getEasternTime (-2)
+            let (yesterday, _) = getEasternTime (-1)
+            let (today, _) = getEasternTime (0)
+            let (tomorrow, _) = getEasternTime (1)
+            api.DailyJob.CalculateStatSheets.calculateStatSheets (database, twoDaysAgo, yesterday, today, tomorrow) |> ignore
+            printf $"Stat sheets job completed at %A{now}\n"
+        with ex ->
+            printf $"Stat sheets job failed at %A{now} with error {ex.Message}\n"
+    
+    static member LeaderboardJob() =
+        let (_, now) = getEasternTime (0)
+        try
+            let monday = api.Utils.getWeekDays.getLastMonday ()
+            let mondayId = monday.ToString("yyyyMMdd")
+            
+            let statSheets =
+                database
+                    .GetCollection<StatSheet>("user-stat-sheets")
+                    .Find(Builders<StatSheet>.Filter.Gte(_.createdAt, monday))
+                    .ToList()
+                |> Seq.toList
+            
+            let leaderboards = api.DailyJob.CalculateLeaderboards.calculateLeaderboard database statSheets mondayId |> Async.AwaitTask |> Async.RunSynchronously
+            
+            database
+                .GetCollection<api.Entities.Leaderboard.Leaderboard>("leaderboards")
+                .ReplaceOne(
+                    Builders<api.Entities.Leaderboard.Leaderboard>.Filter.Eq(_.id, mondayId),
+                    { id = mondayId; items = leaderboards },
+                    ReplaceOptions(IsUpsert = true)
+                ) |> ignore
+            
+            printf $"Leaderboard job completed at %A{now} for week {mondayId}\n"
+        with ex ->
+            printf $"Leaderboard job failed at %A{now} with error {ex.Message}\n"
 
 let scheduleJobs () =
-    let methodCall: Expression<Action<JobRunner>> =
+    let dailyJobCall: Expression<Action<JobRunner>> =
         Expression.Lambda<Action<JobRunner>>(
             Expression.Call(typeof<JobRunner>.GetMethod("DailyJob")),
             Expression.Parameter(typeof<JobRunner>, "x")
         )
+    
+    let fastbreakCardResultsCall: Expression<Action<JobRunner>> =
+        Expression.Lambda<Action<JobRunner>>(
+            Expression.Call(typeof<JobRunner>.GetMethod("FastbreakCardResultsJob")),
+            Expression.Parameter(typeof<JobRunner>, "x")
+        )
+    
+    let statSheetsCall: Expression<Action<JobRunner>> =
+        Expression.Lambda<Action<JobRunner>>(
+            Expression.Call(typeof<JobRunner>.GetMethod("StatSheetsJob")),
+            Expression.Parameter(typeof<JobRunner>, "x")
+        )
+    
+    let leaderboardCall: Expression<Action<JobRunner>> =
+        Expression.Lambda<Action<JobRunner>>(
+            Expression.Call(typeof<JobRunner>.GetMethod("LeaderboardJob")),
+            Expression.Parameter(typeof<JobRunner>, "x")
+        )
 
-    RecurringJob.AddOrUpdate("daily-job", methodCall, "0 */8 * * *");
+    // Schedule jobs with timezone awareness for ET
+    let easternTimeZone = TimeZoneInfo.FindSystemTimeZoneById("Eastern Standard Time")
+    let recurringJobOptions = RecurringJobOptions(TimeZone = easternTimeZone)
+    
+    RecurringJob.AddOrUpdate("daily-job", dailyJobCall, "*/1 * * * *")
+    RecurringJob.AddOrUpdate("fastbreak-card-results-job", fastbreakCardResultsCall, "0 4 * * *", recurringJobOptions)
+    RecurringJob.AddOrUpdate("stat-sheets-job", statSheetsCall, "0 4 * * *", recurringJobOptions)
+    RecurringJob.AddOrUpdate("leaderboard-job", leaderboardCall, "0 4 * * *", recurringJobOptions)
 
 let configureApp (app: IApplicationBuilder) =
     app.UseHangfireDashboard() |> ignore

@@ -42,49 +42,7 @@ let dailyJob enableSchedulePuller database =
         let (_, now) = getEasternTime (0)
         printf $"Schedule puller did not run at %A{now} because its disabled\n"
 
-    try
-        let (_, now) = getEasternTime (0)
-        calculateFastbreakCardResults database |> ignore
-        printf $"Fastbreak card results completed at %A{now}\n"
-    with ex ->
-        let (_, now) = getEasternTime (0)
-        printf $"Fastbreak card results failed at %A{now} with error {ex.Message}\n"
-
-    try
-        let (_, now) = getEasternTime (0)
-        calculateStatSheets (database, twoDaysAgo, yesterday, today, tomorrow) |> ignore
-        printf $"Fastbreak stat sheets completed at %A{now}\n"
-    with ex ->
-        let (_, now) = getEasternTime (0)
-        printf $"Stat sheet failed at %A{now} with error {ex.Message}\n"
-
-    try
-        let (_, now) = getEasternTime (0)
-
-        let monday = getLastMonday ()
-        let mondayId = monday.ToString("yyyyMMdd")
-
-        let statSheets =
-            database
-                .GetCollection<StatSheet>("user-stat-sheets")
-                .Find(Builders<StatSheet>.Filter.Gte(_.createdAt, monday))
-                .ToList()
-            |> Seq.toList
-
-        let leaderboards = calculateLeaderboard database statSheets mondayId |> Async.AwaitTask |> Async.RunSynchronously
-
-        database
-            .GetCollection<Leaderboard>("leaderboards")
-            .ReplaceOne(
-                Builders<Leaderboard>.Filter.Eq(_.id, mondayId),
-                { id = mondayId; items = leaderboards },
-                ReplaceOptions(IsUpsert = true)
-            ) |> ignore
-
-        printf $"Fastbreak leaderboard completed at %A{now} for week {mondayId}\n"
-    with ex ->
-        let (_, now) = getEasternTime (0)
-        printf $"Leaderboards failed at %A{now} with error {ex.Message}\n"
+    // Calculation functions have been moved to separate Hangfire jobs that run at 4am ET
 
     let (_, now) = getEasternTime (0)
     printf $"Daily job completed at %A{now}\n"

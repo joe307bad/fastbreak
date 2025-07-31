@@ -12,7 +12,7 @@ type FastbreakSelection =
       points: int
       description: string
       ``type``: string }
-    
+
 [<CLIMutable>]
 [<BsonIgnoreExtraElements>]
 type public FastbreakSelectionsResult =

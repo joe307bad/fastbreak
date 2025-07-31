@@ -1,45 +1,45 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
-  <PropertyGroup>
-    <TargetFramework>net9.0</TargetFramework>
-  </PropertyGroup>
-  <ItemGroup>
-    <Compile Include="Entities\ScheduleEntity.fs" />
-    <Compile Include="Entities\EmptyFastbreakCard.fs" />
-    <Compile Include="Entities\FastbreakSelections.fs" />
-    <Compile Include="Entities\StatSheet.fs" />
-    <Compile Include="Entities\Leaderboard.fs" />
-    <Compile Include="Utils\apiRouter.fs" />
-    <Compile Include="Utils\asyncMap.fs" />
-    <Compile Include="Utils\tryGetSubject.fs" />
-    <Compile Include="Utils\getWeekDays.fs" />
-    <Compile Include="Utils\calculateLockedCardStreak.fs" />
-    <Compile Include="Utils\lockedCardsForUser.fs" />
-    <Compile Include="Utils\getHighestAndPerfectCards.fs" />
-    <Compile Include="Utils\getLockedCardsToAnalyze.fs" />
-    <Compile Include="Utils\createCurrentWeek.fs" />
-    <Compile Include="Utils\getStatSheetForUser.fs" />
-    <Compile Include="Utils\googleAuthPipeline.fs" />
-    <Compile Include="Utils\deserializeBody.fs" />
-    <Compile Include="Utils\generateRandomUsername.fs" />
-    <Compile Include="Utils\profile.fs" />
-    <Compile Include="Controllers\DailyFastbreakController.fs" />
-    <Compile Include="Controllers\LockCardController.fs" />
-    <Compile Include="Controllers\ProfileController.fs" />
-    <Compile Include="DailyJob\SchedulePuller.fs" />
-    <Compile Include="DailyJob\CalculateFastbreakCardResults.fs" />
-    <Compile Include="DailyJob\CalculateStatSheets.fs" />
-    <Compile Include="DailyJob\CalculateLeaderboards.fs" />
-    <Compile Include="DailyJob\DailyJob.fs" />
-    <Compile Include="Program.fs" />
-  </ItemGroup>
-  <ItemGroup>
-    <PackageReference Include="DotNetEnv" Version="3.1.1" />
-    <PackageReference Include="Google.Apis.Auth" Version="1.69.0" />
-    <PackageReference Include="Hangfire" Version="1.8.17" />
-    <PackageReference Include="Hangfire.Mongo" Version="1.11.2" />
-    <PackageReference Include="Saturn" Version="0.17.0" />
-    <PackageReference Include="MongoDB.Driver" Version="3.0.0" />
-    <PackageReference Include="MongoDB.Bson" Version="3.0.0" />
-    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
-  </ItemGroup>
+    <PropertyGroup>
+        <TargetFramework>net9.0</TargetFramework>
+    </PropertyGroup>
+    <ItemGroup>
+        <Compile Include="Entities\ScheduleEntity.fs"/>
+        <Compile Include="Entities\EmptyFastbreakCard.fs"/>
+        <Compile Include="Entities\FastbreakSelections.fs"/>
+        <Compile Include="Entities\StatSheet.fs"/>
+        <Compile Include="Entities\Leaderboard.fs"/>
+        <Compile Include="Utils\apiRouter.fs"/>
+        <Compile Include="Utils\asyncMap.fs"/>
+        <Compile Include="Utils\tryGetSubject.fs"/>
+        <Compile Include="Utils\getWeekDays.fs"/>
+        <Compile Include="Utils\calculateLockedCardStreak.fs"/>
+        <Compile Include="Utils\lockedCardsForUser.fs"/>
+        <Compile Include="Utils\getHighestAndPerfectCards.fs"/>
+        <Compile Include="Utils\getLockedCardsToAnalyze.fs"/>
+        <Compile Include="Utils\createCurrentWeek.fs"/>
+        <Compile Include="Utils\getStatSheetForUser.fs"/>
+        <Compile Include="Utils\googleAuthPipeline.fs"/>
+        <Compile Include="Utils\deserializeBody.fs"/>
+        <Compile Include="Utils\generateRandomUsername.fs"/>
+        <Compile Include="Utils\profile.fs"/>
+        <Compile Include="Controllers\DailyFastbreakController.fs"/>
+        <Compile Include="Controllers\LockCardController.fs"/>
+        <Compile Include="Controllers\ProfileController.fs"/>
+        <Compile Include="DailyJob\SchedulePuller.fs"/>
+        <Compile Include="DailyJob\CalculateFastbreakCardResults.fs"/>
+        <Compile Include="DailyJob\CalculateStatSheets.fs"/>
+        <Compile Include="DailyJob\CalculateLeaderboards.fs"/>
+        <Compile Include="DailyJob\DailyJob.fs"/>
+        <Compile Include="Program.fs"/>
+    </ItemGroup>
+    <ItemGroup>
+        <PackageReference Include="DotNetEnv" Version="3.1.1"/>
+        <PackageReference Include="Google.Apis.Auth" Version="1.69.0"/>
+        <PackageReference Include="Hangfire" Version="1.8.17"/>
+        <PackageReference Include="Hangfire.Mongo" Version="1.11.2"/>
+        <PackageReference Include="Saturn" Version="0.17.0"/>
+        <PackageReference Include="MongoDB.Driver" Version="3.0.0"/>
+        <PackageReference Include="MongoDB.Bson" Version="3.0.0"/>
+        <PackageReference Include="Newtonsoft.Json" Version="13.0.3"/>
+    </ItemGroup>
 </Project>

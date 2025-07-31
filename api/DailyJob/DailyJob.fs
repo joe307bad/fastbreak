@@ -1,14 +1,7 @@
 module api.DailyJob.DailyJob
 
 open System
-open MongoDB.Driver
-open api.DailyJob.CalculateFastbreakCardResults
-open api.DailyJob.CalculateLeaderboards
-open api.DailyJob.CalculateStatSheets
 open api.DailyJob.SchedulePuller
-open api.Entities.Leaderboard
-open api.Entities.StatSheet
-open api.Utils.getWeekDays
 
 let getEasternTime (addDays) =
     let utcNow = DateTime.UtcNow.AddDays(addDays)
@@ -32,7 +25,9 @@ let dailyJob enableSchedulePuller database =
     // that started during primetime on the West coast.
     if enableSchedulePuller then
         try
-            pullSchedules (database, twoDaysAgo, yesterday, today, tomorrow, twoDaysFromNow) |> ignore
+            pullSchedules (database, twoDaysAgo, yesterday, today, tomorrow, twoDaysFromNow)
+            |> ignore
+
             let (_, now) = getEasternTime (0)
             printf $"Schedule puller completed at %A{now}\n"
         with ex ->

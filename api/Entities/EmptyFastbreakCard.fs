@@ -25,6 +25,5 @@ type EmptyFastbreakCardItem =
 
 [<BsonIgnoreExtraElements>]
 type EmptyFastbreakCard =
-    {
-      date: string
+    { date: string
       items: EmptyFastbreakCardItem[] }

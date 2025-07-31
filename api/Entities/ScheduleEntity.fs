@@ -28,8 +28,7 @@ type Competition() =
 
 [<BsonIgnoreExtraElements>]
 type Event =
-    {
-      id: string
+    { id: string
       date: string
       [<DefaultValue>]
       newProp: string

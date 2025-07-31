@@ -106,7 +106,7 @@ fun LeaderboardScreen(scrollState: ScrollState, leaderboard: DailyLeaderboard?) 
                         }
                         Column (modifier = Modifier.weight(1f).padding(start = 12.dp)) {
                             Text(
-                                text = entry.userId,
+                                text = entry.userName,
                                 color = colors.text,
                                 fontSize = 20.sp,
                                 maxLines = 1,

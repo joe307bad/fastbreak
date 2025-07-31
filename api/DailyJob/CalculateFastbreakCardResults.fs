@@ -57,18 +57,18 @@ let calculateFastbreakCardResults (database: IMongoDatabase) =
 
         let lockedCards =
             let today = DateTime.Today.ToString("yyyyMMdd")
-            let filter = 
-                Builders<FastbreakSelectionState>.Filter.And(
-                    Builders<FastbreakSelectionState>.Filter.Eq(_.results, None),
-                    Builders<FastbreakSelectionState>.Filter.Lt(_.date, today)
-                )
-            
-            lockedCardsCollection
-                .Find(filter)
-                .ToEnumerable()
+
+            let filter =
+                Builders<FastbreakSelectionState>.Filter
+                    .And(
+                        Builders<FastbreakSelectionState>.Filter.Eq(_.results, None),
+                        Builders<FastbreakSelectionState>.Filter.Lt(_.date, today)
+                    )
+
+            lockedCardsCollection.Find(filter).ToEnumerable()
 
         let cards = Seq.cast<FastbreakSelectionState> lockedCards
-        
+
         for card in cards do
             let scheduleResults: System.Collections.Generic.IDictionary<string, EmptyFastbreakCardItem> =
                 database
@@ -78,12 +78,13 @@ let calculateFastbreakCardResults (database: IMongoDatabase) =
                 |> Seq.collect _.items
                 |> Seq.map (fun item -> item.id, item) // Replace `item.id` with your actual key
                 |> dict
-                
+
             printf ($"Processed locked card for user {card.userId} and date {card.date}\n")
 
             let results = calculateResults scheduleResults cards |> Seq.toArray
 
             if results.Length > 0 then
                 lockedCardsCollection.BulkWrite(toSelectionStateWriteModels results) |> ignore
+
         ""
     }

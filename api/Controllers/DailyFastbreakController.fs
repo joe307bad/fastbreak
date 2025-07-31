@@ -49,14 +49,16 @@ let getFastbreakHandler (database: IMongoDatabase) day (next: HttpFunc) (ctx: Ht
         let collection = database.GetCollection<EmptyFastbreakCard>("empty-fastbreak-cards")
 
         let dayDate = DateTime.ParseExact(day, "yyyyMMdd", null)
-        let mondayDate = 
+
+        let mondayDate =
             let daysToSubtract =
                 match dayDate.DayOfWeek with
                 | DayOfWeek.Monday -> 0
                 | DayOfWeek.Sunday -> 6
                 | _ -> int dayDate.DayOfWeek - 1
+
             dayDate.AddDays(float -daysToSubtract)
-        
+
         let mondayId = mondayDate.ToString("yyyyMMdd")
 
         let leaderboard =
@@ -74,23 +76,24 @@ let getFastbreakHandler (database: IMongoDatabase) day (next: HttpFunc) (ctx: Ht
 
         let lockedCard =
             match ctx.TryGetQueryStringValue "userId" with
-            | Some id -> 
-                getLockedCardForUser database id day |> Option.ofObj
+            | Some id -> getLockedCardForUser database id day |> Option.ofObj
             | None -> None
 
         let lastLockedCardResults =
             match ctx.TryGetQueryStringValue "userId" with
-            | Some id -> 
-                getLastLockedCardResultsForUser database id |> Option.ofObj
-            | None -> None
-            
-        let statSheetForUser =
-            match ctx.TryGetQueryStringValue "userId" with
-            | Some id -> 
-                getStatSheetForUser database id |> Option.ofObj
+            | Some id -> getLastLockedCardResultsForUser database id |> Option.ofObj
             | None -> None
 
-        let leaderboardItems = if box leaderboard |> isNull then null else box leaderboard.items
+        let statSheetForUser =
+            match ctx.TryGetQueryStringValue "userId" with
+            | Some id -> getStatSheetForUser database id |> Option.ofObj
+            | None -> None
+
+        let leaderboardItems =
+            if box leaderboard |> isNull then
+                null
+            else
+                box leaderboard.items
 
         match card with
         | None -> return! json Seq.empty next ctx
@@ -108,6 +111,4 @@ let getFastbreakHandler (database: IMongoDatabase) day (next: HttpFunc) (ctx: Ht
     }
 
 let dailyFastbreakRouter database =
-    router {
-        getf "/day/%s" (fun day -> getFastbreakHandler database day)
-    }
+    router { getf "/day/%s" (fun day -> getFastbreakHandler database day) }

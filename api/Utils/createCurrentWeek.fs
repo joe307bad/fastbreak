@@ -8,7 +8,7 @@ open api.Entities.StatSheet
 let createWeek (daysOfTheWeek: List<KeyValuePair<string, DayInfo>>) (database: IMongoDatabase) (userId: string) =
     // Convert input days to a list for processing
     let inputDays = daysOfTheWeek |> List.ofSeq
-    
+
     // Process each day and build MongoDB-friendly structure
     let processedDays =
         inputDays
@@ -24,10 +24,7 @@ let createWeek (daysOfTheWeek: List<KeyValuePair<string, DayInfo>>) (database: I
                     )
 
             let selectionStateTask =
-                database
-                    .GetCollection<FastbreakSelectionState>("locked-fastbreak-cards")
-                    .Find(filter)
-                    .ToListAsync()
+                database.GetCollection<FastbreakSelectionState>("locked-fastbreak-cards").Find(filter).ToListAsync()
 
             let selectionState = selectionStateTask.Result |> Seq.tryHead
 
@@ -48,14 +45,13 @@ let createWeek (daysOfTheWeek: List<KeyValuePair<string, DayInfo>>) (database: I
                     { DayOfWeek = date.DayOfWeek
                       DateCode = date.DateCode
                       TotalPoints = None }
-                      
+
             // Include the original day key in the object itself
             { DayOfWeek = dayOfWeek
               DateCode = date.DateCode
-              TotalPoints = updatedDayInfo.TotalPoints }
-        )
-        |> Array.ofList  // Convert to array for MongoDB compatibility
-    
+              TotalPoints = updatedDayInfo.TotalPoints })
+        |> Array.ofList // Convert to array for MongoDB compatibility
+
     // Calculate the total points
     let totalPoints =
         processedDays
@@ -63,6 +59,7 @@ let createWeek (daysOfTheWeek: List<KeyValuePair<string, DayInfo>>) (database: I
             match day.TotalPoints with
             | Some points -> points
             | None -> 0)
-    
+
     // Return the MongoDB-friendly structure
-    { days = processedDays; total = totalPoints }
+    { days = processedDays
+      total = totalPoints }

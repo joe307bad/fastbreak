@@ -1,19 +1,17 @@
 module api.Entities.Leaderboard
 
-type LeaderboardEntry = {
-    userId: string
-    userName: string
-    points: int
-}
+type LeaderboardEntry =
+    { userId: string
+      userName: string
+      points: int }
 
-type DailyLeaderboard = {
-    dateCode: string
-    entries: LeaderboardEntry[]
-}
+type DailyLeaderboard =
+    { dateCode: string
+      entries: LeaderboardEntry[] }
 
-type LeaderboardResult = {
-    dailyLeaderboards: DailyLeaderboard[]
-    weeklyTotals: LeaderboardEntry[]
-}
+type LeaderboardResult =
+    { dailyLeaderboards: DailyLeaderboard[]
+      weeklyTotals: LeaderboardEntry[] }
 
-type Leaderboard = { id: string; items: LeaderboardResult; }
+type Leaderboard =
+    { id: string; items: LeaderboardResult }

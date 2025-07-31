@@ -14,7 +14,7 @@ let getLastMonday () =
         | _ -> int today.DayOfWeek - 1
 
     today.AddDays(float -daysToSubtract)
-    
+
 let getOneMondayAgo () =
     let today = System.DateTime.Now
 
@@ -28,10 +28,10 @@ let getOneMondayAgo () =
 
 let getWeekDays (startingDay: DateTime) =
     let daysList = List<KeyValuePair<string, DayInfo>>()
-    
+
     for i in 0..6 do
         let currentDate = startingDay.AddDays(float i)
-        
+
         let dayName =
             match i with
             | 0 -> "Monday"
@@ -41,13 +41,15 @@ let getWeekDays (startingDay: DateTime) =
             | 4 -> "Friday"
             | 5 -> "Saturday"
             | _ -> "Sunday"
-        
-        let kvp = KeyValuePair<string, DayInfo>(
-            (i + 1).ToString(),
-            { DayOfWeek = dayName
-              DateCode = currentDate.ToString("yyyyMMdd")
-              TotalPoints = None }
-        )
+
+        let kvp =
+            KeyValuePair<string, DayInfo>(
+                (i + 1).ToString(),
+                { DayOfWeek = dayName
+                  DateCode = currentDate.ToString("yyyyMMdd")
+                  TotalPoints = None }
+            )
+
         daysList.Add(kvp)
-    
+
     daysList

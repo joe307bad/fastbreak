@@ -42,7 +42,7 @@ let addLockedCardsToStatSheet sheet database userId =
     task {
         printf ($"Starting to process stat sheet for user {userId}\n")
         let daysOfTheWeek = getWeekDays (getLastMonday ())
-        let daysOfTheLastWeek = getWeekDays ( getOneMondayAgo ())
+        let daysOfTheLastWeek = getWeekDays (getOneMondayAgo ())
         let currentWeek = createWeek daysOfTheWeek database userId
         let lastWeek = createWeek daysOfTheLastWeek database userId
         let streak = calculateLockedCardStreak database sheet userId
@@ -77,8 +77,7 @@ let updateStatSheets (database: IMongoDatabase) userIds =
             let latestStatSheet = statSheetTask |> Async.AwaitTask |> Async.RunSynchronously
             let yesterday = DateTime.Now.AddDays(-1).ToString("yyyyMMdd")
 
-            let newStatSheet =
-                addLockedCardsToStatSheet latestStatSheet database userId
+            let newStatSheet = addLockedCardsToStatSheet latestStatSheet database userId
 
             let filter = Builders<StatSheet>.Filter.Eq("userId", userId)
 
@@ -122,21 +121,16 @@ let calculateStatSheets (database: IMongoDatabase, twoDaysAgo, yesterday, today,
                 .GetCollection<FastbreakSelectionState>("locked-fastbreak-cards")
                 .Find(
                     Builders<FastbreakSelectionState>.Filter
-                        .And(
-                            Builders<FastbreakSelectionState>.Filter.Ne(_.results, None)
-                            // this is commented for debug purposes, we still need this to trigger a new stat sheet for a user
-                            // if they entered a card yesterday
-                            // Builders<FastbreakSelectionState>.Filter.Eq(_.date, yesterday)
-                        )
+                        .And(Builders<FastbreakSelectionState>.Filter.Ne(_.results, None))
                 )
                 .ToEnumerable()
             |> Seq.choose (fun state ->
                 match state.results with
                 | Some results -> Some(state.userId, results)
-                | None -> None
-            )
+                | None -> None)
             |> Seq.distinctBy fst
             |> Seq.toList
+
         updateStatSheets database userIds |> ignore
 
     // 2. (weekly) last weeks total of all fastbreak cards

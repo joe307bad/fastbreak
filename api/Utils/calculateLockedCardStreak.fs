@@ -20,9 +20,7 @@ let calculateLockedCardStreak (database: IMongoDatabase) (statSheet: StatSheet o
     // Check for early return with recent stat sheet
     match statSheet with
     | Some sheet when sheet.date >= yesterday ->
-        printf (
-            $"No new locked card streak will be calculated since a recent stat sheet was found for user {userId}\n"
-        )
+        printf ($"No new locked card streak will be calculated since a recent stat sheet was found for user {userId}\n")
         // Recent stat sheet exists, return its values directly
         { longest = sheet.items.lockedCardStreak.longest
           current = sheet.items.lockedCardStreak.current }

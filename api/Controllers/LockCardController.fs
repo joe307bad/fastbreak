@@ -27,8 +27,8 @@ let lockCardHandler (database: IMongoDatabase) : HttpHandler =
         task {
             let! state = deserializeBody<FastbreakSelectionState> ctx
             let googleId = tryGetSubject ctx
-            
-            let! userId = 
+
+            let! userId =
                 match googleId with
                 | Some gId -> getUserIdFromProfile database gId
                 | None -> Task.FromResult(None)
@@ -36,15 +36,16 @@ let lockCardHandler (database: IMongoDatabase) : HttpHandler =
             return!
                 match userId with
                 | Some userId ->
-                    
+
                     let collection: IMongoCollection<FastbreakSelectionState> =
-                            database.GetCollection<FastbreakSelectionState>("locked-fastbreak-cards")
+                        database.GetCollection<FastbreakSelectionState>("locked-fastbreak-cards")
 
                     let filter =
-                        Builders<FastbreakSelectionState>.Filter.And(
-                            Builders<FastbreakSelectionState>.Filter.Eq(_.userId, userId),
-                            Builders<FastbreakSelectionState>.Filter.Eq(_.date, state.date)
-                        )
+                        Builders<FastbreakSelectionState>.Filter
+                            .And(
+                                Builders<FastbreakSelectionState>.Filter.Eq(_.userId, userId),
+                                Builders<FastbreakSelectionState>.Filter.Eq(_.date, state.date)
+                            )
 
                     let update =
                         Builders<FastbreakSelectionState>.Update
@@ -55,8 +56,7 @@ let lockCardHandler (database: IMongoDatabase) : HttpHandler =
 
                     let updateOptions = UpdateOptions(IsUpsert = true)
 
-                    let result =
-                        collection.UpdateOne(filter, update, updateOptions)
+                    let result = collection.UpdateOne(filter, update, updateOptions)
                     let response = { id = result.UpsertedId.ToString() }
                     Successful.ok (json response) next ctx
                 | None -> Successful.ok (json {| error = "Error locking card" |}) next ctx
@@ -65,16 +65,18 @@ let lockCardHandler (database: IMongoDatabase) : HttpHandler =
 let getLockCardHandler (database: IMongoDatabase) userId : HttpHandler =
     fun next ctx ->
         task {
-            let collection = database.GetCollection<FastbreakSelectionState>("locked-fastbreak-cards")
+            let collection =
+                database.GetCollection<FastbreakSelectionState>("locked-fastbreak-cards")
 
             let today = DateTime.UtcNow.ToString("yyyyMMdd")
-            
+
             let filter =
-                   Builders<FastbreakSelectionState>.Filter.And(
-                       Builders<FastbreakSelectionState>.Filter.Eq(_.userId, userId),
-                       Builders<FastbreakSelectionState>.Filter.Eq(_.date, today)
-                   )
-            
+                Builders<FastbreakSelectionState>.Filter
+                    .And(
+                        Builders<FastbreakSelectionState>.Filter.Eq(_.userId, userId),
+                        Builders<FastbreakSelectionState>.Filter.Eq(_.date, today)
+                    )
+
             let! result = collection.Find(filter).FirstOrDefaultAsync()
 
             return! json result next ctx

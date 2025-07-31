@@ -2,20 +2,15 @@ module api.Entities.StatSheet
 
 open System
 open MongoDB.Bson.Serialization.Attributes
-open api.Entities.FastbreakSelections
 
 [<BsonIgnoreExtraElements>]
-type DayInfo = {
-    DayOfWeek: string
-    DateCode: string
-    TotalPoints: int option
-}
+type DayInfo =
+    { DayOfWeek: string
+      DateCode: string
+      TotalPoints: int option }
 
 [<BsonIgnoreExtraElements>]
-type Week = {
-    days: DayInfo array 
-    total: int
-}
+type Week = { days: DayInfo array; total: int }
 
 [<BsonIgnoreExtraElements>]
 [<CLIMutable>]
@@ -36,4 +31,8 @@ type StatSheetItem =
 
 [<BsonIgnoreExtraElements>]
 [<CLIMutable>]
-type StatSheet = { userId: string; date: string; items: StatSheetItem; createdAt: DateTime; }
+type StatSheet =
+    { userId: string
+      date: string
+      items: StatSheetItem
+      createdAt: DateTime }

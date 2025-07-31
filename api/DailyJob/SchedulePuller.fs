@@ -8,6 +8,7 @@ open api.Entities.EmptyFastbreakCard
 open MongoDB.Driver
 open api.Entities.ScheduleEntity
 open System.Globalization
+
 let ensureIso8601WithSeconds (dateString: string) =
     let parsedDate = DateTimeOffset.Parse(dateString)
     parsedDate.ToString("yyyy-MM-ddTHH:mm:sszzz")
@@ -96,9 +97,7 @@ let getTomorrowsSchedulesHandler (schedule: Schedule seq) : Task<EmptyFastbreakC
                                   ``type`` = "PICK-EM"
                                   homeTeam = homeTeam.displayName
                                   homeTeamSubtitle =
-                                    competition.venue
-                                    |> Option.map _.fullName
-                                    |> Option.defaultValue null
+                                    competition.venue |> Option.map _.fullName |> Option.defaultValue null
                                   awayTeam = awayTeam.displayName
                                   awayTeamSubtitle = null
                                   date = ensureIso8601WithSeconds event.date
@@ -206,7 +205,15 @@ let getAllSchedules (runAllAsync: RunScheduleUpserts) (date: string) : Async<seq
     }
 
 
-let pullSchedules (database: IMongoDatabase, twoDaysAgo: String, yesterday: String, today: String, tomorrow: String, twoDaysFromNow: String) =
+let pullSchedules
+    (
+        database: IMongoDatabase,
+        twoDaysAgo: String,
+        yesterday: String,
+        today: String,
+        tomorrow: String,
+        twoDaysFromNow: String
+    ) =
     let dates = [ twoDaysAgo; yesterday; today; tomorrow; twoDaysFromNow ]
 
     let collection: IMongoCollection<EmptyFastbreakCard> =
@@ -231,7 +238,7 @@ let pullSchedules (database: IMongoDatabase, twoDaysAgo: String, yesterday: Stri
             )
             |> ignore
 
-            for str in (List.append report [$"Empty Fastbreak card inserted for {date}\n"]) do
+            for str in (List.append report [ $"Empty Fastbreak card inserted for {date}\n" ]) do
                 printfn "%s" str
         }
 

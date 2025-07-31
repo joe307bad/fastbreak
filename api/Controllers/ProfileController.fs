@@ -35,7 +35,11 @@ let saveProfileHandler (database: IMongoDatabase) : HttpHandler =
             return!
                 match googleId with
                 | Some authUserId ->
-                    match getUserIdFromProfile database authUserId |> Async.AwaitTask |> Async.RunSynchronously with
+                    match
+                        getUserIdFromProfile database authUserId
+                        |> Async.AwaitTask
+                        |> Async.RunSynchronously
+                    with
                     | Some userId ->
                         if profile.userId = userId then
                             let collection: IMongoCollection<Profile> =
@@ -89,23 +93,23 @@ let initializeProfileHandler (database: IMongoDatabase) requestedUserId : HttpHa
                 match authUserId with
                 | Some userId ->
                     if requestedUserId = userId then
-                        
+
                         let userNamesCollection: IMongoCollection<Profile> =
                             database.GetCollection<Profile>("profiles")
-                        
+
                         let userFilter = Builders<Profile>.Filter.Eq((_.googleId), userId)
                         let userNameDoc = userNamesCollection.Find(userFilter).ToList()
-                        let randomUserName = generateRandomUsername()
+                        let randomUserName = generateRandomUsername ()
                         let newUserId = Guid.NewGuid().ToString()
-                        
+
                         if userNameDoc.Count = 0 then
-                            let newUserName = {
-                                userId = newUserId
-                                googleId = userId
-                                userName = randomUserName
-                                updatedAt = DateTime.Now
-                            }
-                            userNamesCollection.InsertOne(newUserName)  
+                            let newUserName =
+                                { userId = newUserId
+                                  googleId = userId
+                                  userName = randomUserName
+                                  updatedAt = DateTime.Now }
+
+                            userNamesCollection.InsertOne(newUserName)
 
                         let lockedFastBreakCard =
                             if userNameDoc.Count > 0 then
@@ -113,17 +117,30 @@ let initializeProfileHandler (database: IMongoDatabase) requestedUserId : HttpHa
                                     .GetCollection<FastbreakSelectionState>("locked-fastbreak-cards")
                                     .Find(
                                         Builders<FastbreakSelectionState>.Filter
-                                            .And(Builders<FastbreakSelectionState>.Filter.Eq(_.userId, userNameDoc[0].userId))
+                                            .And(
+                                                Builders<FastbreakSelectionState>.Filter
+                                                    .Eq(_.userId, userNameDoc[0].userId)
+                                            )
                                     )
                                     .Sort(Builders<FastbreakSelectionState>.Sort.Descending("createdAt"))
                                     .FirstOrDefaultAsync()
                                 |> Async.AwaitTask
                                 |> Async.RunSynchronously
                                 |> Option.ofObj
-                            else None
+                            else
+                                None
+
                         let response =
-                            { userId = if userNameDoc.Count = 0 then newUserId else userNameDoc[0].userId
-                              userName = if userNameDoc.Count = 0 then randomUserName else userNameDoc[0].userName
+                            { userId =
+                                if userNameDoc.Count = 0 then
+                                    newUserId
+                                else
+                                    userNameDoc[0].userId
+                              userName =
+                                if userNameDoc.Count = 0 then
+                                    randomUserName
+                                else
+                                    userNameDoc[0].userName
                               lockedFastBreakCard = lockedFastBreakCard }
 
                         Successful.ok (json response) next ctx
@@ -142,8 +159,8 @@ let initializeProfileHandler (database: IMongoDatabase) requestedUserId : HttpHa
         }
 
 let profileRouter database =
-    router { 
+    router {
         pipe_through googleAuthPipeline
         post "/profile" (saveProfileHandler database)
-        postf "/profile/initialize/%s"  (fun userId -> requireGoogleAuth >=> (initializeProfileHandler database userId))
+        postf "/profile/initialize/%s" (fun userId -> requireGoogleAuth >=> (initializeProfileHandler database userId))
     }

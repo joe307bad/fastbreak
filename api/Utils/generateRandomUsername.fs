@@ -2,13 +2,42 @@ module api.Utils.generateRandomUsername
 
 open System
 
-let private words = [
-    "fast"; "cool"; "slam"; "boom"; "jump"; "race"; "fire"; 
-    "bolt"; "rush"; "dash"; "zoom"; "spin"; "flip"; "kick"; 
-    "star"; "rock"; "wave"; "glow"; "moon"; "nova"; "wind"; 
-    "hawk"; "wolf"; "bear"; "lion"; "fox"; "deer"; "owl";
-    "blue"; "red"; "gold"; "pink"; "gray"; "lime"; "teal"
-]
+let private words =
+    [ "fast"
+      "cool"
+      "slam"
+      "boom"
+      "jump"
+      "race"
+      "fire"
+      "bolt"
+      "rush"
+      "dash"
+      "zoom"
+      "spin"
+      "flip"
+      "kick"
+      "star"
+      "rock"
+      "wave"
+      "glow"
+      "moon"
+      "nova"
+      "wind"
+      "hawk"
+      "wolf"
+      "bear"
+      "lion"
+      "fox"
+      "deer"
+      "owl"
+      "blue"
+      "red"
+      "gold"
+      "pink"
+      "gray"
+      "lime"
+      "teal" ]
 
 let generateRandomUsername () =
     let random = Random()

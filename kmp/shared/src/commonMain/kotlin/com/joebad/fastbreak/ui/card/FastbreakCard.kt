@@ -139,20 +139,6 @@ fun FastbreakCard(
                                     color = colors.onPrimary
                                 )
                             )
-                            Spacer(modifier = Modifier.weight(1f))
-                            SmallCircle(color = colors.accent)
-                            Spacer(
-                                modifier = Modifier.width(10.dp)
-                            )
-                            Text(
-                                results.totalPoints.toString(),
-                                style = TextStyle(
-                                    fontFamily = FontFamily.Monospace,
-                                    fontSize = 15.sp,
-                                    color = colors.onPrimary,
-                                    textAlign = TextAlign.End
-                                )
-                            )
                         }
                     }
                 }
@@ -233,7 +219,10 @@ fun FastbreakCard(
                 Spacer(modifier = Modifier.height(10.dp))
                 if (state != null) {
                     Text(
-                        state.totalPoints.toString(),
+                        if (fastbreakResultsCard)
+                            state.totalPoints.toString()
+                        else
+                            "${state.lastLockedCardResults?.results?.totalPoints.toString()} /  ${state.lastLockedCardResults?.totalPoints.toString()}",
                         modifier = Modifier.padding(10.dp),
                         style = TextStyle(
                             fontFamily = FontFamily.Monospace,

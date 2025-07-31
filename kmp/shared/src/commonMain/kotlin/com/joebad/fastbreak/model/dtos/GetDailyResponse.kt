@@ -40,6 +40,7 @@ data class DailyFastbreak(
 @Serializable
 data class LeaderboardEntry(
     val userId: String,
+    val userName: String,
     val points: Int
 )
 

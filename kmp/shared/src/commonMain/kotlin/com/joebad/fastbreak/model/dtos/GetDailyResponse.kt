@@ -41,6 +41,7 @@ data class DailyFastbreak(
 data class LeaderboardEntry(
     val userId: String,
     val userName: String,
+
     val points: Int
 )
 

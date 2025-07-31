@@ -4,6 +4,7 @@ import AuthedUser
 import com.joebad.fastbreak.model.dtos.DailyResponse
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
+import io.ktor.client.plugins.ClientRequestException
 import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.request.get
@@ -13,6 +14,7 @@ import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.client.request.url
 import io.ktor.http.ContentType
+import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.serialization.Serializable
@@ -23,6 +25,12 @@ import kotlinx.serialization.json.Json
 data class LockCardResponse(
     val id: String
 )
+
+sealed class LockCardResult {
+    data class Success(val response: LockCardResponse) : LockCardResult()
+    object AuthenticationRequired : LockCardResult()
+    data class Error(val message: String) : LockCardResult()
+}
 
 val client = HttpClient {
     install(ContentNegotiation) {
@@ -49,15 +57,42 @@ suspend fun lockDailyFastbreakCard(
     url: String,
     fastbreakSelectionState: FastbreakSelectionState,
     authedUser: AuthedUser
-): LockCardResponse? {
+): LockCardResult {
     return try {
-        client.post(url) {
+        val httpResponse = client.post(url) {
             contentType(ContentType.Application.Json)
             header("Authorization", "Bearer ${authedUser.idToken}")
             setBody(fastbreakSelectionState)
-        }.body<LockCardResponse>()
+        }
+        
+        // Check status before attempting to deserialize body
+        when (httpResponse.status) {
+            HttpStatusCode.OK -> {
+                val response = httpResponse.body<LockCardResponse>()
+                LockCardResult.Success(response)
+            }
+            HttpStatusCode.Forbidden, HttpStatusCode.Unauthorized -> {
+                println("Authentication required: ${httpResponse.status}")
+                LockCardResult.AuthenticationRequired
+            }
+            else -> {
+                println("Error locking fastbreak card: ${httpResponse.status}")
+                LockCardResult.Error("HTTP ${httpResponse.status.value}: ${httpResponse.status.description}")
+            }
+        }
+    } catch (e: ClientRequestException) {
+        when (e.response.status) {
+            HttpStatusCode.Forbidden, HttpStatusCode.Unauthorized -> {
+                println("Authentication required: ${e.message}")
+                LockCardResult.AuthenticationRequired
+            }
+            else -> {
+                println("Error locking fastbreak card: ${e.message}")
+                LockCardResult.Error(e.message ?: "Unknown error occurred")
+            }
+        }
     } catch (e: Exception) {
-        println("Error locking fastbreak card: ${e.message}")
-        null
+        println("Unexpected error locking fastbreak card: ${e.message}")
+        LockCardResult.Error(e.message ?: "Unknown error occurred")
     }
 }

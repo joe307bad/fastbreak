@@ -1,11 +1,21 @@
 
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.DrawerValue
 import androidx.compose.material.ModalDrawer
 import androidx.compose.material.rememberDrawerState
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -15,9 +25,14 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.appstractive.jwt.JWT
+import com.appstractive.jwt.from
 import com.arkivanov.decompose.extensions.compose.subscribeAsState
 import com.joebad.fastbreak.ProtectedComponent
 import com.joebad.fastbreak.Theme
@@ -26,12 +41,13 @@ import com.joebad.fastbreak.data.dailyFastbreak.FastbreakSelectionState
 import com.joebad.fastbreak.data.dailyFastbreak.FastbreakStateRepository
 import com.joebad.fastbreak.data.dailyFastbreak.FastbreakViewModel
 import com.joebad.fastbreak.model.dtos.DailyFastbreak
-import com.joebad.fastbreak.onLock
+import com.joebad.fastbreak.ui.GoogleSignInButton
+import com.joebad.fastbreak.ui.PhysicalButton
 import com.joebad.fastbreak.ui.SimpleBottomSheetExample
+import com.joebad.fastbreak.ui.Title
 import com.joebad.fastbreak.ui.help.HelpData
 import com.joebad.fastbreak.ui.help.HelpPage
 import com.joebad.fastbreak.ui.theme.LocalColors
-import io.ktor.client.HttpClient
 import kotbase.Database
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
@@ -60,6 +76,7 @@ fun ProtectedContent(
     var error by remember { mutableStateOf<String?>(null) }
     var showBottomSheet by remember { mutableStateOf(false) }
     var bottomSheetHelpPage by remember { mutableStateOf(HelpPage.HOME) }
+    var showSigninBottomSheet by remember { mutableStateOf(false) }
 
     val openHelpSheet = { helpPage: HelpPage ->
         bottomSheetHelpPage = helpPage
@@ -76,9 +93,8 @@ fun ProtectedContent(
         LocalDate.Format { year(); monthNumber(); dayOfMonth() })
 
     val db = remember { Database("fastbreak") }
-    val httpClient = remember { HttpClient() }
     val dailyFastbreakRepository =
-        remember { FastbreakStateRepository(db, httpClient, authRepository) }
+        remember { FastbreakStateRepository(db, authRepository) }
 
     val syncData: suspend (forceUpdate: Boolean) -> Unit = { forceUpdate ->
         try {
@@ -88,7 +104,6 @@ fun ProtectedContent(
             val statSheetItems = state?.statSheet?.items
             viewModel = FastbreakViewModel(
                 db,
-                { newState -> onLock(dailyFastbreakRepository, coroutineScope, newState) },
                 selectedDate,
                 authRepository,
                 statSheetItems,
@@ -125,6 +140,44 @@ fun ProtectedContent(
     LaunchedEffect(key1 = selectedDate) {
         coroutineScope.launch(Dispatchers.IO) {
             syncData(false)
+        }
+    }
+
+    // Listen for side effects from the ViewModel
+    LaunchedEffect(viewModel) {
+        viewModel?.container?.sideEffectFlow?.collect { sideEffect ->
+            when (sideEffect) {
+                is com.joebad.fastbreak.data.dailyFastbreak.FastbreakSideEffect.ShowSigninBottomSheet -> {
+                    showSigninBottomSheet = true
+                }
+                is com.joebad.fastbreak.data.dailyFastbreak.FastbreakSideEffect.CardLocked -> {
+                    // Handle card lock side effect - this triggers the onLock callback
+                    coroutineScope.launch {
+                        try {
+                            val result = dailyFastbreakRepository.lockCardApi(sideEffect.state)
+                            when (result) {
+                                is com.joebad.fastbreak.data.dailyFastbreak.LockCardResult.Success -> {
+                                    println("Card locked successfully: ${result.response.id}")
+                                    viewModel?.completeCardLock()
+                                }
+                                is com.joebad.fastbreak.data.dailyFastbreak.LockCardResult.AuthenticationRequired -> {
+                                    println("Authentication required, showing signin bottom sheet")
+                                    viewModel?.unlockCard()
+                                    viewModel?.showSigninBottomSheet()
+                                }
+                                is com.joebad.fastbreak.data.dailyFastbreak.LockCardResult.Error -> {
+                                    println("Error locking card: ${result.message}")
+                                    viewModel?.unlockCard()
+                                }
+                            }
+                        } catch (e: Exception) {
+                            println("Exception locking card: ${e.message}")
+                            viewModel?.unlockCard()
+                        }
+                    }
+                }
+                else -> {}
+            }
         }
     }
 
@@ -174,7 +227,9 @@ fun ProtectedContent(
         date = selectedDate,
         fastbreakViewModel = viewModel,
         onShowHelp = { openHelpSheet(HelpPage.DAILY_FASTBREAK_CARD) },
-        showHelpButton = true
+        showHelpButton = true,
+        showCloseButton = true,
+        isLoading =  state?.isLocking
     )
     ModalDrawer(
         modifier = Modifier.background(color = colors.background)
@@ -240,5 +295,94 @@ fun ProtectedContent(
             onDismiss = { showBottomSheet = false },
             helpContent = HelpData.getHelpContent(bottomSheetHelpPage)
         )
+
+        SigninBottomSheet(
+            showBottomSheet = showSigninBottomSheet,
+            onDismiss = { showSigninBottomSheet = false },
+            authRepository = authRepository,
+            onSigninSuccess = { 
+                showSigninBottomSheet = false
+                // Retry locking the card
+                viewModel?.lockCard()
+            }
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun SigninBottomSheet(
+    showBottomSheet: Boolean,
+    onDismiss: () -> Unit,
+    authRepository: AuthRepository,
+    onSigninSuccess: () -> Unit
+) {
+    val bottomSheetState = rememberModalBottomSheetState()
+    val scope = rememberCoroutineScope()
+    val colors = LocalColors.current
+
+    if (showBottomSheet) {
+        ModalBottomSheet(
+            containerColor = colors.background,
+            onDismissRequest = onDismiss,
+            sheetState = bottomSheetState
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Title("Sign In Required")
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Text(
+                    text = "Your session has expired. Please sign in again to continue.",
+                    color = colors.text,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Normal
+                )
+                Box(modifier = Modifier.height(100.dp)) {
+                    GoogleSignInButton(
+                        onLogin = { token ->
+                            if (token != null) {
+                                val jwt = JWT.from(token)
+                                val email = jwt.claims["email"].toString()
+                                val exp = jwt.claims.get("exp").toString().toLong()
+                                val sub = jwt.claims["sub"].toString().replace("\"", "")
+
+                                val authedUser = AuthedUser(
+                                    email,
+                                    exp,
+                                    token,
+                                    userId = sub,
+                                    userName = authRepository.getUser()?.userName ?: ""
+                                )
+                                authRepository.storeAuthedUser(authedUser)
+                                onSigninSuccess()
+                            }
+                        }
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                PhysicalButton(
+                    borderColor = colors.accent,
+                    backgroundColor = colors.background,
+                    onClick = {
+                        scope.launch {
+                            bottomSheetState.hide()
+                            onDismiss()
+                        }
+                    }
+                ) {
+                    Text("CLOSE", color = colors.text)
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+            }
+        }
     }
 }

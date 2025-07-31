@@ -1,6 +1,7 @@
 package com.joebad.fastbreak
 
 import AuthRepository
+import AuthedUser
 import ProfileRepository
 import ProtectedContent
 import androidx.compose.material.MaterialTheme
@@ -45,12 +46,23 @@ class LoginComponent(
     private var _error by mutableStateOf<String?>(null)
     val error: String? get() = _error
     
+    private var _isLoading by mutableStateOf(false)
+    val isLoading: Boolean get() = _isLoading
+    
     fun setError(message: String) {
         _error = message
+        _isLoading = false
     }
     
     fun clearError() {
         _error = null
+    }
+    
+    fun setLoading(loading: Boolean) {
+        _isLoading = loading
+        if (loading) {
+            _error = null
+        }
     }
 }
 
@@ -161,15 +173,29 @@ fun createRootComponent(authRepository: AuthRepository): RootComponent {
 fun onLock(
     dailyFastbreakRepository: FastbreakStateRepository,
     coroutineScope: CoroutineScope,
-    state: FastbreakSelectionState
+    state: FastbreakSelectionState,
+    viewModel: com.joebad.fastbreak.data.dailyFastbreak.FastbreakViewModel?
 ) {
     coroutineScope.launch {
         try {
             val result = dailyFastbreakRepository.lockCardApi(state)
-            print(result);
+            when (result) {
+                is com.joebad.fastbreak.data.dailyFastbreak.LockCardResult.Success -> {
+                    println("Card locked successfully: ${result.response.id}")
+                }
+                is com.joebad.fastbreak.data.dailyFastbreak.LockCardResult.AuthenticationRequired -> {
+                    println("Authentication required, showing signin bottom sheet")
+                    viewModel?.unlockCard()
+                    viewModel?.showSigninBottomSheet()
+                }
+                is com.joebad.fastbreak.data.dailyFastbreak.LockCardResult.Error -> {
+                    println("Error locking card: ${result.message}")
+                    viewModel?.unlockCard()
+                }
+            }
         } catch (e: Exception) {
-            print(e.message);
-//            error = "API failed to lock card: ${e.message}"
+            println("Exception locking card: ${e.message}")
+            viewModel?.unlockCard()
         }
     }
 }
@@ -202,19 +228,44 @@ fun App(
             ) { child ->
                 when (val instance = child.instance) {
                     is RootComponent.Child.Login -> LoginScreen(
-                        goToHome = { authedUser ->
+                        goToHome = { au ->
                             CoroutineScope(Dispatchers.Main).launch {
                                 try {
-                                    instance.component.clearError()
-                                    lockedCard.value = authRepository.getUserAndStore(authedUser)
-                                    instance.component.onLoginClick()
+                                    instance.component.setLoading(true)
+                                    println("Initializing profile for user: ${au.userId}")
+                                    
+                                    val profile = profileRepository.initializeProfile(au.userId, au.idToken)
+                                    println("Profile initialization result: $profile")
+                                    
+                                    if(profile != null) {
+                                        val authedUser = AuthedUser(
+                                            au.email,
+                                            au.exp,
+                                            au.idToken,
+                                            profile.userId,
+                                            profile.userName
+                                        )
+                                        authRepository.storeAuthedUser(authedUser)
+                                        lockedCard.value = profile.lockedFastBreakCard
+                                        println("Navigating to protected content")
+                                        instance.component.onLoginClick()
+                                    } else {
+                                        println("Profile initialization failed")
+                                        instance.component.setError("Unable to initialize your profile. Please check your connection and try again.")
+                                    }
+                                    
                                 } catch (e: Exception) {
-                                    instance.component.setError("Login failed")
+                                    println("Login error: ${e.message}")
+                                    e.printStackTrace()
+                                    instance.component.setError("Login failed: ${e.message ?: "Unknown error occurred"}")
+                                } finally {
+                                    instance.component.setLoading(false)
                                 }
                             }
                         },
                         theme = theme,
-                        error = instance.component.error
+                        error = instance.component.error,
+                        isLoading = instance.component.isLoading
                     )
 
                     is RootComponent.Child.Protected ->

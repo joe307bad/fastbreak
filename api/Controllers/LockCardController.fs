@@ -62,7 +62,7 @@ let lockCardHandler (database: IMongoDatabase) : HttpHandler =
                 | None -> Successful.ok (json {| error = "Error locking card" |}) next ctx
         }
 
-let getLockCardHandler (database: IMongoDatabase) userId : HttpHandler =
+let getLockedCardHandler (database: IMongoDatabase) userId : HttpHandler =
     fun next ctx ->
         task {
             let collection =
@@ -86,5 +86,5 @@ let lockCardRouter database =
     router {
         pipe_through googleAuthPipeline
         post "/lock" (lockCardHandler database)
-        getf "/lock/%s" (fun userId -> getLockCardHandler database userId)
+        getf "/lock/%s" (fun userId -> getLockedCardHandler database userId)
     }

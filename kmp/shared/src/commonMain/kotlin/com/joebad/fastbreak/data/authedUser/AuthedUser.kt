@@ -1,15 +1,8 @@
 
-import com.joebad.fastbreak.data.dailyFastbreak.FastbreakSelectionState
-import com.joebad.fastbreak.getPlatform
 import com.liftric.kvault.KVault
 import io.ktor.client.HttpClient
-import io.ktor.client.call.body
 import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
-import io.ktor.client.request.header
-import io.ktor.client.request.post
-import io.ktor.http.ContentType
-import io.ktor.http.contentType
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.datetime.Clock
 import kotlinx.serialization.Serializable
@@ -24,13 +17,6 @@ data class AuthedUser(
     val userName: String
 )
 
-@Serializable
-data class UserApiResponse(
-    val userId: String,
-    val userName: String,
-    val lockedFastBreakCard: FastbreakSelectionState? = null
-)
-
 class AuthRepository(private val secureStorage: KVault) {
 
     companion object {
@@ -38,7 +24,6 @@ class AuthRepository(private val secureStorage: KVault) {
     }
 
     private val json = Json { ignoreUnknownKeys = true }
-    private val baseUrl = if (getPlatform().name == "iOS") "localhost" else "fastbreak-api.fly.dev"
 
     private val client = HttpClient {
         install(ContentNegotiation) {
@@ -54,48 +39,19 @@ class AuthRepository(private val secureStorage: KVault) {
     }
 
     fun updateUserName(userName: String) {
-        val user = getUser()
-        val userJson = json.encodeToString(
-            user?.let {
-                AuthedUser(
-                    it.email,
-                    it.exp,
-                    it.idToken,
-                    it.userId,
-                    userName
-                )
-            }
-        )
-        storeUser(userJson)
+        val user = getUser() ?: return
+        storeAuthedUser(AuthedUser(
+            user.email,
+            user.exp,
+            user.idToken,
+            user.userId,
+            userName
+        ))
     }
 
-    private fun storeUser(userJson: String) {
+    fun storeAuthedUser(user: AuthedUser) {
+        val userJson = json.encodeToString(user)
         secureStorage.set(KEY_AUTHED_USER, userJson)
-    }
-
-    suspend fun getUserAndStore(user: AuthedUser): FastbreakSelectionState? {
-        try {
-            val response: UserApiResponse =
-                client.post("https://$baseUrl/api/profile/initialize/${user.userId}") {
-                    contentType(ContentType.Application.Json)
-                    header("Authorization", "Bearer ${user.idToken}")
-                }.body()
-
-            val userJson = json.encodeToString(
-                AuthedUser(
-                    user.email,
-                    user.exp,
-                    user.idToken,
-                    response.userId,
-                    response.userName
-                )
-            )
-            storeUser(userJson)
-            return response.lockedFastBreakCard
-        } catch (e: Exception) {
-            println("Error fetching user data: ${e.message}")
-            throw e
-        }
     }
 
     fun getUser(): AuthedUser? {

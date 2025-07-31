@@ -123,7 +123,8 @@ fun BlurredScreen(
     fastbreakViewModel: FastbreakViewModel? = null,
     fastbreakResultsCard: Boolean = false,
     onShowHelp: (() -> Unit)? = null,
-    showHelpButton: Boolean? = false
+    showHelpButton: Boolean? = false,
+    isLoading: Boolean? = false
 ) {
     val colors = LocalColors.current;
     AnimatedVisibility(
@@ -167,6 +168,7 @@ fun BlurredScreen(
             if (!hideLockCardButton) {
                 Column(modifier = Modifier.padding(20.dp).align(Alignment.BottomCenter)) {
                     AnimatedBorderButton(
+                        isLoading = isLoading ?: false,
                         locked = locked,
                         enableLocking = true,
                         onLocked = onLocked,

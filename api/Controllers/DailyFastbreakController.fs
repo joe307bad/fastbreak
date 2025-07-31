@@ -102,7 +102,6 @@ let getFastbreakHandler (database: IMongoDatabase) day (next: HttpFunc) (ctx: Ht
                 json
                     ({| lastLockedCardResults = lastLockedCardResults
                         statSheetForUser = statSheetForUser
-                        // TODO this should be a seperate request because it should be cached seperately from the rest of these properties
                         lockedCardForUser = lockedCard
                         fastbreakCard = card.items
                         leaderboard = leaderboardItems |})

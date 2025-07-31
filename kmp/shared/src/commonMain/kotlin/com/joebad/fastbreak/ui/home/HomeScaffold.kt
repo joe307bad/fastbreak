@@ -41,6 +41,7 @@ import com.joebad.fastbreak.model.dtos.DailyFastbreak
 import com.joebad.fastbreak.ui.help.HelpData
 import com.joebad.fastbreak.ui.help.HelpPage
 import com.joebad.fastbreak.ui.theme.LocalColors
+import com.joebad.fastbreak.utils.DateUtils
 import io.github.alexzhirkevich.cupertino.CupertinoIcon
 import io.github.alexzhirkevich.cupertino.icons.CupertinoIcons
 import io.github.alexzhirkevich.cupertino.icons.outlined.QuestionmarkCircle
@@ -75,7 +76,7 @@ fun HomeScaffold(
     val childStack by component.stack.subscribeAsState()
     val activeChild = childStack.active
     val leaderboard =
-        dailyFastbreak?.leaderboard?.dailyLeaderboards?.find { l -> l.dateCode == selectedDate }
+        dailyFastbreak?.leaderboard?.dailyLeaderboards?.find { l -> l.dateCode == DateUtils.getPreviousDay(selectedDate) }
     val state = viewModel?.container?.stateFlow?.collectAsState()?.value;
     
     val currentHelpPage = when (activeChild.instance) {

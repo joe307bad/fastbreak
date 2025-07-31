@@ -219,10 +219,10 @@ fun FastbreakCard(
                 Spacer(modifier = Modifier.height(10.dp))
                 if (state != null) {
                     Text(
-                        if (fastbreakResultsCard)
+                        if (!fastbreakResultsCard)
                             state.totalPoints.toString()
                         else
-                            "${state.lastLockedCardResults?.results?.totalPoints.toString()} /  ${state.lastLockedCardResults?.totalPoints.toString()}",
+                            "${state.lastLockedCardResults?.results?.totalPoints.toString()} / ${state.lastLockedCardResults?.totalPoints.toString()}",
                         modifier = Modifier.padding(10.dp),
                         style = TextStyle(
                             fontFamily = FontFamily.Monospace,

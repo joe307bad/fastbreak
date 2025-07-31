@@ -1,10 +1,10 @@
 package com.joebad.fastbreak.data.dailyFastbreak
 
 import AuthRepository
+import com.joebad.fastbreak.BuildKonfig.API_BASE_URL
 import com.joebad.fastbreak.getPlatform
 import com.joebad.fastbreak.model.dtos.DailyFastbreak
 import com.joebad.fastbreak.model.dtos.DailyResponse
-import io.ktor.client.HttpClient
 import kotbase.DataSource
 import kotbase.Database
 import kotbase.Meta
@@ -22,22 +22,19 @@ import kotlinx.serialization.json.Json
 
 
 class FastbreakStateRepository(
-    private val db: Database,
-    private val httpClient: HttpClient,
+    db: Database,
     private val authRepository: AuthRepository?
 ) {
-    private val persistence = FastbreakSelectionsPersistence(db, authRepository)
 
     private val lastFetchedCollection =
         db.getCollection("LastFetchedCollection") ?: db.createCollection("LastFetchedCollection")
     private val dailyStateCollection = db.getCollection("FastBreakDailyStateCollection")
         ?: db.createCollection("FastBreakDailyStateCollection")
-    private val BASE_URL = if (getPlatform().name == "iOS") "localhost" else "fastbreak-api.fly.dev"
-    private val LOCK_CARD = "https://${BASE_URL}/api/lock"
+    private val BASE_URL = if (getPlatform().name == "iOS") "localhost" else API_BASE_URL
+    private val LOCK_CARD = "${BASE_URL}/api/lock"
 
     companion object {
         private const val LAST_FETCHED_KEY = "lastFetchedDate"
-        private const val FETCH_THRESHOLD = 12 * 60 * 60
     }
 
     suspend fun getDailyFastbreakState(date: String, forceUpdate: Boolean = false): DailyFastbreak? {
@@ -96,14 +93,13 @@ class FastbreakStateRepository(
         return dailyFastbreak
     }
 
-    suspend fun lockCardApi(fastbreakSelectionState: FastbreakSelectionState): LockCardResponse? {
-        val authedUser = authRepository?.getUser() ?: return null
-        val apiResponse = lockDailyFastbreakCard(LOCK_CARD, fastbreakSelectionState, authedUser)
-        return apiResponse
+    suspend fun lockCardApi(fastbreakSelectionState: FastbreakSelectionState): LockCardResult {
+        val authedUser = authRepository?.getUser() ?: return LockCardResult.AuthenticationRequired
+        return lockDailyFastbreakCard(LOCK_CARD, fastbreakSelectionState, authedUser)
     }
 
     private suspend fun fetchDailyFastbreak(date: String): DailyResponse? {
-        val getDailyFastbreakUrl = "https://${BASE_URL}/api/day/${date}"
+        val getDailyFastbreakUrl = "${BASE_URL}/api/day/${date}"
         val apiResponse = getDailyFastbreak(getDailyFastbreakUrl, authRepository?.getUser()?.userId)
         return apiResponse
     }

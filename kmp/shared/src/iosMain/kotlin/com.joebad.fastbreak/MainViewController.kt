@@ -21,6 +21,7 @@ fun MainViewController() = ComposeUIViewController {
     val themePreference = IosThemePreference()
     val coroutineScope = rememberCoroutineScope()
 
+    // KVault uses iOS Keychain which persists data until explicitly deleted
     val kvault = KVault("auth_secure_storage")
     val authRepository = AuthRepository(kvault)
     val profileRepository = ProfileRepository(authRepository)

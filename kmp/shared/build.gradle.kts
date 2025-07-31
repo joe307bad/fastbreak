@@ -147,12 +147,14 @@ buildkonfig {
     defaultConfigs {
         propertiesProj.load(project.rootProject.file("local.properties").inputStream())
         val apiKey: String = propertiesProj.getProperty("GOOGLE_AUTH_SERVER_ID")
+        val apiBaseUrl: String = propertiesProj.getProperty("API_BASE_URL") ?: "fastbreak-api.fly.dev"
 
         require(apiKey.isNotEmpty()) {
             "Register your GOOGLE_AUTH_SERVER_ID from developer and place it in local.properties as `GOOGLE_AUTH_SERVER_ID`"
         }
 
         buildConfigField(STRING, "GOOGLE_AUTH_SERVER_ID", apiKey)
+        buildConfigField(STRING, "API_BASE_URL", apiBaseUrl)
         buildConfigField(
             com.codingfeline.buildkonfig.compiler.FieldSpec.Type.BOOLEAN,
             "IS_DEBUG",

@@ -46,6 +46,7 @@ jobs:
           RELEASE_KEY_ALIAS=${{ secrets.RELEASE_KEY_ALIAS }}
           RELEASE_KEY_PASSWORD=${{ secrets.RELEASE_KEY_PASSWORD }}
           RELEASE_STORE_PASSWORD=${{ secrets.RELEASE_STORE_PASSWORD }}
+          API_BASE_URL=${{ secrets.API_BASE_URL }}
           EOF
 
       - name: Create keystore
@@ -60,7 +61,9 @@ jobs:
       - name: Create artifact archive
         run: |
           mkdir -p artifacts
-          cp kmp/androidApp/build/outputs/apk/release/*.apk artifacts/ || true
+          
+          # Find and copy APK with a consistent name
+          find kmp/androidApp/build/outputs/apk/release -name "*.apk" -exec cp {} artifacts/fastbreak-release.apk \;
           cp kmp/shared/build/libs/*.jar artifacts/ || true
           
           # Create build info file
@@ -68,10 +71,48 @@ jobs:
           echo "Timestamp: ${{ steps.build_info.outputs.timestamp }}" >> artifacts/build_info.txt
           echo "Commit: ${{ steps.build_info.outputs.short_sha }}" >> artifacts/build_info.txt
           echo "Branch: ${{ github.ref_name }}" >> artifacts/build_info.txt
+          
+          # List contents for debugging
+          ls -la artifacts/
 
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          name: fastbreak-kmp-${{ steps.build_info.outputs.timestamp }}-build${{ steps.build_info.outputs.build_number }}
-          path: artifacts/
-          retention-days: 30       
+          tag_name: v0.0.1-alpha-${{ steps.build_info.outputs.build_number }}
+          release_name: Release v0.0.1-alpha-${{ steps.build_info.outputs.build_number }}
+          body: |
+            ## Fastbreak v0.0.1-alpha-${{ steps.build_info.outputs.build_number }}
+            
+            **Build Info:**
+            - Build Number: ${{ steps.build_info.outputs.build_number }}
+            - Timestamp: ${{ steps.build_info.outputs.timestamp }}
+            - Commit: ${{ steps.build_info.outputs.short_sha }}
+            - Branch: ${{ github.ref_name }}
+            
+            **Changes:**
+            ${{ github.event.head_commit.message }}
+          draft: false
+          prerelease: true
+
+      - name: Upload APK to Release
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: artifacts/fastbreak-release.apk
+          asset_name: fastbreak-v0.0.1-alpha-${{ steps.build_info.outputs.build_number }}.apk
+          asset_content_type: application/vnd.android.package-archive
+
+      - name: Upload Build Info to Release
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: artifacts/build_info.txt
+          asset_name: build_info.txt
+          asset_content_type: text/plain       

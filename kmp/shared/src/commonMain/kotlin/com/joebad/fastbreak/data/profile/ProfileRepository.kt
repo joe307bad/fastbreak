@@ -1,4 +1,5 @@
 
+import com.joebad.fastbreak.BuildKonfig
 import com.joebad.fastbreak.getPlatform
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
@@ -22,11 +23,11 @@ data class Profile(
 class ProfileRepository(authRepository: AuthRepository) {
 
     private val _authRepository = authRepository;
-    private val json = Json { ignoreUnknownKeys = true }
-    private val _baseUrl = if (getPlatform().name == "iOS") "localhost" else "fastbreak-api.fly.dev"
-    private val _saveUserName = "https://${_baseUrl}/api/profile"
+    private val _baseUrl = if (getPlatform().name == "iOS") "localhost" else BuildKonfig.API_BASE_URL
+    private val _saveUserName = "${_baseUrl}/api/profile"
+    private val _initializeProfile = "$_baseUrl/api/profile/initialize"
 
-    val client = HttpClient {
+    private val client = HttpClient {
         install(ContentNegotiation) {
             json(Json {
                 prettyPrint = true
@@ -49,6 +50,26 @@ class ProfileRepository(authRepository: AuthRepository) {
             }.body()
         } catch (e: Exception) {
             println("Error making POST to ${_saveUserName}: ${e.message}")
+            null
+        }
+    }
+
+    suspend fun initializeProfile(userId: String, token: String?): InitializeProfileResponse? {
+        return try {
+            val t = token ?: _authRepository.getUser()?.idToken;
+            println("Initializing profile for userId: $userId")
+            println("API endpoint: ${_initializeProfile}/${userId}")
+            println("Token present: ${t != null}")
+            val response = client.post("${_initializeProfile}/${userId}") {
+                contentType(ContentType.Application.Json)
+                header("Authorization", "Bearer $t")
+            }.body<InitializeProfileResponse>()
+            println("Profile initialization successful: $response")
+            response
+        } catch (e: Exception) {
+            println("Error making POST to ${_initializeProfile}/${userId}: ${e.message}")
+            println("Exception type: ${e::class.simpleName}")
+            e.printStackTrace()
             null
         }
     }

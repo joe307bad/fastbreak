@@ -6,13 +6,11 @@ import StatSheetItemView
 import StatSheetType
 import com.joebad.fastbreak.model.dtos.FastbreakSelectionsResult
 import com.joebad.fastbreak.model.dtos.StatSheetItem
+import com.joebad.fastbreak.utils.DateUtils
 import getRandomId
-import getWeekNumber
 import kotbase.Database
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.MainScope
-import kotlinx.coroutines.flow.launchIn
-import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
@@ -40,7 +38,8 @@ data class FastbreakSelectionState(
     val statSheetItems: List<StatSheetItemView> = emptyList(),
     val results: FastbreakSelectionsResult? = null,
     val lastLockedCardResults: FastbreakSelectionState? = null,
-    val isSavingUserName: Boolean = false
+    val isSavingUserName: Boolean = false,
+    val isLocking: Boolean = false
 )
 
 sealed class FastbreakSideEffect {
@@ -49,12 +48,12 @@ sealed class FastbreakSideEffect {
     data class SelectionUpdated(val selection: FastbreakSelection) : FastbreakSideEffect()
     data class SelectionDeleted(val selection: FastbreakSelection) : FastbreakSideEffect()
     data class CardLocked(val state: FastbreakSelectionState) : FastbreakSideEffect()
+    object ShowSigninBottomSheet : FastbreakSideEffect()
 }
 
 
 class FastbreakViewModel(
     database: Database,
-    onLock: (state: FastbreakSelectionState) -> Unit,
     date: String,
     authRepository: AuthRepository,
     statSheetItems: StatSheetItem?,
@@ -94,14 +93,8 @@ class FastbreakViewModel(
             lastLockedCardWithResults?.date
         );
         setlastLockedCardResults(lastLockedCardWithResults)
-        container.sideEffectFlow
-            .onEach { sideEffect ->
-                when (sideEffect) {
-                    is FastbreakSideEffect.CardLocked -> onLock(sideEffect.state)
-                    else -> {}
-                }
-            }
-            .launchIn(MainScope())
+        // Side effects should be collected in the UI layer, not in the ViewModel
+        // This prevents lifecycle and timing issues
     }
 
     private fun setlastLockedCardResults(lastLockedCardResults: FastbreakSelectionState?) {
@@ -139,7 +132,7 @@ class FastbreakViewModel(
                     StatSheetItemView(
                         statSheetType = StatSheetType.MonoSpace,
                         leftColumnText = currentWeek?.total.toString(),
-                        rightColumnText = "Current week's total\nWeek ${getWeekNumber(currentWeek?.days?.first()?.dateCode)}"
+                        rightColumnText = "Current week's total\nWeek ${currentWeek?.days?.first()?.dateCode?.let { DateUtils.getWeekOfYear(it) } ?: ""}"
                     )
                 )
 
@@ -147,7 +140,7 @@ class FastbreakViewModel(
                     StatSheetItemView(
                         statSheetType = StatSheetType.MonoSpace,
                         leftColumnText = lastWeek?.total.toString(),
-                        rightColumnText = "Last week's total\nWeek ${getWeekNumber(lastWeek?.days?.first()?.dateCode)}"
+                        rightColumnText = "Last week's total\nWeek ${lastWeek?.days?.first()?.dateCode?.let { DateUtils.getWeekOfYear(it) } ?: ""}"
                     )
                 )
 
@@ -183,12 +176,36 @@ class FastbreakViewModel(
     fun lockCard() {
         intent {
             reduce {
-                state.copy(locked = true)
+                state.copy(isLocking = true, locked = false)
             }
-            postSideEffect(FastbreakSideEffect.CardLocked(state))
+            postSideEffect(FastbreakSideEffect.CardLocked(state.copy(isLocking = true, locked = false)))
         }
-
         saveSelections()
+    }
+    
+    fun completeCardLock() {
+        intent {
+            reduce {
+                state.copy(locked = true, isLocking = false)
+            }
+        }
+    }
+
+    fun unlockCard() {
+        intent {
+            reduce {
+                state.copy(locked = false, isLocking = false)
+            }
+        }
+    }
+    
+    fun showSigninBottomSheet() {
+        intent {
+            reduce {
+                state.copy(locked = false, isLocking = false)
+            }
+            postSideEffect(FastbreakSideEffect.ShowSigninBottomSheet)
+        }
     }
 
     fun updateSelection(

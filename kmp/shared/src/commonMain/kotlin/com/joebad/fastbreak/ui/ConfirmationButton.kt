@@ -1,3 +1,4 @@
+
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.ExperimentalAnimationApi
 import androidx.compose.animation.core.Animatable
@@ -56,6 +57,7 @@ import com.joebad.fastbreak.ui.theme.LocalColors
 
 @OptIn(ExperimentalAnimationApi::class)
 @Composable
+// Supports bidirectional transitions: unlocked -> locked and locked -> unlocked
 fun AnimatedBorderButton(
     onLocked: () -> Unit = {},
     borderColor: Color = Color(0xFF3B82F6),
@@ -67,8 +69,10 @@ fun AnimatedBorderButton(
     borderWidth: Float = 8f,
     depthAmount: Float = 6f,
     locked: Boolean = false,
+    isLoading: Boolean = false,
     unlockText: String = "Lock Card",
     lockedText: String = "Card Locked",
+    loadingText: String = "Locking...",
     enableLocking: Boolean? = true,
     onPressDown: () -> Unit = {},
     fullWidth: Boolean = false,
@@ -145,13 +149,14 @@ fun AnimatedBorderButton(
         }
     }
 
-    LaunchedEffect(locked) {
-        if (locked && !animationCompleted) {
-            isPressed = true
-            animationCompleted = true
+    LaunchedEffect(locked, isLoading) {
+        if (!locked && !isLoading) {
+            animationCompleted = false
+            isPressed = false
 
-            animationProgress.snapTo(1f)
-            lockIconOffsetX.snapTo(0f)
+            animationProgress.snapTo(0f)
+            lockIconOffsetX.snapTo(-50f)
+            lockIconAlpha.snapTo(1f)
         }
     }
 
@@ -195,7 +200,7 @@ fun AnimatedBorderButton(
                 .pointerInput(Unit) {
                     detectTapGestures(
                         onPress = {
-                            if (!locked && !animationCompleted) {
+                            if (!locked && !animationCompleted && !isLoading) {
                                 isPressed = true
                                 try {
                                     awaitRelease()
@@ -230,7 +235,10 @@ fun AnimatedBorderButton(
                     modifier = Modifier.fillMaxSize()
                 ) {
                     AnimatedContent(
-                        targetState = if (animationProgress.value >= 0.99f) lockedText else unlockText,
+                        targetState = when {
+                            isLoading || animationProgress.value >= 0.99f -> lockedText
+                            else -> unlockText
+                        },
                         transitionSpec = {
                             slideInVertically { it } with slideOutVertically { -it }
                         },
@@ -239,14 +247,16 @@ fun AnimatedBorderButton(
                         Row(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            if (targetText == lockedText) {
-                                Icon(
-                                    imageVector = Icons.Filled.Lock,
-                                    contentDescription = "Lock",
-                                    tint = colors.onSecondary,
-                                    modifier = Modifier.size(17.dp)
-                                )
-                                Spacer(modifier = Modifier.width(10.dp))
+                            when {
+                                isLoading || targetText == lockedText -> {
+                                    Icon(
+                                        imageVector = Icons.Filled.Lock,
+                                        contentDescription = "Lock",
+                                        tint = colors.onSecondary,
+                                        modifier = Modifier.size(17.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(10.dp))
+                                }
                             }
                             Text(
                                 text = targetText.uppercase(),

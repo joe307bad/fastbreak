@@ -108,8 +108,7 @@ fun StatSheetRow(
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box(
-            modifier = Modifier.width(100.dp).height(50.dp), //.background(color = Color.Red),
-//            horizontalAlignment = Alignment.CenterHorizontally
+            modifier = Modifier.width(100.dp).height(50.dp),
         ) {
             when (statSheetType) {
                 StatSheetType.Button -> {

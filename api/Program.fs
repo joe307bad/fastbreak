@@ -296,7 +296,7 @@ let scheduleJobs () =
     let easternTimeZone = TimeZoneInfo.FindSystemTimeZoneById("Eastern Standard Time")
     let recurringJobOptions = RecurringJobOptions(TimeZone = easternTimeZone)
 
-    RecurringJob.AddOrUpdate("daily-job", dailyJobCall, "*/1 * * * *")
+    RecurringJob.AddOrUpdate("daily-job", dailyJobCall, "30 3 * * *")
     RecurringJob.AddOrUpdate("fastbreak-card-results-job", fastbreakCardResultsCall, "0 4 * * *", recurringJobOptions)
     RecurringJob.AddOrUpdate("stat-sheets-job", statSheetsCall, "0 4 * * *", recurringJobOptions)
     RecurringJob.AddOrUpdate("leaderboard-job", leaderboardCall, "0 4 * * *", recurringJobOptions)

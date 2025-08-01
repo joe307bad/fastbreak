@@ -226,6 +226,14 @@ let pullSchedules
 
             let! cardItems = emptyFastbreakCard |> Async.AwaitTask
 
+            // Insert schedules into schedules collection
+            let scheduleInsertTasks =
+                schedules
+                |> Seq.map (fun schedule ->
+                    insertSchedule (schedule, database, schedule.league, date) |> Async.AwaitTask)
+
+            let! _ = scheduleInsertTasks |> Async.Sequential
+
             let filter = Builders<EmptyFastbreakCard>.Filter.Eq("date", date)
 
             let updateOptions = ReplaceOptions(IsUpsert = true)

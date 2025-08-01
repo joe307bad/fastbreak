@@ -86,7 +86,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tag_name: v0.0.1-alpha-${{ steps.build_info.outputs.build_number }}
-          release_name: Release v0.0.1-alpha-${{ steps.build_info.outputs.build_number }}
+          release_name: Fastbreak v0.0.1-alpha-${{ steps.build_info.outputs.build_number }}
           body: |
             ## Fastbreak v0.0.1-alpha-${{ steps.build_info.outputs.build_number }}
             

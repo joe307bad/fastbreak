@@ -26,8 +26,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
-import com.joebad.fastbreak.Theme
-import com.joebad.fastbreak.ThemePreference
 import com.joebad.fastbreak.ui.PhysicalButton
 import com.joebad.fastbreak.ui.Title
 import com.joebad.fastbreak.ui.theme.LocalColors
@@ -160,12 +158,8 @@ fun StatSheetRow(
 @Composable
 fun DrawerContent(
     onShowLastweeksFastbreakCard: () -> Unit,
-    themePreference: ThemePreference,
-    onToggleTheme: (theme: Theme) -> Unit,
     goToSettings: () -> Unit,
     statSheetItems: List<StatSheetItemView>?,
-    lastFetchedDate: Long,
-    onSync: () -> Unit,
     username: String,
     onShowStatSheetHelp: () -> Unit
 ) {
@@ -249,7 +243,7 @@ fun DrawerContent(
                         }
                     }
                     Spacer(modifier = Modifier.height(10.dp))
-                    if (statSheetItems.isNullOrEmpty() || statSheetItems.any { i -> i.leftColumnText == "null" }) {
+                    if (statSheetItems.isNullOrEmpty()) {
                         Text(
                             text = "No Stat Sheet found. Check back tomorrow.",
                             color = colors.onPrimary,

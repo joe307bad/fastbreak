@@ -239,8 +239,6 @@ fun ProtectedContent(
 //            ThemeSelector(themePreference = themePreference, onToggleTheme = onToggleTheme)
             DrawerContent(
                 onShowLastweeksFastbreakCard = { showLastweeksFastbreakCard.value = true },
-                themePreference = themePreference,
-                onToggleTheme = onToggleTheme,
                 goToSettings = {
                     scope.launch {
                         launch { drawerState.close() }
@@ -252,12 +250,6 @@ fun ProtectedContent(
                     }
                 },
                 statSheetItems = state?.statSheetItems,
-                lastFetchedDate = dailyFastbreak?.lastFetchedDate ?: 0,
-                onSync = {
-                    scope.launch(Dispatchers.IO) {
-                        syncData(true)
-                    }
-                },
                 username = authRepository.getUser()?.userName ?: "",
                 onShowStatSheetHelp = { openHelpSheet(HelpPage.STAT_SHEET) }
             )

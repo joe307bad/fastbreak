@@ -39,18 +39,18 @@ fun lighten(color: Color, factor: Float = 0.2f): Color {
 }
 
 val LightThemeColors = AppColors(
-    background = Color(0xFFF8E8F8),
-    text = Color(0xFF4A2040),
-    primary = darken(Color(0xFFFFA6C9), 0.7f),
-    primaryVariant = Color(0xFFFF78A9),
-    onPrimary = Color(0xFF4A2040),
+    background = Color(0xFFF8F3FF),
+    text = Color(0xFF4A3957),
+    primary = Color(0xFFB8A9E3),
+    primaryVariant = Color(0xFFA394D6),
+    onPrimary = Color(0xFF4A3957),
     secondary = Color(0xFFD8B4F8),
-    onSecondary = Color(0xFF4A2040),
-    secondaryVariant = Color(0xFFC084F5),
-    accent = Color(0xFFFFC75F),
-    onAccent = darken(Color(0xFFFFC75F), 0.5f),
-    error = Color(0xFFE53E3E),
-    onError = Color(0xFFFFFFFF)
+    onSecondary = Color(0xFF4A3957),
+    secondaryVariant = Color(0xFFC8A6F0),
+    accent = Color(0xFFA8E6CF),
+    onAccent = Color(0xFF2D5A42),
+    error = Color(0xFFE8949C),
+    onError = Color(0xFF8B2635)
 )
 
 val DarkThemeColors = AppColors(

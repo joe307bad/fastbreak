@@ -4,3 +4,4 @@ kotlin-js-store/**/*
 /iosApp/CouchbaseLite.xcframework
 /shared/shared.podspec
 /androidApp/src/main/assets/font/CodeBold.otf
+/release-keystore.jks

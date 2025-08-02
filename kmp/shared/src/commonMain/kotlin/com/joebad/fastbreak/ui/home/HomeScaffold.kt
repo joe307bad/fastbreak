@@ -143,7 +143,7 @@ fun HomeScaffold(
                 Column(modifier = Modifier.zIndex(2f)) {
                     when (child.instance) {
                         is ProtectedComponent.Child.Settings -> {
-                            SettingsScreen(dailyFastbreak?.lastFetchedDate ?: 0, onSync, themePreference, onToggleTheme)
+                            SettingsScreen(dailyFastbreak?.lastFetchedDate ?: 0, onSync, themePreference, onToggleTheme, error)
                         }
 
                         is ProtectedComponent.Child.Home -> {

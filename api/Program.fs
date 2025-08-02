@@ -173,7 +173,7 @@ let getEasternTime (addDays) =
     (formatted, dateTime)
 
 type JobRunner =
-    static member DailyJob() =
+    static member SchedulePuller() =
         if enableDailyJob then
             dailyJob enableSchedulePuller database
         else
@@ -270,7 +270,7 @@ type JobRunner =
 let scheduleJobs () =
     let dailyJobCall: Expression<Action<JobRunner>> =
         Expression.Lambda<Action<JobRunner>>(
-            Expression.Call(typeof<JobRunner>.GetMethod("DailyJob")),
+            Expression.Call(typeof<JobRunner>.GetMethod("SchedulePuller")),
             Expression.Parameter(typeof<JobRunner>, "x")
         )
 
@@ -296,10 +296,12 @@ let scheduleJobs () =
     let easternTimeZone = TimeZoneInfo.FindSystemTimeZoneById("Eastern Standard Time")
     let recurringJobOptions = RecurringJobOptions(TimeZone = easternTimeZone)
 
-    RecurringJob.AddOrUpdate("daily-job", dailyJobCall, "30 3 * * *")
-    RecurringJob.AddOrUpdate("fastbreak-card-results-job", fastbreakCardResultsCall, "0 4 * * *", recurringJobOptions)
-    RecurringJob.AddOrUpdate("stat-sheets-job", statSheetsCall, "0 4 * * *", recurringJobOptions)
-    RecurringJob.AddOrUpdate("leaderboard-job", leaderboardCall, "0 4 * * *", recurringJobOptions)
+    // Daily job runs at 4:30 AM ET, 30 minutes before other jobs
+    RecurringJob.AddOrUpdate("daily-job", dailyJobCall, "30 4 * * *")
+    // Other jobs run at 5:00 AM ET daily, after schedule data is pulled
+    RecurringJob.AddOrUpdate("fastbreak-card-results-job", fastbreakCardResultsCall, "0 5 * * *", recurringJobOptions)
+    RecurringJob.AddOrUpdate("stat-sheets-job", statSheetsCall, "0 5 * * *", recurringJobOptions)
+    RecurringJob.AddOrUpdate("leaderboard-job", leaderboardCall, "0 5 * * *", recurringJobOptions)
 
 let configureApp (app: IApplicationBuilder) =
     app.UseHangfireDashboard() |> ignore
@@ -307,7 +309,7 @@ let configureApp (app: IApplicationBuilder) =
 
     let immediateJobCall: Expression<Action<JobRunner>> =
         Expression.Lambda<Action<JobRunner>>(
-            Expression.Call(typeof<JobRunner>.GetMethod("DailyJob")),
+            Expression.Call(typeof<JobRunner>.GetMethod("SchedulePuller")),
             Expression.Parameter(typeof<JobRunner>, "x")
         )
 

@@ -27,7 +27,8 @@ fun SettingsScreen(
     lastFetchedDate: Long,
     onSync: () -> Unit,
     themePreference: ThemePreference,
-    onToggleTheme: (theme: Theme) -> Unit
+    onToggleTheme: (theme: Theme) -> Unit,
+    error: String? = null
 ) {
     val colors = LocalColors.current;
     Column(
@@ -63,6 +64,18 @@ fun SettingsScreen(
                         "SYNC",
                         color = colors.onSecondary,
                         fontWeight = FontWeight.Bold
+                    )
+                }
+                
+                // Display error message if sync fails
+                error?.let { errorMessage ->
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = errorMessage,
+                        color = colors.error,
+                        style = MaterialTheme.typography.body2,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
                     )
                 }
             }

@@ -132,10 +132,4 @@ let calculateStatSheets (database: IMongoDatabase, twoDaysAgo, yesterday, today,
             |> Seq.toList
 
         updateStatSheets database userIds |> ignore
-
-    // 2. (weekly) last weeks total of all fastbreak cards
-    // 6. (weekly) number of weekly wins
-    // other data:
-    // - date the stat sheet was last calculated
-    // collection.BulkWrite(toStatSheetWriteModels statSheets) |> ignore
     }

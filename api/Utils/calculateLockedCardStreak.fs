@@ -11,109 +11,90 @@ let calculateLockedCardStreak (database: IMongoDatabase) (statSheet: StatSheet o
     let lockedCardsCollection =
         database.GetCollection<FastbreakSelectionState>("locked-fastbreak-cards")
 
-    let today = DateTime.Now.ToString("yyyyMMdd")
-    let yesterday = DateTime.Now.AddDays(-1).ToString("yyyyMMdd")
-
-    let parseDate (dateStr: string) =
-        DateTime.ParseExact(dateStr, "yyyyMMdd", System.Globalization.CultureInfo.InvariantCulture)
+    // Use Eastern Time for consistency with the rest of the app
+    let easternZone = TimeZoneInfo.FindSystemTimeZoneById("Eastern Standard Time")
+    let easternNow = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, easternZone)
+    let today = easternNow.Date
+    let yesterday = today.AddDays(-1.0)
+    let yesterdayStr = yesterday.ToString("yyyyMMdd")
+    
+    printf ($"Today: {today:yyyyMMdd}, Yesterday: {yesterdayStr} for user {userId}\n")
 
     // Check for early return with recent stat sheet
     match statSheet with
-    | Some sheet when sheet.date >= yesterday ->
+    | Some sheet when sheet.date >= yesterdayStr ->
         printf ($"No new locked card streak will be calculated since a recent stat sheet was found for user {userId}\n")
         // Recent stat sheet exists, return its values directly
         { longest = sheet.items.lockedCardStreak.longest
           current = sheet.items.lockedCardStreak.current }
-    | None ->
-        printf ($"Calculating new locked card streak using all cards since there is no stat sheet for user {userId}\n")
+    | _ ->
+        // Determine query start date based on stat sheet
+        let (startDate, existingStreak) =
+            match statSheet with
+            | None -> 
+                printf ($"Calculating new locked card streak using all cards since there is no stat sheet for user {userId}\n")
+                (DateTime.MinValue, { longest = 0; current = 0 })
+            | Some sheet ->
+                let sheetDate = DateTime.ParseExact(sheet.date, "yyyyMMdd", System.Globalization.CultureInfo.InvariantCulture)
+                printf ($"Calculating locked card streak starting from {sheet.date} for user {userId}\n")
+                (sheetDate, sheet.items.lockedCardStreak)
 
-        // Get all locked cards for this user
-        let lockedCards =
-            let filter =
-                Builders<FastbreakSelectionState>.Filter
-                    .And(Builders<FastbreakSelectionState>.Filter.Eq(_.userId, userId))
+        // Single optimized query with proper date range  
+        let filter =
+            Builders<FastbreakSelectionState>.Filter.And(
+                Builders<FastbreakSelectionState>.Filter.Eq(_.userId, userId),
+                Builders<FastbreakSelectionState>.Filter.Gt(_.date, startDate.ToString("yyyyMMdd")),
+                Builders<FastbreakSelectionState>.Filter.Lte(_.date, yesterdayStr)
+            )
 
-            lockedCardsCollection.Find(filter).ToListAsync()
+        // Get locked dates efficiently
+        let lockedDates =
+            lockedCardsCollection
+                .Find(filter)
+                .ToListAsync()
             |> Async.AwaitTask
             |> Async.RunSynchronously
+            |> Seq.map (fun card -> card.date)
+            |> Set.ofSeq
+            
+        let datesString = String.Join(", ", lockedDates |> Set.toArray |> Array.sort)
+        printf ($"Found locked dates for user {userId}: {datesString}\n")
 
-        // Sort locked cards by date (newest to oldest)
-        let sortedCards =
-            [ for card in lockedCards -> card.date, card ] |> List.sortByDescending fst
+        // Efficiently calculate streak using iterative approach
+        let calculateStreakFromDate (startDate: DateTime) =
+            let mutable currentDate = yesterday
+            let mutable streakCount = 0
+            let mutable continueStreak = true
+            
+            printf ($"Starting streak calculation from {yesterdayStr} for user {userId}\n")
+            
+            // Count backwards from yesterday until we find a gap
+            while continueStreak && currentDate >= startDate do
+                let dateStr = currentDate.ToString("yyyyMMdd")
+                printf ($"Checking date {dateStr} for user {userId}\n")
+                if lockedDates.Contains(dateStr) then
+                    streakCount <- streakCount + 1
+                    printf ($"Found locked card on {dateStr}, streak count now {streakCount} for user {userId}\n")
+                    currentDate <- currentDate.AddDays(-1.0)
+                else
+                    printf ($"No locked card found on {dateStr}, ending streak for user {userId}\n")
+                    continueStreak <- false
+            
+            // Check if we can continue the streak from an existing stat sheet
+            match statSheet with
+            | Some sheet when continueStreak && currentDate <= DateTime.ParseExact(sheet.date, "yyyyMMdd", System.Globalization.CultureInfo.InvariantCulture) ->
+                // Streak continues back to the stat sheet date, add existing streak
+                let totalCurrent = existingStreak.current + streakCount
+                printf ($"Continuing streak from stat sheet: {existingStreak.current} + {streakCount} = {totalCurrent} for user {userId}\n")
+                { longest = max totalCurrent existingStreak.longest; current = totalCurrent }
+            | _ ->
+                // Fresh streak or gap found
+                let newCurrent = streakCount
+                let newLongest = 
+                    match statSheet with
+                    | Some _ -> max newCurrent existingStreak.longest
+                    | None -> newCurrent
+                printf ($"Fresh streak calculated: current={newCurrent}, longest={newLongest} for user {userId}\n")
+                { longest = newLongest; current = newCurrent }
 
-        // Create a set of dates when cards were locked
-        let lockedDates = sortedCards |> List.map fst |> Set.ofList
-
-        // Calculate the current streak starting from a given day
-        let rec calculateCurrentStreak (currentDate: string) count =
-            if not (lockedDates.Contains currentDate) then
-                // Found a gap, current streak ends
-                count
-            else
-                // Continue counting
-                calculateCurrentStreak ((parseDate currentDate).AddDays(-1.0).ToString("yyyyMMdd")) (count + 1)
-
-        // No statSheet provided, calculate streak starting from yesterday
-        let current = calculateCurrentStreak yesterday 0
-        { longest = current; current = current }
-
-    | Some sheet ->
-        printf (
-            $"Calculating the locked card streak starting with {sheet.date} since the latest stat sheet for user {userId} is older than yesterday\n"
-        )
-
-        // Get locked cards since the date of the stat sheet
-        let lockedCards =
-            let filter =
-                Builders<FastbreakSelectionState>.Filter
-                    .And(
-                        Builders<FastbreakSelectionState>.Filter.Eq(_.userId, userId),
-                        Builders<FastbreakSelectionState>.Filter.Gt(_.date, sheet.date),
-                        Builders<FastbreakSelectionState>.Filter.Lt(_.date, today)
-                    )
-
-            lockedCardsCollection.Find(filter).ToListAsync()
-            |> Async.AwaitTask
-            |> Async.RunSynchronously
-
-        // Sort locked cards by date (newest to oldest)
-        let sortedCards =
-            [ for card in lockedCards -> card.date, card ] |> List.sortByDescending fst
-
-        // Create a set of dates when cards were locked
-        let lockedDates = sortedCards |> List.map fst |> Set.ofList
-
-        // Calculate the current streak starting from a given day
-        let rec calculateCurrentStreak (currentDate: string) count =
-            if not (lockedDates.Contains currentDate) then
-                // Found a gap, current streak ends
-                count
-            else
-                // Continue counting
-                calculateCurrentStreak ((parseDate currentDate).AddDays(-1.0).ToString("yyyyMMdd")) (count + 1)
-
-        // Check if there's a continuous streak from statSheet date to yesterday
-        let rec isStreakFromStatSheetDate (currentDate: string) =
-            if currentDate = sheet.date then
-                // We've gone past the statSheet date, so streak is continuous
-                true
-            elif not (lockedDates.Contains currentDate) then
-                // Found a gap in the streak
-                false
-            else
-                // Continue checking previous day
-                isStreakFromStatSheetDate ((parseDate currentDate).AddDays(-1.0).ToString("yyyyMMdd"))
-
-        if isStreakFromStatSheetDate yesterday then
-            let daysFromStatSheetToYesterday =
-                int ((parseDate yesterday) - (parseDate sheet.date)).TotalDays - 1
-
-            let current = sheet.items.lockedCardStreak.current + daysFromStatSheetToYesterday
-            let longest = max current sheet.items.lockedCardStreak.longest
-            { longest = longest; current = current }
-        else
-            // Start fresh from yesterday
-            let current = calculateCurrentStreak yesterday 0
-
-            { longest = max current sheet.items.lockedCardStreak.longest
-              current = current }
+        calculateStreakFromDate startDate

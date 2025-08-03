@@ -87,5 +87,5 @@ let calculateFastbreakCardResults (database: IMongoDatabase) =
             if results.Length > 0 then
                 lockedCardsCollection.BulkWrite(toSelectionStateWriteModels results) |> ignore
 
-        ""
+        ()
     }

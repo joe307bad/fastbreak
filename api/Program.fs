@@ -337,10 +337,62 @@ let healthHandler: HttpHandler =
                timestamp = DateTime.UtcNow |}
         )
 
+let isLocalRequest (ctx: Microsoft.AspNetCore.Http.HttpContext) =
+    let remoteIp = ctx.Connection.RemoteIpAddress
+    remoteIp.ToString() = "127.0.0.1" || remoteIp.ToString() = "::1"
+
+let triggerAllJobsHandler: HttpHandler =
+    fun next ctx ->
+        if isLocalRequest ctx then
+            try
+                let jobs = [
+                    ("FastbreakCardResultsJob", fun () -> JobRunner.FastbreakCardResultsJob())
+                    ("StatSheetsJob", fun () -> JobRunner.StatSheetsJob())
+                    ("LeaderboardJob", fun () -> JobRunner.LeaderboardJob())
+                ]
+                
+                let jobIds = 
+                    jobs 
+                    |> List.map (fun (jobName, _) ->
+                        let jobCall: Expression<Action<JobRunner>> =
+                            Expression.Lambda<Action<JobRunner>>(
+                                Expression.Call(typeof<JobRunner>.GetMethod(jobName)),
+                                Expression.Parameter(typeof<JobRunner>, "x")
+                            )
+                        let jobId = BackgroundJob.Enqueue(jobCall)
+                        (jobName, jobId)
+                    )
+                
+                ctx.WriteJsonAsync(
+                    {| status = "success"
+                       message = "All non-daily jobs enqueued successfully"
+                       jobs = jobIds
+                       timestamp = DateTime.UtcNow |}
+                )
+            with ex ->
+                ctx.Response.StatusCode <- 500
+                ctx.WriteJsonAsync(
+                    {| status = "error"
+                       message = ex.Message
+                       timestamp = DateTime.UtcNow |}
+                )
+        else
+            ctx.Response.StatusCode <- 403
+            ctx.WriteJsonAsync(
+                {| status = "forbidden"
+                   message = "forbidden"
+                   timestamp = DateTime.UtcNow |}
+            )
+
 let appRouter =
     router {
         get "/" healthHandler
         forward "/api" apiRouter
+        // This can be triggered from a local machine by connecting to the prod db and hitting this endpoint
+        // the jobs will be queued by the prod hangfire instance and executed on the prod server
+#if DEBUG
+        post "/trigger/all-jobs" triggerAllJobsHandler
+#endif
     }
 
 let configureJson (services: IServiceCollection) =

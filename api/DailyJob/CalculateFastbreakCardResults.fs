@@ -10,6 +10,7 @@ let calculateResults
     (correctAnswers: System.Collections.Generic.IDictionary<string, EmptyFastbreakCardItem>)
     (selectionStates: FastbreakSelectionState seq)
     =
+    
     selectionStates
     |> Seq.map (fun state ->
         let correctSelections, incorrectSelections =
@@ -76,7 +77,7 @@ let calculateFastbreakCardResults (database: IMongoDatabase) =
                     .Find(fun x -> x.date = card.date)
                     .ToList()
                 |> Seq.collect _.items
-                |> Seq.map (fun item -> item.id, item) // Replace `item.id` with your actual key
+                |> Seq.map (fun item -> item.id, item)
                 |> dict
 
             printf ($"Processed locked card for user {card.userId} and date {card.date}\n")

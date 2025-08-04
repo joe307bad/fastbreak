@@ -82,8 +82,8 @@ class FastbreakStateRepository(
                 DailyFastbreak(
                     leaderboard = it.leaderboard,
                     fastbreakCard = response.fastbreakCard,
-                    statSheet = it.statSheetForUser,
-                    lastLockedCardResults = it.lastLockedCardResults,
+                    statSheet = response.statSheetForUser,
+                    lastLockedCardResults = response.lastLockedCardResults,
                     lastFetchedDate = getLastFetchedTime()
                 )
             }

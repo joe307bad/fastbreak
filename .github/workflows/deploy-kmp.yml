@@ -90,8 +90,6 @@ jobs:
           tag_name: v0.0.1-alpha-${{ steps.build_info.outputs.build_number }}
           release_name: Fastbreak v0.0.1-alpha-${{ steps.build_info.outputs.build_number }}
           body: |
-            ## Fastbreak v0.0.1-alpha-${{ steps.build_info.outputs.build_number }}
-            
             **Build Info:**
             - Build Number: ${{ steps.build_info.outputs.build_number }}
             - Timestamp: ${{ steps.build_info.outputs.timestamp }}

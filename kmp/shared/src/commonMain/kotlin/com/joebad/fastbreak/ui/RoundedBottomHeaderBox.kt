@@ -38,7 +38,6 @@ fun Title(title: String, animatedAlpha: Float? = null) {
 @Composable
 fun RoundedBottomHeaderBox(
     title: String,
-    subtitle: String,
     secondText: String,
     animatedAlpha: Float
 ) {
@@ -59,14 +58,10 @@ fun RoundedBottomHeaderBox(
             Title(title, animatedAlpha)
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = subtitle,
-                color = colors.onPrimary.copy(alpha = animatedAlpha),
-                textAlign = TextAlign.Center
-            )
-            Text(
                 text = secondText,
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Normal,
                 color = colors.onPrimary.copy(alpha = animatedAlpha),
-                modifier = Modifier.padding(top = 8.dp),
                 textAlign = TextAlign.Center
             )
         }

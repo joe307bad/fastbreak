@@ -63,7 +63,7 @@ fun HomeScreen(
         ) {
             item {
                 Spacer(
-                    modifier = Modifier.height(130.dp)
+                    modifier = Modifier.height(105.dp)
                 )
                 if (error != null) {
                     // Show error message instead of loading
@@ -78,7 +78,6 @@ fun HomeScreen(
         Box(modifier = Modifier.zIndex(1f)) {
             RoundedBottomHeaderBox(
                 "FASTBREAK",
-                "Daily sports pick-em and trivia",
                 headerSubtitle,
                 animatedAlpha = animatedAlpha
             )

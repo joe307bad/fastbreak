@@ -22,6 +22,7 @@ import com.joebad.fastbreak.Theme
 import com.joebad.fastbreak.createRootComponent
 import com.joebad.fastbreak.initFontLoader
 import com.joebad.fastbreak.ui.theme.AppTheme
+import com.joebad.fastbreak.util.AppVersion
 import com.liftric.kvault.KVault
 import kotlinx.coroutines.launch
 
@@ -29,6 +30,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         initFontLoader(applicationContext)
+        AppVersion.initialize(applicationContext)
 
         val kvault = KVault(applicationContext, "auth_secure_storage")
         val authRepository = AuthRepository(kvault)

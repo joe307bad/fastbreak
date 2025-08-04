@@ -231,13 +231,13 @@ fun DrawerContent(
                         SmallFloatingActionButton(
                             onClick = onShowStatSheetHelp,
                             modifier = Modifier.padding(start = 8.dp),
-                            containerColor = colors.primary,
+                            containerColor = androidx.compose.ui.graphics.Color.Transparent,
                             elevation = FloatingActionButtonDefaults.elevation(0.dp)
                         ) {
                             CupertinoIcon(
                                 imageVector = CupertinoIcons.Outlined.QuestionmarkCircle,
                                 contentDescription = "Stat Sheet Help",
-                                tint = colors.text,
+                                tint = colors.onPrimary,
                                 modifier = Modifier.width(16.dp).height(16.dp)
                             )
                         }

@@ -179,6 +179,9 @@ fun HomeScaffold(
                 }
 
                 Row(modifier = Modifier.fillMaxWidth().zIndex(5f)) {
+                    val isHomeScreen = activeChild.instance is ProtectedComponent.Child.Home
+                    val buttonBackgroundColor = if (isHomeScreen) colors.primary else androidx.compose.ui.graphics.Color.Transparent
+                    
                     SmallFloatingActionButton(
                         onClick = {
                             scope.launch {
@@ -193,7 +196,7 @@ fun HomeScaffold(
                             .padding(16.dp)
                             .offset(x = (-5).dp, y = 0.dp)
                             .zIndex(3f),
-                        containerColor = colors.primary,
+                        containerColor = buttonBackgroundColor,
                         elevation = FloatingActionButtonDefaults.elevation(0.dp)
                     ) {
                         Icon(
@@ -212,13 +215,13 @@ fun HomeScaffold(
                             .offset(x = 5.dp, y = 0.dp)
                             .padding(16.dp)
                             .zIndex(5f),
-                        containerColor = colors.primary,
+                        containerColor = buttonBackgroundColor,
                         elevation = FloatingActionButtonDefaults.elevation(0.dp)
                     ) {
                         CupertinoIcon(
                             imageVector = CupertinoIcons.Outlined.QuestionmarkCircle,
                             contentDescription = "How to play",
-                            tint = colors.text,
+                            tint = colors.onPrimary,
                             modifier = Modifier.size(22.dp)
                         )
                     }

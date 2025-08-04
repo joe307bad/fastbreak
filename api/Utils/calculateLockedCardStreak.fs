@@ -82,10 +82,17 @@ let calculateLockedCardStreak (database: IMongoDatabase) (statSheet: StatSheet o
             
             // Check if we can continue the streak from an existing stat sheet
             match statSheet with
-            | Some sheet when continueStreak && currentDate <= DateTime.ParseExact(sheet.date, "yyyyMMdd", System.Globalization.CultureInfo.InvariantCulture) ->
+            | Some sheet when continueStreak && currentDate >= DateTime.ParseExact(sheet.date, "yyyyMMdd", System.Globalization.CultureInfo.InvariantCulture) ->
                 // Streak continues back to the stat sheet date, add existing streak
                 let totalCurrent = existingStreak.current + streakCount
-                printf ($"Continuing streak from stat sheet: {existingStreak.current} + {streakCount} = {totalCurrent} for user {userId}\n")
+                printf $"Continuing streak from stat sheet: {existingStreak.current} + {streakCount} = {totalCurrent} for user {userId}\n"
+                { longest = max totalCurrent existingStreak.longest; current = totalCurrent }
+            | Some _ when continueStreak ->
+                // We've gone past the stat sheet date, but streak is still continuing
+                // This means there might be a gap between stat sheet and our current data
+                // Add the existing streak from the stat sheet
+                let totalCurrent = existingStreak.current + streakCount
+                printf $"Continuing streak past stat sheet date: {existingStreak.current} + {streakCount} = {totalCurrent} for user {userId}\n"
                 { longest = max totalCurrent existingStreak.longest; current = totalCurrent }
             | _ ->
                 // Fresh streak or gap found
@@ -94,7 +101,7 @@ let calculateLockedCardStreak (database: IMongoDatabase) (statSheet: StatSheet o
                     match statSheet with
                     | Some _ -> max newCurrent existingStreak.longest
                     | None -> newCurrent
-                printf ($"Fresh streak calculated: current={newCurrent}, longest={newLongest} for user {userId}\n")
+                printf $"Fresh streak calculated: current={newCurrent}, longest={newLongest} for user {userId}\n"
                 { longest = newLongest; current = newCurrent }
 
         calculateStreakFromDate startDate

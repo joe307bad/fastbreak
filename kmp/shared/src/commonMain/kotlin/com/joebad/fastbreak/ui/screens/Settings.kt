@@ -20,6 +20,7 @@ import com.joebad.fastbreak.ThemePreference
 import com.joebad.fastbreak.ui.PhysicalButton
 import com.joebad.fastbreak.ui.theme.LocalColors
 import com.joebad.fastbreak.ui.theme.darken
+import com.joebad.fastbreak.util.AppVersion
 
 
 @Composable
@@ -67,7 +68,6 @@ fun SettingsScreen(
                     )
                 }
                 
-                // Display error message if sync fails
                 error?.let { errorMessage ->
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
@@ -95,5 +95,13 @@ fun SettingsScreen(
             ThemeSelector(themePreference = themePreference, onToggleTheme = onToggleTheme)
             Spacer(modifier = Modifier.height(10.dp))
         }
+        Text(
+            text = "v${AppVersion.getVersionName()}",
+            color = colors.text.copy(alpha = 0.6f),
+            style = MaterialTheme.typography.caption,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
+        )
+        
     }
 }

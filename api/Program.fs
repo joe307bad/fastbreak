@@ -295,8 +295,6 @@ let scheduleJobs () =
     // Schedule jobs with timezone awareness for ET
     let easternTimeZone = TimeZoneInfo.FindSystemTimeZoneById("Eastern Standard Time")
     let recurringJobOptions = RecurringJobOptions(TimeZone = easternTimeZone)
-    
-    JobRunner.StatSheetsJob ()
 
     // Daily job runs at 4:30 AM ET, 30 minutes before other jobs
     RecurringJob.AddOrUpdate("daily-job", dailyJobCall, "30 4 * * *")

@@ -27,9 +27,9 @@ import com.arkivanov.decompose.router.stack.replaceAll
 import com.arkivanov.decompose.value.Value
 import com.arkivanov.essenty.lifecycle.LifecycleRegistry
 import com.joebad.fastbreak.data.dailyFastbreak.FastbreakSelectionState
-import com.joebad.fastbreak.data.dailyFastbreak.FastbreakStateRepository
 import com.joebad.fastbreak.ui.screens.LoginScreen
 import com.joebad.fastbreak.ui.theme.LocalColors
+import kotbase.Database
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -170,36 +170,6 @@ fun createRootComponent(authRepository: AuthRepository): RootComponent {
     return RootComponent(DefaultComponentContext(LifecycleRegistry()), authRepository)
 }
 
-fun onLock(
-    dailyFastbreakRepository: FastbreakStateRepository,
-    coroutineScope: CoroutineScope,
-    state: FastbreakSelectionState,
-    viewModel: com.joebad.fastbreak.data.dailyFastbreak.FastbreakViewModel?
-) {
-    coroutineScope.launch {
-        try {
-            val result = dailyFastbreakRepository.lockCardApi(state)
-            when (result) {
-                is com.joebad.fastbreak.data.dailyFastbreak.LockCardResult.Success -> {
-                    println("Card locked successfully: ${result.response.id}")
-                }
-                is com.joebad.fastbreak.data.dailyFastbreak.LockCardResult.AuthenticationRequired -> {
-                    println("Authentication required, showing signin bottom sheet")
-                    viewModel?.unlockCard()
-                    viewModel?.showSigninBottomSheet()
-                }
-                is com.joebad.fastbreak.data.dailyFastbreak.LockCardResult.Error -> {
-                    println("Error locking card: ${result.message}")
-                    viewModel?.unlockCard()
-                }
-            }
-        } catch (e: Exception) {
-            println("Exception locking card: ${e.message}")
-            viewModel?.unlockCard()
-        }
-    }
-}
-
 @Composable
 fun App(
     rootComponent: RootComponent,
@@ -212,11 +182,11 @@ fun App(
     val colors = LocalColors.current;
     val lockedCard: MutableState<FastbreakSelectionState?> = mutableStateOf(null)
 
-//    try {
-//        Database.delete("fastbreak")
-//    } catch (e: Exception) {
-//        println("Database already deleted")
-//    }
+    try {
+        Database.delete("fastbreak")
+    } catch (e: Exception) {
+        println("Database already deleted")
+    }
 
     MaterialTheme {
         Surface(color = colors.background) {

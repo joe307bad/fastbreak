@@ -52,7 +52,7 @@
           {
             "id": "567",
             "type": "trivia-multiple-choice",
-            "question": "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua?",
+            "question": "Who holds the NBA record for most 3-pointers made in a career?",
             "answer1": "Stephen Curry",
             "answer2": "Reggie Miller",
             "answer3": "Ray Allen",
@@ -63,7 +63,7 @@
           {
             "id": "098",
             "type": "trivia-tf",
-            "question": "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua?",
+            "question": "The Golden State Warriors won the 2022 NBA Championship.",
             "correctAnswer": "true",
             "points": 200
           }
@@ -77,116 +77,448 @@
   {
     "httpRequest": {
       "method": "GET",
-      "path": "api/user/123"
+      "path": "/api/day/20250805"
     },
     "httpResponse": {
       "statusCode": 200,
+      "headers": {
+        "Content-Type": [
+          "application/json"
+        ]
+      },
       "body": {
-        "statSheet": {
-          "streaks": [
+        "leaderboard": {
+          "dailyLeaderboards": [
             {
-              "text": "Days in a row locking in my Fastbreak card",
-              "value": 1234
-            },
-            {
-              "text": "Days in a row with a correct pick-em",
-              "value": 1234
-            },
-            {
-              "text": "Days in a row with a correct trivia answer",
-              "value": 1234
+              "dateCode": "20250805",
+              "entries": [
+                {
+                  "userId": "user-123",
+                  "userName": "joebad",
+                  "points": 2450
+                },
+                {
+                  "userId": "user-456",
+                  "userName": "bilbo-baggins",
+                  "points": 2200
+                },
+                {
+                  "userId": "user-789",
+                  "userName": "legolas",
+                  "points": 1980
+                }
+              ]
             }
           ],
-          "totals": [
+          "weeklyTotals": [
             {
-              "text": "Yesterday's Fastbreak card total",
-              "value": 12123
+              "userId": "user-123",
+              "userName": "joebad",
+              "points": 15420
             },
             {
-              "text": "Current week's total\nWeek 10",
-              "value": 12123
+              "userId": "user-456",
+              "userName": "bilbo-baggins",
+              "points": 14890
             },
             {
-              "text": "Last week's total\nWeek 9",
-              "value": 12123
-            },
-            {
-              "text": "Current season total\n2025",
-              "value": 12123
-            },
-            {
-              "text": "My all-time highest Fastbreak card",
-              "value": 234324
-            },
-            {
-              "text": "Number of weekly wins",
-              "value": 23
+              "userId": "user-789",
+              "userName": "legolas",
+              "points": 13200
             }
           ]
         },
-        "yesterdaysFastbreakCard": {
-          "id": "vRdG6b24dHhB",
-          "total": 123123,
-          "totalPossible": 3223324324,
-          "totalCorrect": 10,
-          "totalWrong": 3,
-          "cards": [
-            {
-              "id": "123",
-              "type": "featured-pick-em",
-              "homeTeam": "Philadelphia Eagles",
-              "homeTeamSubtitle": "1st in the North",
-              "awayTeam": "Pittsburgh Steelers",
-              "awayTeamSubtitle": "1st in the North",
-              "dateLine1": "Monday",
-              "dateLine2": "Sept. 10th",
-              "dateLine3": "@ 1pm",
-              "playerPick": "awayTeam",
-              "points": 1000,
-              "correct": true
+        "fastbreakCard": [
+          {
+            "id": "card-001",
+            "type": "featured-pick-em",
+            "homeTeam": "Los Angeles Lakers",
+            "homeTeamSubtitle": "2nd in the West",
+            "awayTeam": "Boston Celtics",
+            "awayTeamSubtitle": "1st in the East",
+            "dateLine1": "Monday",
+            "dateLine2": "Aug. 5th",
+            "dateLine3": "@ 8pm EST",
+            "points": 1500
+          },
+          {
+            "id": "card-002",
+            "type": "pick-em",
+            "homeTeam": "Golden State Warriors",
+            "homeTeamSubtitle": "6th in the West",
+            "awayTeam": "Miami Heat",
+            "awayTeamSubtitle": "8th in the East",
+            "dateLine1": "Monday",
+            "dateLine2": "Aug. 5th",
+            "dateLine3": "@ 10:30pm EST",
+            "points": 1200
+          },
+          {
+            "id": "card-003",
+            "type": "trivia-multiple-choice",
+            "question": "Which player has won the most NBA MVP awards?",
+            "answer1": "Michael Jordan",
+            "answer2": "LeBron James",
+            "answer3": "Kareem Abdul-Jabbar",
+            "answer4": "Magic Johnson",
+            "correctAnswer": "answer3",
+            "points": 300
+          },
+          {
+            "id": "card-004",
+            "type": "trivia-tf",
+            "question": "The NBA season typically starts in October.",
+            "correctAnswer": "true",
+            "points": 150
+          },
+          {
+            "id": "card-005",
+            "type": "pick-em",
+            "homeTeam": "Denver Nuggets",
+            "homeTeamSubtitle": "1st in the West",
+            "awayTeam": "Philadelphia 76ers",
+            "awayTeamSubtitle": "3rd in the East",
+            "dateLine1": "Tuesday",
+            "dateLine2": "Aug. 6th",
+            "dateLine3": "@ 7pm EST",
+            "points": 800
+          }
+        ],
+        "lockedCardForUser": null,
+        "statSheetForUser": {
+          "userId": "user-123",
+          "date": "20250805",
+          "items": {
+            "currentWeek": {
+              "days": [
+                {
+                  "dayOfWeek": "Monday",
+                  "dateCode": "20250804",
+                  "totalPoints": 2100
+                },
+                {
+                  "dayOfWeek": "Tuesday",
+                  "dateCode": "20250805",
+                  "totalPoints": null
+                }
+              ],
+              "total": 2100
             },
-            {
-              "id": "345",
-              "type": "pick-em",
-              "homeTeam": "Chicago Bears",
-              "homeTeamSubtitle": "1st in the North",
-              "awayTeam": "St. Louis Rams",
-              "awayTeamSubtitle": "1st in the North",
-              "dateLine1": "Monday",
-              "dateLine2": "Sept. 10th",
-              "dateLine3": "@ 1pm",
-              "playerPick": "homeTeam",
-              "points": 2000,
-              "correct": true
+            "lastWeek": {
+              "days": [
+                {
+                  "dayOfWeek": "Monday",
+                  "dateCode": "20250728",
+                  "totalPoints": 1850
+                },
+                {
+                  "dayOfWeek": "Tuesday",
+                  "dateCode": "20250729",
+                  "totalPoints": 2200
+                },
+                {
+                  "dayOfWeek": "Wednesday",
+                  "dateCode": "20250730",
+                  "totalPoints": 1900
+                },
+                {
+                  "dayOfWeek": "Thursday",
+                  "dateCode": "20250731",
+                  "totalPoints": 2400
+                },
+                {
+                  "dayOfWeek": "Friday",
+                  "dateCode": "20250801",
+                  "totalPoints": 1650
+                },
+                {
+                  "dayOfWeek": "Saturday",
+                  "dateCode": "20250802",
+                  "totalPoints": 1800
+                },
+                {
+                  "dayOfWeek": "Sunday",
+                  "dateCode": "20250803",
+                  "totalPoints": 2200
+                }
+              ],
+              "total": 14000
             },
-            {
-              "id": "567",
-              "type": "trivia-multiple-choice",
-              "question": "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua?",
-              "answer1": "Stephen Curry",
-              "answer2": "Reggie Miller",
-              "answer3": "Ray Allen",
-              "answer4": "Paul Pierce",
-              "correctAnswer": "answer1",
-              "playerAnswer": "answer2",
-              "points": 100,
-              "correct": false
+            "lockedCardStreak": {
+              "longest": 12,
+              "current": 5
             },
-            {
-              "id": "098",
-              "type": "trivia-tf",
-              "question": "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua?",
-              "correctAnswer": "true",
-              "playerAnswer": "false",
-              "points": 200,
-              "correct": false
-            }
-          ]
-        }
+            "highestFastbreakCardEver": {
+              "date": "20250720",
+              "points": 3950
+            },
+            "perfectFastbreakCards": [
+              {
+                "date": "20250720",
+                "points": 3950
+              },
+              {
+                "date": "20250715",
+                "points": 3200
+              }
+            ]
+          },
+          "createdAt": "2025-08-05T10:30:00Z"
+        },
+        "lastLockedCardResults": null
       }
     },
     "times": {
       "unlimited": true
+    }
+  },
+  {
+    "httpRequest": {
+      "method": "GET",
+      "path": "/api/day/20250804"
+    },
+    "httpResponse": {
+      "statusCode": 200,
+      "headers": {
+        "Content-Type": [
+          "application/json"
+        ]
+      },
+      "body": {
+        "leaderboard": {
+          "dailyLeaderboards": [
+            {
+              "dateCode": "20250804",
+              "entries": [
+                {
+                  "userId": "user-123",
+                  "userName": "joebad",
+                  "points": 2350
+                },
+                {
+                  "userId": "user-456",
+                  "userName": "bilbo-baggins",
+                  "points": 2100
+                },
+                {
+                  "userId": "user-789",
+                  "userName": "legolas",
+                  "points": 1880
+                }
+              ]
+            }
+          ],
+          "weeklyTotals": [
+            {
+              "userId": "user-123",
+              "userName": "joebad",
+              "points": 14320
+            },
+            {
+              "userId": "user-456",
+              "userName": "bilbo-baggins",
+              "points": 13790
+            },
+            {
+              "userId": "user-789",
+              "userName": "legolas",
+              "points": 12100
+            }
+          ]
+        },
+        "fastbreakCard": [
+          {
+            "id": "card-20250804-001",
+            "type": "featured-pick-em",
+            "homeTeam": "New York Knicks",
+            "homeTeamSubtitle": "4th in the East",
+            "awayTeam": "Los Angeles Clippers",
+            "awayTeamSubtitle": "5th in the West",
+            "dateLine1": "Sunday",
+            "dateLine2": "Aug. 4th",
+            "dateLine3": "@ 7pm EST",
+            "points": 1400
+          },
+          {
+            "id": "card-20250804-002",
+            "type": "pick-em",
+            "homeTeam": "Milwaukee Bucks",
+            "homeTeamSubtitle": "2nd in the East",
+            "awayTeam": "Phoenix Suns",
+            "awayTeamSubtitle": "4th in the West",
+            "dateLine1": "Sunday",
+            "dateLine2": "Aug. 4th",
+            "dateLine3": "@ 9:30pm EST",
+            "points": 1100
+          },
+          {
+            "id": "card-20250804-003",
+            "type": "trivia-multiple-choice",
+            "question": "Which team has won the most NBA championships?",
+            "answer1": "Los Angeles Lakers",
+            "answer2": "Boston Celtics",
+            "answer3": "Chicago Bulls",
+            "answer4": "Golden State Warriors",
+            "correctAnswer": "answer2",
+            "points": 250
+          },
+          {
+            "id": "card-20250804-004",
+            "type": "trivia-tf",
+            "question": "An NBA game consists of four 12-minute quarters.",
+            "correctAnswer": "true",
+            "points": 180
+          }
+        ],
+        "lockedCardForUser": null,
+        "statSheetForUser": {
+          "userId": "user-123",
+          "date": "20250804",
+          "items": {
+            "currentWeek": {
+              "days": [
+                {
+                  "dayOfWeek": "Sunday",
+                  "dateCode": "20250804",
+                  "totalPoints": 2350
+                }
+              ],
+              "total": 2350
+            },
+            "lastWeek": {
+              "days": [
+                {
+                  "dayOfWeek": "Monday",
+                  "dateCode": "20250728",
+                  "totalPoints": 1850
+                },
+                {
+                  "dayOfWeek": "Tuesday",
+                  "dateCode": "20250729",
+                  "totalPoints": 2200
+                },
+                {
+                  "dayOfWeek": "Wednesday",
+                  "dateCode": "20250730",
+                  "totalPoints": 1900
+                },
+                {
+                  "dayOfWeek": "Thursday",
+                  "dateCode": "20250731",
+                  "totalPoints": 2400
+                },
+                {
+                  "dayOfWeek": "Friday",
+                  "dateCode": "20250801",
+                  "totalPoints": 1650
+                },
+                {
+                  "dayOfWeek": "Saturday",
+                  "dateCode": "20250802",
+                  "totalPoints": 1800
+                },
+                {
+                  "dayOfWeek": "Sunday",
+                  "dateCode": "20250803",
+                  "totalPoints": 2200
+                }
+              ],
+              "total": 14000
+            },
+            "lockedCardStreak": {
+              "longest": 12,
+              "current": 4
+            },
+            "highestFastbreakCardEver": {
+              "date": "20250720",
+              "points": 3950
+            },
+            "perfectFastbreakCards": [
+              {
+                "date": "20250720",
+                "points": 3950
+              },
+              {
+                "date": "20250715",
+                "points": 3200
+              }
+            ]
+          },
+          "createdAt": "2025-08-04T10:30:00Z"
+        },
+        "lastLockedCardResults": null
+      }
+    },
+    "times": {
+      "unlimited": true
+    }
+  },
+  {
+    "httpRequest": {
+      "method": "POST",
+      "path": "/api/profile/initialize/107604865191991316946"
+    },
+    "httpResponse": {
+      "statusCode": 200,
+      "headers": {
+        "Content-Type": [
+          "application/json"
+        ]
+      },
+      "body": {
+        "userId": "f2f5c433-0038-4393-be94-ace77dd289a5",
+        "userName": "fastbreak-user-42",
+        "lockedFastBreakCard": null
+      }
+    },
+    "times": {
+      "unlimited": true
+    }
+  },
+  {
+    "httpRequest": {
+      "method": "POST",
+      "path": "/api/profile/initialize/.*"
+    },
+    "httpResponse": {
+      "statusCode": 200,
+      "headers": {
+        "Content-Type": [
+          "application/json"
+        ]
+      },
+      "body": {
+        "userId": "generic-user-id-123",
+        "userName": "fastbreak-user-generic",
+        "lockedFastBreakCard": null
+      }
+    },
+    "times": {
+      "unlimited": true
+    }
+  },
+  {
+    "httpRequest": {
+      "method": "POST",
+      "path": "/api/lock",
+      "body": {
+        "type": "JSON"
+      }
+    },
+    "httpResponse": {
+      "statusCode": 401,
+      "headers": {
+        "Content-Type": [
+          "application/json"
+        ]
+      },
+      "body": {
+        "error": "Unauthorized - Authentication required"
+      }
+    },
+    "times": {
+      "remainingTimes": 1,
+      "unlimited": false
     }
   },
   {
@@ -205,7 +537,7 @@
         ]
       },
       "body": {
-        "id": "id-123"
+        "id": "lock-success-123"
       }
     },
     "times": {

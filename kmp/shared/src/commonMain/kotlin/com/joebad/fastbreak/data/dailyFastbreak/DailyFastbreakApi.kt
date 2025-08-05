@@ -32,6 +32,11 @@ sealed class LockCardResult {
     data class Error(val message: String) : LockCardResult()
 }
 
+sealed class DailyFastbreakResult {
+    data class Success(val response: DailyResponse) : DailyFastbreakResult()
+    data class Error(val message: String) : DailyFastbreakResult()
+}
+
 val client = HttpClient {
     install(ContentNegotiation) {
         json(Json {
@@ -45,11 +50,30 @@ val client = HttpClient {
     }
 }
 
-suspend fun getDailyFastbreak(url: String, userId: String? = ""): DailyResponse {
-    return client.get {
-        url(url)
-        parameter("userId", userId)
-    }.body<DailyResponse>()
+suspend fun getDailyFastbreak(url: String, userId: String? = ""): DailyFastbreakResult {
+    return try {
+        val httpResponse = client.get {
+            url(url)
+            parameter("userId", userId)
+        }
+        
+        when (httpResponse.status) {
+            HttpStatusCode.OK -> {
+                val response = httpResponse.body<DailyResponse>()
+                DailyFastbreakResult.Success(response)
+            }
+            else -> {
+                println("Error fetching daily fastbreak: ${httpResponse.status}")
+                DailyFastbreakResult.Error("HTTP ${httpResponse.status.value}: ${httpResponse.status.description}")
+            }
+        }
+    } catch (e: ClientRequestException) {
+        println("Client error fetching daily fastbreak: ${e.message}")
+        DailyFastbreakResult.Error("Network error: ${e.message ?: "Unknown client error"}")
+    } catch (e: Exception) {
+        println("Unexpected error fetching daily fastbreak: ${e.message}")
+        DailyFastbreakResult.Error("Unexpected error: ${e.message ?: "Unknown error occurred"}")
+    }
 }
 
 

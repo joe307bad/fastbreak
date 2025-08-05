@@ -4,7 +4,6 @@ import AuthRepository
 import com.joebad.fastbreak.BuildKonfig.API_BASE_URL
 import com.joebad.fastbreak.getPlatform
 import com.joebad.fastbreak.model.dtos.DailyFastbreak
-import com.joebad.fastbreak.model.dtos.DailyResponse
 import kotbase.DataSource
 import kotbase.Database
 import kotbase.Meta
@@ -75,18 +74,26 @@ class FastbreakStateRepository(
     }
 
     private suspend fun fetchAndStoreState(date: String): DailyFastbreak? {
-        val response = fetchDailyFastbreak(date)
+        val result = fetchDailyFastbreak(date)
         saveLastFetchedTime()
-        val dailyFastbreak =
-            response?.let {
+        
+        val dailyFastbreak = when (result) {
+            is DailyFastbreakResult.Success -> {
+                val response = result.response
                 DailyFastbreak(
-                    leaderboard = it.leaderboard,
+                    leaderboard = response.leaderboard,
                     fastbreakCard = response.fastbreakCard,
                     statSheet = response.statSheetForUser,
                     lastLockedCardResults = response.lastLockedCardResults,
                     lastFetchedDate = getLastFetchedTime()
                 )
             }
+            is DailyFastbreakResult.Error -> {
+                println("Failed to fetch daily fastbreak: ${result.message}")
+                null
+            }
+        }
+        
         saveStateToDatabase(date, dailyFastbreak)
         enforceMaxDocumentsLimit()
 
@@ -98,7 +105,7 @@ class FastbreakStateRepository(
         return lockDailyFastbreakCard(LOCK_CARD, fastbreakSelectionState, authedUser)
     }
 
-    private suspend fun fetchDailyFastbreak(date: String): DailyResponse? {
+    private suspend fun fetchDailyFastbreak(date: String): DailyFastbreakResult {
         val getDailyFastbreakUrl = "${BASE_URL}/api/day/${date}"
         val apiResponse = getDailyFastbreak(getDailyFastbreakUrl, authRepository?.getUser()?.userId)
         return apiResponse

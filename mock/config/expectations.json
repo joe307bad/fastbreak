@@ -39,7 +39,7 @@
           },
           {
             "id": "345",
-            "type": "pick-em",
+            "type": "PICK-EM",
             "homeTeam": "Chicago Bears",
             "homeTeamSubtitle": "1st in the North",
             "awayTeam": "St. Louis Rams",
@@ -133,28 +133,56 @@
             "id": "card-001",
             "type": "featured-pick-em",
             "homeTeam": "Los Angeles Lakers",
-            "homeTeamSubtitle": "2nd in the West",
+            "homeTeamSubtitle": "2nd in the West (42-28)",
             "awayTeam": "Boston Celtics",
-            "awayTeamSubtitle": "1st in the East",
+            "awayTeamSubtitle": "1st in the East (48-22)",
+            "date": "2025-08-05T23:59:00Z",
             "dateLine1": "Monday",
             "dateLine2": "Aug. 5th",
-            "dateLine3": "@ 8pm EST",
+            "dateLine3": "@ 11:59pm EST",
             "points": 1500
           },
           {
             "id": "card-002",
-            "type": "pick-em",
+            "type": "PICK-EM",
             "homeTeam": "Golden State Warriors",
-            "homeTeamSubtitle": "6th in the West",
+            "homeTeamSubtitle": "6th in the West (38-32)",
             "awayTeam": "Miami Heat",
-            "awayTeamSubtitle": "8th in the East",
+            "awayTeamSubtitle": "8th in the East (36-34)",
+            "date": "2025-08-05T23:59:00Z",
             "dateLine1": "Monday",
             "dateLine2": "Aug. 5th",
-            "dateLine3": "@ 10:30pm EST",
+            "dateLine3": "@ 11:59pm EST",
             "points": 1200
           },
           {
             "id": "card-003",
+            "type": "PICK-EM",
+            "homeTeam": "Phoenix Suns",
+            "homeTeamSubtitle": "4th in the West (40-30)",
+            "awayTeam": "Milwaukee Bucks",
+            "awayTeamSubtitle": "2nd in the East (46-24)",
+            "date": "2025-08-05T23:59:00Z",
+            "dateLine1": "Monday",
+            "dateLine2": "Aug. 5th",
+            "dateLine3": "@ 11:59pm EST",
+            "points": 1100
+          },
+          {
+            "id": "card-004",
+            "type": "PICK-EM",
+            "homeTeam": "Dallas Mavericks",
+            "homeTeamSubtitle": "5th in the West (39-31)",
+            "awayTeam": "New York Knicks",
+            "awayTeamSubtitle": "4th in the East (42-28)",
+            "date": "2025-08-05T23:59:00Z",
+            "dateLine1": "Monday",
+            "dateLine2": "Aug. 5th",
+            "dateLine3": "@ 11:59pm EST",
+            "points": 1000
+          },
+          {
+            "id": "card-005",
             "type": "trivia-multiple-choice",
             "question": "Which player has won the most NBA MVP awards?",
             "answer1": "Michael Jordan",
@@ -165,23 +193,37 @@
             "points": 300
           },
           {
-            "id": "card-004",
+            "id": "card-006",
             "type": "trivia-tf",
             "question": "The NBA season typically starts in October.",
             "correctAnswer": "true",
             "points": 150
           },
           {
-            "id": "card-005",
-            "type": "pick-em",
+            "id": "card-007",
+            "type": "PICK-EM",
             "homeTeam": "Denver Nuggets",
-            "homeTeamSubtitle": "1st in the West",
+            "homeTeamSubtitle": "1st in the West (50-20)",
             "awayTeam": "Philadelphia 76ers",
-            "awayTeamSubtitle": "3rd in the East",
+            "awayTeamSubtitle": "3rd in the East (44-26)",
+            "date": "2025-08-06T23:59:00Z",
             "dateLine1": "Tuesday",
             "dateLine2": "Aug. 6th",
-            "dateLine3": "@ 7pm EST",
+            "dateLine3": "@ 11:59pm EST",
             "points": 800
+          },
+          {
+            "id": "card-008",
+            "type": "PICK-EM",
+            "homeTeam": "Memphis Grizzlies",
+            "homeTeamSubtitle": "7th in the West (37-33)",
+            "awayTeam": "Atlanta Hawks",
+            "awayTeamSubtitle": "9th in the East (34-36)",
+            "date": "2025-08-06T23:59:00Z",
+            "dateLine1": "Tuesday",
+            "dateLine2": "Aug. 6th",
+            "dateLine3": "@ 11:59pm EST",
+            "points": 900
           }
         ],
         "lockedCardForUser": null,
@@ -331,28 +373,56 @@
             "id": "card-20250804-001",
             "type": "featured-pick-em",
             "homeTeam": "New York Knicks",
-            "homeTeamSubtitle": "4th in the East",
+            "homeTeamSubtitle": "4th in the East (42-28)",
             "awayTeam": "Los Angeles Clippers",
-            "awayTeamSubtitle": "5th in the West",
+            "awayTeamSubtitle": "5th in the West (37-33)",
+            "date": "2025-08-10T23:59:00Z",
             "dateLine1": "Sunday",
             "dateLine2": "Aug. 4th",
-            "dateLine3": "@ 7pm EST",
+            "dateLine3": "@ 11:59pm EST",
             "points": 1400
           },
           {
             "id": "card-20250804-002",
-            "type": "pick-em",
+            "type": "PICK-EM",
             "homeTeam": "Milwaukee Bucks",
-            "homeTeamSubtitle": "2nd in the East",
+            "homeTeamSubtitle": "2nd in the East (46-24)",
             "awayTeam": "Phoenix Suns",
-            "awayTeamSubtitle": "4th in the West",
+            "awayTeamSubtitle": "4th in the West (40-30)",
+            "date": "2025-08-10T23:59:00Z",
             "dateLine1": "Sunday",
             "dateLine2": "Aug. 4th",
-            "dateLine3": "@ 9:30pm EST",
+            "dateLine3": "@ 11:59pm EST",
             "points": 1100
           },
           {
             "id": "card-20250804-003",
+            "type": "PICK-EM",
+            "homeTeam": "Chicago Bulls",
+            "homeTeamSubtitle": "10th in the East (32-38)",
+            "awayTeam": "Sacramento Kings",
+            "awayTeamSubtitle": "8th in the West (36-34)",
+            "date": "2025-08-10T23:59:00Z",
+            "dateLine1": "Sunday",
+            "dateLine2": "Aug. 4th",
+            "dateLine3": "@ 11:59pm EST",
+            "points": 950
+          },
+          {
+            "id": "card-20250804-004",
+            "type": "PICK-EM",
+            "homeTeam": "San Antonio Spurs",
+            "homeTeamSubtitle": "11th in the West (28-42)",
+            "awayTeam": "Charlotte Hornets",
+            "awayTeamSubtitle": "12th in the East (30-40)",
+            "date": "2025-08-10T23:59:00Z",
+            "dateLine1": "Sunday",
+            "dateLine2": "Aug. 4th",
+            "dateLine3": "@ 11:59pm EST",
+            "points": 850
+          },
+          {
+            "id": "card-20250804-005",
             "type": "trivia-multiple-choice",
             "question": "Which team has won the most NBA championships?",
             "answer1": "Los Angeles Lakers",
@@ -363,7 +433,7 @@
             "points": 250
           },
           {
-            "id": "card-20250804-004",
+            "id": "card-20250804-006",
             "type": "trivia-tf",
             "question": "An NBA game consists of four 12-minute quarters.",
             "correctAnswer": "true",
@@ -447,6 +517,235 @@
           "createdAt": "2025-08-04T10:30:00Z"
         },
         "lastLockedCardResults": null
+      }
+    },
+    "times": {
+      "unlimited": true
+    }
+  },
+  {
+    "httpRequest": {
+      "method": "GET",
+      "path": "/api/day/.*"
+    },
+    "httpResponse": {
+      "statusCode": 200,
+      "headers": {
+        "Content-Type": [
+          "application/json"
+        ]
+      },
+      "body": {
+        "leaderboard": {
+          "dailyLeaderboards": [
+            {
+              "dateCode": "20250804",
+              "entries": [
+                {
+                  "userId": "user-123",
+                  "userName": "joebad",
+                  "points": 2200
+                },
+                {
+                  "userId": "user-456",
+                  "userName": "bilbo-baggins",
+                  "points": 1950
+                },
+                {
+                  "userId": "user-789",
+                  "userName": "legolas",
+                  "points": 1750
+                }
+              ]
+            }
+          ],
+          "weeklyTotals": [
+            {
+              "userId": "user-123",
+              "userName": "joebad",
+              "points": 13500
+            },
+            {
+              "userId": "user-456",
+              "userName": "bilbo-baggins",
+              "points": 12800
+            },
+            {
+              "userId": "user-789",
+              "userName": "legolas",
+              "points": 11900
+            }
+          ]
+        },
+        "fastbreakCard": [
+          {
+            "id": "card-generic-001",
+            "type": "featured-pick-em",
+            "homeTeam": "Miami Heat",
+            "homeTeamSubtitle": "8th in the East (36-34)",
+            "awayTeam": "Portland Trail Blazers",
+            "awayTeamSubtitle": "12th in the West (27-43)",
+            "date": "2025-08-10T23:59:00Z",
+            "dateLine1": "Today",
+            "dateLine2": "Game Day",
+            "dateLine3": "@ 11:59pm EST",
+            "points": 1300
+          },
+          {
+            "id": "card-generic-002",
+            "type": "PICK-EM",
+            "homeTeam": "Toronto Raptors",
+            "homeTeamSubtitle": "11th in the East (31-39)",
+            "awayTeam": "Utah Jazz",
+            "awayTeamSubtitle": "13th in the West (25-45)",
+            "date": "2025-08-10T23:59:00Z",
+            "dateLine1": "Today",
+            "dateLine2": "Game Day",
+            "dateLine3": "@ 11:59pm EST",
+            "points": 1000
+          },
+          {
+            "id": "card-generic-003",
+            "type": "PICK-EM",
+            "homeTeam": "Washington Wizards",
+            "homeTeamSubtitle": "14th in the East (26-44)",
+            "awayTeam": "Detroit Pistons",
+            "awayTeamSubtitle": "15th in the East (23-47)",
+            "date": "2025-08-10T23:59:00Z",
+            "dateLine1": "Today",
+            "dateLine2": "Game Day",
+            "dateLine3": "@ 11:59pm EST",
+            "points": 900
+          },
+          {
+            "id": "card-generic-004",
+            "type": "PICK-EM",
+            "homeTeam": "Orlando Magic",
+            "homeTeamSubtitle": "7th in the East (37-33)",
+            "awayTeam": "Minnesota Timberwolves",
+            "awayTeamSubtitle": "9th in the West (35-35)",
+            "date": "2025-08-10T23:59:00Z",
+            "dateLine1": "Today",
+            "dateLine2": "Game Day",
+            "dateLine3": "@ 11:59pm EST",
+            "points": 1100
+          },
+          {
+            "id": "card-generic-005",
+            "type": "trivia-multiple-choice",
+            "question": "Which NBA player is known as 'The King'?",
+            "answer1": "Kevin Durant",
+            "answer2": "LeBron James",
+            "answer3": "Stephen Curry",
+            "answer4": "Giannis Antetokounmpo",
+            "correctAnswer": "answer2",
+            "points": 275
+          },
+          {
+            "id": "card-generic-006",
+            "type": "trivia-tf",
+            "question": "The NBA All-Star Game is held every February.",
+            "correctAnswer": "true",
+            "points": 200
+          }
+        ],
+        "lockedCardForUser": null,
+        "statSheetForUser": {
+          "userId": "user-123",
+          "date": "20250804",
+          "items": {
+            "currentWeek": {
+              "days": [
+                {
+                  "dayOfWeek": "Today",
+                  "dateCode": "20250804",
+                  "totalPoints": 2200
+                }
+              ],
+              "total": 2200
+            },
+            "lastWeek": {
+              "days": [
+                {
+                  "dayOfWeek": "Monday",
+                  "dateCode": "20250728",
+                  "totalPoints": 1850
+                },
+                {
+                  "dayOfWeek": "Tuesday",
+                  "dateCode": "20250729",
+                  "totalPoints": 2200
+                },
+                {
+                  "dayOfWeek": "Wednesday",
+                  "dateCode": "20250730",
+                  "totalPoints": 1900
+                },
+                {
+                  "dayOfWeek": "Thursday",
+                  "dateCode": "20250731",
+                  "totalPoints": 2400
+                },
+                {
+                  "dayOfWeek": "Friday",
+                  "dateCode": "20250801",
+                  "totalPoints": 1650
+                },
+                {
+                  "dayOfWeek": "Saturday",
+                  "dateCode": "20250802",
+                  "totalPoints": 1800
+                },
+                {
+                  "dayOfWeek": "Sunday",
+                  "dateCode": "20250803",
+                  "totalPoints": 2200
+                }
+              ],
+              "total": 14000
+            },
+            "lockedCardStreak": {
+              "longest": 15,
+              "current": 3
+            },
+            "highestFastbreakCardEver": {
+              "date": "20250720",
+              "points": 3950
+            },
+            "perfectFastbreakCards": [
+              {
+                "date": "20250720",
+                "points": 3950
+              },
+              {
+                "date": "20250715",
+                "points": 3200
+              }
+            ]
+          },
+          "createdAt": "2025-08-04T10:30:00Z"
+        },
+        "lastLockedCardResults": null
+      }
+    },
+    "times": {
+      "unlimited": true
+    }
+  },
+  {
+    "httpRequest": {
+      "method": "GET",
+      "path": "/api/day/error-test"
+    },
+    "httpResponse": {
+      "statusCode": 500,
+      "headers": {
+        "Content-Type": [
+          "application/json"
+        ]
+      },
+      "body": {
+        "error": "Internal Server Error - Test error for UI validation"
       }
     },
     "times": {

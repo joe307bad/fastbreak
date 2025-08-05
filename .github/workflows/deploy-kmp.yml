@@ -59,10 +59,19 @@ jobs:
         run: |
           echo "${{ secrets.RELEASE_KEYSTORE }}" | base64 -d > kmp/release-keystore.jks
 
+      - name: Update iOS version in Info.plist
+        run: |
+          # Update CFBundleShortVersionString in Info.plist
+          sed -i 's/<string>1\.0\.0<\/string>/<string>0.0.1-alpha-${{ steps.build_info.outputs.build_number }}<\/string>/g' kmp/iosApp/iosApp/Info.plist
+          # Update CFBundleVersion
+          sed -i 's/<key>CFBundleVersion<\/key>[[:space:]]*<string>1<\/string>/<key>CFBundleVersion<\/key>\n\t<string>${{ steps.build_info.outputs.build_number }}<\/string>/g' kmp/iosApp/iosApp/Info.plist
+
       - name: Build Android APK
         run: |
           cd kmp
-          ./gradlew :androidApp:assembleRelease --no-daemon
+          ./gradlew :androidApp:assembleRelease --no-daemon \
+            -PVERSION_NAME="0.0.1-alpha-${{ steps.build_info.outputs.build_number }}" \
+            -PVERSION_CODE="${{ steps.build_info.outputs.build_number }}"
 
       - name: Create artifact archive
         run: |

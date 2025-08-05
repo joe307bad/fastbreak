@@ -150,14 +150,22 @@ fun AnimatedBorderButton(
     }
 
     LaunchedEffect(locked, isLoading) {
-        if (!locked && !isLoading) {
+        if (locked && !isLoading) {
+            // When locked becomes true (successful lock), ensure button stays in locked state
+            animationCompleted = true
+            isPressed = true
+            animationProgress.snapTo(1f)
+            lockIconOffsetX.snapTo(0f)
+            lockIconAlpha.snapTo(1f)
+        } else if (!locked && !isLoading) {
+            // When explicitly unlocked, reset to unlocked state
             animationCompleted = false
             isPressed = false
-
             animationProgress.snapTo(0f)
             lockIconOffsetX.snapTo(-50f)
             lockIconAlpha.snapTo(1f)
         }
+        // When isLoading is true, don't change state - let the animation continue
     }
 
     Box(

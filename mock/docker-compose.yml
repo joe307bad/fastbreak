@@ -3,6 +3,7 @@ version: '3.8'
 services:
   mockserver:
     image: mockserver/mockserver
+    platform: linux/amd64
     container_name: mockserver
 #    network_mode: "host"
     ports:

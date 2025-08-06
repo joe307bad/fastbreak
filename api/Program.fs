@@ -233,7 +233,9 @@ type JobRunner =
         try
             let monday = api.Utils.getWeekDays.getLastMonday ()
             let mondayId = monday.ToString("yyyyMMdd")
+            let (_, now) = getEasternTime (0)
 
+            // Calculate current week leaderboard
             let statSheets =
                 database
                     .GetCollection<StatSheet>("user-stat-sheets")
@@ -255,6 +257,43 @@ type JobRunner =
                 )
             |> ignore
 
+            printf $"LeaderboardJob: Calculated current week leaderboard for {mondayId}\n"
+
+            // If today is Monday, also calculate the previous week's final leaderboard (ending Sunday)
+            if now.DayOfWeek = DayOfWeek.Monday then
+                let previousMonday = api.Utils.getWeekDays.getOneMondayAgo ()
+                let previousMondayId = previousMonday.ToString("yyyyMMdd")
+                let previousSunday = previousMonday.AddDays(6.0)
+                let previousSundayId = previousSunday.ToString("yyyyMMdd")
+
+                printf $"LeaderboardJob: Today is Monday, calculating previous week leaderboard (Monday {previousMondayId} to Sunday {previousSundayId})\n"
+
+                let previousWeekStatSheets =
+                    database
+                        .GetCollection<StatSheet>("user-stat-sheets")
+                        .Find(Builders<StatSheet>.Filter.And(
+                            Builders<StatSheet>.Filter.Gte(_.createdAt, previousMonday),
+                            Builders<StatSheet>.Filter.Lt(_.createdAt, monday)
+                        ))
+                        .ToList()
+                    |> Seq.toList
+
+                let previousWeekLeaderboards =
+                    api.DailyJob.CalculateLeaderboards.calculateLeaderboard database previousWeekStatSheets previousSundayId
+                    |> Async.AwaitTask
+                    |> Async.RunSynchronously
+
+                database
+                    .GetCollection<api.Entities.Leaderboard.Leaderboard>("leaderboards")
+                    .ReplaceOne(
+                        Builders<api.Entities.Leaderboard.Leaderboard>.Filter.Eq(_.id, previousSundayId),
+                        { id = previousSundayId; items = previousWeekLeaderboards },
+                        ReplaceOptions(IsUpsert = true)
+                    )
+                |> ignore
+
+                printf $"LeaderboardJob: Calculated previous week final leaderboard for Sunday {previousSundayId}\n"
+
             stopwatch.Stop()
             let (_, endTime) = getEasternTime (0)
 
@@ -267,28 +306,52 @@ type JobRunner =
             printf
                 $"LeaderboardJob failed at %A{endTime} (duration: {stopwatch.Elapsed.TotalSeconds:F2}s) with error {ex.Message}\n"
 
+    static member TriggerDependentJobs() =
+        printf "TriggerDependentJobs: Starting job dependency chain\n"
+        
+        let fastbreakCardResultsCall: Expression<Action<JobRunner>> =
+            Expression.Lambda<Action<JobRunner>>(
+                Expression.Call(typeof<JobRunner>.GetMethod("FastbreakCardResultsJob")),
+                Expression.Parameter(typeof<JobRunner>, "x")
+            )
+
+        let statSheetsCall: Expression<Action<JobRunner>> =
+            Expression.Lambda<Action<JobRunner>>(
+                Expression.Call(typeof<JobRunner>.GetMethod("StatSheetsJob")),
+                Expression.Parameter(typeof<JobRunner>, "x")
+            )
+
+        let leaderboardCall: Expression<Action<JobRunner>> =
+            Expression.Lambda<Action<JobRunner>>(
+                Expression.Call(typeof<JobRunner>.GetMethod("LeaderboardJob")),
+                Expression.Parameter(typeof<JobRunner>, "x")
+            )
+        
+        // Start the dependency chain: FastbreakCardResultsJob runs first
+        let fastbreakJobId = BackgroundJob.Enqueue(fastbreakCardResultsCall)
+        printf $"TriggerDependentJobs: Enqueued FastbreakCardResultsJob with ID {fastbreakJobId}\n"
+        
+        // StatSheetsJob depends on FastbreakCardResultsJob
+        let statSheetsJobId = BackgroundJob.ContinueJobWith(fastbreakJobId, statSheetsCall)
+        printf $"TriggerDependentJobs: Enqueued StatSheetsJob with ID {statSheetsJobId} (depends on {fastbreakJobId})\n"
+        
+        // LeaderboardJob depends on StatSheetsJob (which depends on FastbreakCardResultsJob)
+        let leaderboardJobId = BackgroundJob.ContinueJobWith(statSheetsJobId, leaderboardCall)
+        printf $"TriggerDependentJobs: Enqueued LeaderboardJob with ID {leaderboardJobId} (depends on {statSheetsJobId})\n"
+
 let scheduleJobs () =
+    
+    JobRunner.LeaderboardJob ()
+    
     let dailyJobCall: Expression<Action<JobRunner>> =
         Expression.Lambda<Action<JobRunner>>(
             Expression.Call(typeof<JobRunner>.GetMethod("SchedulePuller")),
             Expression.Parameter(typeof<JobRunner>, "x")
         )
 
-    let fastbreakCardResultsCall: Expression<Action<JobRunner>> =
+    let triggerDependentJobsCall: Expression<Action<JobRunner>> =
         Expression.Lambda<Action<JobRunner>>(
-            Expression.Call(typeof<JobRunner>.GetMethod("FastbreakCardResultsJob")),
-            Expression.Parameter(typeof<JobRunner>, "x")
-        )
-
-    let statSheetsCall: Expression<Action<JobRunner>> =
-        Expression.Lambda<Action<JobRunner>>(
-            Expression.Call(typeof<JobRunner>.GetMethod("StatSheetsJob")),
-            Expression.Parameter(typeof<JobRunner>, "x")
-        )
-
-    let leaderboardCall: Expression<Action<JobRunner>> =
-        Expression.Lambda<Action<JobRunner>>(
-            Expression.Call(typeof<JobRunner>.GetMethod("LeaderboardJob")),
+            Expression.Call(typeof<JobRunner>.GetMethod("TriggerDependentJobs")),
             Expression.Parameter(typeof<JobRunner>, "x")
         )
 
@@ -298,10 +361,9 @@ let scheduleJobs () =
 
     // Daily job runs at 4:30 AM ET, 30 minutes before other jobs
     RecurringJob.AddOrUpdate("daily-job", dailyJobCall, "30 4 * * *")
-    // Other jobs run at 5:00 AM ET daily, after schedule data is pulled
-    RecurringJob.AddOrUpdate("fastbreak-card-results-job", fastbreakCardResultsCall, "0 5 * * *", recurringJobOptions)
-    RecurringJob.AddOrUpdate("stat-sheets-job", statSheetsCall, "0 5 * * *", recurringJobOptions)
-    RecurringJob.AddOrUpdate("leaderboard-job", leaderboardCall, "0 5 * * *", recurringJobOptions)
+    // Trigger dependent jobs at 5:00 AM ET daily, after schedule data is pulled
+    // This will run FastbreakCardResultsJob first, then StatSheetsJob, then LeaderboardJob in sequence
+    RecurringJob.AddOrUpdate("trigger-dependent-jobs", triggerDependentJobsCall, "0 5 * * *", recurringJobOptions)
 
 let configureApp (app: IApplicationBuilder) =
     app.UseHangfireDashboard() |> ignore
@@ -345,28 +407,18 @@ let triggerAllJobsHandler: HttpHandler =
     fun next ctx ->
         if isLocalRequest ctx then
             try
-                let jobs = [
-                    ("FastbreakCardResultsJob", fun () -> JobRunner.FastbreakCardResultsJob())
-                    ("StatSheetsJob", fun () -> JobRunner.StatSheetsJob())
-                    ("LeaderboardJob", fun () -> JobRunner.LeaderboardJob())
-                ]
-                
-                let jobIds = 
-                    jobs 
-                    |> List.map (fun (jobName, _) ->
-                        let jobCall: Expression<Action<JobRunner>> =
-                            Expression.Lambda<Action<JobRunner>>(
-                                Expression.Call(typeof<JobRunner>.GetMethod(jobName)),
-                                Expression.Parameter(typeof<JobRunner>, "x")
-                            )
-                        let jobId = BackgroundJob.Enqueue(jobCall)
-                        (jobName, jobId)
+                let triggerDependentJobsCall: Expression<Action<JobRunner>> =
+                    Expression.Lambda<Action<JobRunner>>(
+                        Expression.Call(typeof<JobRunner>.GetMethod("TriggerDependentJobs")),
+                        Expression.Parameter(typeof<JobRunner>, "x")
                     )
+                
+                let jobId = BackgroundJob.Enqueue(triggerDependentJobsCall)
                 
                 ctx.WriteJsonAsync(
                     {| status = "success"
-                       message = "All non-daily jobs enqueued successfully"
-                       jobs = jobIds
+                       message = "Dependent job chain triggered successfully (FastbreakCardResultsJob -> StatSheetsJob -> LeaderboardJob)"
+                       jobId = jobId
                        timestamp = DateTime.UtcNow |}
                 )
             with ex ->

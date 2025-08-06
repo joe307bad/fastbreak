@@ -3,6 +3,8 @@ plugins {
     kotlin("android")
     alias(libs.plugins.jetbrainsCompose)
     alias(libs.plugins.compose.compiler)
+
+    id("io.sentry.android.gradle") version "5.8.0"
 }
 
 android {
@@ -70,4 +72,16 @@ dependencies {
     implementation("com.arkivanov.decompose:extensions-compose:3.2.2")
     implementation("com.arkivanov.decompose:extensions-android:3.2.2")
     implementation("com.liftric:kvault:1.12.0")
+    
+    // Sentry SDK
+    implementation("io.sentry:sentry-android:7.21.0")
+}
+
+sentry {
+    org.set("joe-badaczewski")
+    projectName.set("fastbreak")
+
+    // this will upload your source code to Sentry to show it as part of the stack traces
+    // disable if you don't want to expose your sources
+    includeSourceContext.set(true)
 }

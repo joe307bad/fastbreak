@@ -27,8 +27,10 @@ import com.liftric.kvault.KVault
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
         initFontLoader(applicationContext)
         AppVersion.initialize(applicationContext)
 

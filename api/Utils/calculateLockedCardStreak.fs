@@ -20,11 +20,13 @@ let calculateLockedCardStreak (database: IMongoDatabase) (statSheet: StatSheet o
     
     printf ($"Today: {today:yyyyMMdd}, Yesterday: {yesterdayStr} for user {userId}\n")
 
-    // Check for early return with recent stat sheet
+    // Check for early return with stat sheet from today only
+    // We should only skip calculation if we have today's stat sheet, not yesterday's
+    let todayStr = today.ToString("yyyyMMdd")
     match statSheet with
-    | Some sheet when sheet.date >= yesterdayStr ->
-        printf ($"No new locked card streak will be calculated since a recent stat sheet was found for user {userId}\n")
-        // Recent stat sheet exists, return its values directly
+    | Some sheet when sheet.date = todayStr ->
+        printf ($"No new locked card streak will be calculated since today's stat sheet was found for user {userId}\n")
+        // Today's stat sheet exists, return its values directly
         { longest = sheet.items.lockedCardStreak.longest
           current = sheet.items.lockedCardStreak.current }
     | _ ->
@@ -43,7 +45,7 @@ let calculateLockedCardStreak (database: IMongoDatabase) (statSheet: StatSheet o
         let filter =
             Builders<FastbreakSelectionState>.Filter.And(
                 Builders<FastbreakSelectionState>.Filter.Eq(_.userId, userId),
-                Builders<FastbreakSelectionState>.Filter.Gt(_.date, startDate.ToString("yyyyMMdd")),
+                Builders<FastbreakSelectionState>.Filter.Gte(_.date, startDate.ToString("yyyyMMdd")),
                 Builders<FastbreakSelectionState>.Filter.Lte(_.date, yesterdayStr)
             )
 
@@ -71,10 +73,10 @@ let calculateLockedCardStreak (database: IMongoDatabase) (statSheet: StatSheet o
             // Count backwards from yesterday until we find a gap
             while continueStreak && currentDate >= startDate do
                 let dateStr = currentDate.ToString("yyyyMMdd")
-                printf ($"Checking date {dateStr} for user {userId}\n")
+                // printf ($"Checking date {dateStr} for user {userId}\n")
                 if lockedDates.Contains(dateStr) then
                     streakCount <- streakCount + 1
-                    printf ($"Found locked card on {dateStr}, streak count now {streakCount} for user {userId}\n")
+                    // printf ($"Found locked card on {dateStr}, streak count now {streakCount} for user {userId}\n")
                     currentDate <- currentDate.AddDays(-1.0)
                 else
                     printf ($"No locked card found on {dateStr}, ending streak for user {userId}\n")

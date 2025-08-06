@@ -231,74 +231,27 @@ type JobRunner =
         printf $"LeaderboardJob started at %A{startTime}\n"
 
         try
-            let monday = api.Utils.getWeekDays.getLastMonday ()
-            let mondayId = monday.ToString("yyyyMMdd")
-            let (_, now) = getEasternTime (0)
-
-            // Calculate current week leaderboard
-            let statSheets =
-                database
-                    .GetCollection<StatSheet>("user-stat-sheets")
-                    .Find(Builders<StatSheet>.Filter.Gte(_.createdAt, monday))
-                    .ToList()
-                |> Seq.toList
-
-            let leaderboards =
-                api.DailyJob.CalculateLeaderboards.calculateLeaderboard database statSheets mondayId
+            let (sundayId, leaderboards) =
+                api.DailyJob.CalculateLeaderboards.calculateLeaderboard database
                 |> Async.AwaitTask
                 |> Async.RunSynchronously
 
             database
-                .GetCollection<api.Entities.Leaderboard.Leaderboard>("leaderboards")
+                .GetCollection<Leaderboard.Leaderboard>("leaderboards")
                 .ReplaceOne(
-                    Builders<api.Entities.Leaderboard.Leaderboard>.Filter.Eq(_.id, mondayId),
-                    { id = mondayId; items = leaderboards },
+                    Builders<Leaderboard.Leaderboard>.Filter.Eq(_.id, sundayId),
+                    { id = sundayId; items = leaderboards },
                     ReplaceOptions(IsUpsert = true)
                 )
             |> ignore
 
-            printf $"LeaderboardJob: Calculated current week leaderboard for {mondayId}\n"
-
-            // If today is Monday, also calculate the previous week's final leaderboard (ending Sunday)
-            if now.DayOfWeek = DayOfWeek.Monday then
-                let previousMonday = api.Utils.getWeekDays.getOneMondayAgo ()
-                let previousMondayId = previousMonday.ToString("yyyyMMdd")
-                let previousSunday = previousMonday.AddDays(6.0)
-                let previousSundayId = previousSunday.ToString("yyyyMMdd")
-
-                printf $"LeaderboardJob: Today is Monday, calculating previous week leaderboard (Monday {previousMondayId} to Sunday {previousSundayId})\n"
-
-                let previousWeekStatSheets =
-                    database
-                        .GetCollection<StatSheet>("user-stat-sheets")
-                        .Find(Builders<StatSheet>.Filter.And(
-                            Builders<StatSheet>.Filter.Gte(_.createdAt, previousMonday),
-                            Builders<StatSheet>.Filter.Lt(_.createdAt, monday)
-                        ))
-                        .ToList()
-                    |> Seq.toList
-
-                let previousWeekLeaderboards =
-                    api.DailyJob.CalculateLeaderboards.calculateLeaderboard database previousWeekStatSheets previousSundayId
-                    |> Async.AwaitTask
-                    |> Async.RunSynchronously
-
-                database
-                    .GetCollection<api.Entities.Leaderboard.Leaderboard>("leaderboards")
-                    .ReplaceOne(
-                        Builders<api.Entities.Leaderboard.Leaderboard>.Filter.Eq(_.id, previousSundayId),
-                        { id = previousSundayId; items = previousWeekLeaderboards },
-                        ReplaceOptions(IsUpsert = true)
-                    )
-                |> ignore
-
-                printf $"LeaderboardJob: Calculated previous week final leaderboard for Sunday {previousSundayId}\n"
+            printf $"LeaderboardJob: Calculated current week leaderboard for Sunday {sundayId}\n"
 
             stopwatch.Stop()
             let (_, endTime) = getEasternTime (0)
 
             printf
-                $"LeaderboardJob completed at %A{endTime} (duration: {stopwatch.Elapsed.TotalSeconds:F2}s) for week {mondayId}\n"
+                $"LeaderboardJob completed at %A{endTime} (duration: {stopwatch.Elapsed.TotalSeconds:F2}s) for week {sundayId}\n"
         with ex ->
             stopwatch.Stop()
             let (_, endTime) = getEasternTime (0)
@@ -326,6 +279,7 @@ type JobRunner =
                 Expression.Call(typeof<JobRunner>.GetMethod("LeaderboardJob")),
                 Expression.Parameter(typeof<JobRunner>, "x")
             )
+            
         
         // Start the dependency chain: FastbreakCardResultsJob runs first
         let fastbreakJobId = BackgroundJob.Enqueue(fastbreakCardResultsCall)
@@ -341,7 +295,7 @@ type JobRunner =
 
 let scheduleJobs () =
     
-    JobRunner.LeaderboardJob ()
+    JobRunner.StatSheetsJob ()
     
     let dailyJobCall: Expression<Action<JobRunner>> =
         Expression.Lambda<Action<JobRunner>>(
@@ -358,6 +312,7 @@ let scheduleJobs () =
     // Schedule jobs with timezone awareness for ET
     let easternTimeZone = TimeZoneInfo.FindSystemTimeZoneById("Eastern Standard Time")
     let recurringJobOptions = RecurringJobOptions(TimeZone = easternTimeZone)
+    
 
     // Daily job runs at 4:30 AM ET, 30 minutes before other jobs
     RecurringJob.AddOrUpdate("daily-job", dailyJobCall, "30 4 * * *")

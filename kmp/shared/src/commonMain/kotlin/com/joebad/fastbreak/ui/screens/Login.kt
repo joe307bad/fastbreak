@@ -74,7 +74,7 @@ fun LoginScreen(goToHome: (user: AuthedUser) -> Unit, theme: Theme?, error: Stri
                 error != null -> {
                     Text(
                         text = error,
-                        color = colors.error,
+                        color = colors.text,
                         textAlign = TextAlign.Center,
                         modifier = Modifier.fillMaxWidth()
                     )

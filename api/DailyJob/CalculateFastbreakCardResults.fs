@@ -13,8 +13,10 @@ let calculateResults
     
     selectionStates
     |> Seq.map (fun state ->
+        let selections = if isNull state.selections then [||] else state.selections
+        
         let correctSelections, incorrectSelections =
-            state.selections
+            selections
             |> Array.partition (fun selection ->
                 match correctAnswers.TryGetValue(selection._id) with
                 | true, item -> selection.userAnswer = item.correctAnswer
@@ -57,7 +59,9 @@ let calculateFastbreakCardResults (database: IMongoDatabase) =
             database.GetCollection<FastbreakSelectionState>("locked-fastbreak-cards")
 
         let lockedCards =
-            let today = DateTime.Today.ToString("yyyyMMdd")
+            
+            let easternTimeZone = TimeZoneInfo.FindSystemTimeZoneById("America/New_York")
+            let today = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, easternTimeZone).Date.ToString("yyyyMMdd")
 
             let filter =
                 Builders<FastbreakSelectionState>.Filter
@@ -80,12 +84,15 @@ let calculateFastbreakCardResults (database: IMongoDatabase) =
                 |> Seq.map (fun item -> item.id, item)
                 |> dict
 
-            printf ($"Processed locked card for user {card.userId} and date {card.date}\n")
-
             let results = calculateResults scheduleResults cards |> Seq.toArray
 
             if results.Length > 0 then
-                lockedCardsCollection.BulkWrite(toSelectionStateWriteModels results) |> ignore
-
+                try
+                    lockedCardsCollection.BulkWrite(toSelectionStateWriteModels results) |> ignore
+                    printf ($"Processed locked card for user {card.userId} and date {card.date}\n")
+                with
+                | ex -> printf ($"Error processing locked card for user {card.userId} and date {card.date}: {ex.Message}\n")
+            else
+                printf ($"No cards processed for {card.userId} and date {card.date}\n")
         ()
     }

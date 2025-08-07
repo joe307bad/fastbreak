@@ -118,33 +118,6 @@ let getTomorrowsSchedulesHandler (schedule: Schedule seq) : Task<EmptyFastbreakC
         return schedules
     }
 
-
-let insertSchedule (schedule: Schedule, database: IMongoDatabase, league: string, date: string) =
-    task {
-        let collection = database.GetCollection<Schedule>("schedules")
-
-        let scheduleWithLeague =
-            { schedule with
-                league = league
-                date = date }
-
-        let filter =
-            Builders<Schedule>.Filter
-                .And(Builders<Schedule>.Filter.Eq("league", league), Builders<Schedule>.Filter.Eq("date", date))
-
-        let updateOptions = ReplaceOptions(IsUpsert = true)
-
-        let result = collection.ReplaceOne(filter, scheduleWithLeague, updateOptions)
-
-        if result.MatchedCount > 0 then
-            printf $"Schedule updated successfully. {league} | {date}\n"
-        else
-            printf $"Schedule inserted successfully. {league} | {date}\n"
-
-        return scheduleWithLeague
-    }
-
-
 let urls =
     [ ("nba",
        Printf.StringFormat<string -> string>
@@ -246,4 +219,3 @@ let pullSchedules
     |> List.map insertEmptyFastbreakCard
     |> Async.Sequential
     |> Async.RunSynchronously
-// return results

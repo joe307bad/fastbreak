@@ -67,6 +67,8 @@ jobs:
           sed -i 's/<key>CFBundleVersion<\/key>[[:space:]]*<string>1<\/string>/<key>CFBundleVersion<\/key>\n\t<string>${{ steps.build_info.outputs.build_number }}<\/string>/g' kmp/iosApp/iosApp/Info.plist
 
       - name: Build Android APK
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
         run: |
           cd kmp
           ./gradlew :androidApp:assembleRelease --no-daemon \

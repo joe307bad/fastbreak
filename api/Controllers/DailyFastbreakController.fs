@@ -50,21 +50,20 @@ let getFastbreakHandler (database: IMongoDatabase) day (next: HttpFunc) (ctx: Ht
 
         let dayDate = DateTime.ParseExact(day, "yyyyMMdd", null)
 
-        let mondayDate =
+        let sundayDate =
             let daysToSubtract =
                 match dayDate.DayOfWeek with
-                | DayOfWeek.Monday -> 0
-                | DayOfWeek.Sunday -> 6
-                | _ -> int dayDate.DayOfWeek - 1
+                | DayOfWeek.Sunday -> 0
+                | _ -> int dayDate.DayOfWeek
 
             dayDate.AddDays(float -daysToSubtract)
 
-        let mondayId = mondayDate.ToString("yyyyMMdd")
+        let sundayId = sundayDate.ToString("yyyyMMdd")
 
         let leaderboard =
             database
                 .GetCollection<Leaderboard>("leaderboards")
-                .Find(Builders<Leaderboard>.Filter.Eq(_.id, mondayId))
+                .Find(Builders<Leaderboard>.Filter.Eq(_.id, sundayId))
                 .FirstOrDefault()
 
         let filter = Builders<EmptyFastbreakCard>.Filter.Eq(_.date, day)

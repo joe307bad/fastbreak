@@ -295,8 +295,6 @@ type JobRunner =
 
 let scheduleJobs () =
     
-    JobRunner.StatSheetsJob ()
-    
     let dailyJobCall: Expression<Action<JobRunner>> =
         Expression.Lambda<Action<JobRunner>>(
             Expression.Call(typeof<JobRunner>.GetMethod("SchedulePuller")),

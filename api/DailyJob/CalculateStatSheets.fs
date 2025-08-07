@@ -45,7 +45,7 @@ let addLockedCardsToStatSheet sheet database userId =
         let daysOfTheLastWeek = getWeekDays (getOneMondayAgo ())
         let currentWeek = createWeek daysOfTheWeek database userId
         let lastWeek = createWeek daysOfTheLastWeek database userId
-        let streak = calculateLockedCardStreak database sheet userId
+        let streak = calculateLockedCardStreak database userId
         let lockedCardsToAnalyze = getLockedCardsToAnalyze database userId sheet
 
         let (highestFastbreakCardEver, perfectFastbreakCards) =

@@ -30,7 +30,7 @@ data class FastbreakSelection(
 
 @Serializable
 data class FastbreakSelectionState(
-    val selections: List<FastbreakSelection> = emptyList(),
+    val selections: List<FastbreakSelection>? = null,
     val totalPoints: Int = 0,
     val cardId: String = getRandomId(),
     val locked: Boolean? = false,
@@ -77,7 +77,7 @@ class FastbreakViewModel(
                 try {
                     persistence.saveSelections(
                         lastLockedCard.cardId,
-                        lastLockedCard.selections,
+                        lastLockedCard.selections ?: emptyList(),
                         true,
                         lastLockedCard.date
                     )
@@ -234,7 +234,7 @@ class FastbreakViewModel(
                 }
             }
 
-            val currentSelections = state.selections
+            val currentSelections = state.selections ?: emptyList()
             val existingSelectionIndex = currentSelections.indexOfFirst { it._id == selectionId }
 
             val selection = FastbreakSelection(
@@ -291,7 +291,7 @@ class FastbreakViewModel(
                 val state = container.stateFlow.value;
                 persistence.saveSelections(
                     state.cardId ?: "",
-                    state.selections,
+                    state.selections ?: emptyList(),
                     state.locked,
                     state.date
                 );

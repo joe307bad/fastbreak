@@ -166,7 +166,7 @@ fun FastbreakCard(
                 } else {
                     state?.selections?.forEachIndexed { index, item ->
                         PickEmRow(item.type, item.description, item.points.toString())
-                        if (index < state.selections.lastIndex) {
+                        if (index < (state.selections?.lastIndex ?: -1)) {
                             Divider(modifier = Modifier.background(color = colors.accent))
                         }
                     }

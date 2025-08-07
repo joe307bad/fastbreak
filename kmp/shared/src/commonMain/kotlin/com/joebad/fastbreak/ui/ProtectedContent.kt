@@ -285,7 +285,7 @@ fun ProtectedContent(
         SimpleBottomSheetExample(
             showBottomSheet = showBottomSheet,
             onDismiss = { showBottomSheet = false },
-            helpContent = HelpData.getHelpContent(bottomSheetHelpPage)
+            helpItems = HelpData.getHelpContent(bottomSheetHelpPage)
         )
 
         SigninBottomSheet(

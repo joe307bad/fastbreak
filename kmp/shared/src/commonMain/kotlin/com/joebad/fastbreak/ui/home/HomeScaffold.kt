@@ -86,7 +86,6 @@ fun HomeScaffold(
         is ProtectedComponent.Child.Settings -> HelpPage.SETTINGS
         else -> HelpPage.HOME
     }
-    val helpContent = HelpData.getHelpContent(currentHelpPage)
 
     Scaffold(
         modifier = Modifier.background(color = colors.background),

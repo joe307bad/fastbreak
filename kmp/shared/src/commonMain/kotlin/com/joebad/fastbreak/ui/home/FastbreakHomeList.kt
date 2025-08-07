@@ -87,7 +87,7 @@ fun FastbreakHomeList(dailyFastbreak: DailyFastbreak?, viewModel: FastbreakViewM
                                 item.homeTeamSubtitle,
                                 item.awayTeam,
                                 item.awayTeamSubtitle,
-                                selectedAnswer = state.selections.find { it._id == item.id }?.userAnswer,
+                                selectedAnswer = state.selections?.find { it._id == item.id }?.userAnswer,
                                 onAnswerSelected = { answer ->
                                     val userLoser =
                                         if (answer == item.homeTeam) item.awayTeam else item.homeTeam
@@ -121,7 +121,7 @@ fun FastbreakHomeList(dailyFastbreak: DailyFastbreak?, viewModel: FastbreakViewM
                                 item.homeTeamSubtitle,
                                 item.awayTeam,
                                 item.awayTeamSubtitle,
-                                selectedAnswer = state.selections.find { it._id == item.id }?.userAnswer,
+                                selectedAnswer = state.selections?.find { it._id == item.id }?.userAnswer,
                                 onAnswerSelected = { answer ->
                                     val userLoser =
                                         if (answer == item.homeTeam) item.awayTeam else item.homeTeam
@@ -154,7 +154,7 @@ fun FastbreakHomeList(dailyFastbreak: DailyFastbreak?, viewModel: FastbreakViewM
                                             item.answer4
                                         )
                                     ),
-                                    selectedAnswer = state.selections.find { it._id == item.id }?.userAnswer,
+                                    selectedAnswer = state.selections?.find { it._id == item.id }?.userAnswer,
                                     onAnswerSelected = { answer ->
                                         viewModel.updateSelection(
                                             item.id,
@@ -183,7 +183,7 @@ fun FastbreakHomeList(dailyFastbreak: DailyFastbreak?, viewModel: FastbreakViewM
                                     Question.TrueFalse(
                                         item.question
                                     ),
-                                    selectedAnswer = state.selections.find { it._id == item.id }?.userAnswer,
+                                    selectedAnswer = state.selections?.find { it._id == item.id }?.userAnswer,
                                     onAnswerSelected = { answer ->
                                         viewModel.updateSelection(
                                             item.id,

@@ -182,11 +182,11 @@ fun App(
     val colors = LocalColors.current;
     val lockedCard: MutableState<FastbreakSelectionState?> = mutableStateOf(null)
 
-    try {
-        Database.delete("fastbreak")
-    } catch (e: Exception) {
-        println("Database already deleted")
-    }
+    //try {
+       // Database.delete("fastbreak")
+   // } catch (e: Exception) {
+     // println("Database already deleted")
+   // }
 
     MaterialTheme {
         Surface(color = colors.background) {

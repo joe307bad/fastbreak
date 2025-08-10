@@ -29,10 +29,8 @@ import com.arkivanov.essenty.lifecycle.LifecycleRegistry
 import com.joebad.fastbreak.data.dailyFastbreak.FastbreakSelectionState
 import com.joebad.fastbreak.ui.screens.LoginScreen
 import com.joebad.fastbreak.ui.theme.LocalColors
-import kotbase.Database
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
+import com.joebad.fastbreak.coroutines.SafeCoroutineScope
+import com.joebad.fastbreak.coroutines.safeLaunch
 
 fun shouldEnforceLogin(authRepository: AuthRepository): Boolean {
     val authedUser = authRepository.getUser()
@@ -142,7 +140,14 @@ class RootComponent(
                 LoginComponent(
                     componentContext = componentContext,
                     onLoginClick = {
-                        navigation.replaceAll(Config.Protected)
+                        println("🔄 LoginComponent.onLoginClick called - navigating to Protected")
+                        try {
+                            navigation.replaceAll(Config.Protected)
+                            println("✅ Navigation to Protected completed")
+                        } catch (e: Exception) {
+                            println("❌ Navigation failed: ${e.message}")
+                            e.printStackTrace()
+                        }
                     }
                 )
             )
@@ -182,11 +187,11 @@ fun App(
     val colors = LocalColors.current;
     val lockedCard: MutableState<FastbreakSelectionState?> = mutableStateOf(null)
 
-    //try {
-       // Database.delete("fastbreak")
-   // } catch (e: Exception) {
-     // println("Database already deleted")
-   // }
+//    try {
+//        Database.delete("fastbreak")
+//    } catch (e: Exception) {
+//        println("Database already deleted")
+//    }
 
     MaterialTheme {
         Surface(color = colors.background) {
@@ -199,38 +204,35 @@ fun App(
                 when (val instance = child.instance) {
                     is RootComponent.Child.Login -> LoginScreen(
                         goToHome = { au ->
-                            CoroutineScope(Dispatchers.Main).launch {
-                                try {
-                                    instance.component.setLoading(true)
-                                    println("Initializing profile for user: ${au.userId}")
-                                    
-                                    val profile = profileRepository.initializeProfile(au.userId, au.idToken)
-                                    println("Profile initialization result: $profile")
-                                    
-                                    if(profile != null) {
-                                        val authedUser = AuthedUser(
-                                            au.email,
-                                            au.exp,
-                                            au.idToken,
-                                            profile.userId,
-                                            profile.userName
-                                        )
-                                        authRepository.storeAuthedUser(authedUser)
-                                        lockedCard.value = profile.lockedFastBreakCard
-                                        println("Navigating to protected content")
-                                        instance.component.onLoginClick()
-                                    } else {
-                                        println("Profile initialization failed")
-                                        instance.component.setError("Unable to initialize your profile. Please check your connection and try again.")
-                                    }
-                                    
-                                } catch (e: Exception) {
-                                    println("Login error: ${e.message}")
-                                    e.printStackTrace()
-                                    instance.component.setError("Login failed: ${e.message ?: "Unknown error occurred"}")
-                                } finally {
-                                    instance.component.setLoading(false)
+                            SafeCoroutineScope.safeLaunch {
+                                instance.component.setLoading(true)
+                                println("🔄 Starting login flow for user: ${au.userId}")
+                                
+                                val result = profileRepository.initializeProfile(au.userId, au.idToken)
+                                val profile = result?.response
+                                val baseUrl = result?.baseUrl
+                                println("🔄 Profile initialization result: $profile")
+
+                                if(profile != null) {
+                                    val authedUser = AuthedUser(
+                                        au.email,
+                                        au.exp,
+                                        au.idToken,
+                                        profile.userId,
+                                        profile.userName
+                                    )
+                                    authRepository.storeAuthedUser(authedUser)
+                                    lockedCard.value = profile.lockedFastBreakCard
+                                    println("✅ Profile initialized successfully, calling navigation")
+                                    println("🔄 About to call onLoginClick()...")
+                                    instance.component.onLoginClick()
+                                    println("✅ onLoginClick() called successfully")
+                                } else {
+                                    println("❌ Profile initialization failed")
+                                    instance.component.setError("Unable to initialize your profile. Please check your connection to $baseUrl and try again.")
                                 }
+                                instance.component.setLoading(false)
+                                println("🔄 Login flow completed")
                             }
                         },
                         theme = theme,

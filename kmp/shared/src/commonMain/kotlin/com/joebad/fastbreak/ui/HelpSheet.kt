@@ -25,10 +25,11 @@ import com.joebad.fastbreak.ui.theme.LocalColors
 import kotlinx.coroutines.launch
 
 @Composable
-fun SimpleBottomSheetExample(
+fun HelpSheet(
     showBottomSheet: Boolean,
     onDismiss: () -> Unit,
-    helpItems: List<HelpItem>
+    helpItems: List<HelpItem>,
+    helpTitle: String
 ) {
     val bottomSheetState = rememberModalBottomSheetState()
     val scope = rememberCoroutineScope()
@@ -46,7 +47,7 @@ fun SimpleBottomSheetExample(
                     .padding(16.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Title("Help")
+                Title(helpTitle.replace("_", " "))
 
                 Spacer(modifier = Modifier.height(16.dp))
 

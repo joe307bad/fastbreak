@@ -29,7 +29,7 @@ class FastbreakStateRepository(
         db.getCollection("LastFetchedCollection") ?: db.createCollection("LastFetchedCollection")
     private val dailyStateCollection = db.getCollection("FastBreakDailyStateCollection")
         ?: db.createCollection("FastBreakDailyStateCollection")
-    private val BASE_URL = if (getPlatform().name == "iOS") "localhost" else API_BASE_URL
+    private val BASE_URL = API_BASE_URL
     private val LOCK_CARD = "${BASE_URL}/api/lock"
 
     companion object {
@@ -113,7 +113,7 @@ class FastbreakStateRepository(
 
     private fun saveStateToDatabase(date: String, state: DailyFastbreak?) {
         val doc = MutableDocument(date)
-            .setString("data", Json.encodeToString(state))
+            .setString("data", if (state != null) Json.encodeToString(DailyFastbreak.serializer(), state) else "null")
 
         dailyStateCollection.save(doc)
     }

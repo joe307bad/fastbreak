@@ -51,8 +51,8 @@ let calculateLockedCardStreak (database: IMongoDatabase) userId =
             | Some sheet ->
                 let sheetDate = DateTime.ParseExact(sheet.date, "yyyyMMdd", System.Globalization.CultureInfo.InvariantCulture)
                 printf ($"Found stat sheet from {sheet.date} with current streak: {sheet.items.lockedCardStreak.current}, longest: {sheet.items.lockedCardStreak.longest} for user {userId}\n")
-                // Only query from sheet date forward to check for continuation
-                (sheetDate.AddDays(1.0), sheet.items.lockedCardStreak)
+                // Query from sheet date forward to check for continuation (include sheet date)
+                (sheetDate, sheet.items.lockedCardStreak)
 
         // Query for locked cards based on our strategy
         let filter =

@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.Divider
 import androidx.compose.material.MaterialTheme
@@ -46,6 +47,13 @@ fun SettingsScreen(
             Divider()
             Spacer(modifier = Modifier.height(10.dp))
             Column(modifier = Modifier.padding(horizontal = 10.dp)) {
+                Text(
+                    text = "Last sync date:",
+                    color = colors.text,
+                    style = MaterialTheme.typography.body1,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth().offset(y=5.dp)
+                )
                 Text(
                     text = formatEpochSecondsToDate(lastFetchedDate),
                     color = colors.text,

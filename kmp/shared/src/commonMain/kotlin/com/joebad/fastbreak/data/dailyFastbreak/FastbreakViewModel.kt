@@ -10,8 +10,10 @@ import com.joebad.fastbreak.utils.DateUtils
 import getRandomId
 import kotbase.Database
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.MainScope
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.Dispatchers
+import com.joebad.fastbreak.coroutines.GlobalCoroutineExceptionHandler
+import com.joebad.fastbreak.coroutines.safeLaunch
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 import kotlinx.serialization.Serializable
@@ -60,7 +62,8 @@ class FastbreakViewModel(
     selectedDate: String?,
     lastLockedCard: FastbreakSelectionState?,
     lastLockedCardWithResults: FastbreakSelectionState?
-) : ContainerHost<FastbreakSelectionState, FastbreakSideEffect>, CoroutineScope by MainScope() {
+) : ContainerHost<FastbreakSelectionState, FastbreakSideEffect>, 
+    CoroutineScope by CoroutineScope(SupervisorJob() + Dispatchers.Main + GlobalCoroutineExceptionHandler) {
 
     private val persistence = FastbreakSelectionsPersistence(database, authRepository)
     private val _profileRepository = ProfileRepository(authRepository)
@@ -72,18 +75,14 @@ class FastbreakViewModel(
     )
 
     init {
-        launch {
+        safeLaunch {
             if (lastLockedCard != null && lastLockedCard.date == selectedDate) {
-                try {
-                    persistence.saveSelections(
-                        lastLockedCard.cardId,
-                        lastLockedCard.selections ?: emptyList(),
-                        true,
-                        lastLockedCard.date
-                    )
-                } catch (e: Exception) {
-                    println(e)
-                }
+                persistence.saveSelections(
+                    lastLockedCard.cardId,
+                    lastLockedCard.selections ?: emptyList(),
+                    true,
+                    lastLockedCard.date
+                )
             }
             loadSavedSelections()
         }
@@ -286,40 +285,32 @@ class FastbreakViewModel(
         }
 
     private fun saveSelections() {
-        launch {
-            try {
-                val state = container.stateFlow.value;
-                persistence.saveSelections(
-                    state.cardId ?: "",
-                    state.selections ?: emptyList(),
-                    state.locked,
-                    state.date
-                );
-            } catch (e: Exception) {
-                println(e)
-            }
+        safeLaunch {
+            val state = container.stateFlow.value;
+            persistence.saveSelections(
+                state.cardId ?: "",
+                state.selections ?: emptyList(),
+                state.locked,
+                state.date
+            );
         }
     }
 
     private fun loadSavedSelections() {
-        launch {
-            try {
-                val state = container.stateFlow.value;
-                val savedSelections = persistence.loadSelections(state.date)
-                if (savedSelections != null) {
-                    intent {
-                        reduce {
-                            state.copy(
-                                cardId = savedSelections.cardId,
-                                selections = savedSelections.selectionDtos,
-                                totalPoints = if (savedSelections.selectionDtos.isEmpty()) 0 else savedSelections.selectionDtos.sumOf { it.points },
-                                locked = savedSelections.locked
-                            )
-                        }
+        safeLaunch {
+            val state = container.stateFlow.value;
+            val savedSelections = persistence.loadSelections(state.date)
+            if (savedSelections != null) {
+                intent {
+                    reduce {
+                        state.copy(
+                            cardId = savedSelections.cardId,
+                            selections = savedSelections.selectionDtos,
+                            totalPoints = if (savedSelections.selectionDtos.isEmpty()) 0 else savedSelections.selectionDtos.sumOf { it.points },
+                            locked = savedSelections.locked
+                        )
                     }
                 }
-            } catch (e: Exception) {
-                println(e.message)
             }
         }
     }
@@ -331,16 +322,11 @@ class FastbreakViewModel(
             }
         }
 
-        launch {
-            try {
-                _profileRepository.saveUserName(userName)
-            } catch (e: Exception) {
-                println(e.message)
-            } finally {
-                intent {
-                    reduce {
-                        state.copy(isSavingUserName = false)
-                    }
+        safeLaunch {
+            _profileRepository.saveUserName(userName)
+            intent {
+                reduce {
+                    state.copy(isSavingUserName = false)
                 }
             }
         }

@@ -5,7 +5,6 @@ plugins {
     alias(libs.plugins.kotlinMultiplatform)
     alias(libs.plugins.androidLibrary)
     alias(libs.plugins.jetbrainsCompose)
-//    alias(libs.plugins.composeResources)
     alias(libs.plugins.compose.compiler)
     id("com.codingfeline.buildkonfig")
     kotlin("plugin.serialization") version "2.1.0"
@@ -67,13 +66,13 @@ kotlin {
                 implementation("com.google.accompanist:accompanist-systemuicontroller:0.34.0")
                 implementation("androidx.datastore:datastore-preferences:1.1.3")
 
-                implementation("io.ktor:ktor-client-cio:2.3.6")
-
+                implementation("io.ktor:ktor-client-core:2.3.6")
                 implementation("io.ktor:ktor-client-serialization:2.3.6")
                 implementation("io.ktor:ktor-client-content-negotiation:2.3.6")
                 implementation("io.ktor:ktor-serialization-kotlinx-json:2.3.6")
 
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.0")
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
                 implementation("org.orbit-mvi:orbit-core:9.0.0")
                 implementation("org.orbit-mvi:orbit-compose:9.0.0")
 
@@ -95,6 +94,10 @@ kotlin {
             iosArm64Main.dependsOn(this)
             iosSimulatorArm64Main.dependsOn(this)
 
+            dependencies {
+                implementation("io.ktor:ktor-client-darwin:2.3.6")
+            }
+            
             resources.srcDirs("src/commonMain/composeResources")
         }
 
@@ -107,6 +110,7 @@ kotlin {
             implementation(libs.compose.ui.tooling.preview)
             api(libs.androidx.activity.compose)
             implementation("com.arkivanov.decompose:extensions-android:3.2.2")
+            implementation("io.ktor:ktor-client-cio:2.3.6")
         }
     }
 }

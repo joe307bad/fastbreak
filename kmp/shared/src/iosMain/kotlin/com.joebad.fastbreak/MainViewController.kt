@@ -22,9 +22,12 @@ fun MainViewController() = ComposeUIViewController {
     val coroutineScope = rememberCoroutineScope()
 
     // KVault uses iOS Keychain which persists data until explicitly deleted
-    val kvault = KVault("auth_secure_storage")
-    val authRepository = AuthRepository(kvault)
-    val profileRepository = ProfileRepository(authRepository)
+    val kvault = remember { KVault("auth_secure_storage") }
+    val authRepository = remember { AuthRepository(kvault) }
+    val profileRepository = remember { ProfileRepository(authRepository) }
+    
+    // Create root component once and remember it to prevent recreation on recomposition
+    val rootComponent = remember { createRootComponent(authRepository) }
 
     LaunchedEffect(Unit) {
         theme = themePreference.getTheme()
@@ -32,7 +35,7 @@ fun MainViewController() = ComposeUIViewController {
 
     AppTheme(isDarkTheme = theme == Theme.Dark) {
         App(
-            rootComponent = createRootComponent(authRepository),
+            rootComponent = rootComponent,
             onToggleTheme = { selectedTheme ->
                 theme = selectedTheme
                 coroutineScope.launch {

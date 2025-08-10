@@ -42,8 +42,8 @@ import com.joebad.fastbreak.data.dailyFastbreak.FastbreakStateRepository
 import com.joebad.fastbreak.data.dailyFastbreak.FastbreakViewModel
 import com.joebad.fastbreak.model.dtos.DailyFastbreak
 import com.joebad.fastbreak.ui.GoogleSignInButton
+import com.joebad.fastbreak.ui.HelpSheet
 import com.joebad.fastbreak.ui.PhysicalButton
-import com.joebad.fastbreak.ui.SimpleBottomSheetExample
 import com.joebad.fastbreak.ui.Title
 import com.joebad.fastbreak.ui.help.HelpData
 import com.joebad.fastbreak.ui.help.HelpPage
@@ -282,10 +282,11 @@ fun ProtectedContent(
             onShowHelp = openHelpSheet
         )
 
-        SimpleBottomSheetExample(
+        HelpSheet(
             showBottomSheet = showBottomSheet,
             onDismiss = { showBottomSheet = false },
-            helpItems = HelpData.getHelpContent(bottomSheetHelpPage)
+            helpItems = HelpData.getHelpContent(bottomSheetHelpPage),
+            helpTitle = bottomSheetHelpPage.name
         )
 
         SigninBottomSheet(

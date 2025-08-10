@@ -141,7 +141,6 @@
 				7555FF79242A565900829871 /* Resources */,
 				7555FFB4242A642300829871 /* Embed Frameworks */,
 				DB5A75ED27553FCF2FD60D6A /* [CP] Embed Pods Frameworks */,
-				C25B15B25727BE8BD98BD1E1 /* [CP] Copy Pods Resources */,
 			);
 			buildRules = (
 			);
@@ -251,23 +250,6 @@
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
 			shellScript = "../gradlew :shared:embedAndSignAppleFrameworkForXcode\n";
-		};
-		C25B15B25727BE8BD98BD1E1 /* [CP] Copy Pods Resources */ = {
-			isa = PBXShellScriptBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputFileListPaths = (
-				"${PODS_ROOT}/Target Support Files/Pods-Fastbreak/Pods-Fastbreak-resources-${CONFIGURATION}-input-files.xcfilelist",
-			);
-			name = "[CP] Copy Pods Resources";
-			outputFileListPaths = (
-				"${PODS_ROOT}/Target Support Files/Pods-Fastbreak/Pods-Fastbreak-resources-${CONFIGURATION}-output-files.xcfilelist",
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-Fastbreak/Pods-Fastbreak-resources.sh\"\n";
-			showEnvVarsInLog = 0;
 		};
 		DB5A75ED27553FCF2FD60D6A /* [CP] Embed Pods Frameworks */ = {
 			isa = PBXShellScriptBuildPhase;

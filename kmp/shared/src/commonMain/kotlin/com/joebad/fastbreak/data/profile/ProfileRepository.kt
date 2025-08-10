@@ -1,6 +1,5 @@
 
 import com.joebad.fastbreak.BuildKonfig
-import com.joebad.fastbreak.getPlatform
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.plugins.HttpTimeout
@@ -20,10 +19,16 @@ data class Profile(
     val userId: String?
 )
 
+@Serializable
+data class ProfileInitializationResult(
+    val baseUrl: String,
+    val response: InitializeProfileResponse
+)
+
 class ProfileRepository(authRepository: AuthRepository) {
 
     private val _authRepository = authRepository;
-    private val _baseUrl = if (getPlatform().name == "iOS") "localhost" else BuildKonfig.API_BASE_URL
+    private val _baseUrl = BuildKonfig.API_BASE_URL
     private val _saveUserName = "${_baseUrl}/api/profile"
     private val _initializeProfile = "$_baseUrl/api/profile/initialize"
 
@@ -54,7 +59,7 @@ class ProfileRepository(authRepository: AuthRepository) {
         }
     }
 
-    suspend fun initializeProfile(userId: String, token: String?): InitializeProfileResponse? {
+    suspend fun initializeProfile(userId: String, token: String?): ProfileInitializationResult? {
         return try {
             val t = token ?: _authRepository.getUser()?.idToken;
             println("Initializing profile for userId: $userId")
@@ -65,7 +70,10 @@ class ProfileRepository(authRepository: AuthRepository) {
                 header("Authorization", "Bearer $t")
             }.body<InitializeProfileResponse>()
             println("Profile initialization successful: $response")
-            response
+            ProfileInitializationResult(
+                baseUrl = _baseUrl,
+                response = response
+            )
         } catch (e: Exception) {
             println("Error making POST to ${_initializeProfile}/${userId}: ${e.message}")
             println("Exception type: ${e::class.simpleName}")

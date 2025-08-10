@@ -50,7 +50,7 @@ class AuthRepository(private val secureStorage: KVault) {
     }
 
     fun storeAuthedUser(user: AuthedUser) {
-        val userJson = json.encodeToString(user)
+        val userJson = json.encodeToString(AuthedUser.serializer(), user)
         secureStorage.set(KEY_AUTHED_USER, userJson)
     }
 

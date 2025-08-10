@@ -311,6 +311,8 @@ let scheduleJobs () =
     let easternTimeZone = TimeZoneInfo.FindSystemTimeZoneById("Eastern Standard Time")
     let recurringJobOptions = RecurringJobOptions(TimeZone = easternTimeZone)
     
+    JobRunner.StatSheetsJob ()
+    
     // Daily job runs at 4:30 AM ET, 30 minutes before other jobs
     RecurringJob.AddOrUpdate("daily-job", dailyJobCall, "30 4 * * *")
     // Trigger dependent jobs at 5:00 AM ET daily, after schedule data is pulled

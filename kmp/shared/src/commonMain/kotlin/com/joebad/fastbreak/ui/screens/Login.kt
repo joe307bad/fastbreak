@@ -1,7 +1,7 @@
 package com.joebad.fastbreak.ui.screens
 
 import AuthedUser
-import FastbreakLogo
+import com.joebad.fastbreak.ui.FastbreakLogo
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -33,7 +33,7 @@ fun LoginScreen(goToHome: (user: AuthedUser) -> Unit, theme: Theme?, error: Stri
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Box(modifier = Modifier.size(200.dp)) {
-            FastbreakLogo(theme)
+            FastbreakLogo(isDark = theme == Theme.Dark)
         }
         Box(modifier = Modifier.height(100.dp)) {
             GoogleSignInButton(

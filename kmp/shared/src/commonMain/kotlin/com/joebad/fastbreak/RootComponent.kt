@@ -3,7 +3,6 @@ package com.joebad.fastbreak
 import AuthRepository
 import AuthedUser
 import ProfileRepository
-import ProtectedContent
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Surface
 import androidx.compose.runtime.Composable
@@ -28,6 +27,7 @@ import com.arkivanov.decompose.value.Value
 import com.arkivanov.essenty.lifecycle.LifecycleRegistry
 import com.joebad.fastbreak.data.dailyFastbreak.FastbreakSelectionState
 import com.joebad.fastbreak.ui.screens.LoginScreen
+import com.joebad.fastbreak.ui.screens.TokenDisplayScreen
 import com.joebad.fastbreak.ui.theme.LocalColors
 import com.joebad.fastbreak.coroutines.SafeCoroutineScope
 import com.joebad.fastbreak.coroutines.safeLaunch
@@ -64,54 +64,10 @@ class LoginComponent(
     }
 }
 
-class ProtectedComponent(
+class TokenDisplayComponent(
     componentContext: ComponentContext,
-) : ComponentContext by componentContext {
-
-    private val navigation = StackNavigation<Config>()
-
-    val stack: Value<ChildStack<Config, Child>> = childStack(
-        source = navigation,
-        serializer = null,
-        initialConfiguration = Config.Home,
-        handleBackButton = true,
-        childFactory = ::createChild
-    )
-
-    private fun createChild(config: Config, componentContext: ComponentContext): Child {
-        return when (config) {
-            is Config.Home -> Child.Home
-            is Config.Leaderboard -> Child.Leaderboard
-            is Config.Settings -> Child.Settings
-            is Config.Profile -> Child.Profile
-        }
-    }
-
-    fun goToSettings() {
-        navigation.push(Config.Settings)
-    }
-
-    fun selectTab(tab: Config) {
-
-        println("Current stack before: ${stack.items}")
-        navigation.replaceAll(tab)
-        println("Current stack after: ${stack.items}")
-    }
-
-    sealed class Config {
-        object Home : Config()
-        object Leaderboard : Config()
-        object Settings : Config()
-        object Profile : Config()
-    }
-
-    sealed class Child {
-        object Home : Child()
-        object Leaderboard : Child()
-        object Settings : Child()
-        object Profile : Child()
-    }
-}
+    val onLogout: () -> Unit
+) : ComponentContext by componentContext
 
 class RootComponent(
     componentContext: ComponentContext,
@@ -124,7 +80,7 @@ class RootComponent(
         childStack(
             source = navigation,
             serializer = null,
-            initialConfiguration = if (shouldEnforceLogin(authRepository)) Config.Login else Config.Protected,
+            initialConfiguration = if (shouldEnforceLogin(authRepository)) Config.Login else Config.TokenDisplay,
             handleBackButton = true,
             childFactory = ::createChild,
         )
@@ -140,10 +96,10 @@ class RootComponent(
                 LoginComponent(
                     componentContext = componentContext,
                     onLoginClick = {
-                        println("🔄 LoginComponent.onLoginClick called - navigating to Protected")
+                        println("🔄 LoginComponent.onLoginClick called - navigating to TokenDisplay")
                         try {
-                            navigation.replaceAll(Config.Protected)
-                            println("✅ Navigation to Protected completed")
+                            navigation.replaceAll(Config.TokenDisplay)
+                            println("✅ Navigation to TokenDisplay completed")
                         } catch (e: Exception) {
                             println("❌ Navigation failed: ${e.message}")
                             e.printStackTrace()
@@ -152,9 +108,13 @@ class RootComponent(
                 )
             )
 
-            is Config.Protected -> Child.Protected(
-                ProtectedComponent(
+            is Config.TokenDisplay -> Child.TokenDisplay(
+                TokenDisplayComponent(
                     componentContext = componentContext,
+                    onLogout = {
+                        println("🔄 TokenDisplayComponent.onLogout called - navigating to Login")
+                        navigation.replaceAll(Config.Login)
+                    }
                 )
             )
         }
@@ -162,12 +122,12 @@ class RootComponent(
 
     sealed class Config {
         object Login : Config()
-        object Protected : Config()
+        object TokenDisplay : Config()
     }
 
     sealed class Child {
         data class Login(val component: LoginComponent) : Child()
-        data class Protected(val component: ProtectedComponent) : Child()
+        data class TokenDisplay(val component: TokenDisplayComponent) : Child()
     }
 }
 
@@ -184,14 +144,7 @@ fun App(
     profileRepository: ProfileRepository,
     theme: Theme?
 ) {
-    val colors = LocalColors.current;
-    val lockedCard: MutableState<FastbreakSelectionState?> = mutableStateOf(null)
-
-//    try {
-//        Database.delete("fastbreak")
-//    } catch (e: Exception) {
-//        println("Database already deleted")
-//    }
+    val colors = LocalColors.current
 
     MaterialTheme {
         Surface(color = colors.background) {
@@ -222,7 +175,6 @@ fun App(
                                         profile.userName
                                     )
                                     authRepository.storeAuthedUser(authedUser)
-                                    lockedCard.value = profile.lockedFastBreakCard
                                     println("✅ Profile initialized successfully, calling navigation")
                                     println("🔄 About to call onLoginClick()...")
                                     instance.component.onLoginClick()
@@ -240,17 +192,12 @@ fun App(
                         isLoading = instance.component.isLoading
                     )
 
-                    is RootComponent.Child.Protected ->
-                        ProtectedContent(
-                        instance.component,
-                        onToggleTheme,
-                        themePreference = themePreference,
-                        authRepository,
+                    is RootComponent.Child.TokenDisplay -> TokenDisplayScreen(
+                        authRepository = authRepository,
                         onLogout = {
                             authRepository.clearUser()
-                            rootComponent.goToLogin()
-                        },
-                        lockedCard = lockedCard.value
+                            instance.component.onLogout()
+                        }
                     )
                 }
             }

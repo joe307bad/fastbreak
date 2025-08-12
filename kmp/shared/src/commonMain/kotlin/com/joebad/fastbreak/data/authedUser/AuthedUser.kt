@@ -1,9 +1,5 @@
 
 import com.liftric.kvault.KVault
-import io.ktor.client.HttpClient
-import io.ktor.client.plugins.HttpTimeout
-import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
-import io.ktor.serialization.kotlinx.json.json
 import kotlinx.datetime.Clock
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -13,8 +9,8 @@ data class AuthedUser(
     val email: String,
     val exp: Long,
     val idToken: String,
-    val userId: String,
-    val userName: String
+//    val userId: String,
+//    val userName: String
 )
 
 class AuthRepository(private val secureStorage: KVault) {
@@ -25,27 +21,14 @@ class AuthRepository(private val secureStorage: KVault) {
 
     private val json = Json { ignoreUnknownKeys = true }
 
-    private val client = HttpClient {
-        install(ContentNegotiation) {
-            json(Json {
-                prettyPrint = true
-                isLenient = true
-                ignoreUnknownKeys = true
-            })
-        }
-        install(HttpTimeout) {
-            requestTimeoutMillis = 60_000
-        }
-    }
-
     fun updateUserName(userName: String) {
         val user = getUser() ?: return
         storeAuthedUser(AuthedUser(
             user.email,
             user.exp,
             user.idToken,
-            user.userId,
-            userName
+//            user.userId,
+//            userName
         ))
     }
 

@@ -2,7 +2,6 @@ package com.joebad.fastbreak.data.dailyFastbreak
 
 import AuthRepository
 import com.joebad.fastbreak.BuildKonfig.API_BASE_URL
-import com.joebad.fastbreak.getPlatform
 import com.joebad.fastbreak.model.dtos.DailyFastbreak
 import kotbase.DataSource
 import kotbase.Database
@@ -107,7 +106,7 @@ class FastbreakStateRepository(
 
     private suspend fun fetchDailyFastbreak(date: String): DailyFastbreakResult {
         val getDailyFastbreakUrl = "${BASE_URL}/api/day/${date}"
-        val apiResponse = getDailyFastbreak(getDailyFastbreakUrl, authRepository?.getUser()?.userId)
+        val apiResponse = getDailyFastbreak(getDailyFastbreakUrl, null)
         return apiResponse
     }
 

@@ -51,7 +51,7 @@ class ProfileRepository(authRepository: AuthRepository) {
             client.post(_saveUserName) {
                 contentType(ContentType.Application.Json)
                 header("Authorization", "Bearer ${_authRepository.getUser()?.idToken}")
-                setBody(Profile(userName = userName, userId = _authRepository.getUser()?.userId))
+                setBody(Profile(userName = userName, userId = null))
             }.body()
         } catch (e: Exception) {
             println("Error making POST to ${_saveUserName}: ${e.message}")

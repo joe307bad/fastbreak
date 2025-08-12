@@ -2,11 +2,9 @@ package com.joebad.fastbreak
 
 import AuthRepository
 import AuthedUser
-import ProfileRepository
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Surface
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -17,20 +15,13 @@ import com.arkivanov.decompose.extensions.compose.stack.Children
 import com.arkivanov.decompose.extensions.compose.stack.animation.fade
 import com.arkivanov.decompose.extensions.compose.stack.animation.stackAnimation
 import com.arkivanov.decompose.extensions.compose.subscribeAsState
-import com.arkivanov.decompose.router.stack.ChildStack
 import com.arkivanov.decompose.router.stack.StackNavigation
 import com.arkivanov.decompose.router.stack.childStack
-import com.arkivanov.decompose.router.stack.items
-import com.arkivanov.decompose.router.stack.push
 import com.arkivanov.decompose.router.stack.replaceAll
-import com.arkivanov.decompose.value.Value
 import com.arkivanov.essenty.lifecycle.LifecycleRegistry
-import com.joebad.fastbreak.data.dailyFastbreak.FastbreakSelectionState
 import com.joebad.fastbreak.ui.screens.LoginScreen
 import com.joebad.fastbreak.ui.screens.TokenDisplayScreen
 import com.joebad.fastbreak.ui.theme.LocalColors
-import com.joebad.fastbreak.coroutines.SafeCoroutineScope
-import com.joebad.fastbreak.coroutines.safeLaunch
 
 fun shouldEnforceLogin(authRepository: AuthRepository): Boolean {
     val authedUser = authRepository.getUser()
@@ -141,7 +132,6 @@ fun App(
     onToggleTheme: (theme: Theme) -> Unit,
     themePreference: ThemePreference,
     authRepository: AuthRepository,
-    profileRepository: ProfileRepository,
     theme: Theme?
 ) {
     val colors = LocalColors.current
@@ -157,35 +147,14 @@ fun App(
                 when (val instance = child.instance) {
                     is RootComponent.Child.Login -> LoginScreen(
                         goToHome = { au ->
-                            SafeCoroutineScope.safeLaunch {
-                                instance.component.setLoading(true)
-                                println("🔄 Starting login flow for user: ${au.userId}")
-                                
-                                val result = profileRepository.initializeProfile(au.userId, au.idToken)
-                                val profile = result?.response
-                                val baseUrl = result?.baseUrl
-                                println("🔄 Profile initialization result: $profile")
-
-                                if(profile != null) {
-                                    val authedUser = AuthedUser(
-                                        au.email,
-                                        au.exp,
-                                        au.idToken,
-                                        profile.userId,
-                                        profile.userName
-                                    )
-                                    authRepository.storeAuthedUser(authedUser)
-                                    println("✅ Profile initialized successfully, calling navigation")
-                                    println("🔄 About to call onLoginClick()...")
-                                    instance.component.onLoginClick()
-                                    println("✅ onLoginClick() called successfully")
-                                } else {
-                                    println("❌ Profile initialization failed")
-                                    instance.component.setError("Unable to initialize your profile. Please check your connection to $baseUrl and try again.")
-                                }
-                                instance.component.setLoading(false)
-                                println("🔄 Login flow completed")
-                            }
+                            val authedUser = AuthedUser(
+                                au.email,
+                                au.exp,
+                                au.idToken,
+//                                "Unknown" // Default username since we're not initializing profile
+                            )
+                            authRepository.storeAuthedUser(authedUser)
+                            instance.component.onLoginClick()
                         },
                         theme = theme,
                         error = instance.component.error,

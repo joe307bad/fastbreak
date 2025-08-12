@@ -1,7 +1,6 @@
 package com.joebad.fastbreak.ui.screens
 
 import AuthedUser
-import com.joebad.fastbreak.ui.FastbreakLogo
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,6 +20,7 @@ import androidx.compose.ui.unit.dp
 import com.appstractive.jwt.JWT
 import com.appstractive.jwt.from
 import com.joebad.fastbreak.Theme
+import com.joebad.fastbreak.ui.FastbreakLogo
 import com.joebad.fastbreak.ui.GoogleSignInButton
 import com.joebad.fastbreak.ui.theme.LocalColors
 
@@ -49,8 +49,8 @@ fun LoginScreen(goToHome: (user: AuthedUser) -> Unit, theme: Theme?, error: Stri
                                 email,
                                 exp,
                                 token,
-                                userId = sub,
-                                userName = ""
+//                                userId = sub,
+//                                userName = ""
                             )
                         )
                     }

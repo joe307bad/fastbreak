@@ -47,7 +47,7 @@ class FastbreakSelectionsPersistence(private val db: Database, private val authR
         val document = MutableDocument()
         document.setValue("selections", selectionMaps)
         document.setString("cardId", cardId)
-        document.setString("userId", authRepository?.getUser()?.userId)
+        document.setString("userId", null)
         document.setString("date", date)
         document.setBoolean("locked", locked ?: false)
         document.setLong("timestamp", Clock.System.now().toEpochMilliseconds())
@@ -61,7 +61,7 @@ class FastbreakSelectionsPersistence(private val db: Database, private val authR
             .from(DataSource.collection(getCollectionSafe()))
             .where(
                 Expression.property("date").equalTo(Expression.string(day))
-                    .and(Expression.property("userId").equalTo(Expression.string(authRepository?.getUser()?.userId)))
+                    .and(Expression.property("userId").equalTo(Expression.string(null)))
             )
             .orderBy(Ordering.property("timestamp").descending())
             .execute().firstOrNull()

@@ -65,7 +65,6 @@ class MainActivity : ComponentActivity() {
                             },
                             themePreference = themePreference,
                             authRepository = authRepository,
-                            profileRepository = profileRepository,
                             theme = theme
                         )
                     }

@@ -62,29 +62,9 @@ let lockCardHandler (database: IMongoDatabase) : HttpHandler =
                 | None -> Successful.ok (json {| error = "Error locking card" |}) next ctx
         }
 
-let getLockedCardHandler (database: IMongoDatabase) userId : HttpHandler =
-    fun next ctx ->
-        task {
-            let collection =
-                database.GetCollection<FastbreakSelectionState>("locked-fastbreak-cards")
-
-            let today = DateTime.UtcNow.ToString("yyyyMMdd")
-
-            let filter =
-                Builders<FastbreakSelectionState>.Filter
-                    .And(
-                        Builders<FastbreakSelectionState>.Filter.Eq(_.userId, userId),
-                        Builders<FastbreakSelectionState>.Filter.Eq(_.date, today)
-                    )
-
-            let! result = collection.Find(filter).FirstOrDefaultAsync()
-
-            return! json result next ctx
-        }
 
 let lockCardRouter database =
     router {
         pipe_through googleAuthPipeline
         post "/lock" (lockCardHandler database)
-        getf "/lock/%s" (fun userId -> getLockedCardHandler database userId)
     }

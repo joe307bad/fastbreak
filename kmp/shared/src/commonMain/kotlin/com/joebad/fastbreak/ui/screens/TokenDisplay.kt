@@ -41,8 +41,20 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.appstractive.jwt.JWT
 import com.appstractive.jwt.from
+import com.joebad.fastbreak.BuildKonfig
+import com.joebad.fastbreak.data.cache.CachedHttpClient
+import com.joebad.fastbreak.data.cache.KotbaseApiCache
+import com.joebad.fastbreak.data.dailyFastbreak.DailyFastbreakResult
+import com.joebad.fastbreak.data.dailyFastbreak.getDailyFastbreakCached
 import com.joebad.fastbreak.ui.theme.LocalColors
+import kotbase.Database
 import kotlinx.coroutines.launch
+import kotlinx.datetime.Clock
+import kotlinx.datetime.DateTimeUnit
+import kotlinx.datetime.LocalTime
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.minus
+import kotlinx.datetime.toLocalDateTime
 
 data class CacheStatus(
     val isLoading: Boolean = false,
@@ -51,10 +63,34 @@ data class CacheStatus(
     val error: String? = null
 )
 
+/**
+ * Gets the current fastbreak date in yyyyMMdd format.
+ * If current time is before 4am ET, returns previous day's date.
+ */
+private fun getCurrentFastbreakDate(): String {
+    val etTimeZone = TimeZone.of("America/New_York")
+    val now = Clock.System.now()
+    val nowET = now.toLocalDateTime(etTimeZone)
+    val today = nowET.date
+    val fourAmET = LocalTime(4, 0)
+    
+    val dateToUse = if (nowET.time < fourAmET) {
+        // Before 4am ET, use previous day
+        today.minus(1, DateTimeUnit.DAY)
+    } else {
+        // After 4am ET, use today
+        today
+    }
+    
+    return "${dateToUse.year.toString().padStart(4, '0')}${dateToUse.monthNumber.toString().padStart(2, '0')}${dateToUse.dayOfMonth.toString().padStart(2, '0')}"
+}
+
 @OptIn(ExperimentalMaterialApi::class)
 @Composable
 fun TokenDisplayScreen(
     authRepository: AuthRepository,
+    database: Database? = null,
+    httpClient: io.ktor.client.HttpClient? = null,
     onLogout: () -> Unit
 ) {
     val colors = LocalColors.current
@@ -69,33 +105,60 @@ fun TokenDisplayScreen(
         initialValue = ModalBottomSheetValue.Hidden
     )
     
-    // Simulate cache behavior when user is logged in
+    // Real cache behavior when user is logged in
     LaunchedEffect(user) {
-        if (user != null) {
-            // Show loading state
+        if (user != null && database != null && httpClient != null) {
+            try {
+                // Show loading state
+                cacheStatus = cacheStatus.copy(isLoading = true, isCached = false, error = null)
+                
+                // Calculate the correct date based on 4am ET cutoff
+                val dateString = getCurrentFastbreakDate()
+                
+                // Create cached HTTP client
+                val apiCache = KotbaseApiCache(database)
+                val cachedHttpClient = CachedHttpClient(httpClient, apiCache)
+                
+                // Make the API call
+                val apiUrl = "${BuildKonfig.API_BASE_URL}/api/day/${dateString}"
+                val result = getDailyFastbreakCached(cachedHttpClient, apiUrl, null)
+                
+                when (result) {
+                    is DailyFastbreakResult.Success -> {
+                        cacheStatus = cacheStatus.copy(
+                            isLoading = false,
+                            isCached = result.isFromCache,
+                            rawJson = result.rawJson,
+                            error = null
+                        )
+                    }
+                    is DailyFastbreakResult.Error -> {
+                        cacheStatus = cacheStatus.copy(
+                            isLoading = false,
+                            isCached = false,
+                            rawJson = null,
+                            error = result.message
+                        )
+                    }
+                }
+            } catch (e: Exception) {
+                cacheStatus = cacheStatus.copy(
+                    isLoading = false,
+                    isCached = false,
+                    rawJson = null,
+                    error = "Error: ${e.message}"
+                )
+            }
+        } else if (user != null) {
+            // Fallback to simulation if dependencies not provided
             cacheStatus = cacheStatus.copy(isLoading = true, isCached = false, error = null)
-            
-            // Simulate network delay for fresh fetch
-            kotlinx.coroutines.delay(2000)
-            
-            // First call: cache miss (fresh data from network)
-            val mockJson = """{"leaderboard":{"dailyLeaderboards":[],"weeklyTotals":[]},"fastbreakCard":[{"id":"daily-1","type":"game","homeTeam":"Lakers","awayTeam":"Warriors","points":5,"question":"Who will win?"}],"statSheet":{"totalPoints":15,"streak":3}}"""
+            kotlinx.coroutines.delay(1500)
+            val mockJson = """{"leaderboard":null,"fastbreakCard":[{"id":"demo","type":"game","homeTeam":"Demo","awayTeam":"Mode"}],"statSheet":null}"""
             cacheStatus = cacheStatus.copy(
                 isLoading = false,
-                isCached = false, // First fetch is not from cache
-                rawJson = mockJson
-            )
-            
-            // After 3 seconds, simulate another fetch that hits cache
-            kotlinx.coroutines.delay(3000)
-            cacheStatus = cacheStatus.copy(isLoading = true, isCached = false)
-            
-            // Quick response from cache
-            kotlinx.coroutines.delay(200)
-            cacheStatus = cacheStatus.copy(
-                isLoading = false,
-                isCached = true, // This one is from cache
-                rawJson = mockJson
+                isCached = false,
+                rawJson = mockJson,
+                error = null
             )
         }
     }

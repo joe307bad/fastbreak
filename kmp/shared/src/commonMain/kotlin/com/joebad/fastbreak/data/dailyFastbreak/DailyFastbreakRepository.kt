@@ -2,6 +2,7 @@ package com.joebad.fastbreak.data.dailyFastbreak
 
 import AuthRepository
 import com.joebad.fastbreak.BuildKonfig.API_BASE_URL
+import com.joebad.fastbreak.data.cache.CachedHttpClient
 import com.joebad.fastbreak.model.dtos.DailyFastbreak
 import kotbase.DataSource
 import kotbase.Database
@@ -21,7 +22,8 @@ import kotlinx.serialization.json.Json
 
 class FastbreakStateRepository(
     db: Database,
-    private val authRepository: AuthRepository?
+    private val authRepository: AuthRepository?,
+    private val cachedHttpClient: CachedHttpClient? = null
 ) {
 
     private val lastFetchedCollection =
@@ -84,7 +86,9 @@ class FastbreakStateRepository(
                     fastbreakCard = response.fastbreakCard,
                     statSheet = response.statSheetForUser,
                     lastLockedCardResults = response.lastLockedCardResults,
-                    lastFetchedDate = getLastFetchedTime()
+                    lastFetchedDate = getLastFetchedTime(),
+                    isFromCache = result.isFromCache,
+                    rawJson = result.rawJson
                 )
             }
             is DailyFastbreakResult.Error -> {
@@ -106,8 +110,14 @@ class FastbreakStateRepository(
 
     private suspend fun fetchDailyFastbreak(date: String): DailyFastbreakResult {
         val getDailyFastbreakUrl = "${BASE_URL}/api/day/${date}"
-        val apiResponse = getDailyFastbreak(getDailyFastbreakUrl, null)
-        return apiResponse
+        
+        return if (cachedHttpClient != null) {
+            // Use cached version when available
+            getDailyFastbreakCached(cachedHttpClient, getDailyFastbreakUrl, null)
+        } else {
+            // Fallback to non-cached version
+            getDailyFastbreak(getDailyFastbreakUrl, null)
+        }
     }
 
     private fun saveStateToDatabase(date: String, state: DailyFastbreak?) {

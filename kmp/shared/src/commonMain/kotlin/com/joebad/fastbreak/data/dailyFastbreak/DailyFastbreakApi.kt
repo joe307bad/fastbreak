@@ -1,6 +1,8 @@
 package com.joebad.fastbreak.data.dailyFastbreak
 
 import AuthedUser
+import com.joebad.fastbreak.data.cache.CachedHttpClient
+import com.joebad.fastbreak.data.cache.CachedTypedResponse
 import com.joebad.fastbreak.model.dtos.DailyResponse
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
@@ -33,7 +35,11 @@ sealed class LockCardResult {
 }
 
 sealed class DailyFastbreakResult {
-    data class Success(val response: DailyResponse) : DailyFastbreakResult()
+    data class Success(
+        val response: DailyResponse,
+        val isFromCache: Boolean = false,
+        val rawJson: String? = null
+    ) : DailyFastbreakResult()
     data class Error(val message: String) : DailyFastbreakResult()
 }
 
@@ -72,6 +78,38 @@ suspend fun getDailyFastbreak(url: String, userId: String? = ""): DailyFastbreak
         DailyFastbreakResult.Error("Network error: ${e.message ?: "Unknown client error"}")
     } catch (e: Exception) {
         println("Unexpected error fetching daily fastbreak: ${e.message}")
+        DailyFastbreakResult.Error("Unexpected error: ${e.message ?: "Unknown error occurred"}")
+    }
+}
+
+suspend fun getDailyFastbreakCached(
+    cachedHttpClient: CachedHttpClient,
+    url: String, 
+    userId: String? = ""
+): DailyFastbreakResult {
+    return try {
+        val fullUrl = if (userId.isNullOrEmpty()) url else "$url?userId=$userId"
+        val cachedResponse: CachedTypedResponse<DailyResponse> = cachedHttpClient.getTyped(
+            urlString = fullUrl,
+            deserializer = DailyResponse.serializer()
+        )
+        
+        when {
+            cachedResponse.isSuccess -> {
+                DailyFastbreakResult.Success(
+                    response = cachedResponse.data!!,
+                    isFromCache = cachedResponse.isFromCache,
+                    rawJson = cachedResponse.rawJson
+                )
+            }
+            else -> {
+                val errorMessage = cachedResponse.error ?: "Unknown error occurred"
+                println("Error fetching cached daily fastbreak: $errorMessage")
+                DailyFastbreakResult.Error(errorMessage)
+            }
+        }
+    } catch (e: Exception) {
+        println("Unexpected error fetching cached daily fastbreak: ${e.message}")
         DailyFastbreakResult.Error("Unexpected error: ${e.message ?: "Unknown error occurred"}")
     }
 }

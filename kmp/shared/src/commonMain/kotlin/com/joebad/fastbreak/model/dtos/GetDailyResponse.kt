@@ -34,7 +34,9 @@ data class DailyFastbreak(
     val fastbreakCard: List<EmptyFastbreakCardItem>,
     val statSheet: StatSheetResponse? = null,
     val lastLockedCardResults: FastbreakSelectionState? = null,
-    val lastFetchedDate: Long? = null
+    val lastFetchedDate: Long? = null,
+    val isFromCache: Boolean = false,
+    val rawJson: String? = null
 )
 
 @Serializable

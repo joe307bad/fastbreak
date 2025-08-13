@@ -38,6 +38,7 @@ class MainActivity : ComponentActivity() {
         val authRepository = AuthRepository(kvault)
         val profileRepository = ProfileRepository(authRepository)
 
+        // TODO: Initialize database and httpClient here when dependencies are available
         val rootComponent = createRootComponent(authRepository)
         val themePreference = AndroidThemePreference(applicationContext)
 

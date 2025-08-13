@@ -22,11 +22,6 @@ An F# API built with Saturn framework for managing daily fastbreak games and use
 - Requires Google authentication via Authorization header
 - Creates or updates locked card with user's picks and total points
 
-**GET /api/lock/{userId}**
-- Retrieves user's locked card selections for today
-- Returns current day's fastbreak selections and metadata
-- Requires Google authentication
-
 ### User Profile
 **POST /api/profile**
 - Creates or updates user profile information
@@ -66,9 +61,6 @@ The API uses Google JWT tokens for authentication. Protected endpoints require a
 3. **POST /api/lock** with Authorization header
    - Saves user's game selections and total points
    - Requires authentication to link selections to user
-4. **GET /api/lock/{userId}** with Authorization header
-   - Retrieves user's current locked selections
-   - Used to restore user's picks in UI
 
 ### Profile Management Flow  
 1. **POST /api/profile** with Authorization header
@@ -88,20 +80,16 @@ The API uses Google JWT tokens for authentication. Protected endpoints require a
 
 ### 1. User ID Exposure & Authorization Bypass
 **Issue**: 
-- `GET /api/lock/{userId}` allows any authenticated user to access any other user's data by guessing userIds
 - `POST /api/profile/initialize/{userId}` expects userId in URL path
 - No validation that authenticated user owns the requested userId
 
 **Fix**:
 - Remove userId from URL paths - derive from authenticated JWT token instead
-- Change `GET /api/lock/{userId}` to `GET /api/lock/me` 
 - Change `POST /api/profile/initialize/{userId}` to `POST /api/profile/initialize`
 - Add ownership validation: check that `googleId` from JWT matches profile's `googleId`
 
 **Code Changes**:
 ```fsharp
-// In LockCardController.fs - remove userId parameter
-getf "/lock/me" (fun -> getMyLockedCardHandler database)
 
 // In ProfileController.fs - remove userId parameter  
 post "/profile/initialize" (initializeMyProfileHandler database)
@@ -189,7 +177,7 @@ let mongoConnectionString =
 **Issue**:
 - No rate limiting on any endpoints
 - Background job trigger endpoint could be abused
-- No request size limits or timeout controls
+- No request slockCardApiize limits or timeout controls
 
 **Fix**:
 - Add rate limiting middleware to Saturn application

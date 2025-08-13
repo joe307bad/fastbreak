@@ -22,6 +22,12 @@ import com.arkivanov.essenty.lifecycle.LifecycleRegistry
 import com.joebad.fastbreak.ui.screens.LoginScreen
 import com.joebad.fastbreak.ui.screens.TokenDisplayScreen
 import com.joebad.fastbreak.ui.theme.LocalColors
+import io.ktor.client.HttpClient
+import io.ktor.client.plugins.HttpTimeout
+import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.serialization.kotlinx.json.json
+import kotbase.Database
+import kotlinx.serialization.json.Json
 
 fun shouldEnforceLogin(authRepository: AuthRepository): Boolean {
     val authedUser = authRepository.getUser()
@@ -62,7 +68,9 @@ class TokenDisplayComponent(
 
 class RootComponent(
     componentContext: ComponentContext,
-    authRepository: AuthRepository
+    val authRepository: AuthRepository,
+    val database: kotbase.Database? = null,
+    val httpClient: io.ktor.client.HttpClient? = null
 ) : ComponentContext by componentContext {
 
     private val navigation = StackNavigation<Config>()
@@ -122,8 +130,37 @@ class RootComponent(
     }
 }
 
-fun createRootComponent(authRepository: AuthRepository): RootComponent {
-    return RootComponent(DefaultComponentContext(LifecycleRegistry()), authRepository)
+fun createRootComponent(
+    authRepository: AuthRepository,
+): RootComponent {
+    // Initialize database for caching
+    val database = try {
+        Database("fastbreak_cache")
+    } catch (e: Exception) {
+        println("Failed to initialize database: ${e.message}")
+        null // Gracefully handle database initialization failure
+    }
+
+    // Initialize HTTP client for API calls
+    val httpClient = try {
+        HttpClient {
+            install(ContentNegotiation) {
+                json(Json {
+                    prettyPrint = true
+                    isLenient = true
+                    ignoreUnknownKeys = true
+                })
+            }
+            install(HttpTimeout) {
+                requestTimeoutMillis = 60_000
+            }
+        }
+    } catch (e: Exception) {
+        println("Failed to initialize HTTP client: ${e.message}")
+        null // Gracefully handle HTTP client initialization failure
+    }
+
+    return RootComponent(DefaultComponentContext(LifecycleRegistry()), authRepository, database, httpClient)
 }
 
 @Composable
@@ -153,7 +190,7 @@ fun App(
                                 au.idToken,
 //                                "Unknown" // Default username since we're not initializing profile
                             )
-                            authRepository.storeAuthedUser(authedUser)
+                            rootComponent.authRepository.storeAuthedUser(authedUser)
                             instance.component.onLoginClick()
                         },
                         theme = theme,
@@ -162,9 +199,11 @@ fun App(
                     )
 
                     is RootComponent.Child.TokenDisplay -> TokenDisplayScreen(
-                        authRepository = authRepository,
+                        authRepository = rootComponent.authRepository,
+                        database = rootComponent.database,
+                        httpClient = rootComponent.httpClient,
                         onLogout = {
-                            authRepository.clearUser()
+                            rootComponent.authRepository.clearUser()
                             instance.component.onLogout()
                         }
                     )

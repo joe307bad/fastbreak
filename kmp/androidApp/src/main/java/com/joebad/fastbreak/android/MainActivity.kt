@@ -56,18 +56,7 @@ class MainActivity : ComponentActivity() {
             ) {
                 if (theme != null) {
                     AppTheme(isDarkTheme = theme == Theme.Dark) {
-                        App(
-                            rootComponent = rootComponent,
-                            onToggleTheme = { selectedTheme ->
-                                theme = selectedTheme
-                                coroutineScope.launch {
-                                    themePreference.saveTheme(selectedTheme)
-                                }
-                            },
-                            themePreference = themePreference,
-                            authRepository = authRepository,
-                            theme = theme
-                        )
+                        App(rootComponent, theme)
                     }
                 }
             }

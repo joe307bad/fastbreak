@@ -34,18 +34,6 @@ fun MainViewController() = ComposeUIViewController {
     }
 
     AppTheme(isDarkTheme = theme == Theme.Dark) {
-        App(
-            rootComponent = rootComponent,
-            onToggleTheme = { selectedTheme ->
-                theme = selectedTheme
-                coroutineScope.launch {
-                    themePreference.saveTheme(selectedTheme)
-                }
-            },
-            themePreference = themePreference,
-            authRepository = authRepository,
-            profileRepository = profileRepository,
-            theme = theme
-        )
+        App(rootComponent, theme)
     }
 }

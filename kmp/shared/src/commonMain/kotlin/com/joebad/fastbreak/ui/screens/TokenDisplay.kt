@@ -25,7 +25,6 @@ import androidx.compose.material.ModalBottomSheetValue
 import androidx.compose.material.Text
 import androidx.compose.material.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -41,13 +40,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.appstractive.jwt.JWT
 import com.appstractive.jwt.from
-import com.joebad.fastbreak.BuildKonfig
-import com.joebad.fastbreak.data.cache.CachedHttpClient
-import com.joebad.fastbreak.data.cache.KotbaseApiCache
-import com.joebad.fastbreak.data.dailyFastbreak.DailyFastbreakResult
-import com.joebad.fastbreak.data.dailyFastbreak.getDailyFastbreakCached
 import com.joebad.fastbreak.ui.theme.LocalColors
-import kotbase.Database
 import kotlinx.coroutines.launch
 import kotlinx.datetime.Clock
 import kotlinx.datetime.DateTimeUnit
@@ -67,7 +60,7 @@ data class CacheStatus(
  * Gets the current fastbreak date in yyyyMMdd format.
  * If current time is before 4am ET, returns previous day's date.
  */
-private fun getCurrentFastbreakDate(): String {
+fun getCurrentFastbreakDate(): String {
     val etTimeZone = TimeZone.of("America/New_York")
     val now = Clock.System.now()
     val nowET = now.toLocalDateTime(etTimeZone)
@@ -85,83 +78,53 @@ private fun getCurrentFastbreakDate(): String {
     return "${dateToUse.year.toString().padStart(4, '0')}${dateToUse.monthNumber.toString().padStart(2, '0')}${dateToUse.dayOfMonth.toString().padStart(2, '0')}"
 }
 
+@Composable
+private fun LoadingScreen() {
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = "Loading...",
+            fontSize = 14.sp,
+            fontFamily = FontFamily.Monospace,
+            color = Color.Black
+        )
+    }
+}
+
+@Composable
+fun TokenDisplayScreenWithData(
+    authRepository: AuthRepository,
+    cacheStatus: CacheStatus,
+    onLogout: () -> Unit
+) {
+    if (cacheStatus.isLoading) {
+        LoadingScreen()
+    } else {
+        TokenDisplayScreen(
+            authRepository = authRepository,
+            cacheStatus = cacheStatus,
+            onLogout = onLogout
+        )
+    }
+}
+
 @OptIn(ExperimentalMaterialApi::class)
 @Composable
 fun TokenDisplayScreen(
     authRepository: AuthRepository,
-    database: Database? = null,
-    httpClient: io.ktor.client.HttpClient? = null,
+    cacheStatus: CacheStatus,
     onLogout: () -> Unit
 ) {
     val colors = LocalColors.current
     val user = authRepository.getUser()
     val coroutineScope = rememberCoroutineScope()
     
-    // Cache status state
-    var cacheStatus by remember { mutableStateOf(CacheStatus()) }
-    
     // Bottom sheet state
     val bottomSheetState = rememberModalBottomSheetState(
         initialValue = ModalBottomSheetValue.Hidden
     )
-    
-    // Real cache behavior when user is logged in
-    LaunchedEffect(user) {
-        if (user != null && database != null && httpClient != null) {
-            try {
-                // Show loading state
-                cacheStatus = cacheStatus.copy(isLoading = true, isCached = false, error = null)
-                
-                // Calculate the correct date based on 4am ET cutoff
-                val dateString = getCurrentFastbreakDate()
-                
-                // Create cached HTTP client
-                val apiCache = KotbaseApiCache(database)
-                val cachedHttpClient = CachedHttpClient(httpClient, apiCache)
-                
-                // Make the API call
-                val apiUrl = "${BuildKonfig.API_BASE_URL}/api/day/${dateString}"
-                val result = getDailyFastbreakCached(cachedHttpClient, apiUrl, null)
-                
-                when (result) {
-                    is DailyFastbreakResult.Success -> {
-                        cacheStatus = cacheStatus.copy(
-                            isLoading = false,
-                            isCached = result.isFromCache,
-                            rawJson = result.rawJson,
-                            error = null
-                        )
-                    }
-                    is DailyFastbreakResult.Error -> {
-                        cacheStatus = cacheStatus.copy(
-                            isLoading = false,
-                            isCached = false,
-                            rawJson = null,
-                            error = result.message
-                        )
-                    }
-                }
-            } catch (e: Exception) {
-                cacheStatus = cacheStatus.copy(
-                    isLoading = false,
-                    isCached = false,
-                    rawJson = null,
-                    error = "Error: ${e.message}"
-                )
-            }
-        } else if (user != null) {
-            // Fallback to simulation if dependencies not provided
-            cacheStatus = cacheStatus.copy(isLoading = true, isCached = false, error = null)
-            kotlinx.coroutines.delay(1500)
-            val mockJson = """{"leaderboard":null,"fastbreakCard":[{"id":"demo","type":"game","homeTeam":"Demo","awayTeam":"Mode"}],"statSheet":null}"""
-            cacheStatus = cacheStatus.copy(
-                isLoading = false,
-                isCached = false,
-                rawJson = mockJson,
-                error = null
-            )
-        }
-    }
     
     ModalBottomSheetLayout(
         sheetState = bottomSheetState,
@@ -438,13 +401,12 @@ private fun DailyEndpointItem(
             Box(
                 modifier = Modifier
                     .width(60.dp)
-                    .height(16.dp)
                     .background(
                         color = when {
                             cacheStatus.isLoading -> Color.Yellow.copy(alpha = 0.7f)
                             cacheStatus.isCached -> Color.Green.copy(alpha = 0.7f)
                             cacheStatus.error != null -> Color.Red.copy(alpha = 0.7f)
-                            cacheStatus.rawJson != null && !cacheStatus.isCached -> Color.Blue.copy(alpha = 0.7f)
+                            cacheStatus.rawJson != null && !cacheStatus.isCached -> Color.Cyan.copy(alpha = 0.6f)
                             else -> Color.Gray.copy(alpha = 0.3f)
                         },
                         shape = RoundedCornerShape(2.dp)
@@ -463,8 +425,7 @@ private fun DailyEndpointItem(
                     fontFamily = FontFamily.Monospace,
                     fontWeight = FontWeight.Bold,
                     color = Color.Black,
-                    maxLines = 1,
-                    modifier = Modifier.align(Alignment.Center)
+                    maxLines = 1
                 )
             }
         }

@@ -6,7 +6,6 @@ import io.ktor.client.request.HttpRequestBuilder
 import io.ktor.client.request.get
 import io.ktor.client.request.url
 import io.ktor.http.HttpStatusCode
-import io.ktor.http.parametersOf
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -97,10 +96,11 @@ class CachedHttpClient(
      * @param block Additional request configuration
      * @return CachedResponse containing the parsed data and cache status
      */
-    suspend inline fun <reified T> getTyped(
+    suspend fun <T> getTyped(
         urlString: String,
         useCache: Boolean = true,
-        noinline block: HttpRequestBuilder.() -> Unit = {}
+        deserializer: kotlinx.serialization.DeserializationStrategy<T>,
+        block: HttpRequestBuilder.() -> Unit = {}
     ): CachedTypedResponse<T> {
         return withContext(Dispatchers.Default) {
             val fullUrl = buildFullUrl(urlString, block)
@@ -109,7 +109,7 @@ class CachedHttpClient(
             if (useCache) {
                 apiCache.get(fullUrl)?.let { cachedResponse ->
                     return@withContext try {
-                        val parsedData = kotlinx.serialization.json.Json.decodeFromString<T>(cachedResponse)
+                        val parsedData = kotlinx.serialization.json.Json.decodeFromString(deserializer, cachedResponse)
                         CachedTypedResponse(
                             data = parsedData,
                             rawJson = cachedResponse,
@@ -145,7 +145,7 @@ class CachedHttpClient(
                         }
                         
                         try {
-                            val parsedData = kotlinx.serialization.json.Json.decodeFromString<T>(jsonData)
+                            val parsedData = kotlinx.serialization.json.Json.decodeFromString(deserializer, jsonData)
                             CachedTypedResponse(
                                 data = parsedData,
                                 rawJson = jsonData,
@@ -202,7 +202,7 @@ class CachedHttpClient(
     /**
      * Builds the full URL including query parameters for cache key generation
      */
-    private fun buildFullUrl(baseUrl: String, block: HttpRequestBuilder.() -> Unit): String {
+    internal fun buildFullUrl(baseUrl: String, block: HttpRequestBuilder.() -> Unit): String {
         val builder = HttpRequestBuilder().apply {
             url(baseUrl)
             block()

@@ -10,11 +10,27 @@ An F# API built with Saturn framework for managing daily fastbreak games and use
 - Used for monitoring and uptime checks
 - No authentication required
 
-### Daily Fastbreak
-**GET /api/day/{date}**
+### Daily Fastbreak *(Deprecated)*
+**GET /api/day/{date}** *(Deprecated - use /day/{yyyymmdd}/schedule instead)*
 - Retrieves fastbreak card data for a specific date (format: yyyyMMdd)
 - Returns leaderboard, game card, user's locked selections, and stat sheet
 - Optional `userId` query parameter for personalized data
+- **This endpoint is deprecated and will be removed in a future version**
+
+### Daily Schedule
+**GET /day/{yyyymmdd}/schedule**
+- Retrieves the fastbreak card for a specific date (format: yyyyMMdd)
+- Returns that day's game schedule and betting options
+- No authentication required
+
+### Daily Stats & Leaderboard
+**GET /day/{yyyymmdd}/stats/{userId}**
+- Retrieves weekly leaderboard and user statistics for a specific date
+- Weekly leaderboards run Sunday to Sunday - the date determines which week's leaderboard to return
+- Returns:
+  - Weekly leaderboard for the Sunday-to-Sunday period containing the specified date
+  - User's stat sheet for the previous day
+- Requires valid userId parameter
 
 ### Lock Card Management
 **POST /api/lock**
@@ -28,9 +44,9 @@ An F# API built with Saturn framework for managing daily fastbreak games and use
 - Requires Google authentication and validates user ownership
 - Updates username and maintains Google ID association
 
-**POST /api/profile/initialize/{userId}**
+**POST /api/profile/initialize**
 - Initializes new user profile with random username
-- Creates unique user ID and links to Google account
+- Uses Google ID from authorization token to create unique user ID
 - Returns user profile data and any existing locked cards
 
 ### Development Endpoints
@@ -46,7 +62,8 @@ The API uses Google JWT tokens for authentication. Protected endpoints require a
 
 ### Initial User Registration Flow
 1. **Client authenticates with Google** and obtains JWT token
-2. **POST /api/profile/initialize/{googleId}** with Authorization header
+2. **POST /api/profile/initialize** with Authorization header
+   - Extracts Google ID from JWT token to ensure security
    - Creates new user profile with random username
    - Links Google ID to internal userId
    - Returns: `{userId, userName, lockedFastBreakCard}`
@@ -78,33 +95,32 @@ The API uses Google JWT tokens for authentication. Protected endpoints require a
 
 ⚠️ **CRITICAL**: This API has several security vulnerabilities that should be addressed before production use.
 
-### 1. User ID Exposure & Authorization Bypass
+### 1. User ID Exposure & Authorization Bypass ✅ **FIXED**
 **Issue**: 
 - `POST /api/profile/initialize/{userId}` expects userId in URL path
 - No validation that authenticated user owns the requested userId
 
 **Fix**:
-- Remove userId from URL paths - derive from authenticated JWT token instead
-- Change `POST /api/profile/initialize/{userId}` to `POST /api/profile/initialize`
-- Add ownership validation: check that `googleId` from JWT matches profile's `googleId`
+- ✅ Remove userId from URL paths - derive from authenticated JWT token instead
+- ✅ Change `POST /api/profile/initialize/{userId}` to `POST /api/profile/initialize`
+- ✅ Google ID now extracted directly from JWT token for security
 
 **Code Changes**:
 ```fsharp
-
-// In ProfileController.fs - remove userId parameter  
-post "/profile/initialize" (initializeMyProfileHandler database)
+// In ProfileController.fs - updated implementation
+post "/profile/initialize" (requireGoogleAuth >=> (initializeProfileHandler database))
 ```
 
-### 2. Google ID Privacy Leak
+### 2. Google ID Privacy Leak ✅ **FIXED**
 **Issue**:
 - Google IDs exposed in URL paths (`/api/profile/initialize/{googleId}`)
 - Google IDs logged in server logs, browser history, referrer headers
 - Violates user privacy and Google's best practices
 
 **Fix**:
-- Extract Google ID from validated JWT token only (already available in `ctx.Items["GoogleUser"]`)
-- Never pass Google IDs in URLs or request bodies
-- Update ProfileController.fs:95 to remove userId parameter matching
+- ✅ Extract Google ID from validated JWT token only (already available in `ctx.Items["GoogleUser"]`)
+- ✅ Never pass Google IDs in URLs or request bodies
+- ✅ Removed userId parameter matching - now uses Google ID from token directly
 
 ### 3. JWT Token Validation Issues
 **Issue**:

@@ -31,7 +31,7 @@ class FastbreakStateRepository(
     private val dailyStateCollection = db.getCollection("FastBreakDailyStateCollection")
         ?: db.createCollection("FastBreakDailyStateCollection")
     private val BASE_URL = API_BASE_URL
-    private val LOCK_CARD = "${BASE_URL}/api/lock"
+    private val LOCK_CARD = "${BASE_URL}/lock"
 
     companion object {
         private const val LAST_FETCHED_KEY = "lastFetchedDate"
@@ -109,7 +109,7 @@ class FastbreakStateRepository(
     }
 
     private suspend fun fetchDailyFastbreak(date: String): DailyFastbreakResult {
-        val getDailyFastbreakUrl = "${BASE_URL}/api/day/${date}"
+        val getDailyFastbreakUrl = "${BASE_URL}/day/${date}"
         
         return if (cachedHttpClient != null) {
             // Use cached version when available

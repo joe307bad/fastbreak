@@ -44,4 +44,14 @@ object CacheInitializer {
         val httpClient = initializeHttpClient()
         return Pair(database, httpClient)
     }
+
+    /**
+     * Creates a FastbreakCache with initialized database and HTTP client.
+     * This combines the initializeCache() and FastbreakCache.create() steps.
+     */
+    fun createFastbreakCache(databaseName: String = "fastbreak_cache"): FastbreakCache {
+        val database = initializeDatabase(databaseName)
+        val httpClient = initializeHttpClient()
+        return FastbreakCache.create(database, httpClient)
+    }
 }

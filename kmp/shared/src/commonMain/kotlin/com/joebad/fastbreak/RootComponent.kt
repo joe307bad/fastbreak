@@ -1,7 +1,7 @@
 package com.joebad.fastbreak
 
 import AuthRepository
-import AuthedUser
+import GoogleUser
 import HomeScreen
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Surface
@@ -25,15 +25,17 @@ import com.arkivanov.decompose.router.stack.replaceAll
 import com.arkivanov.decompose.value.Value
 import com.arkivanov.essenty.lifecycle.LifecycleRegistry
 import com.joebad.fastbreak.data.cache.CacheInitializer
-import com.joebad.fastbreak.data.global.AppDataAction
-import com.joebad.fastbreak.data.global.AppDataSideEffect
+import com.joebad.fastbreak.data.cache.FastbreakCache
 import com.joebad.fastbreak.data.global.AppDataViewModel
+import com.joebad.fastbreak.data.profile.ProfileAction
+import com.joebad.fastbreak.data.profile.ProfileSideEffect
+import com.joebad.fastbreak.data.profile.ProfileViewModel
 import com.joebad.fastbreak.ui.screens.LoginScreen
 import com.joebad.fastbreak.ui.theme.LocalColors
 
 fun shouldEnforceLogin(authRepository: AuthRepository): Boolean {
     val authedUser = authRepository.getUser()
-    return authRepository.isUserExpired(authedUser)
+    return authedUser == null
 }
 
 class LoginComponent(
@@ -71,11 +73,11 @@ class HomeComponent(
 class RootComponent(
     componentContext: ComponentContext,
     override val authRepository: AuthRepository,
-    database: kotbase.Database,
-    httpClient: io.ktor.client.HttpClient
+    cache: FastbreakCache
 ) : ComponentContext by componentContext, AppDependencies {
 
-    override val appDataViewModel = AppDataViewModel(database, httpClient)
+    override val appDataViewModel = AppDataViewModel(cache, authRepository)
+    override val profileViewModel = ProfileViewModel(authRepository)
 
     val navigation = StackNavigation<Config>()
     
@@ -99,7 +101,8 @@ class RootComponent(
 
     @OptIn(DelicateDecomposeApi::class)
     fun goToHome() {
-        appDataViewModel.handleAction(AppDataAction.InitializeAppWithData)
+        // The new LoadDailyData action will be called from the UI when needed
+        // with the appropriate dateString and userId parameters
     }
 
     private fun createChild(config: Config, componentContext: ComponentContext): Child {
@@ -137,12 +140,13 @@ class RootComponent(
 fun createRootComponent(
     authRepository: AuthRepository,
 ): RootComponent {
-    val (database, httpClient) = CacheInitializer.initializeCache()
-    return RootComponent(DefaultComponentContext(LifecycleRegistry()), authRepository, database, httpClient)
+    val cache = CacheInitializer.createFastbreakCache()
+    return RootComponent(DefaultComponentContext(LifecycleRegistry()), authRepository, cache)
 }
 
 interface AppDependencies {
     val appDataViewModel: AppDataViewModel
+    val profileViewModel: ProfileViewModel
     val onNavigateToHome: () -> Unit
     val stack: Value<ChildStack<*, RootComponent.Child>>
     val authRepository: AuthRepository
@@ -156,9 +160,9 @@ fun App(
     val colors = LocalColors.current
 
     LaunchedEffect(Unit) {
-        dependencies.appDataViewModel.container.sideEffectFlow.collect { sideEffect ->
+        dependencies.profileViewModel.container.sideEffectFlow.collect { sideEffect ->
             when (sideEffect) {
-                AppDataSideEffect.NavigateToHome -> {
+                ProfileSideEffect.NavigateToHome -> {
                     dependencies.onNavigateToHome()
                 }
             }
@@ -174,24 +178,29 @@ fun App(
                 animation = stackAnimation(fade())
             ) { child ->
                 when (val instance = child.instance) {
-                    is RootComponent.Child.Login -> LoginScreen(
-                        goToHome = { au ->
-                            val authedUser = AuthedUser(
-                                au.email,
-                                au.exp,
-                                au.idToken,
-                            )
-                            dependencies.authRepository.storeAuthedUser(authedUser)
-                            dependencies.onNavigateToHome()
-                        },
-                        theme = theme,
-                        error = instance.component.error,
-                        isLoading = instance.component.isLoading
-                    )
+                    is RootComponent.Child.Login -> {
+                        val profileState by dependencies.profileViewModel.container.stateFlow.collectAsState()
+                        
+                        LoginScreen(
+                            goToHome = { au ->
+                                val googleUser = GoogleUser(
+                                    au.email,
+                                    au.exp,
+                                    au.idToken
+                                )
+                                dependencies.profileViewModel.handleAction(
+                                    ProfileAction.InitializeProfile(googleUser)
+                                )
+                            },
+                            theme = theme,
+                            error = profileState.error ?: instance.component.error,
+                            isLoading = profileState.isLoading || instance.component.isLoading
+                        )
+                    }
 
                     is RootComponent.Child.Home -> {
                         val appDataState by dependencies.appDataViewModel.container.stateFlow.collectAsState()
-                        HomeScreen(cacheStatus = appDataState.cacheStatus)
+                        HomeScreen(appDataState = appDataState)
                     }
                 }
             }

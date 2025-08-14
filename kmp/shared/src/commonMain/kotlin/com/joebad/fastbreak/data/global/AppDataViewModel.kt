@@ -1,37 +1,58 @@
 package com.joebad.fastbreak.data.global
 
+import AuthRepository
 import com.joebad.fastbreak.BuildKonfig
-import com.joebad.fastbreak.data.cache.CachedHttpClient
-import com.joebad.fastbreak.data.cache.KotbaseApiCache
-import com.joebad.fastbreak.data.dailyFastbreak.DailyFastbreakResult
-import com.joebad.fastbreak.data.dailyFastbreak.getDailyFastbreakCached
+import com.joebad.fastbreak.data.cache.FastbreakCache
+import com.joebad.fastbreak.data.dailyFastbreak.ScheduleResult
+import com.joebad.fastbreak.data.dailyFastbreak.StatsResult
+import com.joebad.fastbreak.model.dtos.ScheduleResponse
+import com.joebad.fastbreak.model.dtos.StatsResponse
 import com.joebad.fastbreak.ui.screens.CacheStatus
-import com.joebad.fastbreak.ui.screens.getCurrentFastbreakDate
-import io.ktor.client.HttpClient
-import kotbase.Database
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
+import kotlinx.datetime.Clock
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
 import org.orbitmvi.orbit.Container
 import org.orbitmvi.orbit.ContainerHost
 import org.orbitmvi.orbit.container
 
 data class AppDataState(
     val cacheStatus: CacheStatus = CacheStatus(),
-    val isInitialized: Boolean = false
+    val isInitialized: Boolean = false,
+    val scheduleData: ScheduleResponse? = null,
+    val statsData: StatsResponse? = null,
+    val isLoading: Boolean = false,
+    // TTL-specific states
+    val scheduleIsRefreshing: Boolean = false,
+    val statsIsRefreshing: Boolean = false,
+    val scheduleIsStale: Boolean = false,
+    val statsIsStale: Boolean = false
 )
 
 sealed class AppDataSideEffect {
     object NavigateToHome : AppDataSideEffect()
 }
 
+fun getCurrentDateET(): String {
+    val etTimeZone = TimeZone.of("America/New_York")
+    val nowET = Clock.System.now().toLocalDateTime(etTimeZone)
+    val dateET = nowET.date
+
+    return "${dateET.year}${dateET.monthNumber.toString().padStart(2, '0')}${dateET.dayOfMonth.toString().padStart(2, '0')}"
+}
+
 sealed class AppDataAction {
-    object InitializeAppWithData : AppDataAction()
+    data class LoadDailyData(val dateString: String, val userId: String? = null) : AppDataAction()
+    data class LoadSchedule(val dateString: String) : AppDataAction()
+    data class LoadStats(val dateString: String, val userId: String) : AppDataAction()
 }
 
 class AppDataViewModel(
-    private val database: Database,
-    private val httpClient: HttpClient
+    private val cache: FastbreakCache,
+    authRepository: AuthRepository
 ) : ContainerHost<AppDataState, AppDataSideEffect> {
     
     private val viewModelScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
@@ -39,76 +60,227 @@ class AppDataViewModel(
     override val container: Container<AppDataState, AppDataSideEffect> = viewModelScope.container(AppDataState())
 
     init {
-        initializeAppWithData()
+        loadDailyData(getCurrentDateET(), authRepository.getUser()?.userId)
     }
 
     fun handleAction(action: AppDataAction) {
         when (action) {
-            AppDataAction.InitializeAppWithData -> initializeAppWithData()
+            is AppDataAction.LoadDailyData -> loadDailyData(action.dateString, action.userId)
+            is AppDataAction.LoadSchedule -> loadSchedule(action.dateString)
+            is AppDataAction.LoadStats -> loadStats(action.dateString, action.userId)
         }
     }
 
-    private fun initializeAppWithData() = intent {
+    private fun loadDailyData(dateString: String, userId: String? = null) = intent {
         try {
             reduce {
                 state.copy(
+                    isLoading = true,
                     cacheStatus = state.cacheStatus.copy(
                         isLoading = true,
-                        isCached = false,
                         error = null
                     )
                 )
             }
 
-            val dateString = getCurrentFastbreakDate()
-            val apiCache = KotbaseApiCache(database)
-            val cachedHttpClient = CachedHttpClient(httpClient, apiCache)
-            val apiUrl = "${BuildKonfig.API_BASE_URL}/api/day/${dateString}"
+            // Cache is now initialized once as a class property
+            val scheduleUrl = "${BuildKonfig.API_BASE_URL}/day/${dateString}/schedule"
+            val statsUrl = if (userId != null) "${BuildKonfig.API_BASE_URL}/day/${dateString}/stats/${userId}" else null
 
-            when (val result = getDailyFastbreakCached(cachedHttpClient, apiUrl, null)) {
-                is DailyFastbreakResult.Success -> {
+            // Launch both requests in parallel if userId is available, otherwise just schedule
+            val scheduleDeferred = viewModelScope.async { 
+                try {
+                    cache.getSchedule(scheduleUrl)
+                } catch (e: Exception) {
+                    ScheduleResult.Error("Failed to load schedule: ${e.message}")
+                }
+            }
+            val statsDeferred = if (statsUrl != null) {
+                viewModelScope.async { 
+                    try {
+                        cache.getStats(statsUrl)
+                    } catch (e: Exception) {
+                        StatsResult.Error("Failed to load stats: ${e.message}")
+                    }
+                }
+            } else null
+
+            // Await both results independently - if one fails, the other can still succeed
+            val scheduleResult = scheduleDeferred.await()
+            val statsResult = statsDeferred?.await()
+
+            var hasError = false
+            var errorMessage = ""
+            var isFromCache = false
+            var rawJson: String? = null
+
+            when (scheduleResult) {
+                is ScheduleResult.Success -> {
+                    isFromCache = scheduleResult.isFromCache
+                    rawJson = scheduleResult.rawJson
                     reduce {
                         state.copy(
-                            cacheStatus = CacheStatus(
+                            scheduleData = scheduleResult.response,
+                            scheduleIsRefreshing = scheduleResult.isRefreshing,
+                            scheduleIsStale = scheduleResult.isExpired
+                        )
+                    }
+                }
+                is ScheduleResult.Error -> {
+                    hasError = true
+                    errorMessage = "Schedule: ${scheduleResult.message}"
+                }
+            }
+
+            statsResult?.let { result ->
+                when (result) {
+                    is StatsResult.Success -> {
+                        reduce {
+                            state.copy(
+                                statsData = result.response,
+                                statsIsRefreshing = result.isRefreshing,
+                                statsIsStale = result.isExpired
+                            )
+                        }
+                    }
+                    is StatsResult.Error -> {
+                        hasError = true
+                        errorMessage += if (errorMessage.isNotEmpty()) "; Stats: ${result.message}" else "Stats: ${result.message}"
+                    }
+                }
+            }
+
+            reduce {
+                state.copy(
+                    isLoading = false,
+                    isInitialized = true,
+                    cacheStatus = state.cacheStatus.copy(
+                        isLoading = false,
+                        isCached = isFromCache,
+                        rawJson = rawJson,
+                        error = if (hasError) errorMessage else null
+                    )
+                )
+            }
+
+        } catch (e: Exception) {
+            reduce {
+                state.copy(
+                    isLoading = false,
+                    isInitialized = true,
+                    cacheStatus = state.cacheStatus.copy(
+                        isLoading = false,
+                        error = "Error: ${e.message}"
+                    )
+                )
+            }
+        }
+    }
+
+    private fun loadSchedule(dateString: String) = intent {
+        try {
+            reduce {
+                state.copy(
+                    isLoading = true,
+                    cacheStatus = state.cacheStatus.copy(isLoading = true, error = null)
+                )
+            }
+
+            val scheduleUrl = "${BuildKonfig.API_BASE_URL}/day/${dateString}/schedule"
+
+            when (val result = cache.getSchedule(scheduleUrl)) {
+                is ScheduleResult.Success -> {
+                    reduce {
+                        state.copy(
+                            isLoading = false,
+                            scheduleData = result.response,
+                            scheduleIsRefreshing = result.isRefreshing,
+                            scheduleIsStale = result.isExpired,
+                            cacheStatus = state.cacheStatus.copy(
                                 isLoading = false,
                                 isCached = result.isFromCache,
                                 rawJson = result.rawJson,
                                 error = null
-                            ),
-                            isInitialized = true
+                            )
                         )
                     }
-//                    postSideEffect(AppDataSideEffect.NavigateToHome)
                 }
-
-                is DailyFastbreakResult.Error -> {
+                is ScheduleResult.Error -> {
                     reduce {
                         state.copy(
-                            cacheStatus = CacheStatus(
+                            isLoading = false,
+                            cacheStatus = state.cacheStatus.copy(
                                 isLoading = false,
-                                isCached = false,
-                                rawJson = null,
                                 error = result.message
-                            ),
-                            isInitialized = true
+                            )
                         )
                     }
-//                    postSideEffect(AppDataSideEffect.NavigateToHome)
                 }
             }
         } catch (e: Exception) {
             reduce {
                 state.copy(
-                    cacheStatus = CacheStatus(
+                    isLoading = false,
+                    cacheStatus = state.cacheStatus.copy(
                         isLoading = false,
-                        isCached = false,
-                        rawJson = null,
                         error = "Error: ${e.message}"
-                    ),
-                    isInitialized = true
+                    )
                 )
             }
-//            postSideEffect(AppDataSideEffect.NavigateToHome)
         }
     }
+
+    private fun loadStats(dateString: String, userId: String) = intent {
+        try {
+            reduce {
+                state.copy(
+                    isLoading = true,
+                    cacheStatus = state.cacheStatus.copy(isLoading = true, error = null)
+                )
+            }
+
+            val statsUrl = "${BuildKonfig.API_BASE_URL}/day/${dateString}/stats/${userId}"
+
+            when (val result = cache.getStats(statsUrl)) {
+                is StatsResult.Success -> {
+                    reduce {
+                        state.copy(
+                            isLoading = false,
+                            statsData = result.response,
+                            statsIsRefreshing = result.isRefreshing,
+                            statsIsStale = result.isExpired,
+                            cacheStatus = state.cacheStatus.copy(
+                                isLoading = false,
+                                isCached = result.isFromCache,
+                                rawJson = result.rawJson,
+                                error = null
+                            )
+                        )
+                    }
+                }
+                is StatsResult.Error -> {
+                    reduce {
+                        state.copy(
+                            isLoading = false,
+                            cacheStatus = state.cacheStatus.copy(
+                                isLoading = false,
+                                error = result.message
+                            )
+                        )
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            reduce {
+                state.copy(
+                    isLoading = false,
+                    cacheStatus = state.cacheStatus.copy(
+                        isLoading = false,
+                        error = "Error: ${e.message}"
+                    )
+                )
+            }
+        }
+    }
+
 }

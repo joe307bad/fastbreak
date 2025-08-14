@@ -29,8 +29,8 @@ class ProfileRepository(authRepository: AuthRepository) {
 
     private val _authRepository = authRepository;
     private val _baseUrl = BuildKonfig.API_BASE_URL
-    private val _saveUserName = "${_baseUrl}/api/profile"
-    private val _initializeProfile = "$_baseUrl/api/profile/initialize"
+    private val _saveUserName = "${_baseUrl}/profile"
+    private val _initializeProfile = "$_baseUrl/profile/initialize"
 
     private val client = HttpClient {
         install(ContentNegotiation) {
@@ -59,6 +59,26 @@ class ProfileRepository(authRepository: AuthRepository) {
         }
     }
 
+    suspend fun initializeProfile(googleUser: GoogleUser): ProfileInitializationResult? {
+        return try {
+            val response = client.post(_initializeProfile) {
+                contentType(ContentType.Application.Json)
+                header("Authorization", "Bearer ${googleUser.idToken}")
+            }.body<InitializeProfileResponse>()
+
+            ProfileInitializationResult(
+                baseUrl = _baseUrl,
+                response = response
+            )
+        } catch (e: Exception) {
+            println("Error making POST to ${_initializeProfile}: ${e.message}")
+            println("Exception type: ${e::class.simpleName}")
+            e.printStackTrace()
+            null
+        }
+    }
+
+    @Deprecated("Use initializeProfile(GoogleUser) instead")
     suspend fun initializeProfile(userId: String, token: String?): ProfileInitializationResult? {
         return try {
             val t = token ?: _authRepository.getUser()?.idToken;

@@ -9,7 +9,15 @@ data class AuthedUser(
     val email: String,
     val exp: Long,
     val idToken: String,
-//    val userId: String,
+    val userId: String,
+//    val userName: String
+)
+
+@Serializable
+data class GoogleUser(
+    val email: String,
+    val exp: Long,
+    val idToken: String,
 //    val userName: String
 )
 
@@ -27,7 +35,7 @@ class AuthRepository(private val secureStorage: KVault) {
             user.email,
             user.exp,
             user.idToken,
-//            user.userId,
+            user.userId,
 //            userName
         ))
     }
@@ -56,4 +64,5 @@ class AuthRepository(private val secureStorage: KVault) {
     fun clearUser() {
         secureStorage.deleteObject(KEY_AUTHED_USER)
     }
+    
 }

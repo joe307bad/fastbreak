@@ -4,6 +4,11 @@ import AuthedUser
 import com.joebad.fastbreak.data.cache.CachedHttpClient
 import com.joebad.fastbreak.data.cache.CachedTypedResponse
 import com.joebad.fastbreak.model.dtos.DailyResponse
+import com.joebad.fastbreak.model.dtos.ScheduleResponse
+import com.joebad.fastbreak.model.dtos.StatsResponse
+import com.joebad.fastbreak.data.cache.TTLCachedHttpClient
+import com.joebad.fastbreak.data.cache.ScheduleExpirationStrategy
+import com.joebad.fastbreak.data.cache.StatsExpirationStrategy
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.plugins.ClientRequestException
@@ -41,6 +46,28 @@ sealed class DailyFastbreakResult {
         val rawJson: String? = null
     ) : DailyFastbreakResult()
     data class Error(val message: String) : DailyFastbreakResult()
+}
+
+sealed class ScheduleResult {
+    data class Success(
+        val response: ScheduleResponse,
+        val isFromCache: Boolean = false,
+        val rawJson: String? = null,
+        val isExpired: Boolean = false,
+        val isRefreshing: Boolean = false
+    ) : ScheduleResult()
+    data class Error(val message: String) : ScheduleResult()
+}
+
+sealed class StatsResult {
+    data class Success(
+        val response: StatsResponse,
+        val isFromCache: Boolean = false,
+        val rawJson: String? = null,
+        val isExpired: Boolean = false,
+        val isRefreshing: Boolean = false
+    ) : StatsResult()
+    data class Error(val message: String) : StatsResult()
 }
 
 val client = HttpClient {
@@ -82,6 +109,7 @@ suspend fun getDailyFastbreak(url: String, userId: String? = ""): DailyFastbreak
     }
 }
 
+@Deprecated("Use FastbreakCache.getSchedule() or FastbreakCache.getStats() instead")
 suspend fun getDailyFastbreakCached(
     cachedHttpClient: CachedHttpClient,
     url: String, 
@@ -113,7 +141,6 @@ suspend fun getDailyFastbreakCached(
         DailyFastbreakResult.Error("Unexpected error: ${e.message ?: "Unknown error occurred"}")
     }
 }
-
 
 suspend fun lockDailyFastbreakCard(
     url: String,
@@ -156,5 +183,58 @@ suspend fun lockDailyFastbreakCard(
     } catch (e: Exception) {
         println("Unexpected error locking fastbreak card: ${e.message}")
         LockCardResult.Error(e.message ?: "Unknown error occurred")
+    }
+}
+
+
+suspend fun getScheduleCached(
+    ttlCachedClient: TTLCachedHttpClient,
+    url: String
+): ScheduleResult {
+    return try {
+        val response = ttlCachedClient.get(
+            urlString = url,
+            deserializer = ScheduleResponse.serializer(),
+            expirationStrategy = ScheduleExpirationStrategy()
+        )
+        
+        when {
+            response.isSuccess -> ScheduleResult.Success(
+                response = response.data!!,
+                isFromCache = response.isFromCache,
+                rawJson = response.rawJson,
+                isExpired = response.isExpired,
+                isRefreshing = response.isRefreshing
+            )
+            else -> ScheduleResult.Error(response.error ?: "Unknown error")
+        }
+    } catch (e: Exception) {
+        ScheduleResult.Error("Unexpected error: ${e.message}")
+    }
+}
+
+suspend fun getStatsCached(
+    ttlCachedClient: TTLCachedHttpClient,
+    url: String
+): StatsResult {
+    return try {
+        val response = ttlCachedClient.get(
+            urlString = url,
+            deserializer = StatsResponse.serializer(),
+            expirationStrategy = StatsExpirationStrategy()
+        )
+        
+        when {
+            response.isSuccess -> StatsResult.Success(
+                response = response.data!!,
+                isFromCache = response.isFromCache,
+                rawJson = response.rawJson,
+                isExpired = response.isExpired,
+                isRefreshing = response.isRefreshing
+            )
+            else -> StatsResult.Error(response.error ?: "Unknown error")
+        }
+    } catch (e: Exception) {
+        StatsResult.Error("Unexpected error: ${e.message}")
     }
 }

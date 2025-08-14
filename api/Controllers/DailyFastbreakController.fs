@@ -99,14 +99,80 @@ let getFastbreakHandler (database: IMongoDatabase) day (next: HttpFunc) (ctx: Ht
         | Some card ->
             return!
                 json
-                    ({| lastLockedCardResults = lastLockedCardResults
-                        statSheetForUser = statSheetForUser
-                        lockedCardForUser = lockedCard
-                        fastbreakCard = card.items
-                        leaderboard = leaderboardItems |})
+                    {| lastLockedCardResults = lastLockedCardResults
+                       statSheetForUser = statSheetForUser
+                       lockedCardForUser = lockedCard
+                       fastbreakCard = card.items
+                       leaderboard = leaderboardItems |}
                     next
                     ctx
     }
 
+let getScheduleHandler (database: IMongoDatabase) day (next: HttpFunc) (ctx: HttpContext) =
+    task {
+        let collection = database.GetCollection<EmptyFastbreakCard>("empty-fastbreak-cards")
+        let filter = Builders<EmptyFastbreakCard>.Filter.Eq(_.date, day)
+
+        let! card =
+            collection.Find(filter).FirstOrDefaultAsync()
+            |> Async.AwaitTask
+            |> asyncMap Option.ofObj
+
+        match card with
+        | None -> return! json Seq.empty next ctx
+        | Some card ->
+            return!
+                json
+                    {| fastbreakCard = card.items |}
+                    next
+                    ctx
+    }
+
+let getStatsHandler (database: IMongoDatabase) (day, userId) (next: HttpFunc) (ctx: HttpContext) =
+    task {
+        let dayDate = DateTime.ParseExact(day, "yyyyMMdd", null)
+
+        let sundayDate =
+            let daysToSubtract =
+                match dayDate.DayOfWeek with
+                | DayOfWeek.Sunday -> 0
+                | _ -> int dayDate.DayOfWeek
+
+            dayDate.AddDays(float -daysToSubtract)
+
+        let sundayId = sundayDate.ToString("yyyyMMdd")
+
+        let leaderboard =
+            database
+                .GetCollection<Leaderboard>("leaderboards")
+                .Find(Builders<Leaderboard>.Filter.Eq(_.id, sundayId))
+                .FirstOrDefault()
+
+        let previousDayDate = dayDate.AddDays(-1.0)
+        let previousDay = previousDayDate.ToString("yyyyMMdd")
+        
+        let statSheetForUser = getStatSheetForUser database userId |> Option.ofObj
+
+        let leaderboardItems =
+            if box leaderboard |> isNull then
+                null
+            else
+                box leaderboard.items
+
+        return!
+            json
+                {| weeklyLeaderboard = leaderboardItems
+                   statSheetForUser = statSheetForUser
+                   weekStartDate = sundayId
+                   requestedDate = day
+                   previousDay = previousDay |}
+                next
+                ctx
+    }
+
 let dailyFastbreakRouter database =
-    router { getf "/day/%s" (fun day -> getFastbreakHandler database day) }
+    router { 
+        getf "/day/%s" (getFastbreakHandler database)
+        getf "/day/%s/schedule" (getScheduleHandler database)
+        getf "/day/%s/stats/%s" (getStatsHandler database)
+    }

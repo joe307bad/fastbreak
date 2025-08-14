@@ -1,6 +1,6 @@
 package com.joebad.fastbreak.ui.screens
 
-import AuthedUser
+import GoogleUser
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -25,7 +25,7 @@ import com.joebad.fastbreak.ui.GoogleSignInButton
 import com.joebad.fastbreak.ui.theme.LocalColors
 
 @Composable
-fun LoginScreen(goToHome: (user: AuthedUser) -> Unit, theme: Theme?, error: String? = null, isLoading: Boolean = false) {
+fun LoginScreen(goToHome: (user: GoogleUser) -> Unit, theme: Theme?, error: String? = null, isLoading: Boolean = false) {
     val colors = LocalColors.current
     Column(
         modifier = Modifier.fillMaxSize(),
@@ -45,11 +45,10 @@ fun LoginScreen(goToHome: (user: AuthedUser) -> Unit, theme: Theme?, error: Stri
                         val sub = jwt.claims["sub"].toString().replace("\"", "")
                         println("Decoded payload: ${jwt.header}")
                         goToHome(
-                            AuthedUser(
+                            GoogleUser(
                                 email,
                                 exp,
                                 token,
-//                                userId = sub,
 //                                userName = ""
                             )
                         )

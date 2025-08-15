@@ -1,6 +1,7 @@
 
 package com.joebad.fastbreak.ui.screens
 
+import AuthRepository
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -32,11 +33,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import com.joebad.fastbreak.data.global.AppDataState
+import com.joebad.fastbreak.data.picks.ScheduleAction
+import com.joebad.fastbreak.data.picks.ScheduleViewModel
 import com.joebad.fastbreak.model.dtos.LeaderboardItem
 import com.joebad.fastbreak.ui.LockableButton
-import com.joebad.fastbreak.ui.screens.schedule.ScheduleAction
 import com.joebad.fastbreak.ui.screens.schedule.ScheduleSection
-import com.joebad.fastbreak.ui.screens.schedule.ScheduleViewModel
 import com.joebad.fastbreak.ui.theme.AppColors
 import com.joebad.fastbreak.ui.theme.LocalColors
 import io.github.alexzhirkevich.cupertino.CupertinoSegmentedControl
@@ -54,9 +55,9 @@ enum class HomeTab {
 
 @OptIn(ExperimentalCupertinoApi::class)
 @Composable
-fun HomeScreen(appDataState: AppDataState, onLogout: () -> Unit = {}) {
+fun HomeScreen(appDataState: AppDataState, onLogout: () -> Unit = {}, authRepository: AuthRepository) {
     val colors = LocalColors.current
-    val scheduleViewModel = remember { ScheduleViewModel() }
+    val scheduleViewModel = remember { ScheduleViewModel(authRepository) }
     val scheduleState by scheduleViewModel.container.stateFlow.collectAsState()
     var selectedTab by remember { mutableStateOf(HomeTab.PICKS) }
     
@@ -250,7 +251,7 @@ fun HomeScreen(appDataState: AppDataState, onLogout: () -> Unit = {}) {
             ) {
                 LockableButton(
                     onClick = {
-                        scheduleViewModel.handleAction(ScheduleAction.SubmitPicks)
+//                        scheduleViewModel.handleAction(ScheduleAction.SubmitPicks)
                     },
                     onLock = {
                         scheduleViewModel.handleAction(ScheduleAction.LockPicks)

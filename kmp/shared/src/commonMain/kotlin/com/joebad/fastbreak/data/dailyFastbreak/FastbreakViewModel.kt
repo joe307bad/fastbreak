@@ -39,12 +39,3 @@ data class FastbreakSelectionState(
     val isLocking: Boolean = false
 )
 
-sealed class FastbreakSideEffect {
-
-    data class SelectionAdded(val selection: FastbreakSelection) : FastbreakSideEffect()
-    data class SelectionUpdated(val selection: FastbreakSelection) : FastbreakSideEffect()
-    data class SelectionDeleted(val selection: FastbreakSelection) : FastbreakSideEffect()
-    data class CardLocked(val state: FastbreakSelectionState) : FastbreakSideEffect()
-    object ShowSigninBottomSheet : FastbreakSideEffect()
-}
-

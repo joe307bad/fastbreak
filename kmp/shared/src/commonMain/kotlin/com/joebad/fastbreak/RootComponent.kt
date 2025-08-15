@@ -210,7 +210,8 @@ fun App(
                         val appDataState by dependencies.appDataViewModel.container.stateFlow.collectAsState()
                         MainNavigationScreen(
                             appDataState = appDataState,
-                            onLogout = instance.component.onLogout
+                            onLogout = instance.component.onLogout,
+                            authRepository = dependencies.authRepository
                         )
                     }
                 }

@@ -1,8 +1,15 @@
-package com.joebad.fastbreak.ui.screens.schedule
+package com.joebad.fastbreak.data.picks
 
+import AuthRepository
+import com.joebad.fastbreak.data.dailyFastbreak.FastbreakSelection
+import com.joebad.fastbreak.data.dailyFastbreak.FastbreakSelectionState
+import getRandomId
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.datetime.Clock
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
 import org.orbitmvi.orbit.Container
 import org.orbitmvi.orbit.ContainerHost
 import org.orbitmvi.orbit.container
@@ -18,18 +25,18 @@ sealed class ScheduleAction {
     data class ClearSelection(val gameId: String) : ScheduleAction()
     data object ClearAllSelections : ScheduleAction()
     data object LockPicks : ScheduleAction()
-    data object SubmitPicks : ScheduleAction()
 }
 
 sealed class ScheduleSideEffect {
     data class ShowToast(val message: String) : ScheduleSideEffect()
 }
 
-class ScheduleViewModel : ContainerHost<ScheduleState, ScheduleSideEffect> {
+class ScheduleViewModel(private val authRepository: AuthRepository) : ContainerHost<ScheduleState, ScheduleSideEffect> {
     
     private val viewModelScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+    private val picksRepository = PicksRepository(authRepository)
     
-    override val container: Container<ScheduleState, ScheduleSideEffect> = 
+    override val container: Container<ScheduleState, ScheduleSideEffect> =
         viewModelScope.container(ScheduleState())
 
     fun handleAction(action: ScheduleAction) {
@@ -38,7 +45,6 @@ class ScheduleViewModel : ContainerHost<ScheduleState, ScheduleSideEffect> {
             is ScheduleAction.ClearSelection -> clearSelection(action.gameId)
             is ScheduleAction.ClearAllSelections -> clearAllSelections()
             is ScheduleAction.LockPicks -> lockPicks()
-            is ScheduleAction.SubmitPicks -> submitPicks()
         }
     }
 
@@ -90,16 +96,47 @@ class ScheduleViewModel : ContainerHost<ScheduleState, ScheduleSideEffect> {
     }
     
     private fun lockPicks() = intent {
-        reduce {
-            state.copy(
-                isLocked = true
+        reduce { state.copy(isLoading = true) }
+        
+        try {
+            // Convert current picks to FastbreakSelectionState format
+            val selections = state.selectedWinners.map { (gameId, teamName) ->
+                FastbreakSelection(
+                    _id = gameId,
+                    userAnswer = teamName,
+                    points = 0, // Points calculated server-side
+                    description = "Selected $teamName to win",
+                    type = "team_selection"
+                )
+            }
+            
+            val currentDate = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date.toString()
+            
+            val selectionState = FastbreakSelectionState(
+                selections = selections,
+                totalPoints = 0,
+                cardId = getRandomId(),
+                locked = true,
+                date = currentDate
             )
+            
+            val result = picksRepository.lockPicks(selectionState)
+            
+            if (result != null) {
+                reduce { 
+                    state.copy(
+                        isLoading = false,
+                        isLocked = true
+                    )
+                }
+                postSideEffect(ScheduleSideEffect.ShowToast("Picks submitted and locked!"))
+            } else {
+                reduce { state.copy(isLoading = false) }
+                postSideEffect(ScheduleSideEffect.ShowToast("Failed to submit picks"))
+            }
+        } catch (e: Exception) {
+            reduce { state.copy(isLoading = false) }
+            postSideEffect(ScheduleSideEffect.ShowToast("Error submitting picks: ${e.message}"))
         }
-        postSideEffect(ScheduleSideEffect.ShowToast("Picks locked!"))
-    }
-    
-    private fun submitPicks() = intent {
-        // Handle regular submission without locking
-        postSideEffect(ScheduleSideEffect.ShowToast("Picks submitted!"))
     }
 }

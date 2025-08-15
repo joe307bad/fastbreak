@@ -1,3 +1,4 @@
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -11,6 +12,7 @@ import androidx.compose.material.Divider
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
@@ -19,9 +21,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.joebad.fastbreak.data.global.AppDataState
-import com.joebad.fastbreak.model.dtos.EmptyFastbreakCardItem
 import com.joebad.fastbreak.model.dtos.LeaderboardItem
 import com.joebad.fastbreak.ui.PhysicalButton
+import com.joebad.fastbreak.ui.screens.schedule.ScheduleSection
+import com.joebad.fastbreak.ui.screens.schedule.ScheduleViewModel
 import com.joebad.fastbreak.ui.theme.AppColors
 import com.joebad.fastbreak.ui.theme.LocalColors
 import kotlinx.datetime.Clock
@@ -32,6 +35,7 @@ import kotlinx.datetime.toLocalDateTime
 @Composable
 fun HomeScreen(appDataState: AppDataState, onLogout: () -> Unit = {}) {
     val colors = LocalColors.current
+    val scheduleViewModel = remember { ScheduleViewModel() }
 
     LazyColumn(
         modifier = Modifier
@@ -93,7 +97,7 @@ fun HomeScreen(appDataState: AppDataState, onLogout: () -> Unit = {}) {
                         .background(colors.background)
                         .padding(vertical = 5.dp, horizontal = 8.dp)
                 ) {
-                    ScheduleSection(schedule.fastbreakCard, colors)
+                    ScheduleSection(schedule.fastbreakCard, colors, scheduleViewModel)
                 }
             }
         }
@@ -270,51 +274,6 @@ private fun CacheStatusSection(appDataState: AppDataState, colors: AppColors) {
     }
 }
 
-@Composable
-private fun ScheduleSection(games: List<EmptyFastbreakCardItem>, colors: AppColors) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(colors.background)
-            .padding(horizontal = 8.dp, vertical = 2.dp)
-    ) {
-        Text(
-            text = "TODAY'S SCHEDULE (${games.size})",
-            style = MaterialTheme.typography.caption,
-            color = colors.accent,
-            fontWeight = FontWeight.Bold,
-            fontFamily = FontFamily.Monospace,
-            modifier = Modifier.padding(bottom = 10.dp)
-        )
-
-        games.forEach { game ->
-            GameReceiptRow(game, colors)
-        }
-
-    }
-}
-
-@Composable
-private fun GameReceiptRow(game: EmptyFastbreakCardItem, colors: AppColors) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween
-    ) {
-        Text(
-            text = if (game.awayTeam != null && game.homeTeam != null) {
-                "${game.awayTeam} @ ${game.homeTeam}"
-            } else {
-                game.type
-            },
-            style = MaterialTheme.typography.caption,
-            color = colors.onSurface,
-            fontFamily = FontFamily.Monospace,
-            modifier = Modifier.weight(1f),
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
-    }
-}
 
 @Composable
 private fun StatsSection(

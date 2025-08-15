@@ -9,13 +9,16 @@ import org.orbitmvi.orbit.container
 
 data class ScheduleState(
     val selectedWinners: Map<String, String> = emptyMap(),
-    val isLoading: Boolean = false
+    val isLoading: Boolean = false,
+    val isLocked: Boolean = false
 )
 
 sealed class ScheduleAction {
     data class SelectWinner(val gameId: String, val teamName: String) : ScheduleAction()
     data class ClearSelection(val gameId: String) : ScheduleAction()
     data object ClearAllSelections : ScheduleAction()
+    data object LockPicks : ScheduleAction()
+    data object SubmitPicks : ScheduleAction()
 }
 
 sealed class ScheduleSideEffect {
@@ -34,10 +37,18 @@ class ScheduleViewModel : ContainerHost<ScheduleState, ScheduleSideEffect> {
             is ScheduleAction.SelectWinner -> selectWinner(action.gameId, action.teamName)
             is ScheduleAction.ClearSelection -> clearSelection(action.gameId)
             is ScheduleAction.ClearAllSelections -> clearAllSelections()
+            is ScheduleAction.LockPicks -> lockPicks()
+            is ScheduleAction.SubmitPicks -> submitPicks()
         }
     }
 
     private fun selectWinner(gameId: String, teamName: String) = intent {
+        // Prevent selections when locked
+        if (state.isLocked) {
+            postSideEffect(ScheduleSideEffect.ShowToast("Cannot change selections when locked"))
+            return@intent
+        }
+        
         val currentSelection = state.selectedWinners[gameId]
         
         reduce {
@@ -76,5 +87,19 @@ class ScheduleViewModel : ContainerHost<ScheduleState, ScheduleSideEffect> {
             )
         }
         postSideEffect(ScheduleSideEffect.ShowToast("All selections cleared"))
+    }
+    
+    private fun lockPicks() = intent {
+        reduce {
+            state.copy(
+                isLocked = true
+            )
+        }
+        postSideEffect(ScheduleSideEffect.ShowToast("Picks locked!"))
+    }
+    
+    private fun submitPicks() = intent {
+        // Handle regular submission without locking
+        postSideEffect(ScheduleSideEffect.ShowToast("Picks submitted!"))
     }
 }

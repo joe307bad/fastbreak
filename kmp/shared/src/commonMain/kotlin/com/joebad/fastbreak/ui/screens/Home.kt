@@ -3,16 +3,21 @@ package com.joebad.fastbreak.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.Divider
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Text
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -25,8 +30,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import com.joebad.fastbreak.data.global.AppDataState
 import com.joebad.fastbreak.model.dtos.LeaderboardItem
+import com.joebad.fastbreak.ui.LockableButton
+import com.joebad.fastbreak.ui.screens.schedule.ScheduleAction
 import com.joebad.fastbreak.ui.screens.schedule.ScheduleSection
 import com.joebad.fastbreak.ui.screens.schedule.ScheduleViewModel
 import com.joebad.fastbreak.ui.theme.AppColors
@@ -49,14 +57,20 @@ enum class HomeTab {
 fun HomeScreen(appDataState: AppDataState, onLogout: () -> Unit = {}) {
     val colors = LocalColors.current
     val scheduleViewModel = remember { ScheduleViewModel() }
+    val scheduleState by scheduleViewModel.container.stateFlow.collectAsState()
     var selectedTab by remember { mutableStateOf(HomeTab.PICKS) }
+    
+    val hasPicks = scheduleState.selectedWinners.isNotEmpty()
+    val picksCount = scheduleState.selectedWinners.size
 
-    LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(colors.background),
-        verticalArrangement = Arrangement.Top
-    ) {
+    Box(modifier = Modifier.fillMaxSize()) {
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(colors.background)
+                .padding(bottom = if (selectedTab == HomeTab.PICKS && hasPicks) 80.dp else 0.dp),
+            verticalArrangement = Arrangement.Top
+        ) {
         // Header with title and segmented control
         item {
             Column(
@@ -223,6 +237,44 @@ fun HomeScreen(appDataState: AppDataState, onLogout: () -> Unit = {}) {
             }
         }
 
+        }
+        
+        // Lockable Card pinned to bottom when picks are selected
+        if (selectedTab == HomeTab.PICKS && hasPicks) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .background(colors.background.copy(alpha = 0.95f))
+                    .padding(16.dp)
+            ) {
+                LockableButton(
+                    onClick = {
+                        scheduleViewModel.handleAction(ScheduleAction.SubmitPicks)
+                    },
+                    onLock = {
+                        scheduleViewModel.handleAction(ScheduleAction.LockPicks)
+                    },
+                    lockable = true,
+                    isLocked = scheduleState.isLocked,
+                    modifier = Modifier.fillMaxWidth().zIndex(1f)
+                ) {
+                    androidx.compose.material3.Text(
+                        text = "SUBMIT $picksCount PICK${if (picksCount == 1) "" else "S"}",
+                        color = LocalColors.current.onSecondary
+                    )
+                }
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(3.dp)
+                                .offset(y = ButtonDefaults.MinHeight - 1.dp)
+                                .background(colors.accent)
+                        ) {
+                            androidx.compose.material3.Text(text = " ")
+                        }
+            }
+        }
     }
 }
 

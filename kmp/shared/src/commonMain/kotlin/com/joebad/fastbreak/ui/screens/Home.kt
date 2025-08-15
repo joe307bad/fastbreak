@@ -1,4 +1,6 @@
 
+package com.joebad.fastbreak.ui.screens
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -6,15 +8,18 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.Divider
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -22,20 +27,29 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.joebad.fastbreak.data.global.AppDataState
 import com.joebad.fastbreak.model.dtos.LeaderboardItem
-import com.joebad.fastbreak.ui.PhysicalButton
 import com.joebad.fastbreak.ui.screens.schedule.ScheduleSection
 import com.joebad.fastbreak.ui.screens.schedule.ScheduleViewModel
 import com.joebad.fastbreak.ui.theme.AppColors
 import com.joebad.fastbreak.ui.theme.LocalColors
+import io.github.alexzhirkevich.cupertino.CupertinoSegmentedControl
+import io.github.alexzhirkevich.cupertino.CupertinoSegmentedControlDefaults
+import io.github.alexzhirkevich.cupertino.CupertinoSegmentedControlTab
+import io.github.alexzhirkevich.cupertino.ExperimentalCupertinoApi
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 
+enum class HomeTab {
+    PICKS, LEADERBOARD
+}
+
+@OptIn(ExperimentalCupertinoApi::class)
 @Composable
 fun HomeScreen(appDataState: AppDataState, onLogout: () -> Unit = {}) {
     val colors = LocalColors.current
     val scheduleViewModel = remember { ScheduleViewModel() }
+    var selectedTab by remember { mutableStateOf(HomeTab.PICKS) }
 
     LazyColumn(
         modifier = Modifier
@@ -43,7 +57,7 @@ fun HomeScreen(appDataState: AppDataState, onLogout: () -> Unit = {}) {
             .background(colors.background),
         verticalArrangement = Arrangement.Top
     ) {
-        // Simple header line
+        // Header with title and segmented control
         item {
             Column(
                 modifier = Modifier
@@ -68,6 +82,46 @@ fun HomeScreen(appDataState: AppDataState, onLogout: () -> Unit = {}) {
                     textAlign = TextAlign.Center,
                     modifier = Modifier.fillMaxWidth()
                 )
+                
+                // Segmented control for Picks/Leaderboard
+                CupertinoSegmentedControl(
+                    colors = CupertinoSegmentedControlDefaults.colors(
+                        separatorColor = colors.accent,
+                        indicatorColor = colors.accent
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 8.dp),
+                    selectedTabIndex = when (selectedTab) {
+                        HomeTab.PICKS -> 0
+                        HomeTab.LEADERBOARD -> 1
+                    },
+                    shape = RectangleShape
+                ) {
+                    CupertinoSegmentedControlTab(
+                        isSelected = selectedTab == HomeTab.PICKS,
+                        onClick = { selectedTab = HomeTab.PICKS }
+                    ) {
+                        Text(
+                            "PICKS", 
+                            color = if (selectedTab == HomeTab.PICKS) colors.onAccent else colors.text,
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    CupertinoSegmentedControlTab(
+                        isSelected = selectedTab == HomeTab.LEADERBOARD,
+                        onClick = { selectedTab = HomeTab.LEADERBOARD }
+                    ) {
+                        Text(
+                            "LEADERBOARD", 
+                            color = if (selectedTab == HomeTab.LEADERBOARD) colors.onAccent else colors.text,
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+                
                 Divider(
                     color = colors.onSurface.copy(alpha = 0.3f),
                     thickness = 1.dp,
@@ -76,42 +130,50 @@ fun HomeScreen(appDataState: AppDataState, onLogout: () -> Unit = {}) {
             }
         }
 
-        // Cache Status - compact
-        item {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(colors.background)
-                    .padding(vertical = 5.dp, horizontal = 8.dp)
-            ) {
-                CacheStatusSection(appDataState, colors)
-            }
-        }
-
-        // Schedule Data - show all games
-        appDataState.scheduleData?.let { schedule ->
-            item {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(colors.background)
-                        .padding(vertical = 5.dp, horizontal = 8.dp)
-                ) {
-                    ScheduleSection(schedule.fastbreakCard, colors, scheduleViewModel)
+        // Content based on selected tab
+        if (selectedTab == HomeTab.PICKS) {
+            // Schedule Data - show all games
+            appDataState.scheduleData?.let { schedule ->
+                item {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(colors.background)
+                            .padding(vertical = 5.dp, horizontal = 8.dp)
+                    ) {
+                        ScheduleSection(schedule.fastbreakCard, colors, scheduleViewModel)
+                    }
                 }
             }
         }
 
-        // Stats Data  
-        appDataState.statsData?.let { stats ->
-            item {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(colors.background)
-                        .padding(vertical = 5.dp, horizontal = 8.dp)
-                ) {
-                    StatsSection(stats, colors)
+        if (selectedTab == HomeTab.LEADERBOARD) {
+            // Stats Data - Leaderboard view
+            appDataState.statsData?.let { stats ->
+                stats.weeklyLeaderboard?.let { leaderboard ->
+                    // Daily Leaderboard (top half)
+                    item {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(colors.background)
+                                .padding(horizontal = 8.dp, vertical = 2.dp)
+                        ) {
+                            DailyLeaderboardSection(leaderboard, colors)
+                        }
+                    }
+                    
+                    // Weekly Totals (bottom half)
+                    item {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(colors.background)
+                                .padding(horizontal = 8.dp, vertical = 2.dp)
+                        ) {
+                            WeeklyTotalsSection(leaderboard, colors)
+                        }
+                    }
                 }
             }
         }
@@ -161,234 +223,113 @@ fun HomeScreen(appDataState: AppDataState, onLogout: () -> Unit = {}) {
             }
         }
 
-        // Logout button at bottom
-        item {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(colors.background)
-                    .padding(16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                PhysicalButton(
-                    onClick = onLogout,
-                    modifier = Modifier.width(120.dp),
-                    backgroundColor = colors.error,
-                    contentColor = colors.onError,
-                    bottomBorderColor = colors.error.copy(alpha = 0.7f),
-                    elevation = 6.dp,
-                    pressDepth = 3.dp
-                ) {
-                    Text(
-                        text = "LOGOUT",
-                        fontFamily = FontFamily.Monospace,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun CacheStatusSection(appDataState: AppDataState, colors: AppColors) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(colors.background)
-            .padding(horizontal = 8.dp, vertical = 2.dp)
-    ) {
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Text(
-                text = "/day/${appDataState.dateCode}/schedule",
-                style = MaterialTheme.typography.caption,
-                color = colors.onSurface.copy(alpha = 0.7f),
-                fontFamily = FontFamily.Monospace,
-                modifier = Modifier.weight(1f),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            Column(
-                horizontalAlignment = androidx.compose.ui.Alignment.End
-            ) {
-                Text(
-                    text = when {
-                        appDataState.scheduleIsRefreshing -> "REFRESHING"
-                        appDataState.scheduleIsStale -> "STALE"
-                        appDataState.scheduleData != null && appDataState.scheduleIsFromCache -> "CACHED/${
-                            formatExpirationTime(
-                                appDataState.scheduleExpiresAt
-                            )
-                        }/${formatLastFetchedTime(appDataState.scheduleCachedAt)}"
-
-                        appDataState.scheduleData != null -> "FRESH/${formatLastFetchedTime(appDataState.scheduleCachedAt)}"
-                        else -> "NONE"
-                    },
-                    style = MaterialTheme.typography.caption,
-                    color = colors.onSurface,
-                    fontFamily = FontFamily.Monospace
-                )
-            }
-        }
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Text(
-                text = "/day/${appDataState.dateCode}/stats/${appDataState.statsData?.statSheetForUser?.userId}",
-                style = MaterialTheme.typography.caption,
-                color = colors.onSurface.copy(alpha = 0.7f),
-                fontFamily = FontFamily.Monospace,
-                modifier = Modifier.weight(1f),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            Column(
-                horizontalAlignment = androidx.compose.ui.Alignment.End
-            ) {
-                Text(
-                    text = when {
-                        appDataState.statsIsRefreshing -> "REFRESHING"
-                        appDataState.statsIsStale -> "STALE"
-                        appDataState.statsData != null && appDataState.statsIsFromCache -> "CACHED/${
-                            formatExpirationTime(
-                                appDataState.statsExpiresAt
-                            )
-                        }/${formatLastFetchedTime(appDataState.statsCachedAt)}"
-
-                        appDataState.statsData != null -> "FRESH/${formatLastFetchedTime(appDataState.statsCachedAt)}"
-                        else -> "NONE"
-                    },
-                    style = MaterialTheme.typography.caption,
-                    color = colors.onSurface,
-                    fontFamily = FontFamily.Monospace
-                )
-            }
-        }
-
     }
 }
 
 
+
 @Composable
-private fun StatsSection(
-    statsData: com.joebad.fastbreak.model.dtos.StatsResponse,
+private fun DailyLeaderboardSection(
+    leaderboard: com.joebad.fastbreak.model.dtos.LeaderboardResult,
     colors: AppColors
 ) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(colors.background)
-            .padding(horizontal = 8.dp, vertical = 2.dp)
+            .padding(vertical = 8.dp)
     ) {
         Text(
-            text = "WEEKLY STATS / ${statsData.weekStartDate} ",
+            text = "DAILY LEADERBOARD",
             style = MaterialTheme.typography.caption,
             color = colors.accent,
             fontWeight = FontWeight.Bold,
-            fontFamily = FontFamily.Monospace
+            fontFamily = FontFamily.Monospace,
+            modifier = Modifier.padding(bottom = 4.dp)
+        )
+        Text(
+            text = "Highest card results for each day",
+            style = MaterialTheme.typography.caption,
+            color = colors.onSurface.copy(alpha = 0.7f),
+            fontFamily = FontFamily.Monospace,
+            modifier = Modifier.padding(bottom = 8.dp)
         )
 
-        // Leaderboard
-        statsData.weeklyLeaderboard?.let { leaderboard ->
-            Text(
-                text = "DAILY LEADERBOARD:",
-                style = MaterialTheme.typography.caption,
-                color = colors.onSurface,
-                fontWeight = FontWeight.Bold,
-                fontFamily = FontFamily.Monospace,
-                modifier = Modifier.padding(top = 10.dp)
-            )
-            Text(
-                text = "Highest card results for each day",
-                style = MaterialTheme.typography.caption,
-                color = colors.onSurface.copy(alpha = 0.7f),
-                fontFamily = FontFamily.Monospace,
-                modifier = Modifier.padding(bottom = 10.dp)
-            )
-
-            Column(modifier = Modifier.padding(start = 20.dp)) {
-                leaderboard.dailyLeaderboards.forEachIndexed { index, dailyLeaderboard ->
-                    dailyLeaderboard.entries.isNotEmpty().let { hasItems ->
-                        if (hasItems) {
-                            Text(
-                                text = dailyLeaderboard.dateCode,
-                                style = MaterialTheme.typography.caption,
-                                color = colors.onSurface,
-                                fontWeight = FontWeight.Bold,
-                                fontFamily = FontFamily.Monospace,
-                                modifier = Modifier.padding(top = 4.dp)
-                            )
-                            dailyLeaderboard.entries.forEachIndexed { index, leaderboardEntry ->
-                                LeaderboardReceiptRow(
-                                    index + 1,
-                                    LeaderboardItem(
-                                        leaderboardEntry.userId,
-                                        leaderboardEntry.userName,
-                                        leaderboardEntry.points
-                                    ),
-                                    colors
-                                )
-                            }
-                        }
+        Column(modifier = Modifier.padding(start = 16.dp)) {
+            leaderboard.dailyLeaderboards.forEach { dailyLeaderboard ->
+                if (dailyLeaderboard.entries.isNotEmpty()) {
+                    Text(
+                        text = dailyLeaderboard.dateCode,
+                        style = MaterialTheme.typography.caption,
+                        color = colors.onSurface,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.Monospace,
+                        modifier = Modifier.padding(top = 6.dp, bottom = 2.dp)
+                    )
+                    dailyLeaderboard.entries.take(3).forEachIndexed { index, leaderboardEntry ->
+                        LeaderboardReceiptRow(
+                            position = index + 1,
+                            item = LeaderboardItem(
+                                id = leaderboardEntry.userId,
+                                user = leaderboardEntry.userName,
+                                points = leaderboardEntry.points
+                            ),
+                            colors = colors
+                        )
                     }
                 }
             }
-            Text(
-                text = "WEEKLY TOTALS:",
-                style = MaterialTheme.typography.caption,
-                color = colors.onSurface,
-                fontWeight = FontWeight.Bold,
-                fontFamily = FontFamily.Monospace,
-                modifier = Modifier.padding(top = 20.dp)
-            )
-            Text(
-                text = "Running total for the week",
-                style = MaterialTheme.typography.caption,
-                color = colors.onSurface.copy(alpha = 0.7f),
-                fontFamily = FontFamily.Monospace,
-                modifier = Modifier.padding(bottom = 10.dp)
-            )
-
-            leaderboard.weeklyTotals.forEachIndexed { index, weeklyTotal ->
-                LeaderboardReceiptRow(
-                    index + 1,
-                    LeaderboardItem(weeklyTotal.userId, weeklyTotal.userName, weeklyTotal.points),
-                    colors
-                )
-            }
-
         }
-
-//
-//        statsData.statSheetForUser?.items?.let { items ->
-//            Text(
-//                text = "STAT SHEET:",
-//                style = MaterialTheme.typography.caption,
-//                color = colors.onSurface,
-//                fontWeight = FontWeight.Bold,
-//                fontFamily = FontFamily.Monospace,
-//                modifier = Modifier.padding(top = 4.dp)
-//            )
-//
-//            items.forEachIndexed { index, items ->
-//                dailyLeaderboard.entries.forEachIndexed { index, leaderboardEntry ->
-//                    LeaderboardReceiptRow(index + 1, LeaderboardItem(leaderboardEntry.userId, leaderboardEntry.userName, leaderboardEntry.points), colors)
-//                }
-//            }
-
-//
-//        }
-
+        
         Divider(
             color = colors.onSurface.copy(alpha = 0.3f),
             thickness = 1.dp,
-            modifier = Modifier.padding(vertical = 4.dp)
+            modifier = Modifier.padding(vertical = 8.dp)
+        )
+    }
+}
+
+@Composable
+private fun WeeklyTotalsSection(
+    leaderboard: com.joebad.fastbreak.model.dtos.LeaderboardResult,
+    colors: AppColors
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp)
+    ) {
+        Text(
+            text = "WEEKLY TOTALS",
+            style = MaterialTheme.typography.caption,
+            color = colors.accent,
+            fontWeight = FontWeight.Bold,
+            fontFamily = FontFamily.Monospace,
+            modifier = Modifier.padding(bottom = 4.dp)
+        )
+        Text(
+            text = "Running total for the week",
+            style = MaterialTheme.typography.caption,
+            color = colors.onSurface.copy(alpha = 0.7f),
+            fontFamily = FontFamily.Monospace,
+            modifier = Modifier.padding(bottom = 8.dp)
+        )
+
+        leaderboard.weeklyTotals.forEachIndexed { index, weeklyTotal ->
+            LeaderboardReceiptRow(
+                position = index + 1,
+                item = LeaderboardItem(
+                    id = weeklyTotal.userId,
+                    user = weeklyTotal.userName,
+                    points = weeklyTotal.points
+                ),
+                colors = colors
+            )
+        }
+        
+        Divider(
+            color = colors.onSurface.copy(alpha = 0.3f),
+            thickness = 1.dp,
+            modifier = Modifier.padding(vertical = 8.dp)
         )
     }
 }

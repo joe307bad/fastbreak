@@ -1,224 +1,241 @@
+package com.joebad.fastbreak.ui.screens
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.selection.selectable
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.RadioButton
-import androidx.compose.material3.RadioButtonDefaults
-import androidx.compose.material3.Text
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.material.Divider
+import androidx.compose.material.MaterialTheme
+import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import com.joebad.fastbreak.data.global.AppDataState
 import com.joebad.fastbreak.ui.PhysicalButton
-import com.joebad.fastbreak.ui.Title
+import com.joebad.fastbreak.ui.theme.AppColors
 import com.joebad.fastbreak.ui.theme.LocalColors
+import kotlinx.datetime.Clock
+import kotlinx.datetime.Instant
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
 
+@Composable
+fun ProfileScreen(appDataState: AppDataState, onLogout: () -> Unit = {}) {
+    val colors = LocalColors.current
 
-fun generateRandomUsername(): String {
-    val adjectives =
-        listOf("cool", "fast", "bright", "smart", "bold", "swift", "wild", "calm", "brave", "wise")
-    val nouns =
-        listOf("tiger", "eagle", "wolf", "lion", "bear", "shark", "hawk", "fox", "deer", "owl")
-    val verbs = listOf(
-        "runs",
-        "jumps",
-        "flies",
-        "swims",
-        "climbs",
-        "dives",
-        "soars",
-        "leaps",
-        "glides",
-        "races"
-    )
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(colors.background),
+        verticalArrangement = Arrangement.Top
+    ) {
+        // Header
+        item {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(colors.background)
+                    .padding(vertical = 5.dp, horizontal = 8.dp)
+            ) {
+                Text(
+                    text = "PROFILE",
+                    style = MaterialTheme.typography.body1,
+                    color = colors.onSurface,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = FontFamily.Monospace,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Text(
+                    text = getCurrentDateFormatted(),
+                    style = MaterialTheme.typography.caption,
+                    color = colors.onSurface.copy(alpha = 0.7f),
+                    fontFamily = FontFamily.Monospace,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                
+                Divider(
+                    color = colors.onSurface.copy(alpha = 0.3f),
+                    thickness = 1.dp,
+                    modifier = Modifier.padding(vertical = 4.dp)
+                )
+            }
+        }
 
-    val randomNumber = (1000..9999).random()
-    return "${adjectives.random()}-${nouns.random()}-${verbs.random()}-$randomNumber"
+        // Cache Status Section
+        item {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(colors.background)
+                    .padding(vertical = 5.dp, horizontal = 8.dp)
+            ) {
+                CacheStatusSection(appDataState, colors)
+            }
+        }
+
+        // Logout button
+        item {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(colors.background)
+                    .padding(16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                PhysicalButton(
+                    onClick = onLogout,
+                    modifier = Modifier.width(120.dp),
+                    backgroundColor = colors.error,
+                    contentColor = colors.onError,
+                    bottomBorderColor = colors.error.copy(alpha = 0.7f),
+                    elevation = 6.dp,
+                    pressDepth = 3.dp
+                ) {
+                    Text(
+                        text = "LOGOUT",
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+        }
+    }
 }
 
 @Composable
-fun ProfileScreen(
-    userId: String,
-    email: String,
-    userName: String,
-    loading: Boolean? = false,
-    onSaveUserName: (String) -> Unit,
-    logout: () -> Unit
-) {
-    val colors = LocalColors.current
-    val gmailUsername = email.substringBefore("@").replace("\"", "")
-    var randomUsername by remember { mutableStateOf(if (userName != gmailUsername) userName else generateRandomUsername()) }
+private fun CacheStatusSection(appDataState: AppDataState, colors: AppColors) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(colors.background)
+            .padding(horizontal = 8.dp, vertical = 2.dp)
+    ) {
+        Text(
+            text = "CACHE STATUS",
+            style = MaterialTheme.typography.caption,
+            color = colors.accent,
+            fontWeight = FontWeight.Bold,
+            fontFamily = FontFamily.Monospace,
+            modifier = Modifier.padding(bottom = 8.dp)
+        )
 
-    var selectedOption by remember { mutableStateOf(if (userName == gmailUsername) 0 else 1) }
-    val usernameOptions = listOf(gmailUsername, randomUsername)
-
-    val selectedUsername = usernameOptions[selectedOption]
-
-    Box(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-        Column(
-            modifier = Modifier.fillMaxSize().background(colors.background).padding(8.dp),
-            verticalArrangement = Arrangement.Top,
-            horizontalAlignment = Alignment.CenterHorizontally
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Title("PROFILE")
-            Spacer(modifier = Modifier.height(8.dp))
             Text(
-                color = colors.text,
-                text = "",
-                textAlign = TextAlign.Center
+                text = "/day/${appDataState.dateCode}/schedule",
+                style = MaterialTheme.typography.caption,
+                color = colors.onSurface.copy(alpha = 0.7f),
+                fontFamily = FontFamily.Monospace,
+                modifier = Modifier.weight(1f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
-            Spacer(modifier = Modifier.height(10.dp))
             Column(
-                modifier = Modifier.fillMaxSize().background(colors.background),
-                verticalArrangement = Arrangement.Top,
-                horizontalAlignment = Alignment.Start
-            ) {
-                Column(
-                    modifier = Modifier.fillMaxSize().background(colors.background),
-                    verticalArrangement = Arrangement.Top,
-                    horizontalAlignment = Alignment.Start
-                ) {
-                    Text(
-                        text = "User ID:",
-                        color = colors.onPrimary,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 18.sp,
-                        modifier = Modifier.width(100.dp).padding(bottom = 20.dp)
-                    )
-                    Text(
-                        text = userId,
-                        color = colors.onPrimary,
-                        fontSize = 16.sp,
-                        fontFamily = FontFamily.Monospace
-                    )
-
-                    Text(
-                        text = "Leaderboard display name:",
-                        color = colors.onPrimary,
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(bottom = 8.dp, top = 40.dp)
-                    )
-
-                    usernameOptions.forEachIndexed { index, option ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .selectable(
-                                    selected = (selectedOption == index),
-                                    onClick = {
-                                        selectedOption = index
-                                    }
-                                )
-                                .padding(vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            RadioButton(
-                                selected = (selectedOption == index),
-                                onClick = {
-                                    selectedOption = index
-                                },
-                                colors = RadioButtonDefaults.colors(
-                                    selectedColor = colors.onPrimary,
-                                    unselectedColor = colors.onPrimary
-                                )
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = option,
-                                color = colors.onPrimary,
-                                fontSize = 16.sp,
-                                fontFamily = FontFamily.Monospace,
-                                modifier = Modifier.weight(1f)
-                            )
-                            if (index == 1) {
-                                OutlinedButton(
-                                    onClick = {
-                                        randomUsername = generateRandomUsername()
-                                    },
-                                    colors = ButtonDefaults.outlinedButtonColors(
-                                        contentColor = colors.onPrimary
-                                    ),
-                                    shape = RectangleShape,
-                                    modifier = Modifier.size(width = 80.dp, height = 32.dp),
-                                    contentPadding = androidx.compose.foundation.layout.PaddingValues(
-                                        0.dp
-                                    )
-                                ) {
-                                    Box(
-                                        contentAlignment = Alignment.Center,
-                                        modifier = Modifier.fillMaxSize()
-                                    ) {
-                                        Text(
-                                            text = "NEW",
-                                            fontSize = 12.sp,
-                                            textAlign = TextAlign.Center
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(20.dp))
-
-                    PhysicalButton(
-                        onClick = {
-                            onSaveUserName(selectedUsername)
-                        },
-                        loading = loading,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text(
-                            text = "SAVE PROFILE",
-                            textAlign = TextAlign.Center
-                        )
-                    }
-
-
-                }
-
-
-            }
-
-        }
-
-        Box(modifier = Modifier.align(Alignment.BottomCenter)) {
-
-            PhysicalButton(
-                destructive = true,
-                onClick = {
-                    logout()
-                },
-                shape = RectangleShape,
-                modifier = Modifier.fillMaxWidth(),
-                textSize = 16
+                horizontalAlignment = androidx.compose.ui.Alignment.End
             ) {
                 Text(
-                    text = "LOGOUT",
-                    textAlign = TextAlign.Center
+                    text = when {
+                        appDataState.scheduleIsRefreshing -> "REFRESHING"
+                        appDataState.scheduleIsStale -> "STALE"
+                        appDataState.scheduleData != null && appDataState.scheduleIsFromCache -> "CACHED/${
+                            formatExpirationTime(
+                                appDataState.scheduleExpiresAt
+                            )
+                        }/${formatLastFetchedTime(appDataState.scheduleCachedAt)}"
+
+                        appDataState.scheduleData != null -> "FRESH/${formatLastFetchedTime(appDataState.scheduleCachedAt)}"
+                        else -> "NONE"
+                    },
+                    style = MaterialTheme.typography.caption,
+                    color = colors.onSurface,
+                    fontFamily = FontFamily.Monospace
+                )
+            }
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                text = "/day/${appDataState.dateCode}/stats/${appDataState.statsData?.statSheetForUser?.userId}",
+                style = MaterialTheme.typography.caption,
+                color = colors.onSurface.copy(alpha = 0.7f),
+                fontFamily = FontFamily.Monospace,
+                modifier = Modifier.weight(1f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Column(
+                horizontalAlignment = androidx.compose.ui.Alignment.End
+            ) {
+                Text(
+                    text = when {
+                        appDataState.statsIsRefreshing -> "REFRESHING"
+                        appDataState.statsIsStale -> "STALE"
+                        appDataState.statsData != null && appDataState.statsIsFromCache -> "CACHED/${
+                            formatExpirationTime(
+                                appDataState.statsExpiresAt
+                            )
+                        }/${formatLastFetchedTime(appDataState.statsCachedAt)}"
+
+                        appDataState.statsData != null -> "FRESH/${formatLastFetchedTime(appDataState.statsCachedAt)}"
+                        else -> "NONE"
+                    },
+                    style = MaterialTheme.typography.caption,
+                    color = colors.onSurface,
+                    fontFamily = FontFamily.Monospace
                 )
             }
         }
     }
+}
+
+private fun getCurrentDateFormatted(): String {
+    val etTimeZone = TimeZone.of("America/New_York")
+    val nowET = Clock.System.now().toLocalDateTime(etTimeZone)
+    val date = nowET.date
+    val months = listOf(
+        "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+        "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+    )
+    return "${months[date.monthNumber - 1]} ${date.dayOfMonth}, ${date.year}"
+}
+
+private fun formatExpirationTime(expiresAt: Instant?): String {
+    return expiresAt?.let { instant ->
+        val etTimeZone = TimeZone.of("America/New_York")
+        val expirationET = instant.toLocalDateTime(etTimeZone)
+        val time = expirationET.time
+        val hour = if (time.hour == 0) 12 else if (time.hour > 12) time.hour - 12 else time.hour
+        val amPm = if (time.hour < 12) "AM" else "PM"
+        val minute = time.minute.toString().padStart(2, '0')
+        "$hour:$minute $amPm"
+    } ?: ""
+}
+
+private fun formatLastFetchedTime(lastFetchedAt: Instant?): String {
+    return lastFetchedAt?.let { instant ->
+        val etTimeZone = TimeZone.of("America/New_York")
+        val fetchedET = instant.toLocalDateTime(etTimeZone)
+        val time = fetchedET.time
+        val hour = if (time.hour == 0) 12 else if (time.hour > 12) time.hour - 12 else time.hour
+        val amPm = if (time.hour < 12) "AM" else "PM"
+        val minute = time.minute.toString().padStart(2, '0')
+        "$hour:$minute $amPm"
+    } ?: ""
 }

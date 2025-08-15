@@ -2,7 +2,7 @@ package com.joebad.fastbreak
 
 import AuthRepository
 import GoogleUser
-import HomeScreen
+import com.joebad.fastbreak.ui.navigation.MainNavigationScreen
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Surface
 import androidx.compose.runtime.Composable
@@ -208,7 +208,7 @@ fun App(
 
                     is RootComponent.Child.Home -> {
                         val appDataState by dependencies.appDataViewModel.container.stateFlow.collectAsState()
-                        HomeScreen(
+                        MainNavigationScreen(
                             appDataState = appDataState,
                             onLogout = instance.component.onLogout
                         )

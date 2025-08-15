@@ -41,7 +41,7 @@ fun ScheduleSection(
         modifier = Modifier
             .fillMaxWidth()
             .background(colors.background)
-            .padding(horizontal = 8.dp, vertical = 2.dp)
+            .padding(vertical = 2.dp)
     ) {
         Text(
             text = "TODAY'S SCHEDULE (${games.size})",

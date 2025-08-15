@@ -7,7 +7,7 @@ import com.joebad.fastbreak.data.dailyFastbreak.ScheduleResult
 import com.joebad.fastbreak.data.dailyFastbreak.StatsResult
 import com.joebad.fastbreak.model.dtos.ScheduleResponse
 import com.joebad.fastbreak.model.dtos.StatsResponse
-import com.joebad.fastbreak.ui.screens.CacheStatus
+
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -19,6 +19,13 @@ import kotlinx.datetime.toLocalDateTime
 import org.orbitmvi.orbit.Container
 import org.orbitmvi.orbit.ContainerHost
 import org.orbitmvi.orbit.container
+
+data class CacheStatus(
+    val isLoading: Boolean = false,
+    val isCached: Boolean = false,
+    val rawJson: String? = null,
+    val error: String? = null
+)
 
 data class AppDataState(
     val dateCode: String,

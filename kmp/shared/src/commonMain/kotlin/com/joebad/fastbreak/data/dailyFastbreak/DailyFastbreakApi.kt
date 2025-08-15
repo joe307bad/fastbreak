@@ -26,6 +26,7 @@ import io.ktor.http.contentType
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlinx.datetime.Instant
 
 
 @Serializable
@@ -54,7 +55,8 @@ sealed class ScheduleResult {
         val isFromCache: Boolean = false,
         val rawJson: String? = null,
         val isExpired: Boolean = false,
-        val isRefreshing: Boolean = false
+        val isRefreshing: Boolean = false,
+        val expiresAt: Instant? = null
     ) : ScheduleResult()
     data class Error(val message: String) : ScheduleResult()
 }
@@ -65,7 +67,8 @@ sealed class StatsResult {
         val isFromCache: Boolean = false,
         val rawJson: String? = null,
         val isExpired: Boolean = false,
-        val isRefreshing: Boolean = false
+        val isRefreshing: Boolean = false,
+        val expiresAt: Instant? = null
     ) : StatsResult()
     data class Error(val message: String) : StatsResult()
 }

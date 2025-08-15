@@ -13,6 +13,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.datetime.Clock
+import kotlinx.datetime.Instant
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import org.orbitmvi.orbit.Container
@@ -20,6 +21,7 @@ import org.orbitmvi.orbit.ContainerHost
 import org.orbitmvi.orbit.container
 
 data class AppDataState(
+    val dateCode: String,
     val cacheStatus: CacheStatus = CacheStatus(),
     val isInitialized: Boolean = false,
     val scheduleData: ScheduleResponse? = null,
@@ -29,7 +31,11 @@ data class AppDataState(
     val scheduleIsRefreshing: Boolean = false,
     val statsIsRefreshing: Boolean = false,
     val scheduleIsStale: Boolean = false,
-    val statsIsStale: Boolean = false
+    val statsIsStale: Boolean = false,
+    val scheduleExpiresAt: Instant? = null,
+    val statsExpiresAt: Instant? = null,
+    val scheduleIsFromCache: Boolean = false,
+    val statsIsFromCache: Boolean = false
 )
 
 sealed class AppDataSideEffect {
@@ -45,29 +51,31 @@ fun getCurrentDateET(): String {
 }
 
 sealed class AppDataAction {
-    data class LoadDailyData(val dateString: String, val userId: String? = null) : AppDataAction()
-    data class LoadSchedule(val dateString: String) : AppDataAction()
-    data class LoadStats(val dateString: String, val userId: String) : AppDataAction()
+    data class LoadDailyData(val userId: String? = null) : AppDataAction()
+    data object LoadSchedule : AppDataAction()
+    data class LoadStats(val userId: String) : AppDataAction()
 }
 
 class AppDataViewModel(
     private val cache: FastbreakCache,
     authRepository: AuthRepository
 ) : ContainerHost<AppDataState, AppDataSideEffect> {
+
+    private val dateCode = { getCurrentDateET() }
     
     private val viewModelScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     
-    override val container: Container<AppDataState, AppDataSideEffect> = viewModelScope.container(AppDataState())
+    override val container: Container<AppDataState, AppDataSideEffect> = viewModelScope.container(AppDataState(dateCode()))
 
     init {
-        loadDailyData(getCurrentDateET(), authRepository.getUser()?.userId)
+        loadDailyData(dateCode(), authRepository.getUser()?.userId)
     }
 
     fun handleAction(action: AppDataAction) {
         when (action) {
-            is AppDataAction.LoadDailyData -> loadDailyData(action.dateString, action.userId)
-            is AppDataAction.LoadSchedule -> loadSchedule(action.dateString)
-            is AppDataAction.LoadStats -> loadStats(action.dateString, action.userId)
+            is AppDataAction.LoadDailyData -> loadDailyData(dateCode(), action.userId)
+            is AppDataAction.LoadSchedule -> loadSchedule(dateCode())
+            is AppDataAction.LoadStats -> loadStats(dateCode(), action.userId)
         }
     }
 
@@ -122,7 +130,9 @@ class AppDataViewModel(
                         state.copy(
                             scheduleData = scheduleResult.response,
                             scheduleIsRefreshing = scheduleResult.isRefreshing,
-                            scheduleIsStale = scheduleResult.isExpired
+                            scheduleIsStale = scheduleResult.isExpired,
+                            scheduleExpiresAt = scheduleResult.expiresAt,
+                            scheduleIsFromCache = scheduleResult.isFromCache
                         )
                     }
                 }
@@ -139,7 +149,9 @@ class AppDataViewModel(
                             state.copy(
                                 statsData = result.response,
                                 statsIsRefreshing = result.isRefreshing,
-                                statsIsStale = result.isExpired
+                                statsIsStale = result.isExpired,
+                                statsExpiresAt = result.expiresAt,
+                                statsIsFromCache = result.isFromCache
                             )
                         }
                     }
@@ -196,6 +208,8 @@ class AppDataViewModel(
                             scheduleData = result.response,
                             scheduleIsRefreshing = result.isRefreshing,
                             scheduleIsStale = result.isExpired,
+                            scheduleExpiresAt = result.expiresAt,
+                            scheduleIsFromCache = result.isFromCache,
                             cacheStatus = state.cacheStatus.copy(
                                 isLoading = false,
                                 isCached = result.isFromCache,
@@ -249,6 +263,8 @@ class AppDataViewModel(
                             statsData = result.response,
                             statsIsRefreshing = result.isRefreshing,
                             statsIsStale = result.isExpired,
+                            statsExpiresAt = result.expiresAt,
+                            statsIsFromCache = result.isFromCache,
                             cacheStatus = state.cacheStatus.copy(
                                 isLoading = false,
                                 isCached = result.isFromCache,

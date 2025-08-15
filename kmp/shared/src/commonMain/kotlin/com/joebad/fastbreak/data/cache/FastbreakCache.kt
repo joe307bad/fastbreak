@@ -35,7 +35,8 @@ class FastbreakCache private constructor(
                     isFromCache = response.isFromCache,
                     rawJson = response.rawJson,
                     isExpired = response.isExpired,
-                    isRefreshing = response.isRefreshing
+                    isRefreshing = response.isRefreshing,
+                    expiresAt = response.expiresAt
                 )
                 else -> ScheduleResult.Error(response.error ?: "Unknown error")
             }
@@ -58,7 +59,8 @@ class FastbreakCache private constructor(
                     isFromCache = response.isFromCache,
                     rawJson = response.rawJson,
                     isExpired = response.isExpired,
-                    isRefreshing = response.isRefreshing
+                    isRefreshing = response.isRefreshing,
+                    expiresAt = response.expiresAt
                 )
                 else -> StatsResult.Error(response.error ?: "Unknown error")
             }

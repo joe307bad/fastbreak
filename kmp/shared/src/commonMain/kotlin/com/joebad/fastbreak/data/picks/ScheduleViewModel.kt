@@ -7,9 +7,6 @@ import getRandomId
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.datetime.Clock
-import kotlinx.datetime.TimeZone
-import kotlinx.datetime.toLocalDateTime
 import org.orbitmvi.orbit.Container
 import org.orbitmvi.orbit.ContainerHost
 import org.orbitmvi.orbit.container
@@ -17,7 +14,8 @@ import org.orbitmvi.orbit.container
 data class ScheduleState(
     val selectedWinners: Map<String, String> = emptyMap(),
     val isLoading: Boolean = false,
-    val isLocked: Boolean = false
+    val isLocked: Boolean = false,
+    val isRefreshingToken: Boolean = false
 )
 
 sealed class ScheduleAction {
@@ -29,13 +27,15 @@ sealed class ScheduleAction {
 
 sealed class ScheduleSideEffect {
     data class ShowToast(val message: String) : ScheduleSideEffect()
+    object RequireLogin : ScheduleSideEffect()
 }
 
-class ScheduleViewModel(private val authRepository: AuthRepository) : ContainerHost<ScheduleState, ScheduleSideEffect> {
-    
+class ScheduleViewModel(private val dateCode: String, private val authRepository: AuthRepository) :
+    ContainerHost<ScheduleState, ScheduleSideEffect> {
+
     private val viewModelScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private val picksRepository = PicksRepository(authRepository)
-    
+
     override val container: Container<ScheduleState, ScheduleSideEffect> =
         viewModelScope.container(ScheduleState())
 
@@ -49,14 +49,14 @@ class ScheduleViewModel(private val authRepository: AuthRepository) : ContainerH
     }
 
     private fun selectWinner(gameId: String, teamName: String) = intent {
-        // Prevent selections when locked
-        if (state.isLocked) {
+        // Prevent selections when locked or during token refresh
+        if (state.isLocked || state.isRefreshingToken) {
             postSideEffect(ScheduleSideEffect.ShowToast("Cannot change selections when locked"))
             return@intent
         }
-        
+
         val currentSelection = state.selectedWinners[gameId]
-        
+
         reduce {
             state.copy(
                 selectedWinners = if (currentSelection == teamName) {
@@ -68,7 +68,7 @@ class ScheduleViewModel(private val authRepository: AuthRepository) : ContainerH
                 }
             )
         }
-        
+
         // Optional: Show feedback
         val message = if (currentSelection == teamName) {
             "Deselected $teamName"
@@ -94,10 +94,10 @@ class ScheduleViewModel(private val authRepository: AuthRepository) : ContainerH
         }
         postSideEffect(ScheduleSideEffect.ShowToast("All selections cleared"))
     }
-    
+
     private fun lockPicks() = intent {
         reduce { state.copy(isLoading = true) }
-        
+
         try {
             // Convert current picks to FastbreakSelectionState format
             val selections = state.selectedWinners.map { (gameId, teamName) ->
@@ -106,36 +106,97 @@ class ScheduleViewModel(private val authRepository: AuthRepository) : ContainerH
                     userAnswer = teamName,
                     points = 0, // Points calculated server-side
                     description = "Selected $teamName to win",
-                    type = "team_selection"
+                    type = "PICK_EM"
                 )
             }
-            
-            val currentDate = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date.toString()
-            
+
             val selectionState = FastbreakSelectionState(
                 selections = selections,
                 totalPoints = 0,
                 cardId = getRandomId(),
                 locked = true,
-                date = currentDate
+                date = dateCode
             )
-            
+
             val result = picksRepository.lockPicks(selectionState)
-            
-            if (result != null) {
-                reduce { 
-                    state.copy(
-                        isLoading = false,
-                        isLocked = true
-                    )
+
+            when (result) {
+                is LockPicksResult.Success -> {
+                    reduce {
+                        state.copy(
+                            isLoading = false,
+                            isLocked = true,
+                            isRefreshingToken = false
+                        )
+                    }
+                    postSideEffect(ScheduleSideEffect.ShowToast("Picks submitted and locked!"))
                 }
-                postSideEffect(ScheduleSideEffect.ShowToast("Picks submitted and locked!"))
-            } else {
-                reduce { state.copy(isLoading = false) }
-                postSideEffect(ScheduleSideEffect.ShowToast("Failed to submit picks"))
+
+                is LockPicksResult.TokenRefreshRequired -> {
+                    // Set refreshing state and attempt transparent refresh
+                    reduce {
+                        state.copy(
+                            isRefreshingToken = true,
+                            isLoading = true  // Keep loading state during refresh
+                        )
+                    }
+
+                    // Attempt refresh and retry
+                    val refreshResult = picksRepository.lockPicksWithRefreshedToken(selectionState)
+                    when (refreshResult) {
+                        is LockPicksResult.Success -> {
+                            reduce {
+                                state.copy(
+                                    isLoading = false,
+                                    isLocked = true,
+                                    isRefreshingToken = false
+                                )
+                            }
+                            postSideEffect(ScheduleSideEffect.ShowToast("Picks submitted and locked!"))
+                        }
+
+                        is LockPicksResult.Error -> {
+                            reduce {
+                                state.copy(
+                                    isLoading = false,
+                                    isRefreshingToken = false
+                                )
+                            }
+                            postSideEffect(ScheduleSideEffect.ShowToast("Session expired. Please sign in again."))
+                            postSideEffect(ScheduleSideEffect.RequireLogin)
+                        }
+
+                        is LockPicksResult.TokenRefreshRequired -> {
+                            // Should not happen after refresh attempt
+                            reduce {
+                                state.copy(
+                                    isLoading = false,
+                                    isRefreshingToken = false
+                                )
+                            }
+                            postSideEffect(ScheduleSideEffect.ShowToast("Authentication error. Please sign in again."))
+                            postSideEffect(ScheduleSideEffect.RequireLogin)
+                        }
+                    }
+                }
+
+                is LockPicksResult.Error -> {
+                    reduce {
+                        state.copy(
+                            isLoading = false,
+                            isRefreshingToken = false
+                        )
+                    }
+                    postSideEffect(ScheduleSideEffect.ShowToast("Failed to submit picks: ${result.message}"))
+                }
             }
         } catch (e: Exception) {
-            reduce { state.copy(isLoading = false) }
+            reduce {
+                state.copy(
+                    isLoading = false,
+                    isRefreshingToken = false
+                )
+            }
             postSideEffect(ScheduleSideEffect.ShowToast("Error submitting picks: ${e.message}"))
         }
     }

@@ -1,4 +1,3 @@
-
 package com.joebad.fastbreak.ui.screens
 
 import AuthRepository
@@ -55,12 +54,16 @@ enum class HomeTab {
 
 @OptIn(ExperimentalCupertinoApi::class)
 @Composable
-fun HomeScreen(appDataState: AppDataState, onLogout: () -> Unit = {}, authRepository: AuthRepository) {
+fun HomeScreen(
+    appDataState: AppDataState,
+    onLogout: () -> Unit = {},
+    authRepository: AuthRepository
+) {
     val colors = LocalColors.current
-    val scheduleViewModel = remember { ScheduleViewModel(authRepository) }
+    val scheduleViewModel = remember { ScheduleViewModel(appDataState.dateCode, authRepository) }
     val scheduleState by scheduleViewModel.container.stateFlow.collectAsState()
     var selectedTab by remember { mutableStateOf(HomeTab.PICKS) }
-    
+
     val hasPicks = scheduleState.selectedWinners.isNotEmpty()
     val picksCount = scheduleState.selectedWinners.size
 
@@ -72,174 +75,174 @@ fun HomeScreen(appDataState: AppDataState, onLogout: () -> Unit = {}, authReposi
                 .padding(bottom = if (selectedTab == HomeTab.PICKS && hasPicks) 80.dp else 0.dp),
             verticalArrangement = Arrangement.Top
         ) {
-        // Header with title and segmented control
-        item {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(colors.background)
-                    .padding(vertical = 5.dp, horizontal = 8.dp)
-            ) {
-                Text(
-                    text = "FASTBREAK",
-                    style = MaterialTheme.typography.body1,
-                    color = colors.onSurface,
-                    fontWeight = FontWeight.Bold,
-                    fontFamily = FontFamily.Monospace,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Text(
-                    text = getCurrentDateFormatted(),
-                    style = MaterialTheme.typography.caption,
-                    color = colors.onSurface.copy(alpha = 0.7f),
-                    fontFamily = FontFamily.Monospace,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth()
-                )
-                
-                // Segmented control for Picks/Leaderboard
-                CupertinoSegmentedControl(
-                    colors = CupertinoSegmentedControlDefaults.colors(
-                        separatorColor = colors.accent,
-                        indicatorColor = colors.accent
-                    ),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 8.dp),
-                    selectedTabIndex = when (selectedTab) {
-                        HomeTab.PICKS -> 0
-                        HomeTab.LEADERBOARD -> 1
-                    },
-                    shape = RectangleShape
-                ) {
-                    CupertinoSegmentedControlTab(
-                        isSelected = selectedTab == HomeTab.PICKS,
-                        onClick = { selectedTab = HomeTab.PICKS }
-                    ) {
-                        Text(
-                            "PICKS", 
-                            color = if (selectedTab == HomeTab.PICKS) colors.onAccent else colors.text,
-                            fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                    CupertinoSegmentedControlTab(
-                        isSelected = selectedTab == HomeTab.LEADERBOARD,
-                        onClick = { selectedTab = HomeTab.LEADERBOARD }
-                    ) {
-                        Text(
-                            "LEADERBOARD", 
-                            color = if (selectedTab == HomeTab.LEADERBOARD) colors.onAccent else colors.text,
-                            fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                }
-                
-                Divider(
-                    color = colors.onSurface.copy(alpha = 0.3f),
-                    thickness = 1.dp,
-                    modifier = Modifier.padding(vertical = 4.dp)
-                )
-            }
-        }
-
-        // Content based on selected tab
-        if (selectedTab == HomeTab.PICKS) {
-            // Schedule Data - show all games
-            appDataState.scheduleData?.let { schedule ->
-                item {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(colors.background)
-                            .padding(vertical = 5.dp, horizontal = 8.dp)
-                    ) {
-                        ScheduleSection(schedule.fastbreakCard, colors, scheduleViewModel)
-                    }
-                }
-            }
-        }
-
-        if (selectedTab == HomeTab.LEADERBOARD) {
-            // Stats Data - Leaderboard view
-            appDataState.statsData?.let { stats ->
-                stats.weeklyLeaderboard?.let { leaderboard ->
-                    // Daily Leaderboard (top half)
-                    item {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .background(colors.background)
-                                .padding(horizontal = 8.dp, vertical = 2.dp)
-                        ) {
-                            DailyLeaderboardSection(leaderboard, colors)
-                        }
-                    }
-                    
-                    // Weekly Totals (bottom half)
-                    item {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .background(colors.background)
-                                .padding(horizontal = 8.dp, vertical = 2.dp)
-                        ) {
-                            WeeklyTotalsSection(leaderboard, colors)
-                        }
-                    }
-                }
-            }
-        }
-
-        // Loading State
-        if (appDataState.isLoading) {
-            item {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(8.dp),
-                    horizontalArrangement = Arrangement.Center
-                ) {
-                    Text(
-                        text = "LOADING...",
-                        style = MaterialTheme.typography.caption,
-                        color = colors.onSurface,
-                        fontFamily = FontFamily.Monospace
-                    )
-                }
-            }
-        }
-
-        // Error State
-        appDataState.cacheStatus.error?.let { error ->
+            // Header with title and segmented control
             item {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
                         .background(colors.background)
-                        .padding(8.dp)
+                        .padding(vertical = 5.dp, horizontal = 8.dp)
                 ) {
                     Text(
-                        text = "ERROR:",
-                        style = MaterialTheme.typography.caption,
-                        color = colors.error,
+                        text = "FASTBREAK",
+                        style = MaterialTheme.typography.body1,
+                        color = colors.onSurface,
                         fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.Monospace
+                        fontFamily = FontFamily.Monospace,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
                     )
                     Text(
-                        text = error,
+                        text = getCurrentDateFormatted(),
                         style = MaterialTheme.typography.caption,
-                        color = colors.error,
-                        fontFamily = FontFamily.Monospace
+                        color = colors.onSurface.copy(alpha = 0.7f),
+                        fontFamily = FontFamily.Monospace,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    // Segmented control for Picks/Leaderboard
+                    CupertinoSegmentedControl(
+                        colors = CupertinoSegmentedControlDefaults.colors(
+                            separatorColor = colors.accent,
+                            indicatorColor = colors.accent
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 8.dp),
+                        selectedTabIndex = when (selectedTab) {
+                            HomeTab.PICKS -> 0
+                            HomeTab.LEADERBOARD -> 1
+                        },
+                        shape = RectangleShape
+                    ) {
+                        CupertinoSegmentedControlTab(
+                            isSelected = selectedTab == HomeTab.PICKS,
+                            onClick = { selectedTab = HomeTab.PICKS }
+                        ) {
+                            Text(
+                                "PICKS",
+                                color = if (selectedTab == HomeTab.PICKS) colors.onAccent else colors.text,
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        CupertinoSegmentedControlTab(
+                            isSelected = selectedTab == HomeTab.LEADERBOARD,
+                            onClick = { selectedTab = HomeTab.LEADERBOARD }
+                        ) {
+                            Text(
+                                "LEADERBOARD",
+                                color = if (selectedTab == HomeTab.LEADERBOARD) colors.onAccent else colors.text,
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+
+                    Divider(
+                        color = colors.onSurface.copy(alpha = 0.3f),
+                        thickness = 1.dp,
+                        modifier = Modifier.padding(vertical = 4.dp)
                     )
                 }
             }
-        }
+
+            // Content based on selected tab
+            if (selectedTab == HomeTab.PICKS) {
+                // Schedule Data - show all games
+                appDataState.scheduleData?.let { schedule ->
+                    item {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(colors.background)
+                                .padding(vertical = 5.dp, horizontal = 8.dp)
+                        ) {
+                            ScheduleSection(schedule.fastbreakCard, colors, scheduleViewModel)
+                        }
+                    }
+                }
+            }
+
+            if (selectedTab == HomeTab.LEADERBOARD) {
+                // Stats Data - Leaderboard view
+                appDataState.statsData?.let { stats ->
+                    stats.weeklyLeaderboard?.let { leaderboard ->
+                        // Daily Leaderboard (top half)
+                        item {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(colors.background)
+                                    .padding(horizontal = 8.dp, vertical = 2.dp)
+                            ) {
+                                DailyLeaderboardSection(leaderboard, colors)
+                            }
+                        }
+
+                        // Weekly Totals (bottom half)
+                        item {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(colors.background)
+                                    .padding(horizontal = 8.dp, vertical = 2.dp)
+                            ) {
+                                WeeklyTotalsSection(leaderboard, colors)
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Loading State
+            if (appDataState.isLoading) {
+                item {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(8.dp),
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Text(
+                            text = "LOADING...",
+                            style = MaterialTheme.typography.caption,
+                            color = colors.onSurface,
+                            fontFamily = FontFamily.Monospace
+                        )
+                    }
+                }
+            }
+
+            // Error State
+            appDataState.cacheStatus.error?.let { error ->
+                item {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(colors.background)
+                            .padding(8.dp)
+                    ) {
+                        Text(
+                            text = "ERROR:",
+                            style = MaterialTheme.typography.caption,
+                            color = colors.error,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = FontFamily.Monospace
+                        )
+                        Text(
+                            text = error,
+                            style = MaterialTheme.typography.caption,
+                            color = colors.error,
+                            fontFamily = FontFamily.Monospace
+                        )
+                    }
+                }
+            }
 
         }
-        
+
         // Lockable Card pinned to bottom when picks are selected
         if (selectedTab == HomeTab.PICKS && hasPicks) {
             Box(
@@ -257,7 +260,7 @@ fun HomeScreen(appDataState: AppDataState, onLogout: () -> Unit = {}, authReposi
                         scheduleViewModel.handleAction(ScheduleAction.LockPicks)
                     },
                     lockable = true,
-                    isLocked = scheduleState.isLocked,
+                    isLocked = scheduleState.isLocked || scheduleState.isRefreshingToken,
                     modifier = Modifier.fillMaxWidth().zIndex(1f)
                 ) {
                     androidx.compose.material3.Text(
@@ -265,20 +268,19 @@ fun HomeScreen(appDataState: AppDataState, onLogout: () -> Unit = {}, authReposi
                         color = LocalColors.current.onSecondary
                     )
                 }
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(3.dp)
-                                .offset(y = ButtonDefaults.MinHeight - 1.dp)
-                                .background(colors.accent)
-                        ) {
-                            androidx.compose.material3.Text(text = " ")
-                        }
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(3.dp)
+                        .offset(y = ButtonDefaults.MinHeight - 1.dp)
+                        .background(colors.accent)
+                ) {
+                    androidx.compose.material3.Text(text = " ")
+                }
             }
         }
     }
 }
-
 
 
 @Composable
@@ -332,7 +334,7 @@ private fun DailyLeaderboardSection(
                 }
             }
         }
-        
+
         Divider(
             color = colors.onSurface.copy(alpha = 0.3f),
             thickness = 1.dp,
@@ -378,7 +380,7 @@ private fun WeeklyTotalsSection(
                 colors = colors
             )
         }
-        
+
         Divider(
             color = colors.onSurface.copy(alpha = 0.3f),
             thickness = 1.dp,

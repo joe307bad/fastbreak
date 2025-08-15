@@ -3,12 +3,12 @@ package com.joebad.fastbreak.data.dailyFastbreak
 import AuthedUser
 import com.joebad.fastbreak.data.cache.CachedHttpClient
 import com.joebad.fastbreak.data.cache.CachedTypedResponse
+import com.joebad.fastbreak.data.cache.ScheduleExpirationStrategy
+import com.joebad.fastbreak.data.cache.StatsExpirationStrategy
+import com.joebad.fastbreak.data.cache.TTLCachedHttpClient
 import com.joebad.fastbreak.model.dtos.DailyResponse
 import com.joebad.fastbreak.model.dtos.ScheduleResponse
 import com.joebad.fastbreak.model.dtos.StatsResponse
-import com.joebad.fastbreak.data.cache.TTLCachedHttpClient
-import com.joebad.fastbreak.data.cache.ScheduleExpirationStrategy
-import com.joebad.fastbreak.data.cache.StatsExpirationStrategy
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.plugins.ClientRequestException
@@ -24,9 +24,9 @@ import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
 import io.ktor.serialization.kotlinx.json.json
+import kotlinx.datetime.Instant
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
-import kotlinx.datetime.Instant
 
 
 @Serializable
@@ -56,7 +56,8 @@ sealed class ScheduleResult {
         val rawJson: String? = null,
         val isExpired: Boolean = false,
         val isRefreshing: Boolean = false,
-        val expiresAt: Instant? = null
+        val expiresAt: Instant? = null,
+        val cachedAt: Instant? = null
     ) : ScheduleResult()
     data class Error(val message: String) : ScheduleResult()
 }
@@ -68,7 +69,8 @@ sealed class StatsResult {
         val rawJson: String? = null,
         val isExpired: Boolean = false,
         val isRefreshing: Boolean = false,
-        val expiresAt: Instant? = null
+        val expiresAt: Instant? = null,
+        val cachedAt: Instant? = null
     ) : StatsResult()
     data class Error(val message: String) : StatsResult()
 }

@@ -35,7 +35,11 @@ data class AppDataState(
     val scheduleExpiresAt: Instant? = null,
     val statsExpiresAt: Instant? = null,
     val scheduleIsFromCache: Boolean = false,
-    val statsIsFromCache: Boolean = false
+    val statsIsFromCache: Boolean = false,
+    val scheduleLastFetchedAt: Instant? = null,
+    val statsLastFetchedAt: Instant? = null,
+    val scheduleCachedAt: Instant? = null,
+    val statsCachedAt: Instant? = null
 )
 
 sealed class AppDataSideEffect {
@@ -132,7 +136,9 @@ class AppDataViewModel(
                             scheduleIsRefreshing = scheduleResult.isRefreshing,
                             scheduleIsStale = scheduleResult.isExpired,
                             scheduleExpiresAt = scheduleResult.expiresAt,
-                            scheduleIsFromCache = scheduleResult.isFromCache
+                            scheduleIsFromCache = scheduleResult.isFromCache,
+                            scheduleLastFetchedAt = if (!scheduleResult.isFromCache) Clock.System.now() else state.scheduleLastFetchedAt,
+                            scheduleCachedAt = scheduleResult.cachedAt
                         )
                     }
                 }
@@ -151,7 +157,9 @@ class AppDataViewModel(
                                 statsIsRefreshing = result.isRefreshing,
                                 statsIsStale = result.isExpired,
                                 statsExpiresAt = result.expiresAt,
-                                statsIsFromCache = result.isFromCache
+                                statsIsFromCache = result.isFromCache,
+                                statsLastFetchedAt = if (!result.isFromCache) Clock.System.now() else state.statsLastFetchedAt,
+                                statsCachedAt = result.cachedAt
                             )
                         }
                     }
@@ -210,6 +218,7 @@ class AppDataViewModel(
                             scheduleIsStale = result.isExpired,
                             scheduleExpiresAt = result.expiresAt,
                             scheduleIsFromCache = result.isFromCache,
+                            scheduleLastFetchedAt = if (!result.isFromCache) Clock.System.now() else state.scheduleLastFetchedAt,
                             cacheStatus = state.cacheStatus.copy(
                                 isLoading = false,
                                 isCached = result.isFromCache,
@@ -260,11 +269,13 @@ class AppDataViewModel(
                     reduce {
                         state.copy(
                             isLoading = false,
+                            statsCachedAt = result.cachedAt,
                             statsData = result.response,
                             statsIsRefreshing = result.isRefreshing,
                             statsIsStale = result.isExpired,
                             statsExpiresAt = result.expiresAt,
                             statsIsFromCache = result.isFromCache,
+                            statsLastFetchedAt = if (!result.isFromCache) Clock.System.now() else state.statsLastFetchedAt,
                             cacheStatus = state.cacheStatus.copy(
                                 isLoading = false,
                                 isCached = result.isFromCache,

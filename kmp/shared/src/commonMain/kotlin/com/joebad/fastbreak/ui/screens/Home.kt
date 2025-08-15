@@ -189,9 +189,9 @@ private fun CacheStatusSection(appDataState: AppDataState, colors: AppColors) {
                             formatExpirationTime(
                                 appDataState.scheduleExpiresAt
                             )
-                        }"
+                        }/${formatLastFetchedTime(appDataState.scheduleCachedAt)}"
 
-                        appDataState.scheduleData != null -> "FRESH"
+                        appDataState.scheduleData != null -> "FRESH/${formatLastFetchedTime(appDataState.scheduleCachedAt)}"
                         else -> "NONE"
                     },
                     style = MaterialTheme.typography.caption,
@@ -225,9 +225,9 @@ private fun CacheStatusSection(appDataState: AppDataState, colors: AppColors) {
                             formatExpirationTime(
                                 appDataState.statsExpiresAt
                             )
-                        }"
+                        }/${formatLastFetchedTime(appDataState.statsCachedAt)}"
 
-                        appDataState.statsData != null -> "FRESH"
+                        appDataState.statsData != null -> "FRESH/${formatLastFetchedTime(appDataState.statsCachedAt)}"
                         else -> "NONE"
                     },
                     style = MaterialTheme.typography.caption,
@@ -444,6 +444,18 @@ private fun formatExpirationTime(expiresAt: Instant?): String {
         val etTimeZone = TimeZone.of("America/New_York")
         val expirationET = instant.toLocalDateTime(etTimeZone)
         val time = expirationET.time
+        val hour = if (time.hour == 0) 12 else if (time.hour > 12) time.hour - 12 else time.hour
+        val amPm = if (time.hour < 12) "AM" else "PM"
+        val minute = time.minute.toString().padStart(2, '0')
+        "$hour:$minute $amPm"
+    } ?: ""
+}
+
+private fun formatLastFetchedTime(lastFetchedAt: Instant?): String {
+    return lastFetchedAt?.let { instant ->
+        val etTimeZone = TimeZone.of("America/New_York")
+        val fetchedET = instant.toLocalDateTime(etTimeZone)
+        val time = fetchedET.time
         val hour = if (time.hour == 0) 12 else if (time.hour > 12) time.hour - 12 else time.hour
         val amPm = if (time.hour < 12) "AM" else "PM"
         val minute = time.minute.toString().padStart(2, '0')

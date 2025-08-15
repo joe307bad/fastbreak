@@ -26,6 +26,7 @@ import com.arkivanov.decompose.value.Value
 import com.arkivanov.essenty.lifecycle.LifecycleRegistry
 import com.joebad.fastbreak.data.cache.CacheInitializer
 import com.joebad.fastbreak.data.cache.FastbreakCache
+import com.joebad.fastbreak.data.global.AppDataAction
 import com.joebad.fastbreak.data.global.AppDataViewModel
 import com.joebad.fastbreak.data.profile.ProfileAction
 import com.joebad.fastbreak.data.profile.ProfileSideEffect
@@ -162,7 +163,11 @@ fun App(
     LaunchedEffect(Unit) {
         dependencies.profileViewModel.container.sideEffectFlow.collect { sideEffect ->
             when (sideEffect) {
-                ProfileSideEffect.NavigateToHome -> {
+                ProfileSideEffect.InitializationComplete -> {
+                    val userId = dependencies.authRepository.getUser()!!.userId
+                    dependencies.appDataViewModel.handleAction(
+                        AppDataAction.LoadStats(userId)
+                    )
                     dependencies.onNavigateToHome()
                 }
             }

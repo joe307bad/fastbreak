@@ -17,7 +17,7 @@ data class ProfileState(
 )
 
 sealed class ProfileSideEffect {
-    object NavigateToHome : ProfileSideEffect()
+    object InitializationComplete : ProfileSideEffect()
 }
 
 sealed class ProfileAction {
@@ -69,7 +69,7 @@ class ProfileViewModel(
                     )
                 }
                 
-                postSideEffect(ProfileSideEffect.NavigateToHome)
+                postSideEffect(ProfileSideEffect.InitializationComplete)
             } else {
                 reduce {
                     state.copy(

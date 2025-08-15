@@ -121,7 +121,10 @@ class RootComponent(
             is Config.Home -> Child.Home(
                 HomeComponent(
                     componentContext = componentContext,
-                    onLogout = { navigation.replaceAll(Config.Login) }
+                    onLogout = { 
+                        authRepository.clearUser()
+                        navigation.replaceAll(Config.Login) 
+                    }
                 )
             )
         }
@@ -205,7 +208,10 @@ fun App(
 
                     is RootComponent.Child.Home -> {
                         val appDataState by dependencies.appDataViewModel.container.stateFlow.collectAsState()
-                        HomeScreen(appDataState = appDataState)
+                        HomeScreen(
+                            appDataState = appDataState,
+                            onLogout = instance.component.onLogout
+                        )
                     }
                 }
             }

@@ -5,11 +5,13 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.Divider
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -19,6 +21,7 @@ import androidx.compose.ui.unit.dp
 import com.joebad.fastbreak.data.global.AppDataState
 import com.joebad.fastbreak.model.dtos.EmptyFastbreakCardItem
 import com.joebad.fastbreak.model.dtos.LeaderboardItem
+import com.joebad.fastbreak.ui.PhysicalButton
 import com.joebad.fastbreak.ui.theme.AppColors
 import com.joebad.fastbreak.ui.theme.LocalColors
 import kotlinx.datetime.Clock
@@ -27,7 +30,7 @@ import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 
 @Composable
-fun HomeScreen(appDataState: AppDataState) {
+fun HomeScreen(appDataState: AppDataState, onLogout: () -> Unit = {}) {
     val colors = LocalColors.current
 
     LazyColumn(
@@ -149,6 +152,33 @@ fun HomeScreen(appDataState: AppDataState) {
                         style = MaterialTheme.typography.caption,
                         color = colors.error,
                         fontFamily = FontFamily.Monospace
+                    )
+                }
+            }
+        }
+
+        // Logout button at bottom
+        item {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(colors.background)
+                    .padding(16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                PhysicalButton(
+                    onClick = onLogout,
+                    modifier = Modifier.width(120.dp),
+                    backgroundColor = colors.error,
+                    contentColor = colors.onError,
+                    bottomBorderColor = colors.error.copy(alpha = 0.7f),
+                    elevation = 6.dp,
+                    pressDepth = 3.dp
+                ) {
+                    Text(
+                        text = "LOGOUT",
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold
                     )
                 }
             }

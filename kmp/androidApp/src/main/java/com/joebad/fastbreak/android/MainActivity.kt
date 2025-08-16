@@ -22,7 +22,7 @@ import com.joebad.fastbreak.Theme
 import com.joebad.fastbreak.createRootComponent
 import com.joebad.fastbreak.initFontLoader
 import com.joebad.fastbreak.ui.theme.AppTheme
-import com.joebad.fastbreak.util.AppVersion
+import com.joebad.fastbreak.utils.AppVersion
 import com.liftric.kvault.KVault
 import kotlinx.coroutines.launch
 

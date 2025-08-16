@@ -13,10 +13,12 @@ open api.Utils.tryGetSubject
 open api.Utils.googleAuthPipeline
 
 [<BsonIgnoreExtraElements>]
+[<CLIMutable>]
 type Profile =
     { userId: string
       googleId: string
       userName: string
+      email: string option
       updatedAt: DateTime }
 
 type SaveResponse = { success: bool; message: string }
@@ -53,6 +55,7 @@ let saveProfileHandler (database: IMongoDatabase) : HttpHandler =
                                     .Set((_.updatedAt), DateTime.Now)
                                     .Set((_.googleId), authUserId)
                                     .SetOnInsert((_.userId), userId)
+                                    .SetOnInsert((_.email), None)
 
                             let updateOptions = UpdateOptions(IsUpsert = true)
 
@@ -105,6 +108,7 @@ let initializeProfileHandler (database: IMongoDatabase) : HttpHandler =
                             { userId = newUserId
                               googleId = userId
                               userName = randomUserName
+                              email = None
                               updatedAt = DateTime.Now }
 
                         userNamesCollection.InsertOne(newUserName)

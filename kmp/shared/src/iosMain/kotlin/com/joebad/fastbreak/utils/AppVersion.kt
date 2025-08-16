@@ -1,4 +1,4 @@
-package com.joebad.fastbreak.util
+package com.joebad.fastbreak.utils
 
 import platform.Foundation.NSBundle
 
@@ -7,7 +7,7 @@ actual object AppVersion {
         val bundle = NSBundle.mainBundle
         return bundle.objectForInfoDictionaryKey("CFBundleShortVersionString") as? String ?: "Unknown"
     }
-    
+
     actual fun getVersionCode(): Int {
         val bundle = NSBundle.mainBundle
         val versionString = bundle.objectForInfoDictionaryKey("CFBundleVersion") as? String

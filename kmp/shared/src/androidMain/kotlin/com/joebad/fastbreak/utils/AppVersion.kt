@@ -1,15 +1,15 @@
-package com.joebad.fastbreak.util
+package com.joebad.fastbreak.utils
 
 import android.content.Context
 import android.content.pm.PackageManager
 
 actual object AppVersion {
     private var context: Context? = null
-    
+
     fun initialize(context: Context) {
         this.context = context
     }
-    
+
     actual fun getVersionName(): String {
         return try {
             val packageInfo = context?.packageManager?.getPackageInfo(context!!.packageName, 0)
@@ -18,7 +18,7 @@ actual object AppVersion {
             "Unknown"
         }
     }
-    
+
     actual fun getVersionCode(): Int {
         return try {
             val packageInfo = context?.packageManager?.getPackageInfo(context!!.packageName, 0)

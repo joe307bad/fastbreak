@@ -141,42 +141,55 @@ class ScheduleViewModel(private val dateCode: String, private val authRepository
                         )
                     }
 
-                    // Attempt refresh and retry
-                    val refreshResult = picksRepository.lockPicksWithRefreshedToken(selectionState)
-                    when (refreshResult) {
-                        is LockPicksResult.Success -> {
-                            reduce {
-                                state.copy(
-                                    isLoading = false,
-                                    isLocked = true,
-                                    isRefreshingToken = false
-                                )
+                    // Attempt to refresh the token
+                    val refreshSuccess = picksRepository.refreshToken()
+                    
+                    if (refreshSuccess) {
+                        // Retry the lock picks request with the new token
+                        val retryResult = picksRepository.lockPicks(selectionState)
+                        
+                        when (retryResult) {
+                            is LockPicksResult.Success -> {
+                                reduce {
+                                    state.copy(
+                                        isLoading = false,
+                                        isLocked = true,
+                                        isRefreshingToken = false
+                                    )
+                                }
+                                postSideEffect(ScheduleSideEffect.ShowToast("Picks submitted and locked!"))
                             }
-                            postSideEffect(ScheduleSideEffect.ShowToast("Picks submitted and locked!"))
-                        }
-
-                        is LockPicksResult.Error -> {
-                            reduce {
-                                state.copy(
-                                    isLoading = false,
-                                    isRefreshingToken = false
-                                )
+                            
+                            is LockPicksResult.TokenRefreshRequired -> {
+                                // Still failing after refresh - token might be invalid
+                                reduce {
+                                    state.copy(
+                                        isLoading = false,
+                                        isRefreshingToken = false
+                                    )
+                                }
+                                postSideEffect(ScheduleSideEffect.RequireLogin)
                             }
-                            postSideEffect(ScheduleSideEffect.ShowToast("Session expired. Please sign in again."))
-                            postSideEffect(ScheduleSideEffect.RequireLogin)
-                        }
-
-                        is LockPicksResult.TokenRefreshRequired -> {
-                            // Should not happen after refresh attempt
-                            reduce {
-                                state.copy(
-                                    isLoading = false,
-                                    isRefreshingToken = false
-                                )
+                            
+                            is LockPicksResult.Error -> {
+                                reduce {
+                                    state.copy(
+                                        isLoading = false,
+                                        isRefreshingToken = false
+                                    )
+                                }
+                                postSideEffect(ScheduleSideEffect.ShowToast("Failed to submit picks after token refresh: ${retryResult.message}"))
                             }
-                            postSideEffect(ScheduleSideEffect.ShowToast("Authentication error. Please sign in again."))
-                            postSideEffect(ScheduleSideEffect.RequireLogin)
                         }
+                    } else {
+                        // Token refresh failed - require login
+                        reduce {
+                            state.copy(
+                                isLoading = false,
+                                isRefreshingToken = false
+                            )
+                        }
+                        postSideEffect(ScheduleSideEffect.RequireLogin)
                     }
                 }
 

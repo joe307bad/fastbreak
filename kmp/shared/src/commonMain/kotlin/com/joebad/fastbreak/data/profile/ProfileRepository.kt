@@ -25,12 +25,33 @@ data class ProfileInitializationResult(
     val response: InitializeProfileResponse
 )
 
+@Serializable
+data class LoginRequest(
+    val googleIdToken: String
+)
+
+@Serializable
+data class RefreshRequest(
+    val refreshToken: String
+)
+
+@Serializable
+data class AuthResponse(
+    val success: Boolean,
+    val accessToken: String?,
+    val refreshToken: String?,
+    val userId: String?,
+    val message: String
+)
+
 class ProfileRepository(authRepository: AuthRepository) {
 
     private val _authRepository = authRepository;
     private val _baseUrl = BuildKonfig.API_BASE_URL
     private val _saveUserName = "${_baseUrl}/profile"
     private val _initializeProfile = "$_baseUrl/profile/initialize"
+    private val _authLogin = "$_baseUrl/auth/login"
+    private val _authRefresh = "$_baseUrl/auth/refresh"
 
     private val client = HttpClient {
         install(ContentNegotiation) {
@@ -96,6 +117,38 @@ class ProfileRepository(authRepository: AuthRepository) {
             )
         } catch (e: Exception) {
             println("Error making POST to ${_initializeProfile}/${userId}: ${e.message}")
+            println("Exception type: ${e::class.simpleName}")
+            e.printStackTrace()
+            null
+        }
+    }
+
+    suspend fun login(googleIdToken: String): AuthResponse? {
+        return try {
+            val response = client.post(_authLogin) {
+                contentType(ContentType.Application.Json)
+                setBody(LoginRequest(googleIdToken = googleIdToken))
+            }.body<AuthResponse>()
+
+            response
+        } catch (e: Exception) {
+            println("Error making POST to ${_authLogin}: ${e.message}")
+            println("Exception type: ${e::class.simpleName}")
+            e.printStackTrace()
+            null
+        }
+    }
+
+    suspend fun refreshToken(refreshToken: String): AuthResponse? {
+        return try {
+            val response = client.post(_authRefresh) {
+                contentType(ContentType.Application.Json)
+                setBody(RefreshRequest(refreshToken = refreshToken))
+            }.body<AuthResponse>()
+
+            response
+        } catch (e: Exception) {
+            println("Error making POST to ${_authRefresh}: ${e.message}")
             println("Exception type: ${e::class.simpleName}")
             e.printStackTrace()
             null

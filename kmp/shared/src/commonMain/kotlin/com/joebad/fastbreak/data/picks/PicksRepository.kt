@@ -16,12 +16,27 @@ import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
 import io.ktor.serialization.kotlinx.json.json
+import kotlinx.datetime.Clock
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
 @Serializable
 data class LockPicksResponse(
     val id: String
+)
+
+@Serializable
+data class RefreshRequest(
+    val refreshToken: String
+)
+
+@Serializable
+data class AuthResponse(
+    val success: Boolean,
+    val accessToken: String?,
+    val refreshToken: String?,
+    val userId: String?,
+    val message: String
 )
 
 sealed class LockPicksResult {
@@ -36,6 +51,7 @@ class PicksRepository(authRepository: AuthRepository) {
     private val _googleAuthService = GoogleAuthService(authRepository)
     private val _baseUrl = BuildKonfig.API_BASE_URL
     private val _lockPicks = "${_baseUrl}/lock"
+    private val _authRefresh = "${_baseUrl}/auth/refresh"
 
     private val client = HttpClient {
         install(ContentNegotiation) {
@@ -73,41 +89,51 @@ class PicksRepository(authRepository: AuthRepository) {
             LockPicksResult.Error("Network error: ${e.message}")
         }
     }
-    
-    suspend fun lockPicksWithRefreshedToken(selectionState: FastbreakSelectionState): LockPicksResult {
-        return try {
-            // First attempt to refresh token
-            val refreshSuccess = _googleAuthService.refreshToken()
-            
-            if (refreshSuccess) {
-                // Retry with potentially new token
-                println("Token refreshed successfully, retrying request...")
-                val response = makeAuthenticatedRequest(selectionState)
-                when {
-                    response.status.value in 200..299 -> {
-                        val lockResponse: LockPicksResponse = response.body()
-                        LockPicksResult.Success(lockResponse)
-                    }
-                    else -> {
-                        println("Retry failed with status: ${response.status}")
-                        LockPicksResult.Error("Retry failed with status: ${response.status}")
-                    }
-                }
-            } else {
-                println("Token refresh failed")
-                LockPicksResult.Error("Token refresh failed")
-            }
-        } catch (e: Exception) {
-            println("Error during token refresh and retry: ${e.message}")
-            LockPicksResult.Error("Token refresh error: ${e.message}")
-        }
-    }
-    
+
     private suspend fun makeAuthenticatedRequest(selectionState: FastbreakSelectionState): HttpResponse {
         return client.post(_lockPicks) {
             contentType(ContentType.Application.Json)
+            // NOTE: This now expects AuthedUser.idToken to contain the JWT access token from /auth/login
+            // The client must call ProfileRepository.login() first to get JWT tokens
             header("Authorization", "Bearer ${_authRepository.getUser()?.idToken}")
             setBody(selectionState)
+        }
+    }
+
+    suspend fun refreshToken(): Boolean {
+        return try {
+            val refreshToken = _authRepository.getRefreshToken()
+            if (refreshToken != null) {
+                val response = client.post(_authRefresh) {
+                    contentType(ContentType.Application.Json)
+                    setBody(RefreshRequest(refreshToken = refreshToken))
+                }
+                
+                when {
+                    response.status.value in 200..299 -> {
+                        val authResponse: AuthResponse = response.body()
+                        if (authResponse.success && authResponse.accessToken != null) {
+                            // Update stored tokens
+                            authResponse.userId?.let { userId ->
+                                _authRepository.updateTokens(
+                                    accessToken = authResponse.accessToken,
+                                    refreshToken = authResponse.refreshToken,
+                                    exp = Clock.System.now().epochSeconds + 3600 // Assume 1 hour expiry
+                                )
+                            }
+                            true
+                        } else {
+                            false
+                        }
+                    }
+                    else -> false
+                }
+            } else {
+                false
+            }
+        } catch (e: Exception) {
+            println("Token refresh failed: ${e.message}")
+            false
         }
     }
 }

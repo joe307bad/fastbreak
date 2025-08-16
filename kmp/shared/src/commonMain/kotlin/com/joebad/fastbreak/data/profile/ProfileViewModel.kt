@@ -28,10 +28,11 @@ sealed class ProfileAction {
 class ProfileViewModel(
     private val authRepository: AuthRepository
 ) : ContainerHost<ProfileState, ProfileSideEffect> {
-    
+
     private val viewModelScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
-    
-    override val container: Container<ProfileState, ProfileSideEffect> = viewModelScope.container(ProfileState())
+
+    override val container: Container<ProfileState, ProfileSideEffect> =
+        viewModelScope.container(ProfileState())
 
     fun handleAction(action: ProfileAction) {
         when (action) {
@@ -50,25 +51,25 @@ class ProfileViewModel(
             }
 
             val profileRepository = ProfileRepository(authRepository)
-            val result = profileRepository.initializeProfile(googleUser)
-            
-            if (result != null) {
-                // Create AuthedUser with the userId from the backend
+            val result = profileRepository.login(googleUser.idToken)
+
+            if (result?.accessToken != null && result.userId != null && result.refreshToken != null) {
                 val authedUser = AuthedUser(
                     email = googleUser.email,
                     exp = googleUser.exp,
-                    idToken = googleUser.idToken,
-                    userId = result.response.userId
+                    idToken = result.accessToken,
+                    userId = result.userId,
+                    refreshToken = result.refreshToken
                 )
                 authRepository.storeAuthedUser(authedUser)
-                
+
                 reduce {
                     state.copy(
                         isLoading = false,
                         error = null
                     )
                 }
-                
+
                 postSideEffect(ProfileSideEffect.InitializationComplete)
             } else {
                 reduce {

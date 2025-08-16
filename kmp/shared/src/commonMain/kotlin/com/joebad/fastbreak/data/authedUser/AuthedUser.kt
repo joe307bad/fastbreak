@@ -10,6 +10,7 @@ data class AuthedUser(
     val exp: Long,
     val idToken: String,
     val userId: String,
+    val refreshToken: String? = null
 //    val userName: String
 )
 
@@ -36,6 +37,7 @@ class AuthRepository(private val secureStorage: KVault) {
             user.exp,
             user.idToken,
             user.userId,
+            user.refreshToken
 //            userName
         ))
     }
@@ -63,6 +65,21 @@ class AuthRepository(private val secureStorage: KVault) {
 
     fun clearUser() {
         secureStorage.deleteObject(KEY_AUTHED_USER)
+    }
+
+    fun getRefreshToken(): String? {
+        return getUser()?.refreshToken
+    }
+
+    fun updateTokens(accessToken: String, refreshToken: String?, exp: Long) {
+        val user = getUser() ?: return
+        storeAuthedUser(AuthedUser(
+            user.email,
+            exp,
+            accessToken,
+            user.userId,
+            refreshToken
+        ))
     }
     
 }

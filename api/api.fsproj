@@ -8,6 +8,7 @@
         <Compile Include="Entities\FastbreakSelections.fs"/>
         <Compile Include="Entities\StatSheet.fs"/>
         <Compile Include="Entities\Leaderboard.fs"/>
+        <Compile Include="Entities\RefreshToken.fs"/>
         <Compile Include="Utils\apiRouter.fs"/>
         <Compile Include="Utils\asyncMap.fs"/>
         <Compile Include="Utils\tryGetSubject.fs"/>
@@ -22,9 +23,14 @@
         <Compile Include="Utils\deserializeBody.fs"/>
         <Compile Include="Utils\generateRandomUsername.fs"/>
         <Compile Include="Utils\profile.fs"/>
+        <Compile Include="Utils\jwtUtils.fs"/>
+        <Compile Include="Utils\refreshTokenUtils.fs"/>
+        <Compile Include="Utils\tokenAuthPipeline.fs"/>
+        <Compile Include="Utils\tryGetAuthenticatedUser.fs"/>
         <Compile Include="Controllers\DailyFastbreakController.fs"/>
         <Compile Include="Controllers\LockCardController.fs"/>
         <Compile Include="Controllers\ProfileController.fs"/>
+        <Compile Include="Controllers\AuthController.fs"/>
         <Compile Include="DailyJob\SchedulePuller.fs"/>
         <Compile Include="DailyJob\CalculateFastbreakCardResults.fs"/>
         <Compile Include="DailyJob\CalculateStatSheets.fs"/>
@@ -41,5 +47,6 @@
         <PackageReference Include="MongoDB.Driver" Version="3.0.0"/>
         <PackageReference Include="MongoDB.Bson" Version="3.0.0"/>
         <PackageReference Include="Newtonsoft.Json" Version="13.0.3"/>
+        <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.2.1"/>
     </ItemGroup>
 </Project>

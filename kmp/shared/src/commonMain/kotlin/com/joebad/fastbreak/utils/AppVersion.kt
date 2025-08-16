@@ -1,4 +1,4 @@
-package com.joebad.fastbreak.util
+package com.joebad.fastbreak.utils
 
 expect object AppVersion {
     fun getVersionName(): String

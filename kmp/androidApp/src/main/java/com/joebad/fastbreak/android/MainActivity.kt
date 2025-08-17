@@ -22,7 +22,7 @@ import com.joebad.fastbreak.Theme
 import com.joebad.fastbreak.createRootComponent
 import com.joebad.fastbreak.initFontLoader
 import com.joebad.fastbreak.ui.theme.AppTheme
-import com.joebad.fastbreak.util.AppVersion
+import com.joebad.fastbreak.utils.AppVersion
 import com.liftric.kvault.KVault
 import kotlinx.coroutines.launch
 
@@ -38,6 +38,7 @@ class MainActivity : ComponentActivity() {
         val authRepository = AuthRepository(kvault)
         val profileRepository = ProfileRepository(authRepository)
 
+        // TODO: Initialize database and httpClient here when dependencies are available
         val rootComponent = createRootComponent(authRepository)
         val themePreference = AndroidThemePreference(applicationContext)
 
@@ -55,19 +56,7 @@ class MainActivity : ComponentActivity() {
             ) {
                 if (theme != null) {
                     AppTheme(isDarkTheme = theme == Theme.Dark) {
-                        App(
-                            rootComponent = rootComponent,
-                            onToggleTheme = { selectedTheme ->
-                                theme = selectedTheme
-                                coroutineScope.launch {
-                                    themePreference.saveTheme(selectedTheme)
-                                }
-                            },
-                            themePreference = themePreference,
-                            authRepository = authRepository,
-                            profileRepository = profileRepository,
-                            theme = theme
-                        )
+                        App(rootComponent, theme)
                     }
                 }
             }

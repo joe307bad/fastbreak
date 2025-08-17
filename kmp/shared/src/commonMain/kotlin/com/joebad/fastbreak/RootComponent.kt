@@ -1,13 +1,13 @@
 package com.joebad.fastbreak
 
 import AuthRepository
-import AuthedUser
-import ProfileRepository
-import ProtectedContent
+import GoogleUser
+import com.joebad.fastbreak.ui.navigation.MainNavigationScreen
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Surface
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -21,22 +21,22 @@ import com.arkivanov.decompose.extensions.compose.subscribeAsState
 import com.arkivanov.decompose.router.stack.ChildStack
 import com.arkivanov.decompose.router.stack.StackNavigation
 import com.arkivanov.decompose.router.stack.childStack
-import com.arkivanov.decompose.router.stack.items
-import com.arkivanov.decompose.router.stack.push
 import com.arkivanov.decompose.router.stack.replaceAll
 import com.arkivanov.decompose.value.Value
 import com.arkivanov.essenty.lifecycle.LifecycleRegistry
-import com.joebad.fastbreak.data.dailyFastbreak.FastbreakSelectionState
+import com.joebad.fastbreak.data.cache.CacheInitializer
+import com.joebad.fastbreak.data.cache.FastbreakCache
+import com.joebad.fastbreak.data.global.AppDataAction
+import com.joebad.fastbreak.data.global.AppDataViewModel
+import com.joebad.fastbreak.data.profile.ProfileAction
+import com.joebad.fastbreak.data.profile.ProfileSideEffect
+import com.joebad.fastbreak.data.profile.ProfileViewModel
 import com.joebad.fastbreak.ui.screens.LoginScreen
 import com.joebad.fastbreak.ui.theme.LocalColors
-import kotbase.Database
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 
 fun shouldEnforceLogin(authRepository: AuthRepository): Boolean {
     val authedUser = authRepository.getUser()
-    return authRepository.isUserExpired(authedUser)
+    return authedUser == null
 }
 
 class LoginComponent(
@@ -66,67 +66,32 @@ class LoginComponent(
     }
 }
 
-class ProtectedComponent(
+class HomeComponent(
     componentContext: ComponentContext,
-) : ComponentContext by componentContext {
-
-    private val navigation = StackNavigation<Config>()
-
-    val stack: Value<ChildStack<Config, Child>> = childStack(
-        source = navigation,
-        serializer = null,
-        initialConfiguration = Config.Home,
-        handleBackButton = true,
-        childFactory = ::createChild
-    )
-
-    private fun createChild(config: Config, componentContext: ComponentContext): Child {
-        return when (config) {
-            is Config.Home -> Child.Home
-            is Config.Leaderboard -> Child.Leaderboard
-            is Config.Settings -> Child.Settings
-            is Config.Profile -> Child.Profile
-        }
-    }
-
-    fun goToSettings() {
-        navigation.push(Config.Settings)
-    }
-
-    fun selectTab(tab: Config) {
-
-        println("Current stack before: ${stack.items}")
-        navigation.replaceAll(tab)
-        println("Current stack after: ${stack.items}")
-    }
-
-    sealed class Config {
-        object Home : Config()
-        object Leaderboard : Config()
-        object Settings : Config()
-        object Profile : Config()
-    }
-
-    sealed class Child {
-        object Home : Child()
-        object Leaderboard : Child()
-        object Settings : Child()
-        object Profile : Child()
-    }
-}
+    val onLogout: () -> Unit
+) : ComponentContext by componentContext
 
 class RootComponent(
     componentContext: ComponentContext,
-    authRepository: AuthRepository
-) : ComponentContext by componentContext {
+    override val authRepository: AuthRepository,
+    cache: FastbreakCache
+) : ComponentContext by componentContext, AppDependencies {
 
-    private val navigation = StackNavigation<Config>()
+    override val fastbreakCache = cache
+    override val appDataViewModel = AppDataViewModel(cache, authRepository)
+    override val profileViewModel = ProfileViewModel(authRepository)
 
-    val stack =
+    val navigation = StackNavigation<Config>()
+    
+    override val onNavigateToHome: () -> Unit = {
+        navigation.replaceAll(Config.Home)
+    }
+
+    override val stack =
         childStack(
             source = navigation,
             serializer = null,
-            initialConfiguration = if (shouldEnforceLogin(authRepository)) Config.Login else Config.Protected,
+            initialConfiguration = if (shouldEnforceLogin(authRepository)) Config.Login else Config.Home,
             handleBackButton = true,
             childFactory = ::createChild,
         )
@@ -136,20 +101,31 @@ class RootComponent(
         navigation.replaceAll(Config.Login)
     }
 
+    @OptIn(DelicateDecomposeApi::class)
+    fun goToHome() {
+        // The new LoadDailyData action will be called from the UI when needed
+        // with the appropriate dateString and userId parameters
+    }
+
     private fun createChild(config: Config, componentContext: ComponentContext): Child {
         return when (config) {
             is Config.Login -> Child.Login(
                 LoginComponent(
                     componentContext = componentContext,
-                    onLoginClick = {
-                        navigation.replaceAll(Config.Protected)
+                    onLoginClick = { 
+                        // Don't navigate directly, let the side effect handle navigation
+                        // The goToHome function will initialize data and trigger navigation
                     }
                 )
             )
 
-            is Config.Protected -> Child.Protected(
-                ProtectedComponent(
+            is Config.Home -> Child.Home(
+                HomeComponent(
                     componentContext = componentContext,
+                    onLogout = { 
+                        authRepository.clearUser()
+                        navigation.replaceAll(Config.Login) 
+                    }
                 )
             )
         }
@@ -157,99 +133,90 @@ class RootComponent(
 
     sealed class Config {
         object Login : Config()
-        object Protected : Config()
+        object Home : Config()
     }
 
     sealed class Child {
         data class Login(val component: LoginComponent) : Child()
-        data class Protected(val component: ProtectedComponent) : Child()
+        data class Home(val component: HomeComponent) : Child()
     }
 }
 
-fun createRootComponent(authRepository: AuthRepository): RootComponent {
-    return RootComponent(DefaultComponentContext(LifecycleRegistry()), authRepository)
+fun createRootComponent(
+    authRepository: AuthRepository,
+): RootComponent {
+    val cache = CacheInitializer.createFastbreakCache()
+    return RootComponent(DefaultComponentContext(LifecycleRegistry()), authRepository, cache)
+}
+
+interface AppDependencies {
+    val appDataViewModel: AppDataViewModel
+    val profileViewModel: ProfileViewModel
+    val onNavigateToHome: () -> Unit
+    val stack: Value<ChildStack<*, RootComponent.Child>>
+    val authRepository: AuthRepository
+    val fastbreakCache: FastbreakCache
 }
 
 @Composable
 fun App(
-    rootComponent: RootComponent,
-    onToggleTheme: (theme: Theme) -> Unit,
-    themePreference: ThemePreference,
-    authRepository: AuthRepository,
-    profileRepository: ProfileRepository,
+    dependencies: AppDependencies,
     theme: Theme?
 ) {
-    val colors = LocalColors.current;
-    val lockedCard: MutableState<FastbreakSelectionState?> = mutableStateOf(null)
+    val colors = LocalColors.current
 
-    //try {
-       // Database.delete("fastbreak")
-   // } catch (e: Exception) {
-     // println("Database already deleted")
-   // }
+    LaunchedEffect(Unit) {
+        dependencies.profileViewModel.container.sideEffectFlow.collect { sideEffect ->
+            when (sideEffect) {
+                ProfileSideEffect.InitializationComplete -> {
+                    val userId = dependencies.authRepository.getUser()!!.userId
+                    dependencies.appDataViewModel.handleAction(
+                        AppDataAction.LoadStats(userId)
+                    )
+                    dependencies.onNavigateToHome()
+                }
+            }
+        }
+    }
 
     MaterialTheme {
         Surface(color = colors.background) {
-            val childStack = rootComponent.stack.subscribeAsState()
+            val childStack = dependencies.stack.subscribeAsState()
 
             Children(
                 stack = childStack.value,
                 animation = stackAnimation(fade())
             ) { child ->
                 when (val instance = child.instance) {
-                    is RootComponent.Child.Login -> LoginScreen(
-                        goToHome = { au ->
-                            CoroutineScope(Dispatchers.Main).launch {
-                                try {
-                                    instance.component.setLoading(true)
-                                    println("Initializing profile for user: ${au.userId}")
-                                    
-                                    val profile = profileRepository.initializeProfile(au.userId, au.idToken)
-                                    println("Profile initialization result: $profile")
-                                    
-                                    if(profile != null) {
-                                        val authedUser = AuthedUser(
-                                            au.email,
-                                            au.exp,
-                                            au.idToken,
-                                            profile.userId,
-                                            profile.userName
-                                        )
-                                        authRepository.storeAuthedUser(authedUser)
-                                        lockedCard.value = profile.lockedFastBreakCard
-                                        println("Navigating to protected content")
-                                        instance.component.onLoginClick()
-                                    } else {
-                                        println("Profile initialization failed")
-                                        instance.component.setError("Unable to initialize your profile. Please check your connection and try again.")
-                                    }
-                                    
-                                } catch (e: Exception) {
-                                    println("Login error: ${e.message}")
-                                    e.printStackTrace()
-                                    instance.component.setError("Login failed: ${e.message ?: "Unknown error occurred"}")
-                                } finally {
-                                    instance.component.setLoading(false)
-                                }
-                            }
-                        },
-                        theme = theme,
-                        error = instance.component.error,
-                        isLoading = instance.component.isLoading
-                    )
+                    is RootComponent.Child.Login -> {
+                        val profileState by dependencies.profileViewModel.container.stateFlow.collectAsState()
+                        
+                        LoginScreen(
+                            goToHome = { au ->
+                                val googleUser = GoogleUser(
+                                    au.email,
+                                    au.exp,
+                                    au.idToken
+                                )
+                                dependencies.profileViewModel.handleAction(
+                                    ProfileAction.InitializeProfile(googleUser)
+                                )
+                            },
+                            theme = theme,
+                            error = profileState.error ?: instance.component.error,
+                            isLoading = profileState.isLoading || instance.component.isLoading
+                        )
+                    }
 
-                    is RootComponent.Child.Protected ->
-                        ProtectedContent(
-                        instance.component,
-                        onToggleTheme,
-                        themePreference = themePreference,
-                        authRepository,
-                        onLogout = {
-                            authRepository.clearUser()
-                            rootComponent.goToLogin()
-                        },
-                        lockedCard = lockedCard.value
-                    )
+                    is RootComponent.Child.Home -> {
+                        val appDataState by dependencies.appDataViewModel.container.stateFlow.collectAsState()
+                        MainNavigationScreen(
+                            appDataState = appDataState,
+                            onLogout = instance.component.onLogout,
+                            authRepository = dependencies.authRepository,
+                            fastbreakCache = dependencies.fastbreakCache
+                        )
+                    }
                 }
             }
         }

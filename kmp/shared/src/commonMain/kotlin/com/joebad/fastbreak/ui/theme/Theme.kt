@@ -17,7 +17,9 @@ data class AppColors(
     val accent: Color,
     val onAccent: Color,
     val error: Color,
-    val onError: Color
+    val onError: Color,
+    val surface: Color,
+    val onSurface: Color
 )
 
 fun darken(color: Color, factor: Float = 0.8f): Color {
@@ -50,7 +52,9 @@ val LightThemeColors = AppColors(
     accent = Color(0xFFA8E6CF),
     onAccent = Color(0xFF2D5A42),
     error = Color(0xFFE8949C),
-    onError = Color(0xFF8B2635)
+    onError = Color(0xFF8B2635),
+    surface = Color(0xFFFFFFFF),
+    onSurface = Color(0xFF4A3957)
 )
 
 val DarkThemeColors = AppColors(
@@ -65,7 +69,9 @@ val DarkThemeColors = AppColors(
     accent = darken( Color(0xFF00E5FF), 0.8f),
     onAccent = darken(Color(0xFF6A0DAD), 0.5f),
     error = Color(0xFFFF5252),
-    onError = Color(0xFF000000)
+    onError = Color(0xFF000000),
+    surface = Color(0xFF2A1B3D),
+    onSurface = Color(0xFFE0C3FC)
 )
 
 val LocalColors = staticCompositionLocalOf { LightThemeColors }

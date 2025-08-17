@@ -19,6 +19,7 @@ open Saturn.Endpoint
 open api.Controllers.ProfileController
 open api.DailyJob.DailyJob
 open api.Controllers.LockCardController
+open api.Controllers.AuthController
 open api.Entities
 open api.Entities.FastbreakSelections
 open api.Entities.StatSheet
@@ -119,11 +120,19 @@ BsonSerializer.RegisterSerializer(
 
 BsonSerializer.RegisterSerializer(typeof<int option>, OptionSerializer<int>())
 BsonSerializer.RegisterSerializer(typeof<bool option>, OptionSerializer<bool>())
+BsonSerializer.RegisterSerializer(typeof<string option>, OptionSerializer<string>())
 BsonSerializer.RegisterSerializer(typeof<FastbreakCard option>, OptionSerializer<FastbreakCard>())
 
 BsonClassMap.RegisterClassMap<ScheduleEntity.Event>(fun cm ->
     cm.AutoMap()
     cm.SetIgnoreExtraElements(true))
+|> ignore
+
+BsonClassMap.RegisterClassMap<api.Controllers.ProfileController.Profile>(fun cm ->
+    cm.AutoMap()
+    cm.SetIgnoreExtraElements(true)
+    // Set default value for email field for backward compatibility with existing data
+    cm.GetMemberMap("email").SetDefaultValue(None) |> ignore)
 |> ignore
 
 let mongoConnectionString =
@@ -310,7 +319,7 @@ let scheduleJobs () =
     // Schedule jobs with timezone awareness for ET
     let easternTimeZone = TimeZoneInfo.FindSystemTimeZoneById("Eastern Standard Time")
     let recurringJobOptions = RecurringJobOptions(TimeZone = easternTimeZone)
-    
+       
     // Daily job runs at 4:30 AM ET, 30 minutes before other jobs
     RecurringJob.AddOrUpdate("daily-job", dailyJobCall, "30 4 * * *")
     // Trigger dependent jobs at 5:00 AM ET daily, after schedule data is pulled
@@ -339,6 +348,7 @@ let endpointPipe =
 
 let apiRouter =
     router {
+        forward "" (authRouter database)
         forward "" (lockCardRouter database)
         forward "" (dailyFastbreakRouter database)
         forward "" (profileRouter database)

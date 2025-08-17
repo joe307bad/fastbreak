@@ -13,10 +13,12 @@ open api.Utils.tryGetSubject
 open api.Utils.googleAuthPipeline
 
 [<BsonIgnoreExtraElements>]
+[<CLIMutable>]
 type Profile =
     { userId: string
       googleId: string
       userName: string
+      email: string option
       updatedAt: DateTime }
 
 type SaveResponse = { success: bool; message: string }
@@ -53,6 +55,7 @@ let saveProfileHandler (database: IMongoDatabase) : HttpHandler =
                                     .Set((_.updatedAt), DateTime.Now)
                                     .Set((_.googleId), authUserId)
                                     .SetOnInsert((_.userId), userId)
+                                    .SetOnInsert((_.email), None)
 
                             let updateOptions = UpdateOptions(IsUpsert = true)
 
@@ -84,7 +87,7 @@ let saveProfileHandler (database: IMongoDatabase) : HttpHandler =
 
         }
 
-let initializeProfileHandler (database: IMongoDatabase) requestedUserId : HttpHandler =
+let initializeProfileHandler (database: IMongoDatabase) : HttpHandler =
     fun next ctx ->
         task {
             let authUserId = tryGetSubject ctx
@@ -92,64 +95,57 @@ let initializeProfileHandler (database: IMongoDatabase) requestedUserId : HttpHa
             return!
                 match authUserId with
                 | Some userId ->
-                    if requestedUserId = userId then
+                    let userNamesCollection: IMongoCollection<Profile> =
+                        database.GetCollection<Profile>("profiles")
 
-                        let userNamesCollection: IMongoCollection<Profile> =
-                            database.GetCollection<Profile>("profiles")
+                    let userFilter = Builders<Profile>.Filter.Eq((_.googleId), userId)
+                    let userNameDoc = userNamesCollection.Find(userFilter).ToList()
+                    let randomUserName = generateRandomUsername ()
+                    let newUserId = Guid.NewGuid().ToString()
 
-                        let userFilter = Builders<Profile>.Filter.Eq((_.googleId), userId)
-                        let userNameDoc = userNamesCollection.Find(userFilter).ToList()
-                        let randomUserName = generateRandomUsername ()
-                        let newUserId = Guid.NewGuid().ToString()
+                    if userNameDoc.Count = 0 then
+                        let newUserName =
+                            { userId = newUserId
+                              googleId = userId
+                              userName = randomUserName
+                              email = None
+                              updatedAt = DateTime.Now }
 
-                        if userNameDoc.Count = 0 then
-                            let newUserName =
-                                { userId = newUserId
-                                  googleId = userId
-                                  userName = randomUserName
-                                  updatedAt = DateTime.Now }
+                        userNamesCollection.InsertOne(newUserName)
 
-                            userNamesCollection.InsertOne(newUserName)
+                    let lockedFastBreakCard =
+                        if userNameDoc.Count > 0 then
+                            database
+                                .GetCollection<FastbreakSelectionState>("locked-fastbreak-cards")
+                                .Find(
+                                    Builders<FastbreakSelectionState>.Filter
+                                        .And(
+                                            Builders<FastbreakSelectionState>.Filter
+                                                .Eq(_.userId, userNameDoc[0].userId)
+                                        )
+                                )
+                                .Sort(Builders<FastbreakSelectionState>.Sort.Descending("createdAt"))
+                                .FirstOrDefaultAsync()
+                            |> Async.AwaitTask
+                            |> Async.RunSynchronously
+                            |> Option.ofObj
+                        else
+                            None
 
-                        let lockedFastBreakCard =
-                            if userNameDoc.Count > 0 then
-                                database
-                                    .GetCollection<FastbreakSelectionState>("locked-fastbreak-cards")
-                                    .Find(
-                                        Builders<FastbreakSelectionState>.Filter
-                                            .And(
-                                                Builders<FastbreakSelectionState>.Filter
-                                                    .Eq(_.userId, userNameDoc[0].userId)
-                                            )
-                                    )
-                                    .Sort(Builders<FastbreakSelectionState>.Sort.Descending("createdAt"))
-                                    .FirstOrDefaultAsync()
-                                |> Async.AwaitTask
-                                |> Async.RunSynchronously
-                                |> Option.ofObj
+                    let response =
+                        { userId =
+                            if userNameDoc.Count = 0 then
+                                newUserId
                             else
-                                None
+                                userNameDoc[0].userId
+                          userName =
+                            if userNameDoc.Count = 0 then
+                                randomUserName
+                            else
+                                userNameDoc[0].userName
+                          lockedFastBreakCard = lockedFastBreakCard }
 
-                        let response =
-                            { userId =
-                                if userNameDoc.Count = 0 then
-                                    newUserId
-                                else
-                                    userNameDoc[0].userId
-                              userName =
-                                if userNameDoc.Count = 0 then
-                                    randomUserName
-                                else
-                                    userNameDoc[0].userName
-                              lockedFastBreakCard = lockedFastBreakCard }
-
-                        Successful.ok (json response) next ctx
-                    else
-                        let response =
-                            { success = false
-                              message = "User ID mismatch" }
-
-                        RequestErrors.BAD_REQUEST (json response) next ctx
+                    Successful.ok (json response) next ctx
                 | None ->
                     let response =
                         { success = false
@@ -162,5 +158,5 @@ let profileRouter database =
     router {
         pipe_through googleAuthPipeline
         post "/profile" (saveProfileHandler database)
-        postf "/profile/initialize/%s" (fun userId -> requireGoogleAuth >=> (initializeProfileHandler database userId))
+        post "/profile/initialize" (initializeProfileHandler database)
     }

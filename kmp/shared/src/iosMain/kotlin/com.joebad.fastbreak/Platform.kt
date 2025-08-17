@@ -21,6 +21,14 @@ private class IOSPlatform : Platform {
 actual fun onApplicationStartPlatformSpecific() {
 }
 
+object AppInitializer {
+    val shared = this
+    
+    fun onApplicationStart() {
+        onApplicationStartPlatformSpecific()
+    }
+}
+
 class IosFontLoader : FontLoader {
     override fun loadFont(fontName: String): FontFamily {
         val bundle = platform.Foundation.NSBundle.mainBundle

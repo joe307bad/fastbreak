@@ -10,7 +10,8 @@ open api.Entities.FastbreakSelections
 open api.Utils.profile
 open api.Utils.deserializeBody
 open api.Utils.tryGetSubject
-open api.Utils.googleAuthPipeline
+open api.Utils.tryGetAuthenticatedUser
+open api.Utils.tokenAuthPipeline
 
 type GoogleUser = { subject: string }
 
@@ -26,12 +27,27 @@ let lockCardHandler (database: IMongoDatabase) : HttpHandler =
     fun next ctx ->
         task {
             let! state = deserializeBody<FastbreakSelectionState> ctx
-            let googleId = tryGetSubject ctx
-
+            
+            // Try JWT authentication first
+            let authenticatedUser = tryGetAuthenticatedUser ctx
+            
             let! userId =
-                match googleId with
-                | Some gId -> getUserIdFromProfile database gId
-                | None -> Task.FromResult(None)
+                match authenticatedUser with
+                | Some user -> 
+                    // JWT authentication successful
+                    printfn "Using JWT authentication for userId: %s" user.UserId
+                    Task.FromResult(Some user.UserId)
+                | None -> 
+                    // Fallback to Google authentication
+                    printfn "JWT auth failed, trying Google auth fallback"
+                    let googleId = tryGetSubject ctx
+                    match googleId with
+                    | Some gId -> 
+                        printfn "Using Google authentication for googleId: %s" gId
+                        getUserIdFromProfile database gId
+                    | None -> 
+                        printfn "Both JWT and Google authentication failed"
+                        Task.FromResult(None)
 
             return!
                 match userId with
@@ -57,34 +73,25 @@ let lockCardHandler (database: IMongoDatabase) : HttpHandler =
                     let updateOptions = UpdateOptions(IsUpsert = true)
 
                     let result = collection.UpdateOne(filter, update, updateOptions)
-                    let response = { id = result.UpsertedId.ToString() }
+                    
+                    // Generate a response ID - use UpsertedId for new documents, or generate one for updates
+                    let responseId = 
+                        if result.UpsertedId <> null then 
+                            result.UpsertedId.ToString()
+                        else 
+                            Guid.NewGuid().ToString() // Generate ID for updates
+                    
+                    let response = { id = responseId }
                     Successful.ok (json response) next ctx
-                | None -> Successful.ok (json {| error = "Error locking card" |}) next ctx
+                | None -> 
+                    let response = { id = "" } // Provide empty id to match Kotlin expectations
+                    RequestErrors.BAD_REQUEST (json response) next ctx
         }
 
-let getLockedCardHandler (database: IMongoDatabase) userId : HttpHandler =
-    fun next ctx ->
-        task {
-            let collection =
-                database.GetCollection<FastbreakSelectionState>("locked-fastbreak-cards")
-
-            let today = DateTime.UtcNow.ToString("yyyyMMdd")
-
-            let filter =
-                Builders<FastbreakSelectionState>.Filter
-                    .And(
-                        Builders<FastbreakSelectionState>.Filter.Eq(_.userId, userId),
-                        Builders<FastbreakSelectionState>.Filter.Eq(_.date, today)
-                    )
-
-            let! result = collection.Find(filter).FirstOrDefaultAsync()
-
-            return! json result next ctx
-        }
 
 let lockCardRouter database =
     router {
-        pipe_through googleAuthPipeline
+        
+        pipe_through tokenAuthPipeline
         post "/lock" (lockCardHandler database)
-        getf "/lock/%s" (fun userId -> getLockedCardHandler database userId)
     }

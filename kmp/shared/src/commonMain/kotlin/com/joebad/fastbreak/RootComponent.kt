@@ -2,7 +2,6 @@ package com.joebad.fastbreak
 
 import AuthRepository
 import GoogleUser
-import com.joebad.fastbreak.ui.navigation.MainNavigationScreen
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Surface
 import androidx.compose.runtime.Composable
@@ -31,6 +30,7 @@ import com.joebad.fastbreak.data.global.AppDataViewModel
 import com.joebad.fastbreak.data.profile.ProfileAction
 import com.joebad.fastbreak.data.profile.ProfileSideEffect
 import com.joebad.fastbreak.data.profile.ProfileViewModel
+import com.joebad.fastbreak.ui.screens.HomeScreen
 import com.joebad.fastbreak.ui.screens.LoginScreen
 import com.joebad.fastbreak.ui.theme.LocalColors
 
@@ -210,7 +210,7 @@ fun App(
 
                     is RootComponent.Child.Home -> {
                         val appDataState by dependencies.appDataViewModel.container.stateFlow.collectAsState()
-                        MainNavigationScreen(
+                        HomeScreen(
                             appDataState = appDataState,
                             onLogout = instance.component.onLogout,
                             authRepository = dependencies.authRepository,

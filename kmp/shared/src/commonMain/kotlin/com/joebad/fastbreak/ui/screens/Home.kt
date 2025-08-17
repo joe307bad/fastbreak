@@ -8,14 +8,11 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.Divider
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Text
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -27,16 +24,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import com.joebad.fastbreak.data.cache.FastbreakCache
 import com.joebad.fastbreak.data.global.AppDataState
-import com.joebad.fastbreak.data.picks.ScheduleAction
 import com.joebad.fastbreak.data.picks.ScheduleViewModel
 import com.joebad.fastbreak.model.dtos.LeaderboardItem
-import com.joebad.fastbreak.ui.LockableButton
 import com.joebad.fastbreak.ui.ScheduleSection
 import com.joebad.fastbreak.ui.theme.AppColors
 import com.joebad.fastbreak.ui.theme.LocalColors
@@ -79,82 +73,9 @@ fun HomeScreen(
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
-                .background(colors.background)
-                .padding(bottom = if (selectedTab == HomeTab.PICKS && hasPicks) 80.dp else 0.dp),
+                .background(colors.background),
             verticalArrangement = Arrangement.Top
         ) {
-            // Header with title and segmented control
-            item {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(colors.background)
-                        .padding(vertical = 5.dp, horizontal = 8.dp)
-                ) {
-                    Text(
-                        text = "FASTBREAK",
-                        style = MaterialTheme.typography.body1,
-                        color = colors.onSurface,
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.Monospace,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    Text(
-                        text = getCurrentDateFormatted(),
-                        style = MaterialTheme.typography.caption,
-                        color = colors.onSurface.copy(alpha = 0.7f),
-                        fontFamily = FontFamily.Monospace,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-
-                    // Segmented control for Picks/Leaderboard
-                    CupertinoSegmentedControl(
-                        colors = CupertinoSegmentedControlDefaults.colors(
-                            separatorColor = colors.accent,
-                            indicatorColor = colors.accent
-                        ),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 8.dp),
-                        selectedTabIndex = when (selectedTab) {
-                            HomeTab.PICKS -> 0
-                            HomeTab.LEADERBOARD -> 1
-                        },
-                        shape = RectangleShape
-                    ) {
-                        CupertinoSegmentedControlTab(
-                            isSelected = selectedTab == HomeTab.PICKS,
-                            onClick = { selectedTab = HomeTab.PICKS }
-                        ) {
-                            Text(
-                                "PICKS",
-                                color = if (selectedTab == HomeTab.PICKS) colors.onAccent else colors.text,
-                                fontFamily = FontFamily.Monospace,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                        CupertinoSegmentedControlTab(
-                            isSelected = selectedTab == HomeTab.LEADERBOARD,
-                            onClick = { selectedTab = HomeTab.LEADERBOARD }
-                        ) {
-                            Text(
-                                "LEADERBOARD",
-                                color = if (selectedTab == HomeTab.LEADERBOARD) colors.onAccent else colors.text,
-                                fontFamily = FontFamily.Monospace,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    }
-
-                    Divider(
-                        color = colors.onSurface.copy(alpha = 0.3f),
-                        thickness = 1.dp,
-                        modifier = Modifier.padding(vertical = 4.dp)
-                    )
-                }
-            }
 
             // Content based on selected tab
             if (selectedTab == HomeTab.PICKS) {
@@ -165,7 +86,7 @@ fun HomeScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .background(colors.background)
-                                .padding(vertical = 5.dp, horizontal = 8.dp)
+                                .padding(vertical = 10.dp, horizontal = 8.dp)
                         ) {
                             val lockedCardForDate = appDataState.statsData?.lockedCardForDate
                             ScheduleSection(
@@ -256,73 +177,125 @@ fun HomeScreen(
             }
 
         }
+//
+//        if (selectedTab == HomeTab.PICKS) {
+//            Box(
+//                modifier = Modifier
+//                    .align(Alignment.BottomCenter)
+//                    .fillMaxWidth()
+//                    .padding(horizontal = 16.dp, vertical = 80.dp)
+//                    .zIndex(2f)
+//            ) {
+//                Column {
+//                    if (hasPicks) {
+//                        // Display card info inline and compact above the button
+//                        val lockedCard = appDataState.statsData?.lockedCardForDate
+//                        val cardInfo = buildString {
+//                            append("${totalPoints}pts")
+//                            lockedCard?.cardId?.let { cardId ->
+//                                append(" | ID: ${cardId.take(8)}")
+//                            }
+//                            lockedCard?.createdAt?.let { createdAt ->
+//                                append(" | ${createdAt.take(10).replace("-", "")}")
+//                            }
+//                        }
+//
+//                        Text(
+//                            text = cardInfo,
+//                            style = MaterialTheme.typography.caption,
+//                            color = colors.onSurface,
+//                            fontFamily = FontFamily.Monospace,
+//                            modifier = Modifier
+//                                .fillMaxWidth()
+//                                .padding(bottom = 8.dp)
+//                                .background(colors.background.copy(alpha = 0.95f)),
+//                            textAlign = TextAlign.Center
+//                        )
+//
+//                        LockableButton(
+//                            onClick = {  },
+//                            onLock = {
+//                                scheduleViewModel.handleAction(ScheduleAction.LockPicks)
+//                            },
+//                            lockable = true,
+//                            isLocked = scheduleState.isLocked || scheduleState.isRefreshingToken || hasExistingLockedSelections,
+//                            modifier = Modifier.fillMaxWidth()
+//                        ) {
+//                            androidx.compose.material3.Text(
+//                                text = if (hasExistingLockedSelections) {
+//                                    "LOCKED"
+//                                } else {
+//                                    "SUBMIT $picksCount PICK${if (picksCount == 1) "" else "S"}"
+//                                },
+//                                color = LocalColors.current.onSecondary
+//                            )
+//                        }
+//                    } else {
+//                        // Show disabled/depressed button when no picks
+//                        LockableButton(
+//                            onClick = {  },
+//                            onLock = {  },
+//                            lockable = false,
+//                            isLocked = true,
+//                            modifier = Modifier.fillMaxWidth()
+//                        ) {
+//                            androidx.compose.material3.Text(
+//                                text = "NO PICKS SELECTED",
+//                                color = LocalColors.current.onSecondary.copy(alpha = 0.5f)
+//                            )
+//                        }
+//                    }
+//                }
+//            }
+//        }
 
-        // Lockable Card pinned to bottom when picks are selected
-        if (selectedTab == HomeTab.PICKS && hasPicks) {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .fillMaxWidth()
-                    .background(colors.background.copy(alpha = 0.95f))
-                    .padding(16.dp)
+        // Bottom segmented control
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .background(colors.background.copy(alpha = 0.95f))
+                .padding(16.dp)
+                .zIndex(1f)
+        ) {
+            CupertinoSegmentedControl(
+                colors = CupertinoSegmentedControlDefaults.colors(
+                    separatorColor = colors.accent,
+                    indicatorColor = colors.accent
+                ),
+                modifier = Modifier.fillMaxWidth(),
+                selectedTabIndex = when (selectedTab) {
+                    HomeTab.PICKS -> 0
+                    HomeTab.LEADERBOARD -> 1
+                },
+                shape = RectangleShape
             ) {
-                Column {
-                    // Display card info inline and compact above the button
-                    val lockedCard = appDataState.statsData?.lockedCardForDate
-                    val cardInfo = buildString {
-                        append("${totalPoints}pts")
-                        lockedCard?.cardId?.let { cardId -> 
-                            append(" | ID: ${cardId.take(8)}")
-                        }
-                        lockedCard?.createdAt?.let { createdAt ->
-                            append(" | ${createdAt.take(10).replace("-", "")}")
-                        }
-                    }
-                    
+                CupertinoSegmentedControlTab(
+                    isSelected = selectedTab == HomeTab.PICKS,
+                    onClick = { selectedTab = HomeTab.PICKS }
+                ) {
                     Text(
-                        text = cardInfo,
-                        style = MaterialTheme.typography.caption,
-                        color = colors.onSurface,
+                        "TODAY",
+                        color = if (selectedTab == HomeTab.PICKS) colors.onAccent else colors.text,
                         fontFamily = FontFamily.Monospace,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(bottom = 8.dp),
-                        textAlign = TextAlign.Center
+                        fontWeight = FontWeight.Bold
                     )
-                    
-                    LockableButton(
-                        onClick = {
-//                        scheduleViewModel.handleAction(ScheduleAction.SubmitPicks)
-                        },
-                        onLock = {
-                            scheduleViewModel.handleAction(ScheduleAction.LockPicks)
-                        },
-                        lockable = true,
-                        isLocked = scheduleState.isLocked || scheduleState.isRefreshingToken || hasExistingLockedSelections,
-                        modifier = Modifier.fillMaxWidth().zIndex(1f)
-                    ) {
-                        androidx.compose.material3.Text(
-                            text = if (hasExistingLockedSelections) {
-                                "LOCKED"
-                            } else {
-                                "SUBMIT $picksCount PICK${if (picksCount == 1) "" else "S"}"
-                            },
-                            color = LocalColors.current.onSecondary
-                        )
-                    }
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(3.dp)
-                            .offset(y = ButtonDefaults.MinHeight - 1.dp)
-                            .background(colors.accent)
-                    ) {
-                        androidx.compose.material3.Text(text = " ")
-                    }
+                }
+                CupertinoSegmentedControlTab(
+                    isSelected = selectedTab == HomeTab.LEADERBOARD,
+                    onClick = { selectedTab = HomeTab.LEADERBOARD }
+                ) {
+                    Text(
+                        "LEADERBOARD",
+                        color = if (selectedTab == HomeTab.LEADERBOARD) colors.onAccent else colors.text,
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold
+                    )
                 }
             }
         }
     }
+
 }
 
 

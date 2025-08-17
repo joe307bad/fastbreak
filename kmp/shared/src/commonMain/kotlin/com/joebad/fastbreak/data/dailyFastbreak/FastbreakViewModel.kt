@@ -30,12 +30,14 @@ data class FastbreakSelectionState(
     val selections: List<FastbreakSelection>? = null,
     val totalPoints: Int = 0,
     val cardId: String = getRandomId(),
+    val userId: String? = null,
     val locked: Boolean? = false,
     val date: String,
     val statSheetItems: List<StatSheetItemView> = emptyList(),
     val results: FastbreakSelectionsResult? = null,
     val lastLockedCardResults: FastbreakSelectionState? = null,
     val isSavingUserName: Boolean = false,
-    val isLocking: Boolean = false
+    val isLocking: Boolean = false,
+    val createdAt: String? = null
 )
 

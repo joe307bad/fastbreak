@@ -173,4 +173,37 @@ class TTLCachedHttpClient(
             println("Error setting cache for $urlString: ${e.message}")
         }
     }
+    
+    suspend fun <T> updateProperty(
+        urlString: String,
+        deserializer: KSerializer<T>,
+        expirationStrategy: CacheExpirationStrategy,
+        updateFunction: (T?) -> T?
+    ): Boolean {
+        return try {
+            val cacheKey = ttlCache.generateCacheKey(urlString)
+            
+            // Get existing cached data
+            val existingData = ttlCache.getCacheData<T>(cacheKey, deserializer)
+            
+            // Apply the update function
+            val updatedData = updateFunction(existingData)
+            
+            if (updatedData != null) {
+                // Store the updated data with preserved expiration
+                val existingMetadata = ttlCache.getCacheMetadata(cacheKey)
+                val currentTime = Clock.System.now()
+                val expiresAt = existingMetadata?.expiresAt ?: expirationStrategy.calculateExpirationTime(currentTime)
+                
+                ttlCache.storeCacheData<T>(cacheKey, updatedData, deserializer)
+                ttlCache.storeCacheMetadata(cacheKey, CacheMetadata(currentTime, expiresAt))
+                true
+            } else {
+                false
+            }
+        } catch (e: Exception) {
+            println("Error updating cache property for $urlString: ${e.message}")
+            false
+        }
+    }
 }

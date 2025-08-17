@@ -1,6 +1,7 @@
 package com.joebad.fastbreak.data.picks
 
 import AuthRepository
+import com.joebad.fastbreak.data.cache.FastbreakCache
 import com.joebad.fastbreak.data.dailyFastbreak.FastbreakSelection
 import com.joebad.fastbreak.data.dailyFastbreak.FastbreakSelectionState
 import getRandomId
@@ -30,11 +31,14 @@ sealed class ScheduleSideEffect {
     object RequireLogin : ScheduleSideEffect()
 }
 
-class ScheduleViewModel(private val dateCode: String, private val authRepository: AuthRepository) :
-    ContainerHost<ScheduleState, ScheduleSideEffect> {
+class ScheduleViewModel(
+    private val dateCode: String, 
+    private val authRepository: AuthRepository,
+    private val fastbreakCache: FastbreakCache
+) : ContainerHost<ScheduleState, ScheduleSideEffect> {
 
     private val viewModelScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
-    private val picksRepository = PicksRepository(authRepository)
+    private val picksRepository = PicksRepository(authRepository, fastbreakCache)
 
     override val container: Container<ScheduleState, ScheduleSideEffect> =
         viewModelScope.container(ScheduleState())

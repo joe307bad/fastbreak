@@ -91,6 +91,7 @@ let lockCardHandler (database: IMongoDatabase) : HttpHandler =
 
 let lockCardRouter database =
     router {
-        // No authentication pipeline here - we handle auth inside the handler
+        
+        pipe_through tokenAuthPipeline
         post "/lock" (lockCardHandler database)
     }

@@ -23,6 +23,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import AuthRepository
+import com.joebad.fastbreak.data.cache.FastbreakCache
 import com.joebad.fastbreak.data.global.AppDataState
 import com.joebad.fastbreak.ui.theme.LocalColors
 
@@ -31,7 +32,7 @@ enum class NavigationTab {
 }
 
 @Composable
-fun MainNavigationScreen(appDataState: AppDataState, onLogout: () -> Unit = {}, authRepository: AuthRepository) {
+fun MainNavigationScreen(appDataState: AppDataState, onLogout: () -> Unit = {}, authRepository: AuthRepository, fastbreakCache: FastbreakCache) {
     val colors = LocalColors.current
     var selectedTab by remember { mutableStateOf(NavigationTab.HOME) }
 
@@ -42,7 +43,7 @@ fun MainNavigationScreen(appDataState: AppDataState, onLogout: () -> Unit = {}, 
     ) {
         // Main content
         when (selectedTab) {
-            NavigationTab.HOME -> com.joebad.fastbreak.ui.screens.HomeScreen(appDataState = appDataState, onLogout = {}, authRepository = authRepository)
+            NavigationTab.HOME -> com.joebad.fastbreak.ui.screens.HomeScreen(appDataState = appDataState, onLogout = {}, authRepository = authRepository, fastbreakCache = fastbreakCache)
             NavigationTab.PROFILE -> com.joebad.fastbreak.ui.screens.ProfileScreen(appDataState = appDataState, onLogout = onLogout)
         }
         

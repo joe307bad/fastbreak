@@ -31,12 +31,13 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
+import com.joebad.fastbreak.data.cache.FastbreakCache
 import com.joebad.fastbreak.data.global.AppDataState
 import com.joebad.fastbreak.data.picks.ScheduleAction
 import com.joebad.fastbreak.data.picks.ScheduleViewModel
 import com.joebad.fastbreak.model.dtos.LeaderboardItem
 import com.joebad.fastbreak.ui.LockableButton
-import com.joebad.fastbreak.ui.screens.schedule.ScheduleSection
+import com.joebad.fastbreak.ui.ScheduleSection
 import com.joebad.fastbreak.ui.theme.AppColors
 import com.joebad.fastbreak.ui.theme.LocalColors
 import io.github.alexzhirkevich.cupertino.CupertinoSegmentedControl
@@ -57,15 +58,22 @@ enum class HomeTab {
 fun HomeScreen(
     appDataState: AppDataState,
     onLogout: () -> Unit = {},
-    authRepository: AuthRepository
+    authRepository: AuthRepository,
+    fastbreakCache: FastbreakCache
 ) {
     val colors = LocalColors.current
-    val scheduleViewModel = remember { ScheduleViewModel(appDataState.dateCode, authRepository) }
+    val scheduleViewModel = remember { ScheduleViewModel(appDataState.dateCode, authRepository, fastbreakCache) }
     val scheduleState by scheduleViewModel.container.stateFlow.collectAsState()
     var selectedTab by remember { mutableStateOf(HomeTab.PICKS) }
 
     val hasPicks = scheduleState.selectedWinners.isNotEmpty()
     val picksCount = scheduleState.selectedWinners.size
+    val hasExistingLockedSelections = appDataState.statsData?.lockedCardForDate?.selections?.isNotEmpty() == true
+    
+    // Calculate total points for selected picks
+    val totalPoints = appDataState.scheduleData?.fastbreakCard?.filter { game ->
+        scheduleState.selectedWinners.containsKey(game.id)
+    }?.sumOf { it.points } ?: 0
 
     Box(modifier = Modifier.fillMaxSize()) {
         LazyColumn(
@@ -159,7 +167,13 @@ fun HomeScreen(
                                 .background(colors.background)
                                 .padding(vertical = 5.dp, horizontal = 8.dp)
                         ) {
-                            ScheduleSection(schedule.fastbreakCard, colors, scheduleViewModel)
+                            val lockedCardForDate = appDataState.statsData?.lockedCardForDate
+                            ScheduleSection(
+                                games = schedule.fastbreakCard, 
+                                colors = colors, 
+                                viewModel = scheduleViewModel,
+                                lockedCardForDate = lockedCardForDate
+                            )
                         }
                     }
                 }
@@ -252,30 +266,59 @@ fun HomeScreen(
                     .background(colors.background.copy(alpha = 0.95f))
                     .padding(16.dp)
             ) {
-                LockableButton(
-                    onClick = {
-//                        scheduleViewModel.handleAction(ScheduleAction.SubmitPicks)
-                    },
-                    onLock = {
-                        scheduleViewModel.handleAction(ScheduleAction.LockPicks)
-                    },
-                    lockable = true,
-                    isLocked = scheduleState.isLocked || scheduleState.isRefreshingToken,
-                    modifier = Modifier.fillMaxWidth().zIndex(1f)
-                ) {
-                    androidx.compose.material3.Text(
-                        text = "SUBMIT $picksCount PICK${if (picksCount == 1) "" else "S"}",
-                        color = LocalColors.current.onSecondary
+                Column {
+                    // Display card info inline and compact above the button
+                    val lockedCard = appDataState.statsData?.lockedCardForDate
+                    val cardInfo = buildString {
+                        append("${totalPoints}pts")
+                        lockedCard?.cardId?.let { cardId -> 
+                            append(" | ID: ${cardId.take(8)}")
+                        }
+                        lockedCard?.createdAt?.let { createdAt ->
+                            append(" | ${createdAt.take(10).replace("-", "")}")
+                        }
+                    }
+                    
+                    Text(
+                        text = cardInfo,
+                        style = MaterialTheme.typography.caption,
+                        color = colors.onSurface,
+                        fontFamily = FontFamily.Monospace,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 8.dp),
+                        textAlign = TextAlign.Center
                     )
-                }
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(3.dp)
-                        .offset(y = ButtonDefaults.MinHeight - 1.dp)
-                        .background(colors.accent)
-                ) {
-                    androidx.compose.material3.Text(text = " ")
+                    
+                    LockableButton(
+                        onClick = {
+//                        scheduleViewModel.handleAction(ScheduleAction.SubmitPicks)
+                        },
+                        onLock = {
+                            scheduleViewModel.handleAction(ScheduleAction.LockPicks)
+                        },
+                        lockable = true,
+                        isLocked = scheduleState.isLocked || scheduleState.isRefreshingToken || hasExistingLockedSelections,
+                        modifier = Modifier.fillMaxWidth().zIndex(1f)
+                    ) {
+                        androidx.compose.material3.Text(
+                            text = if (hasExistingLockedSelections) {
+                                "LOCKED"
+                            } else {
+                                "SUBMIT $picksCount PICK${if (picksCount == 1) "" else "S"}"
+                            },
+                            color = LocalColors.current.onSecondary
+                        )
+                    }
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(3.dp)
+                            .offset(y = ButtonDefaults.MinHeight - 1.dp)
+                            .background(colors.accent)
+                    ) {
+                        androidx.compose.material3.Text(text = " ")
+                    }
                 }
             }
         }

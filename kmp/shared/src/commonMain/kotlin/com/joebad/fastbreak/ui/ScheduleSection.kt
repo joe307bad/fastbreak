@@ -1,4 +1,4 @@
-package com.joebad.fastbreak.ui.screens.schedule
+package com.joebad.fastbreak.ui
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
@@ -26,6 +26,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.joebad.fastbreak.data.dailyFastbreak.FastbreakSelectionState
 import com.joebad.fastbreak.data.picks.ScheduleAction
 import com.joebad.fastbreak.data.picks.ScheduleViewModel
 import com.joebad.fastbreak.model.dtos.EmptyFastbreakCardItem
@@ -35,9 +36,19 @@ import com.joebad.fastbreak.ui.theme.AppColors
 fun ScheduleSection(
     games: List<EmptyFastbreakCardItem>, 
     colors: AppColors,
-    viewModel: ScheduleViewModel
+    viewModel: ScheduleViewModel,
+    lockedCardForDate: FastbreakSelectionState? = null
 ) {
     val state by viewModel.container.stateFlow.collectAsState()
+    
+    // Pre-populate selections from locked card if available
+    lockedCardForDate?.selections?.forEach { selection ->
+        if (state.selectedWinners[selection._id] == null) {
+            viewModel.handleAction(ScheduleAction.SelectWinner(selection._id, selection.userAnswer))
+        }
+    }
+    
+    val isLocked = lockedCardForDate?.selections?.isNotEmpty() == true
     
     Column(
         modifier = Modifier
@@ -59,8 +70,11 @@ fun ScheduleSection(
                 game = game, 
                 colors = colors,
                 selectedWinner = state.selectedWinners[game.id],
+                isLocked = isLocked,
                 onWinnerSelected = { team -> 
-                    viewModel.handleAction(ScheduleAction.SelectWinner(game.id, team))
+                    if (!isLocked) {
+                        viewModel.handleAction(ScheduleAction.SelectWinner(game.id, team))
+                    }
                 }
             )
         }
@@ -72,6 +86,7 @@ private fun GameReceiptRow(
     game: EmptyFastbreakCardItem, 
     colors: AppColors,
     selectedWinner: String?,
+    isLocked: Boolean = false,
     onWinnerSelected: (String) -> Unit
 ) {
     Column(
@@ -89,6 +104,7 @@ private fun GameReceiptRow(
                 TeamSelectionButton(
                     teamName = game.awayTeam,
                     isSelected = selectedWinner == game.awayTeam,
+                    isLocked = isLocked,
                     colors = colors,
                     onClick = { onWinnerSelected(game.awayTeam) },
                     modifier = Modifier.weight(1f)
@@ -104,6 +120,7 @@ private fun GameReceiptRow(
                 TeamSelectionButton(
                     teamName = game.homeTeam,
                     isSelected = selectedWinner == game.homeTeam,
+                    isLocked = isLocked,
                     colors = colors,
                     onClick = { onWinnerSelected(game.homeTeam) },
                     modifier = Modifier.weight(1f)
@@ -133,6 +150,7 @@ private fun GameReceiptRow(
 private fun TeamSelectionButton(
     teamName: String,
     isSelected: Boolean,
+    isLocked: Boolean = false,
     colors: AppColors,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
@@ -144,7 +162,11 @@ private fun TeamSelectionButton(
     )
     
     val animatedAlpha by animateFloatAsState(
-        targetValue = if (isSelected) 1f else 0.7f,
+        targetValue = when {
+            isLocked -> if (isSelected) 1f else 0.5f
+            isSelected -> 1f
+            else -> 0.7f
+        },
         animationSpec = tween(300),
         label = "alpha"
     )
@@ -158,7 +180,12 @@ private fun TeamSelectionButton(
     Text(
         text = teamName,
         style = MaterialTheme.typography.caption,
-        color = if (isSelected) colors.accent else colors.onSurface,
+        color = when {
+            isLocked && isSelected -> colors.accent
+            isLocked -> colors.onSurface.copy(alpha = 0.6f)
+            isSelected -> colors.accent
+            else -> colors.onSurface
+        },
         fontFamily = FontFamily.Monospace,
         fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
         maxLines = 1,
@@ -168,7 +195,7 @@ private fun TeamSelectionButton(
                 color = animatedBackgroundColor,
                 shape = RoundedCornerShape(4.dp)
             )
-            .clickable { onClick() }
+            .clickable(enabled = !isLocked) { onClick() }
             .padding(horizontal = 8.dp, vertical = 4.dp)
             .scale(animatedScale)
             .alpha(animatedAlpha)

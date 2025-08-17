@@ -88,4 +88,16 @@ class FastbreakCache private constructor(
             expirationStrategy = StatsExpirationStrategy()
         )
     }
+    
+    suspend fun updateStatsProperty(
+        url: String, 
+        updateFunction: (StatsResponse?) -> StatsResponse?
+    ): Boolean {
+        return ttlClient.updateProperty(
+            urlString = url,
+            deserializer = StatsResponse.serializer(),
+            expirationStrategy = StatsExpirationStrategy(),
+            updateFunction = updateFunction
+        )
+    }
 }

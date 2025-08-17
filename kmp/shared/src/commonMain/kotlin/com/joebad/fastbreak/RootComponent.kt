@@ -77,6 +77,7 @@ class RootComponent(
     cache: FastbreakCache
 ) : ComponentContext by componentContext, AppDependencies {
 
+    override val fastbreakCache = cache
     override val appDataViewModel = AppDataViewModel(cache, authRepository)
     override val profileViewModel = ProfileViewModel(authRepository)
 
@@ -154,6 +155,7 @@ interface AppDependencies {
     val onNavigateToHome: () -> Unit
     val stack: Value<ChildStack<*, RootComponent.Child>>
     val authRepository: AuthRepository
+    val fastbreakCache: FastbreakCache
 }
 
 @Composable
@@ -211,7 +213,8 @@ fun App(
                         MainNavigationScreen(
                             appDataState = appDataState,
                             onLogout = instance.component.onLogout,
-                            authRepository = dependencies.authRepository
+                            authRepository = dependencies.authRepository,
+                            fastbreakCache = dependencies.fastbreakCache
                         )
                     }
                 }

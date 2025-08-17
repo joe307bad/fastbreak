@@ -158,12 +158,28 @@ let getStatsHandler (database: IMongoDatabase) (day, userId) (next: HttpFunc) (c
                 null
             else
                 box leaderboard.items
+                
+        let lockedCardForDate = 
+            let collection: IMongoCollection<FastbreakSelectionState> =
+                database.GetCollection<FastbreakSelectionState>("locked-fastbreak-cards")
+
+            let filter =
+                Builders<FastbreakSelectionState>.Filter
+                    .And(
+                        Builders<FastbreakSelectionState>.Filter.Eq(_.userId, userId),
+                        Builders<FastbreakSelectionState>.Filter.Eq(_.date, day)
+                    )
+            collection.Find(filter).Limit(1).ToListAsync()
+            |> Async.AwaitTask
+            |> Async.RunSynchronously
+            |> Seq.tryHead
 
         return!
             json
                 {| weeklyLeaderboard = leaderboardItems
                    statSheetForUser = statSheetForUser
                    weekStartDate = sundayId
+                   lockedCardForDate = lockedCardForDate
                    requestedDate = day
                    previousDay = previousDay |}
                 next

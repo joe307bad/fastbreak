@@ -3,6 +3,7 @@ package com.joebad.fastbreak.data.picks
 import AuthRepository
 import com.joebad.fastbreak.BuildKonfig
 import com.joebad.fastbreak.data.auth.GoogleAuthService
+import com.joebad.fastbreak.data.cache.FastbreakCache
 import com.joebad.fastbreak.data.dailyFastbreak.FastbreakSelectionState
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
@@ -17,6 +18,8 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.datetime.Clock
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
@@ -45,7 +48,10 @@ sealed class LockPicksResult {
     data class Error(val message: String) : LockPicksResult()
 }
 
-class PicksRepository(authRepository: AuthRepository) {
+class PicksRepository(
+    authRepository: AuthRepository,
+    private val fastbreakCache: FastbreakCache
+) {
 
     private val _authRepository = authRepository
     private val _googleAuthService = GoogleAuthService(authRepository)
@@ -77,6 +83,10 @@ class PicksRepository(authRepository: AuthRepository) {
                 }
                 response.status.value in 200..299 -> {
                     val lockResponse: LockPicksResponse = response.body()
+                    
+                    // Update cache with locked selection state
+                    updateCacheAfterLock(selectionState)
+                    
                     LockPicksResult.Success(lockResponse)
                 }
                 else -> {
@@ -98,6 +108,41 @@ class PicksRepository(authRepository: AuthRepository) {
             header("Authorization", "Bearer ${_authRepository.getUser()?.idToken}")
             setBody(selectionState)
         }
+    }
+
+    private suspend fun updateCacheAfterLock(selectionState: FastbreakSelectionState) {
+        try {
+            val userId = _authRepository.getUser()?.userId
+            if (userId != null) {
+                val dateCode = getCurrentDateET()
+                val statsUrl = "${_baseUrl}/day/${dateCode}/stats/${userId}"
+                
+                // Update the cache to mark the card as locked and set the lockedCardForDate
+                val success = fastbreakCache.updateStatsProperty(statsUrl) { currentStats ->
+                    currentStats?.copy(
+                        lockedCardForDate = selectionState.copy(
+                            locked = true,
+                            createdAt = Clock.System.now().toString()
+                        )
+                    )
+                }
+                
+                if (success) {
+                    println("Successfully updated cache after lock")
+                } else {
+                    println("Failed to update cache after lock")
+                }
+            }
+        } catch (e: Exception) {
+            println("Error updating cache after lock: ${e.message}")
+        }
+    }
+
+    private fun getCurrentDateET(): String {
+        val etTimeZone = TimeZone.of("America/New_York")
+        val nowET = Clock.System.now().toLocalDateTime(etTimeZone)
+        val dateET = nowET.date
+        return "${dateET.year}${dateET.monthNumber.toString().padStart(2, '0')}${dateET.dayOfMonth.toString().padStart(2, '0')}"
     }
 
     suspend fun refreshToken(): Boolean {

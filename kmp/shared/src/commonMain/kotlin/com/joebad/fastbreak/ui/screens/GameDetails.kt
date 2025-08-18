@@ -45,6 +45,103 @@ enum class TeamPickOption {
     AWAY, PICK, HOME
 }
 
+
+@Composable
+fun ScrollableStats(colors: AppColors) {
+    // Sample player data
+    val playerStats = listOf(
+        PlayerStatsRow(
+            playerName = "J. Herbert",
+            stats = listOf(
+                PlayerStat("Impact Score", "24.6", isBold = true),
+                PlayerStat("Pass yds", "287"),
+                PlayerStat("Pass TD", "2"),
+                PlayerStat("INT", "1"),
+                PlayerStat("Rating", "94.2"),
+                PlayerStat("Rush yds", "23"),
+                PlayerStat("Rush TD", "0"),
+                PlayerStat("Fumbles", "0"),
+                PlayerStat("Comp%", "68.5")
+            )
+        ),
+        PlayerStatsRow(
+            playerName = "A. Ekeler",
+            stats = listOf(
+                PlayerStat("Impact Score", "18.3", isBold = true),
+                PlayerStat("Rush yds", "112"),
+                PlayerStat("Rush TD", "1"),
+                PlayerStat("Rec", "7"),
+                PlayerStat("Rec yds", "65"),
+                PlayerStat("Rec TD", "1"),
+                PlayerStat("Fumbles", "0"),
+                PlayerStat("YPC", "4.8"),
+                PlayerStat("Long", "18")
+            )
+        ),
+        PlayerStatsRow(
+            playerName = "K. Allen",
+            stats = listOf(
+                PlayerStat("Impact Score", "21.7", isBold = true),
+                PlayerStat("Rec", "8"),
+                PlayerStat("Rec yds", "109"),
+                PlayerStat("Rec TD", "1"),
+                PlayerStat("Targets", "12"),
+                PlayerStat("YPR", "13.6"),
+                PlayerStat("Long", "24"),
+                PlayerStat("Drops", "1"),
+                PlayerStat("Catch%", "66.7")
+            )
+        ),
+        PlayerStatsRow(
+            playerName = "M. Williams",
+            stats = listOf(
+                PlayerStat("Impact Score", "15.2", isBold = true),
+                PlayerStat("Rec", "5"),
+                PlayerStat("Rec yds", "87"),
+                PlayerStat("Rec TD", "0"),
+                PlayerStat("Targets", "8"),
+                PlayerStat("YPR", "17.4"),
+                PlayerStat("Long", "31"),
+                PlayerStat("Drops", "0"),
+                PlayerStat("Catch%", "62.5")
+            )
+        ),
+        PlayerStatsRow(
+            playerName = "C. Mack",
+            stats = listOf(
+                PlayerStat("Impact Score", "19.4", isBold = true),
+                PlayerStat("Tackles", "9"),
+                PlayerStat("Sacks", "2.5"),
+                PlayerStat("TFL", "3"),
+                PlayerStat("QB Hits", "4"),
+                PlayerStat("PD", "1"),
+                PlayerStat("FF", "1"),
+                PlayerStat("FR", "0"),
+                PlayerStat("Int", "0")
+            )
+        )
+    )
+
+    Column(
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Text(
+            text = "IMPACT PLAYERS",
+            style = MaterialTheme.typography.caption,
+            color = colors.accent,
+            fontWeight = FontWeight.Bold,
+            fontFamily = FontFamily.Monospace
+        )
+        playerStats.forEach { playerRow ->
+            PlayerStatRow(
+                playerRow = playerRow,
+                colors = colors
+            )
+        }
+    }
+}
+
+
 @OptIn(ExperimentalCupertinoApi::class)
 @Composable
 fun GameDetailsScreen(
@@ -86,6 +183,11 @@ fun GameDetailsScreen(
                     // Insights section
                     InsightsSection(colors = colors)
                 }
+
+                item {
+                    // Scrollable player stats
+                    ScrollableStats(colors = colors)
+                }
                 
                 item {
                     // Predictive analysis section
@@ -103,11 +205,6 @@ fun GameDetailsScreen(
                         modifier = Modifier.padding(top = 8.dp)
                     )
                 }
-                
-                item {
-                    // Scrollable player stats
-                    ScrollableStats(colors = colors)
-                }
             }
         }
         
@@ -119,73 +216,89 @@ fun GameDetailsScreen(
                 .background(colors.background.copy(alpha = 0.95f))
                 .padding(16.dp)
         ) {
-            if (game.awayTeam != null && game.homeTeam != null) {
-                CupertinoSegmentedControl(
-                    colors = CupertinoSegmentedControlDefaults.colors(
-                        separatorColor = colors.accent.copy(alpha = 0.8f),
-                        indicatorColor = colors.accent.copy(alpha = 0.6f)
-                    ),
-                    modifier = Modifier.fillMaxWidth(),
-                    selectedTabIndex = when (selectedPick) {
-                        TeamPickOption.AWAY -> 0
-                        TeamPickOption.PICK -> 1
-                        TeamPickOption.HOME -> 2
-                    },
-                    shape = RectangleShape
-                ) {
-                    CupertinoSegmentedControlTab(
-                        isSelected = selectedPick == TeamPickOption.AWAY,
-                        onClick = { selectedPick = TeamPickOption.AWAY }
-                    ) {
-                        Text(
-                            game.homeTeam,
-                            color = colors.onSurface,
-                            fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 12.sp,
-                            maxLines = 1,
-                            overflow = TextOverflow.Clip
-                        )
-                    }
-                    CupertinoSegmentedControlTab(
-                        isSelected = selectedPick == TeamPickOption.PICK,
-                        onClick = { selectedPick = TeamPickOption.PICK }
-                    ) {
-                        Text(
-                            "NONE",
-                            color = colors.onSurface.copy(alpha = 0.6f),
-                            fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.Normal,
-                            fontSize = 12.sp,
-                            maxLines = 1,
-                            overflow = TextOverflow.Clip
-                        )
-                    }
-                    CupertinoSegmentedControlTab(
-                        isSelected = selectedPick == TeamPickOption.HOME,
-                        onClick = { selectedPick = TeamPickOption.HOME }
-                    ) {
-                        Text(
-                            game.homeTeam,
-                            color = colors.onSurface,
-                            fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 12.sp,
-                            maxLines = 1,
-                            overflow = TextOverflow.Clip
-                        )
-                    }
-                }
-            } else {
-                // For non-team games, show generic pick option
+            Column {
+                // Instructional text above segmented control
                 Text(
-                    text = "PICK UNAVAILABLE",
+                    text = "Pick and beat the model. Based on our analysis, #2 has a 95% chance of winning",
                     style = MaterialTheme.typography.caption,
-                    color = colors.onSurface.copy(alpha = 0.5f),
+                    color = colors.onSurface.copy(alpha = 0.8f),
                     fontFamily = FontFamily.Monospace,
-                    modifier = Modifier.fillMaxWidth(),
-                    textAlign = TextAlign.Center
+                    fontSize = 11.sp,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 8.dp)
                 )
+                
+                // Segmented control
+                if (game.awayTeam != null && game.homeTeam != null) {
+                    CupertinoSegmentedControl(
+                        colors = CupertinoSegmentedControlDefaults.colors(
+                            separatorColor = colors.accent.copy(alpha = 0.8f),
+                            indicatorColor = colors.accent.copy(alpha = 0.6f)
+                        ),
+                        modifier = Modifier.fillMaxWidth(),
+                        selectedTabIndex = when (selectedPick) {
+                            TeamPickOption.AWAY -> 0
+                            TeamPickOption.PICK -> 1
+                            TeamPickOption.HOME -> 2
+                        },
+                        shape = RectangleShape
+                    ) {
+                        CupertinoSegmentedControlTab(
+                            isSelected = selectedPick == TeamPickOption.AWAY,
+                            onClick = { selectedPick = TeamPickOption.AWAY }
+                        ) {
+                            Text(
+                                "#1",
+                                color = colors.onSurface,
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 12.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Clip
+                            )
+                        }
+                        CupertinoSegmentedControlTab(
+                            isSelected = selectedPick == TeamPickOption.PICK,
+                            onClick = { selectedPick = TeamPickOption.PICK }
+                        ) {
+                            Text(
+                                "NONE",
+                                color = colors.onSurface.copy(alpha = 0.6f),
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.Normal,
+                                fontSize = 12.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Clip
+                            )
+                        }
+                        CupertinoSegmentedControlTab(
+                            isSelected = selectedPick == TeamPickOption.HOME,
+                            onClick = { selectedPick = TeamPickOption.HOME }
+                        ) {
+                            Text(
+                                "#2",
+                                color = colors.onSurface,
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 12.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Clip
+                            )
+                        }
+                    }
+                } else {
+                    // For non-team games, show generic pick option
+                    Text(
+                        text = "PICK UNAVAILABLE",
+                        style = MaterialTheme.typography.caption,
+                        color = colors.onSurface.copy(alpha = 0.5f),
+                        fontFamily = FontFamily.Monospace,
+                        modifier = Modifier.fillMaxWidth(),
+                        textAlign = TextAlign.Center
+                    )
+                }
             }
         }
     }
@@ -217,6 +330,8 @@ fun GameBasicInfo(
         fontFamily = FontFamily.Monospace,
         fontSize = 11.sp,
         textAlign = TextAlign.Center,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
         modifier = Modifier.fillMaxWidth()
     )
 }
@@ -227,23 +342,24 @@ fun TeamComparisonSection(
     colors: AppColors
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceAround
+        modifier = Modifier.fillMaxWidth()
     ) {
-        // Away team
+        // Away team (#1) - 50% width
         TeamColumn(
-            teamName = game.awayTeam ?: "",
+            teamName = "#1 ${game.awayTeam ?: "TBD"}",
             eloRating = if (game.awayTeam != null) (1650 + kotlin.random.Random.nextInt(200)).toString() else "---",
             powerRanking = if (game.awayTeam != null) kotlin.random.Random.nextInt(1, 33).toString() else "---",
-            colors = colors
+            colors = colors,
+            modifier = Modifier.weight(0.5f)
         )
         
-        // Home team
+        // Home team (#2) - 50% width
         TeamColumn(
-            teamName = game.homeTeam ?: "",
+            teamName = "#2 ${game.homeTeam ?: "TBD"}",
             eloRating = if (game.homeTeam != null) (1650 + kotlin.random.Random.nextInt(200)).toString() else "---",
             powerRanking = if (game.homeTeam != null) kotlin.random.Random.nextInt(1, 33).toString() else "---",
-            colors = colors
+            colors = colors,
+            modifier = Modifier.weight(0.5f)
         )
     }
 }
@@ -253,18 +369,22 @@ private fun TeamColumn(
     teamName: String,
     eloRating: String,
     powerRanking: String,
-    colors: AppColors
+    colors: AppColors,
+    modifier: Modifier = Modifier
 ) {
     Column(
-        horizontalAlignment = Alignment.Start
+        horizontalAlignment = Alignment.Start,
+        modifier = modifier.padding(horizontal = 8.dp)
     ) {
-        // Team name - bold and not truncated
+        // Team name - bold and truncated with ellipsis
         Text(
             text = teamName,
             style = MaterialTheme.typography.body1,
             color = colors.onSurface,
             fontFamily = FontFamily.Monospace,
-            fontWeight = FontWeight.Bold
+            fontWeight = FontWeight.Bold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
         )
         
         Spacer(modifier = Modifier.height(8.dp))
@@ -295,7 +415,51 @@ private fun TeamColumn(
 
 @Composable
 private fun DataTable(colors: AppColors) {
-    Column {
+    Row(
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        // Team #1 table
+        TeamDataTable(
+            teamNumber = "#1",
+            teamData = listOf(
+                Triple("PPG", "108.7", "+3.6"),
+                Triple("FG%", "44.8", "-2.4"),
+                Triple("3P%", "35.9", "-2.2"),
+                Triple("REB", "41.8", "-1.4"),
+                Triple("AST", "22.3", "-2.3"),
+                Triple("TO", "14.7", "+1.5")
+            ),
+            colors = colors,
+            modifier = Modifier.weight(0.5f)
+        )
+        
+        Spacer(modifier = Modifier.width(16.dp))
+        
+        // Team #2 table
+        TeamDataTable(
+            teamNumber = "#2",
+            teamData = listOf(
+                Triple("PPG", "112.3", "+3.6"),
+                Triple("FG%", "47.2", "+2.4"),
+                Triple("3P%", "38.1", "+2.2"),
+                Triple("REB", "43.2", "+1.4"),
+                Triple("AST", "24.6", "+2.3"),
+                Triple("TO", "13.2", "-1.5")
+            ),
+            colors = colors,
+            modifier = Modifier.weight(0.5f)
+        )
+    }
+}
+
+@Composable
+private fun TeamDataTable(
+    teamNumber: String,
+    teamData: List<Triple<String, String, String>>, // stat, value, diff
+    colors: AppColors,
+    modifier: Modifier = Modifier
+) {
+    Column(modifier = modifier) {
         // Table header
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -310,16 +474,7 @@ private fun DataTable(colors: AppColors) {
                 modifier = Modifier.weight(1f)
             )
             Text(
-                text = "HOME",
-                style = MaterialTheme.typography.caption,
-                color = colors.accent,
-                fontWeight = FontWeight.Bold,
-                fontFamily = FontFamily.Monospace,
-                modifier = Modifier.weight(1f),
-                textAlign = TextAlign.Center
-            )
-            Text(
-                text = "AWAY",
+                text = teamNumber,
                 style = MaterialTheme.typography.caption,
                 color = colors.accent,
                 fontWeight = FontWeight.Bold,
@@ -345,16 +500,7 @@ private fun DataTable(colors: AppColors) {
         )
         
         // Table rows
-        val tableData = listOf(
-            listOf("PPG", "112.3", "108.7", "+3.6"),
-            listOf("FG%", "47.2", "44.8", "+2.4"),
-            listOf("3P%", "38.1", "35.9", "+2.2"),
-            listOf("REB", "43.2", "41.8", "+1.4"),
-            listOf("AST", "24.6", "22.3", "+2.3"),
-            listOf("TO", "13.2", "14.7", "-1.5")
-        )
-        
-        tableData.forEach { row ->
+        teamData.forEach { (stat, value, diff) ->
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -362,14 +508,14 @@ private fun DataTable(colors: AppColors) {
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Text(
-                    text = row[0],
+                    text = stat,
                     style = MaterialTheme.typography.caption,
                     color = colors.onSurface,
                     fontFamily = FontFamily.Monospace,
                     modifier = Modifier.weight(1f)
                 )
                 Text(
-                    text = row[1],
+                    text = value,
                     style = MaterialTheme.typography.caption,
                     color = colors.onSurface,
                     fontFamily = FontFamily.Monospace,
@@ -377,17 +523,9 @@ private fun DataTable(colors: AppColors) {
                     textAlign = TextAlign.Center
                 )
                 Text(
-                    text = row[2],
+                    text = diff,
                     style = MaterialTheme.typography.caption,
-                    color = colors.onSurface,
-                    fontFamily = FontFamily.Monospace,
-                    modifier = Modifier.weight(1f),
-                    textAlign = TextAlign.Center
-                )
-                Text(
-                    text = row[3],
-                    style = MaterialTheme.typography.caption,
-                    color = if (row[3].startsWith("+")) colors.accent else colors.error,
+                    color = if (diff.startsWith("+")) colors.accent else colors.error,
                     fontFamily = FontFamily.Monospace,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.weight(1f),
@@ -511,94 +649,6 @@ fun PredictiveAnalysisSection(
                 fontFamily = FontFamily.Monospace,
                 lineHeight = 16.sp,
                 modifier = Modifier.weight(1f)
-            )
-        }
-    }
-}
-
-@Composable
-fun ScrollableStats(colors: AppColors) {
-    // Sample player data
-    val playerStats = listOf(
-        PlayerStatsRow(
-            playerName = "J. Herbert",
-            stats = listOf(
-                PlayerStat("Impact Score", "24.6", isBold = true),
-                PlayerStat("Pass yds", "287"),
-                PlayerStat("Pass TD", "2"),
-                PlayerStat("INT", "1"),
-                PlayerStat("Rating", "94.2"),
-                PlayerStat("Rush yds", "23"),
-                PlayerStat("Rush TD", "0"),
-                PlayerStat("Fumbles", "0"),
-                PlayerStat("Comp%", "68.5")
-            )
-        ),
-        PlayerStatsRow(
-            playerName = "A. Ekeler",
-            stats = listOf(
-                PlayerStat("Impact Score", "18.3", isBold = true),
-                PlayerStat("Rush yds", "112"),
-                PlayerStat("Rush TD", "1"),
-                PlayerStat("Rec", "7"),
-                PlayerStat("Rec yds", "65"),
-                PlayerStat("Rec TD", "1"),
-                PlayerStat("Fumbles", "0"),
-                PlayerStat("YPC", "4.8"),
-                PlayerStat("Long", "18")
-            )
-        ),
-        PlayerStatsRow(
-            playerName = "K. Allen",
-            stats = listOf(
-                PlayerStat("Impact Score", "21.7", isBold = true),
-                PlayerStat("Rec", "8"),
-                PlayerStat("Rec yds", "109"),
-                PlayerStat("Rec TD", "1"),
-                PlayerStat("Targets", "12"),
-                PlayerStat("YPR", "13.6"),
-                PlayerStat("Long", "24"),
-                PlayerStat("Drops", "1"),
-                PlayerStat("Catch%", "66.7")
-            )
-        ),
-        PlayerStatsRow(
-            playerName = "M. Williams",
-            stats = listOf(
-                PlayerStat("Impact Score", "15.2", isBold = true),
-                PlayerStat("Rec", "5"),
-                PlayerStat("Rec yds", "87"),
-                PlayerStat("Rec TD", "0"),
-                PlayerStat("Targets", "8"),
-                PlayerStat("YPR", "17.4"),
-                PlayerStat("Long", "31"),
-                PlayerStat("Drops", "0"),
-                PlayerStat("Catch%", "62.5")
-            )
-        ),
-        PlayerStatsRow(
-            playerName = "C. Mack",
-            stats = listOf(
-                PlayerStat("Impact Score", "19.4", isBold = true),
-                PlayerStat("Tackles", "9"),
-                PlayerStat("Sacks", "2.5"),
-                PlayerStat("TFL", "3"),
-                PlayerStat("QB Hits", "4"),
-                PlayerStat("PD", "1"),
-                PlayerStat("FF", "1"),
-                PlayerStat("FR", "0"),
-                PlayerStat("Int", "0")
-            )
-        )
-    )
-    
-    Column(
-        verticalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        playerStats.forEach { playerRow ->
-            PlayerStatRow(
-                playerRow = playerRow,
-                colors = colors
             )
         }
     }

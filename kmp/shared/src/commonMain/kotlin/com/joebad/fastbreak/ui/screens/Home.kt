@@ -30,6 +30,7 @@ import androidx.compose.ui.zIndex
 import com.joebad.fastbreak.data.cache.FastbreakCache
 import com.joebad.fastbreak.data.global.AppDataState
 import com.joebad.fastbreak.data.picks.ScheduleViewModel
+import com.joebad.fastbreak.model.dtos.EmptyFastbreakCardItem
 import com.joebad.fastbreak.model.dtos.LeaderboardItem
 import com.joebad.fastbreak.ui.ScheduleSection
 import com.joebad.fastbreak.ui.theme.AppColors
@@ -53,7 +54,8 @@ fun HomeScreen(
     appDataState: AppDataState,
     onLogout: () -> Unit = {},
     authRepository: AuthRepository,
-    fastbreakCache: FastbreakCache
+    fastbreakCache: FastbreakCache,
+    onGameDetailsClick: (EmptyFastbreakCardItem) -> Unit = {}
 ) {
     val colors = LocalColors.current
     val scheduleViewModel = remember { ScheduleViewModel(appDataState.dateCode, authRepository, fastbreakCache) }
@@ -68,6 +70,7 @@ fun HomeScreen(
     val totalPoints = appDataState.scheduleData?.fastbreakCard?.filter { game ->
         scheduleState.selectedWinners.containsKey(game.id)
     }?.sumOf { it.points } ?: 0
+
 
     Box(modifier = Modifier.fillMaxSize()) {
         LazyColumn(
@@ -93,7 +96,8 @@ fun HomeScreen(
                                 games = schedule.fastbreakCard, 
                                 colors = colors, 
                                 viewModel = scheduleViewModel,
-                                lockedCardForDate = lockedCardForDate
+                                lockedCardForDate = lockedCardForDate,
+                                onGameDetailsClick = onGameDetailsClick
                             )
                         }
                     }

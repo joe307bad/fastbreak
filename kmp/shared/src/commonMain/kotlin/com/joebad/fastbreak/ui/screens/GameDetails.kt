@@ -150,13 +150,12 @@ fun GameDetailsScreen(
     onBackClick: () -> Unit
 ) {
     var selectedPick by remember { mutableStateOf(TeamPickOption.PICK) }
-    
+
     Box(modifier = Modifier.fillMaxSize()) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .background(colors.background)
-                .padding(bottom = 80.dp) // Reduced space for bottom segmented control
         ) {
             LazyColumn(
                 modifier = Modifier
@@ -168,17 +167,17 @@ fun GameDetailsScreen(
                     // Basic game info
                     GameBasicInfo(game = game, colors = colors)
                 }
-                
+
                 item {
                     // Two-column team layout
                     TeamComparisonSection(game = game, colors = colors)
                 }
-                
+
                 item {
                     // Data table
                     DataTable(colors = colors)
                 }
-                
+
                 item {
                     // Insights section
                     InsightsSection(colors = colors)
@@ -188,117 +187,100 @@ fun GameDetailsScreen(
                     // Scrollable player stats
                     ScrollableStats(colors = colors)
                 }
-                
+
                 item {
                     // Predictive analysis section
                     PredictiveAnalysisSection(game = game, colors = colors)
                 }
-                
+
+
                 item {
-                    // PLAYER STATS header
-                    Text(
-                        text = "PLAYER STATS",
-                        style = MaterialTheme.typography.caption,
-                        color = colors.accent,
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.Monospace,
-                        modifier = Modifier.padding(top = 8.dp)
-                    )
-                }
-            }
-        }
-        
-        // Bottom segmented control for team selection
-        Box(
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .fillMaxWidth()
-                .background(colors.background.copy(alpha = 0.95f))
-                .padding(16.dp)
-        ) {
-            Column {
-                // Instructional text above segmented control
-                Text(
-                    text = "Pick and beat the model. Based on our analysis, #2 has a 95% chance of winning",
-                    style = MaterialTheme.typography.caption,
-                    color = colors.onSurface.copy(alpha = 0.8f),
-                    fontFamily = FontFamily.Monospace,
-                    fontSize = 11.sp,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 8.dp)
-                )
-                
-                // Segmented control
-                if (game.awayTeam != null && game.homeTeam != null) {
-                    CupertinoSegmentedControl(
-                        colors = CupertinoSegmentedControlDefaults.colors(
-                            separatorColor = colors.accent.copy(alpha = 0.8f),
-                            indicatorColor = colors.accent.copy(alpha = 0.6f)
-                        ),
-                        modifier = Modifier.fillMaxWidth(),
-                        selectedTabIndex = when (selectedPick) {
-                            TeamPickOption.AWAY -> 0
-                            TeamPickOption.PICK -> 1
-                            TeamPickOption.HOME -> 2
-                        },
-                        shape = RectangleShape
-                    ) {
-                        CupertinoSegmentedControlTab(
-                            isSelected = selectedPick == TeamPickOption.AWAY,
-                            onClick = { selectedPick = TeamPickOption.AWAY }
-                        ) {
+                    Column {
+                        // Instructional text above segmented control
+                        Text(
+                            text = "Pick and beat the model. Based on our analysis, #2 has a 95% chance of winning",
+                            style = MaterialTheme.typography.caption,
+                            color = colors.onSurface.copy(alpha = 0.8f),
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 11.sp,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 8.dp)
+                        )
+
+                        // Segmented control
+                        if (game.awayTeam != null && game.homeTeam != null) {
+                            CupertinoSegmentedControl(
+                                colors = CupertinoSegmentedControlDefaults.colors(
+                                    separatorColor = colors.accent.copy(alpha = 0.8f),
+                                    indicatorColor = colors.accent.copy(alpha = 0.6f)
+                                ),
+                                modifier = Modifier.fillMaxWidth(),
+                                selectedTabIndex = when (selectedPick) {
+                                    TeamPickOption.AWAY -> 0
+                                    TeamPickOption.PICK -> 1
+                                    TeamPickOption.HOME -> 2
+                                },
+                                shape = RectangleShape
+                            ) {
+                                CupertinoSegmentedControlTab(
+                                    isSelected = selectedPick == TeamPickOption.AWAY,
+                                    onClick = { selectedPick = TeamPickOption.AWAY }
+                                ) {
+                                    Text(
+                                        "#1",
+                                        color = colors.onSurface,
+                                        fontFamily = FontFamily.Monospace,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 12.sp,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Clip
+                                    )
+                                }
+                                CupertinoSegmentedControlTab(
+                                    isSelected = selectedPick == TeamPickOption.PICK,
+                                    onClick = { selectedPick = TeamPickOption.PICK }
+                                ) {
+                                    Text(
+                                        "NONE",
+                                        color = colors.onSurface.copy(alpha = 0.6f),
+                                        fontFamily = FontFamily.Monospace,
+                                        fontWeight = FontWeight.Normal,
+                                        fontSize = 12.sp,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Clip
+                                    )
+                                }
+                                CupertinoSegmentedControlTab(
+                                    isSelected = selectedPick == TeamPickOption.HOME,
+                                    onClick = { selectedPick = TeamPickOption.HOME }
+                                ) {
+                                    Text(
+                                        "#2",
+                                        color = colors.onSurface,
+                                        fontFamily = FontFamily.Monospace,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 12.sp,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Clip
+                                    )
+                                }
+                            }
+                        } else {
+                            // For non-team games, show generic pick option
                             Text(
-                                "#1",
-                                color = colors.onSurface,
+                                text = "PICK UNAVAILABLE",
+                                style = MaterialTheme.typography.caption,
+                                color = colors.onSurface.copy(alpha = 0.5f),
                                 fontFamily = FontFamily.Monospace,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 12.sp,
-                                maxLines = 1,
-                                overflow = TextOverflow.Clip
-                            )
-                        }
-                        CupertinoSegmentedControlTab(
-                            isSelected = selectedPick == TeamPickOption.PICK,
-                            onClick = { selectedPick = TeamPickOption.PICK }
-                        ) {
-                            Text(
-                                "NONE",
-                                color = colors.onSurface.copy(alpha = 0.6f),
-                                fontFamily = FontFamily.Monospace,
-                                fontWeight = FontWeight.Normal,
-                                fontSize = 12.sp,
-                                maxLines = 1,
-                                overflow = TextOverflow.Clip
-                            )
-                        }
-                        CupertinoSegmentedControlTab(
-                            isSelected = selectedPick == TeamPickOption.HOME,
-                            onClick = { selectedPick = TeamPickOption.HOME }
-                        ) {
-                            Text(
-                                "#2",
-                                color = colors.onSurface,
-                                fontFamily = FontFamily.Monospace,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 12.sp,
-                                maxLines = 1,
-                                overflow = TextOverflow.Clip
+                                modifier = Modifier.fillMaxWidth(),
+                                textAlign = TextAlign.Center
                             )
                         }
                     }
-                } else {
-                    // For non-team games, show generic pick option
-                    Text(
-                        text = "PICK UNAVAILABLE",
-                        style = MaterialTheme.typography.caption,
-                        color = colors.onSurface.copy(alpha = 0.5f),
-                        fontFamily = FontFamily.Monospace,
-                        modifier = Modifier.fillMaxWidth(),
-                        textAlign = TextAlign.Center
-                    )
                 }
+
             }
         }
     }
@@ -322,7 +304,7 @@ fun GameBasicInfo(
 ) {
     // Sample game info - in a real app this would come from the game data
     val gameInfo = "Dec 15, 2024 • 8:15 PM EST • Crypto.com Arena, Los Angeles, CA"
-    
+
     Text(
         text = gameInfo,
         style = MaterialTheme.typography.caption,
@@ -348,16 +330,18 @@ fun TeamComparisonSection(
         TeamColumn(
             teamName = "#1 ${game.awayTeam ?: "TBD"}",
             eloRating = if (game.awayTeam != null) (1650 + kotlin.random.Random.nextInt(200)).toString() else "---",
-            powerRanking = if (game.awayTeam != null) kotlin.random.Random.nextInt(1, 33).toString() else "---",
+            powerRanking = if (game.awayTeam != null) kotlin.random.Random.nextInt(1, 33)
+                .toString() else "---",
             colors = colors,
             modifier = Modifier.weight(0.5f)
         )
-        
+
         // Home team (#2) - 50% width
         TeamColumn(
             teamName = "#2 ${game.homeTeam ?: "TBD"}",
             eloRating = if (game.homeTeam != null) (1650 + kotlin.random.Random.nextInt(200)).toString() else "---",
-            powerRanking = if (game.homeTeam != null) kotlin.random.Random.nextInt(1, 33).toString() else "---",
+            powerRanking = if (game.homeTeam != null) kotlin.random.Random.nextInt(1, 33)
+                .toString() else "---",
             colors = colors,
             modifier = Modifier.weight(0.5f)
         )
@@ -386,9 +370,9 @@ private fun TeamColumn(
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
-        
+
         Spacer(modifier = Modifier.height(8.dp))
-        
+
         // ELO Rating
         Text(
             text = "ELO: $eloRating",
@@ -398,9 +382,9 @@ private fun TeamColumn(
             fontWeight = FontWeight.Normal,
             fontSize = 16.sp
         )
-        
+
         Spacer(modifier = Modifier.height(4.dp))
-        
+
         // Power Ranking
         Text(
             text = "PWR: $powerRanking",
@@ -432,9 +416,9 @@ private fun DataTable(colors: AppColors) {
             colors = colors,
             modifier = Modifier.weight(0.5f)
         )
-        
+
         Spacer(modifier = Modifier.width(16.dp))
-        
+
         // Team #2 table
         TeamDataTable(
             teamNumber = "#2",
@@ -492,13 +476,13 @@ private fun TeamDataTable(
                 textAlign = TextAlign.End
             )
         }
-        
+
         Divider(
             color = colors.onSurface.copy(alpha = 0.3f),
             thickness = 0.5.dp,
             modifier = Modifier.padding(vertical = 4.dp)
         )
-        
+
         // Table rows
         teamData.forEach { (stat, value, diff) ->
             Row(
@@ -548,13 +532,13 @@ fun InsightsSection(colors: AppColors) {
             fontWeight = FontWeight.Bold,
             fontFamily = FontFamily.Monospace
         )
-        
+
         val insights = listOf(
             "Home team advantage is amplified by superior offensive line play, allowing 2.1 fewer sacks per game on average",
             "Away team's defensive secondary has allowed 15% fewer passing yards in the red zone over their last 5 games",
             "Weather conditions favor ground-heavy offensive schemes, with historical data showing 23% increase in rushing attempts"
         )
-        
+
         insights.forEach { insight ->
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -595,20 +579,21 @@ fun PredictiveAnalysisSection(
             fontWeight = FontWeight.Bold,
             fontFamily = FontFamily.Monospace
         )
-        
+
         val prediction = if (game.homeTeam != null && game.awayTeam != null) {
             val homeTeamName = game.homeTeam
             val awayTeamName = game.awayTeam
-            val favoredTeam = if (kotlin.random.Random.nextBoolean()) homeTeamName to game.homeTeam else awayTeamName to game.awayTeam
+            val favoredTeam =
+                if (kotlin.random.Random.nextBoolean()) homeTeamName to game.homeTeam else awayTeamName to game.awayTeam
             val margin = kotlin.random.Random.nextInt(3, 14)
-            
+
             "Model predicts **${favoredTeam.second}** will win by $margin points based on recent form and matchup analysis. " +
-            "Their superior third-down conversion rate (68.2% vs 52.1%) and defensive pressure in crucial situations " +
-            "should provide the decisive edge in a closely contested game."
+                    "Their superior third-down conversion rate (68.2% vs 52.1%) and defensive pressure in crucial situations " +
+                    "should provide the decisive edge in a closely contested game."
         } else {
             "Prediction unavailable - teams not yet determined for this matchup."
         }
-        
+
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.Top
@@ -624,24 +609,30 @@ fun PredictiveAnalysisSection(
             val annotatedPrediction = buildAnnotatedString {
                 val cleanPrediction = prediction.replace("**", "")
                 var currentIndex = 0
-                val boldPattern = Regex("(Lakers|Warriors|Celtics|Heat|Bulls|Knicks|Nets|Sixers|Bucks|Raptors|Hawks|Hornets|Magic|Wizards|Pistons|Pacers|Cavaliers|Nuggets|Jazz|Thunder|Trail Blazers|Timberwolves|Kings|Suns|Clippers|Mavericks|Rockets|Grizzlies|Pelicans|Spurs)")
-                
+                val boldPattern =
+                    Regex("(Lakers|Warriors|Celtics|Heat|Bulls|Knicks|Nets|Sixers|Bucks|Raptors|Hawks|Hornets|Magic|Wizards|Pistons|Pacers|Cavaliers|Nuggets|Jazz|Thunder|Trail Blazers|Timberwolves|Kings|Suns|Clippers|Mavericks|Rockets|Grizzlies|Pelicans|Spurs)")
+
                 boldPattern.findAll(cleanPrediction).forEach { matchResult ->
                     // Add text before the team name
                     append(cleanPrediction.substring(currentIndex, matchResult.range.first))
-                    
+
                     // Add the team name with bold styling
-                    withStyle(style = SpanStyle(fontWeight = FontWeight.Bold, color = colors.accent)) {
+                    withStyle(
+                        style = SpanStyle(
+                            fontWeight = FontWeight.Bold,
+                            color = colors.accent
+                        )
+                    ) {
                         append(matchResult.value)
                     }
-                    
+
                     currentIndex = matchResult.range.last + 1
                 }
-                
+
                 // Add remaining text
                 append(cleanPrediction.substring(currentIndex))
             }
-            
+
             Text(
                 text = annotatedPrediction,
                 style = MaterialTheme.typography.caption,
@@ -674,7 +665,7 @@ private fun PlayerStatRow(
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
-        
+
         // Horizontally scrollable stats
         LazyRow(
             horizontalArrangement = Arrangement.spacedBy(16.dp),

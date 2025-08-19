@@ -8,6 +8,7 @@
   <ItemGroup>
     <Compile Include="Entities\GameData.fs" />
     <Compile Include="Services\EloCalculator.fs" />
+    <Compile Include="Services\CsvParser.fs" />
     <Compile Include="Commands\EloPlus.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>

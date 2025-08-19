@@ -6,8 +6,8 @@ open Fastbreak.Cli.Entities
 module EloCalculator =
     
     // Standard Elo rating constants
-    let DEFAULT_RATING = 1500.0m
-    let K_FACTOR = 32.0m
+    let DEFAULT_RATING = 1600.0m
+    let K_FACTOR = 24.0m
     
     // Calculate expected score for a team given their rating vs opponent
     let calculateExpectedScore (teamRating: decimal) (opponentRating: decimal) : decimal =
@@ -55,7 +55,7 @@ module EloCalculator =
         |> Map.toList
         |> List.map (fun (team, rating) -> {
             Team = team
-            StandardElo = Math.Round(rating, 2)
+            StandardElo = Math.Round(rating, 3)
             EloPlus = None
             LastUpdated = timestamp
         })

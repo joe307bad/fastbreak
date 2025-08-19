@@ -2,13 +2,11 @@ open Argu
 open Fastbreak.Cli.Commands
 
 type CliArgs =
-    | [<CliPrefix(CliPrefix.None)>] Export_Leaderboard of ParseResults<DataExport.ExportArgs>
-    | [<CliPrefix(CliPrefix.None)>] Export_Stats of ParseResults<DataExport.ExportArgs>
+    | [<CliPrefix(CliPrefix.None)>] Generate_Elo_Plus
     interface IArgParserTemplate with
         member this.Usage =
             match this with
-            | Export_Leaderboard _ -> "export leaderboard data"
-            | Export_Stats _ -> "export statistics data"
+            | Generate_Elo_Plus -> "generate Elo+ ratings using ML.NET"
 
 [<EntryPoint>]
 let main args =
@@ -18,8 +16,7 @@ let main args =
         let results = parser.ParseCommandLine(inputs = args, raiseOnUsage = true)
         
         match results.GetAllResults() with
-        | [Export_Leaderboard exportArgs] -> DataExport.exportLeaderboard exportArgs
-        | [Export_Stats exportArgs] -> DataExport.exportStatSheets exportArgs
+        | [Generate_Elo_Plus] -> EloPlus.generateEloPlusRatings ()
         | [] -> 
             printfn "%s" (parser.PrintUsage())
             0

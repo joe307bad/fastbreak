@@ -6,12 +6,13 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="Commands\DataExport.fs" />
+    <Compile Include="Commands\EloPlus.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Argu" Version="6.2.4" />
+    <PackageReference Include="Microsoft.ML" Version="3.0.1" />
     <PackageReference Include="MongoDB.Driver" Version="3.0.0" />
   </ItemGroup>
 

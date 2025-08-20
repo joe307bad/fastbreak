@@ -101,10 +101,8 @@ module EloPlus =
                 sortedGames
                 |> List.iteri (fun i game ->
                     let gameDetails = EloCalculator.getGameDetails currentRatings game
-                    if i % progressInterval = 0 || i < 10 then // Always show first 10 games
+                    if i % progressInterval = 0 then // Show every Nth game based on progress interval
                         printfn "%s" gameDetails
-                    elif i % progressInterval = 0 then
-                        printfn "Processed %d games..." (i + 1)
                     currentRatings <- EloCalculator.processGame currentRatings game
                 )
                 

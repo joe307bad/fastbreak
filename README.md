@@ -139,6 +139,18 @@ Simple entity structure to represent:
    - Error handling and reporting for malformed data
    - Performance metrics: total games processed and processing time
 10. 🔲 **Phase 8**: Build ML.NET model for second-pass enhancement
+   - Create ML.NET training data structure with features:
+     - Traditional Elo ratings (home/away team)
+     - Weather factors (temperature, wind speed/direction, precipitation)
+     - Pitcher performance metrics (ERA, WHIP, K/BB ratio, innings pitched)
+     - Team offensive metrics (OPS differential)
+     - Team pitching metrics (ERA+, FIP differential)
+   - Implement binary classification model for game outcome prediction
+   - Feature engineering: normalize values, create interaction terms
+   - Model selection: compare Logistic Regression, Decision Tree, Fast Tree
+   - Cross-validation with temporal splitting (chronological order maintained)
+   - Generate Elo+ adjustment factors based on ML model confidence
+   - Integration with existing Elo calculation pipeline
 11. 🔲 **Phase 9**: Implement model training and validation
    - Split historical data into 80% training and 20% validation sets
    - Train ML.NET model on 80% of chronologically ordered games
@@ -157,6 +169,63 @@ Simple entity structure to represent:
    - Create shared interfaces for rating calculations
    - Enable API integration for web services
    - Maintain CLI compatibility with shared components
+
+### ML.NET Model Architecture (Phase 8)
+
+#### Feature Engineering Strategy
+```fsharp
+type GameFeatures = {
+    // Elo-based features
+    HomeElo: float32
+    AwayElo: float32
+    EloDifference: float32
+    
+    // Weather features (normalized)
+    Temperature: float32         // Normalized to 0-1 range
+    WindSpeed: float32          // Normalized to 0-1 range
+    WindFactor: float32         // Directional wind impact (-1 to 1)
+    PrecipitationLevel: float32 // Categorical: 0=none, 0.5=light, 1=heavy
+    
+    // Pitcher features
+    HomeERAAdvantage: float32   // (League avg ERA - Home ERA) / League avg
+    AwayERAAdvantage: float32   // (League avg ERA - Away ERA) / League avg
+    HomeWHIPAdvantage: float32  // Similar normalization
+    AwayWHIPAdvantage: float32
+    HomeStrikeoutRate: float32  // K/9 normalized
+    AwayStrikeoutRate: float32
+    
+    // Team offensive features
+    OPSDifferential: float32    // HomeOPS - AwayOPS
+    ERAPlus Differential: float32 // HomeERA+ - AwayERA+
+    FIPDifferential: float32    // AwayFIP - HomeFIP (lower is better)
+    
+    // Interaction terms
+    EloWeatherInteraction: float32      // Elo difference * weather factor
+    PitcherMatchupAdvantage: float32    // Combined pitcher advantage score
+}
+
+type GamePrediction = {
+    HomeWinProbability: float32
+    Label: bool  // true = home win, false = away win
+}
+```
+
+#### Model Training Pipeline
+1. **Data Preprocessing**: Convert GameData to GameFeatures with normalization
+2. **Feature Selection**: Use ML.NET feature importance analysis
+3. **Model Training**: Train multiple algorithms in parallel:
+   - FastTree (gradient boosting)
+   - LightGBM (if available)
+   - Logistic Regression (baseline)
+4. **Model Evaluation**: Cross-validation with temporal splits
+5. **Hyperparameter Tuning**: Grid search for optimal parameters
+6. **Elo+ Integration**: Use model confidence to adjust traditional Elo ratings
+
+#### Performance Targets
+- **Accuracy**: >62% on validation set (baseline: ~54% for random)
+- **AUC-ROC**: >0.65 (Area Under Curve for binary classification)
+- **Precision/Recall**: Balanced performance for both home/away wins
+- **Training Speed**: <30 seconds for 10,000 games on standard hardware
 
 ### Sample Data Structure
 

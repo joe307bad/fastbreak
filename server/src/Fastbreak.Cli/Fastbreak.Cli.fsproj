@@ -9,6 +9,10 @@
     <Compile Include="Entities\GameData.fs" />
     <Compile Include="Services\EloCalculator.fs" />
     <Compile Include="Services\CsvParser.fs" />
+    <Compile Include="Services\MLFeatures.fs" />
+    <Compile Include="Services\FeatureEngineering.fs" />
+    <Compile Include="Services\MLModelTrainer.fs" />
+    <Compile Include="Services\EloPlusCalculator.fs" />
     <Compile Include="Commands\EloPlus.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>

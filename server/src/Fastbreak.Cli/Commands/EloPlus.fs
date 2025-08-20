@@ -60,7 +60,6 @@ module EloPlus =
     
     let generateEloPlusRatings (args: ParseResults<'T>) =
         printfn "=== Elo+ Rating Generation ==="
-        printfn "Phase 4: CSV file input support implemented\n"
         
         let progressInterval = 10 // Default for now  
         let filePath = 
@@ -171,10 +170,75 @@ module EloPlus =
                 printfn "Games per second: %.1f" (float games.Length / processingTime.TotalSeconds)
                 printfn "Data source: %s" dataSource
                 
-                printfn "\nPhase 4 Complete: CSV file input support implemented"
-                printfn "Next Steps:"
-                printfn "- Phase 5: Create CSV sample data file"
-                printfn "- Phase 6: Add streaming and progress reporting"
-                printfn "- Phase 7: Implement second-pass Elo+ calculation with ML.NET"
+                // Test feature engineering (Phase 8 Step 2)
+                printfn "\n=== ML Feature Engineering Test ==="
+                printfn "=================================="
+                let features = FeatureEngineering.convertGamesToFeatures games
+                let featureStats = FeatureEngineering.getFeatureStatistics features
+                printfn "%s" featureStats
                 
+                if features.Length > 0 then
+                    let firstFeature = features.[0]
+                    printfn "\nSample Feature Vector (Game 1):"
+                    printfn "HomeElo: %.1f, AwayElo: %.1f, EloDiff: %.1f" 
+                        firstFeature.HomeElo firstFeature.AwayElo firstFeature.EloDifference
+                    printfn "Temperature: %.2f, WindSpeed: %.2f, WindFactor: %.2f" 
+                        firstFeature.Temperature firstFeature.WindSpeed firstFeature.WindFactor
+                    printfn "HomeERA+: %.2f, AwayERA+: %.2f, OPSDiff: %.3f" 
+                        firstFeature.HomeERAAdvantage firstFeature.AwayERAAdvantage firstFeature.OPSDifferential
+                    printfn "HomeWin: %b" firstFeature.HomeWin
+                    
+                    // Test ML.NET training (Phase 8 Step 3)
+                    if features.Length >= 10 then // Need enough data for training/testing
+                        printfn "\n=== ML.NET Model Training Test ==="
+                        printfn "================================="
+                        let baseline = MLModelTrainer.calculateBaseline features
+                        printfn "Baseline accuracy: %.1f%% (always predict majority class)" (baseline * 100.0)
+                        
+                        try
+                            let result = MLModelTrainer.trainModel features MLModelTrainer.defaultConfig
+                            printfn "%s" (MLModelTrainer.formatTrainingResult result)
+                            
+                            if result.Accuracy > baseline then
+                                printfn "✅ ML model beats baseline by %.1f%%" ((result.Accuracy - baseline) * 100.0)
+                            else
+                                printfn "⚠️  ML model underperformed baseline"
+                        with
+                        | ex -> 
+                            printfn "❌ ML training failed: %s" ex.Message
+                    else
+                        printfn "\n⚠️  Not enough data for ML training (need ≥10 games, have %d)" features.Length
+                
+                // Test Elo+ calculation (Phase 8 Step 4)
+                printfn "\n=== Elo+ Enhanced Ratings Test ==="
+                printfn "================================="
+                let eloPlusRatings = EloPlusCalculator.calculateEloPlusRatings games EloPlusCalculator.defaultConfig
+                let eloPlusStats = EloPlusCalculator.getEloPlusStatistics eloPlusRatings
+                printfn "%s" eloPlusStats
+                
+                if not (Map.isEmpty eloPlusRatings) then
+                    printfn "\nTop 10 Elo+ Ratings:"
+                    let topRatings = 
+                        eloPlusRatings
+                        |> Map.toList
+                        |> List.map snd
+                        |> List.sortByDescending (fun r -> r.FinalEloPlus)
+                        |> List.take (min 10 (Map.count eloPlusRatings))
+                    
+                    topRatings
+                    |> List.mapi (fun i rating ->
+                        let adjustment = 
+                            if rating.EloPlusAdjustment > 0.0 then sprintf "+%.1f" rating.EloPlusAdjustment 
+                            elif rating.EloPlusAdjustment < 0.0 then sprintf "%.1f" rating.EloPlusAdjustment
+                            else "±0.0"
+                        let confidence = 
+                            rating.MLConfidence 
+                            |> Option.map (fun c -> sprintf " (%.1f%% conf)" (c * 100.0)) 
+                            |> Option.defaultValue ""
+                        sprintf "%d. %-25s Elo: %.1f → Elo+: %.1f [%s]%s" 
+                            (i + 1) rating.Team (float rating.StandardElo) (float rating.FinalEloPlus) adjustment confidence)
+                    |> List.iter (printfn "%s")
+                else
+                    printfn "\n❌ No Elo+ ratings calculated - insufficient game data or ML model training failed"
+
                 0

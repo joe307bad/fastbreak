@@ -1,11 +1,27 @@
 # Main script for collecting baseball game data
-# Creates CSV files matching the fastbreak test.csv format
+# Creates CSV files with comprehensive game statistics including:
+# - Starting pitchers and their performance metrics
+# - Team advanced statistics from FanGraphs (wOBA, ERA-, FIP)
+# - Weather conditions
+# - Game outcomes and scores
 
 # Load configuration and setup
 source("config/setup.R")
 source("config/config.R")
 source("utils/data_utils.R")
 source("utils/weather_utils.R")
+
+# Logging configuration
+LOG_LEVEL <- Sys.getenv("LOG_LEVEL", "INFO")  # DEBUG, INFO, WARN, ERROR
+VERBOSE <- LOG_LEVEL %in% c("DEBUG", "INFO")
+
+log_message <- function(level, message) {
+  if (level == "DEBUG" && LOG_LEVEL != "DEBUG") return()
+  if (level == "INFO" && !VERBOSE) return()
+  
+  timestamp <- format(Sys.time(), "%Y-%m-%d %H:%M:%S")
+  cat(sprintf("[%s] %s: %s\n", timestamp, level, message))
+}
 
 #' Collect comprehensive game data for date range
 #' @param start_date Start date (YYYY-MM-DD format)
@@ -15,19 +31,37 @@ collect_game_data <- function(start_date = DEFAULT_START_DATE,
                              end_date = DEFAULT_END_DATE,
                              output_file = OUTPUT_FILENAME) {
   
-  cat("Starting data collection from", start_date, "to", end_date, "\n")
+  log_message("INFO", sprintf("Starting data collection from %s to %s", start_date, end_date))
+  
+  # Validate inputs
+  if (is.na(as.Date(start_date)) || is.na(as.Date(end_date))) {
+    stop("Invalid date format. Use YYYY-MM-DD")
+  }
   
   # Step 1: Get game schedule
-  cat("Fetching game schedule...\n")
-  games <- get_game_schedule(start_date, end_date)
-  cat("Found", nrow(games), "games\n")
+  log_message("INFO", "Fetching game schedule...")
+  games <- tryCatch({
+    get_game_schedule(start_date, end_date)
+  }, error = function(e) {
+    log_message("ERROR", sprintf("Failed to fetch game schedule: %s", e$message))
+    stop(e)
+  })
   
-  # Step 2: Process each game (limit to first game for testing)
+  if (nrow(games) == 0) {
+    log_message("WARN", "No games found for the specified date range")
+    return(data.frame())
+  }
+  
+  log_message("INFO", sprintf("Found %d games", nrow(games)))
+  
+  # Step 2: Process each game
   cat("Processing game data...\n")
   
-  # Limit to first game only for testing
-  games <- games[1, ]
-  cat("Limited to first game for testing\n")
+  # Option to limit to single game for testing (set LIMIT_GAMES environment variable)
+  if (Sys.getenv("LIMIT_GAMES", "FALSE") == "TRUE") {
+    games <- games[1, , drop = FALSE]
+    log_message("INFO", "Limited to single game for testing (LIMIT_GAMES=TRUE)")
+  }
   
   # Process games one by one with detailed logging
   game_data_list <- list()

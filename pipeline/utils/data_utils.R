@@ -5,17 +5,43 @@
 #' @param game_date Date of the game
 get_starting_pitchers <- function(game_pk, game_date) {
   tryCatch({
-    # Get game info to find starting pitchers
-    game_info <- mlb_game_info(game_pk)
+    # Get play-by-play data which contains reliable pitcher information
+    pbp <- mlb_pbp(game_pk)
     
-    # Extract starting pitcher info (this is a simplified version)
-    # In practice, you'd need to parse the game data to find actual starters
+    if (is.null(pbp) || nrow(pbp) == 0) {
+      stop(sprintf("No play-by-play data available for game %s", game_pk))
+    }
+    
+    # Get starting pitchers from first inning
+    # Home starter pitches when away team bats (top of 1st inning)
+    # Away starter pitches when home team bats (bottom of 1st inning)
+    
+    home_starter <- pbp %>%
+      filter(about.inning == 1, about.halfInning == "top", !is.na(matchup.pitcher.fullName)) %>%
+      slice(1) %>%
+      pull(matchup.pitcher.fullName)
+    
+    away_starter <- pbp %>%
+      filter(about.inning == 1, about.halfInning == "bottom", !is.na(matchup.pitcher.fullName)) %>%
+      slice(1) %>%
+      pull(matchup.pitcher.fullName)
+    
+    # Validate that we found both pitchers
+    if (length(home_starter) == 0 || is.na(home_starter)) {
+      stop(sprintf("Could not find home starting pitcher for game %s", game_pk))
+    }
+    
+    if (length(away_starter) == 0 || is.na(away_starter)) {
+      stop(sprintf("Could not find away starting pitcher for game %s", game_pk))
+    }
+    
     list(
-      home_pitcher = "TBD",  # Would extract from game data
-      away_pitcher = "TBD"
+      home_pitcher = home_starter,
+      away_pitcher = away_starter
     )
   }, error = function(e) {
-    list(home_pitcher = NA, away_pitcher = NA)
+    # Re-throw the error to fail the script
+    stop(sprintf("Failed to get starting pitchers for game %s: %s", game_pk, e$message))
   })
 }
 
@@ -86,95 +112,190 @@ get_pitcher_stats <- function(pitcher_name, as_of_date) {
 }
 
 #' Get team statistics as of a specific date
-#' @param team_abbrev Team abbreviation (e.g., "LAD")
+#' @param team_name Full team name (e.g., "Chicago White Sox")
 #' @param as_of_date Date to get stats through
-get_team_stats <- function(team_abbrev, as_of_date) {
-  cat(sprintf("    Getting team stats for: %s as of %s\n", team_abbrev, as_of_date))
+get_team_stats <- function(team_name, as_of_date) {
+  cat(sprintf("    Getting team stats for: %s as of %s\n", team_name, as_of_date))
   
-  # Convert full team name to abbreviation if needed
-  team_code <- team_abbrev
-  if (team_abbrev %in% names(MLB_TEAMS)) {
-    team_code <- MLB_TEAMS[[team_abbrev]]
-    cat(sprintf("    Converted team name '%s' to abbreviation '%s'\n", team_abbrev, team_code))
+  # Map full team names to the city names used in Baseball Reference data
+  team_name_map <- list(
+    "Atlanta Braves" = "Atlanta",
+    "Baltimore Orioles" = "Baltimore", 
+    "Boston Red Sox" = "Boston",
+    "Chicago Cubs" = "Chicago",
+    "Chicago White Sox" = "Chicago",
+    "Cincinnati Reds" = "Cincinnati",
+    "Cleveland Guardians" = "Cleveland",
+    "Colorado Rockies" = "Colorado",
+    "Detroit Tigers" = "Detroit",
+    "Houston Astros" = "Houston",
+    "Kansas City Royals" = "Kansas City",
+    "Los Angeles Angels" = "Los Angeles",
+    "Los Angeles Dodgers" = "Los Angeles", 
+    "Miami Marlins" = "Miami",
+    "Milwaukee Brewers" = "Milwaukee",
+    "Minnesota Twins" = "Minnesota",
+    "New York Mets" = "New York",
+    "New York Yankees" = "New York",
+    "Oakland Athletics" = "Oakland",
+    "Philadelphia Phillies" = "Philadelphia",
+    "Pittsburgh Pirates" = "Pittsburgh",
+    "San Diego Padres" = "San Diego",
+    "San Francisco Giants" = "San Francisco",
+    "Seattle Mariners" = "Seattle",
+    "St. Louis Cardinals" = "St. Louis",
+    "Tampa Bay Rays" = "Tampa Bay",
+    "Texas Rangers" = "Texas",
+    "Toronto Blue Jays" = "Toronto",
+    "Washington Nationals" = "Washington"
+  )
+  
+  # Get the Baseball Reference team name
+  bref_team_name <- team_name_map[[team_name]]
+  if (is.null(bref_team_name)) {
+    bref_team_name <- team_name  # fallback to original name
+    cat(sprintf("    Warning: No mapping found for '%s', using original name\n", team_name))
+  } else {
+    cat(sprintf("    Mapped '%s' to Baseball Reference name '%s'\n", team_name, bref_team_name))
   }
   
   tryCatch({
-    cat("    Getting batting stats...\n")
-    cat(sprintf("    Calling bref_daily_batter with t1='2024-03-28', t2='%s'\n", as_of_date))
+    # Get season year from date
+    season_year <- year(as.Date(as_of_date))
     
-    # Ensure date format is correct
-    t1_date <- as.Date("2024-03-28")
+    # Ensure date format is correct for FanGraphs
+    t1_date <- as.Date("2024-03-28")  # Season start
     t2_date <- as.Date(as_of_date)
     
-    cat(sprintf("    Date check: t1=%s, t2=%s, t2 >= t1: %s\n", 
-                t1_date, t2_date, t2_date >= t1_date))
+    cat(sprintf("    Date check: t1=%s, t2=%s, season=%d\n", 
+                t1_date, t2_date, season_year))
     
     if (t2_date < t1_date) {
       cat("    Warning: End date is before start date, using start date for both\n")
       t2_date <- t1_date
     }
     
-    # Get team batting stats
-    batting_data <- bref_daily_batter(
-      t1 = format(t1_date, "%Y-%m-%d"),
-      t2 = format(t2_date, "%Y-%m-%d")
+    # Get team batting stats from FanGraphs
+    cat("    Getting batting stats from FanGraphs...\n")
+    fg_batting <- fg_team_batter(
+      startseason = season_year,
+      endseason = season_year,
+      startdate = format(t1_date, "%Y-%m-%d"),
+      enddate = format(t2_date, "%Y-%m-%d")
     )
     
-    cat(sprintf("    Retrieved %d batter records\n", nrow(batting_data)))
+    cat(sprintf("    Retrieved FanGraphs batting data: %d teams\n", nrow(fg_batting)))
     
-    if (nrow(batting_data) > 0) {
-      unique_teams <- unique(batting_data$Tm)[1:min(10, length(unique(batting_data$Tm)))]
-      cat("    Available teams in batting data:\n")
-      cat(paste("     ", unique_teams, collapse = "\n"))
-      cat("\n")
-      
-      team_batting <- batting_data %>%
-        filter(Tm == team_code) %>%
-        summarise(
-          team_ops = weighted.mean(OPS, AB, na.rm = TRUE),
-          team_woba = weighted.mean(wOBA, PA, na.rm = TRUE),
-          .groups = 'drop'
-        )
-      cat(sprintf("    Found %d batting records for team %s\n", 
-                  sum(batting_data$Tm == team_code, na.rm = TRUE), team_code))
-    } else {
-      team_batting <- data.frame(team_ops = NA, team_woba = NA)
+    # Map team names to FanGraphs abbreviations (based on the available teams shown above)
+    fg_team_map <- list(
+      "Atlanta Braves" = "ATL",
+      "Baltimore Orioles" = "BAL", 
+      "Boston Red Sox" = "BOS",
+      "Chicago Cubs" = "CHC",
+      "Chicago White Sox" = "CHW",
+      "Cincinnati Reds" = "CIN",
+      "Cleveland Guardians" = "CLE",
+      "Colorado Rockies" = "COL",
+      "Detroit Tigers" = "DET",
+      "Houston Astros" = "HOU",
+      "Kansas City Royals" = "KCR",
+      "Los Angeles Angels" = "LAA",
+      "Los Angeles Dodgers" = "LAD", 
+      "Miami Marlins" = "MIA",
+      "Milwaukee Brewers" = "MIL",
+      "Minnesota Twins" = "MIN",
+      "New York Mets" = "NYM",
+      "New York Yankees" = "NYY",
+      "Oakland Athletics" = "OAK",
+      "Philadelphia Phillies" = "PHI",
+      "Pittsburgh Pirates" = "PIT",
+      "San Diego Padres" = "SDP",
+      "San Francisco Giants" = "SFG",
+      "Seattle Mariners" = "SEA",
+      "St. Louis Cardinals" = "STL",
+      "Tampa Bay Rays" = "TBR",
+      "Texas Rangers" = "TEX",
+      "Toronto Blue Jays" = "TOR",
+      "Washington Nationals" = "WSN"
+    )
+    
+    # Get FanGraphs team abbreviation using full team name
+    fg_team_name <- fg_team_map[[team_name]]
+    if (is.null(fg_team_name)) {
+      fg_team_name <- bref_team_name  # fallback
+      cat(sprintf("    Warning: No FanGraphs mapping found for '%s', using '%s'\n", team_name, bref_team_name))
     }
     
-    cat("    Getting pitching stats...\n")
-    cat(sprintf("    Calling bref_daily_pitcher with t1='2024-03-28', t2='%s'\n", as_of_date))
+    cat(sprintf("    Looking for FanGraphs team: %s\n", fg_team_name))
     
-    # Get team pitching stats
-    pitching_data <- bref_daily_pitcher(
-      t1 = format(t1_date, "%Y-%m-%d"), 
-      t2 = format(t2_date, "%Y-%m-%d")
+    # Extract team batting stats
+    if (nrow(fg_batting) > 0) {
+      cat("    Available teams in FanGraphs batting data:\n")
+      cat(paste("     ", unique(fg_batting$team_name), collapse = "\n"))
+      cat("\n")
+      
+      team_batting <- fg_batting %>%
+        filter(team_name == fg_team_name) %>%
+        slice(1)  # Take first row if multiple
+      
+      if (nrow(team_batting) > 0) {
+        team_ops <- team_batting$OPS
+        team_woba <- team_batting$wOBA
+        cat(sprintf("    Found batting stats for %s: OPS=%.3f, wOBA=%.3f\n", 
+                    fg_team_name, team_ops, team_woba))
+      } else {
+        team_ops <- NA
+        team_woba <- NA
+        cat(sprintf("    No batting stats found for team %s\n", fg_team_name))
+      }
+    } else {
+      team_ops <- NA
+      team_woba <- NA
+      cat("    No FanGraphs batting data available\n")
+    }
+    
+    # Get team pitching stats from FanGraphs
+    cat("    Getting pitching stats from FanGraphs...\n")
+    fg_pitching <- fg_team_pitcher(
+      startseason = season_year,
+      endseason = season_year,
+      startdate = format(t1_date, "%Y-%m-%d"),
+      enddate = format(t2_date, "%Y-%m-%d")
     )
     
-    cat(sprintf("    Retrieved %d pitcher records\n", nrow(pitching_data)))
+    cat(sprintf("    Retrieved FanGraphs pitching data: %d teams\n", nrow(fg_pitching)))
     
-    if (nrow(pitching_data) > 0) {
-      team_pitching <- pitching_data %>%
-        filter(Tm == team_code) %>%
-        summarise(
-          team_era_plus = weighted.mean(ERA_plus, IP, na.rm = TRUE),
-          team_fip = weighted.mean(FIP, IP, na.rm = TRUE),
-          .groups = 'drop'
-        )
-      cat(sprintf("    Found %d pitching records for team %s\n", 
-                  sum(pitching_data$Tm == team_code, na.rm = TRUE), team_code))
+    # Extract team pitching stats
+    if (nrow(fg_pitching) > 0) {
+      team_pitching <- fg_pitching %>%
+        filter(team_name == fg_team_name) %>%
+        slice(1)  # Take first row if multiple
+      
+      if (nrow(team_pitching) > 0) {
+        team_era_plus <- team_pitching$`ERA-`  # ERA- in FanGraphs (lower is better)
+        team_fip <- team_pitching$FIP
+        cat(sprintf("    Found pitching stats for %s: ERA-=%.1f, FIP=%.2f\n", 
+                    fg_team_name, team_era_plus, team_fip))
+      } else {
+        team_era_plus <- NA
+        team_fip <- NA
+        cat(sprintf("    No pitching stats found for team %s\n", fg_team_name))
+      }
     } else {
-      team_pitching <- data.frame(team_era_plus = NA, team_fip = NA)
+      team_era_plus <- NA
+      team_fip <- NA
+      cat("    No FanGraphs pitching data available\n")
     }
     
     # Combine stats
     result <- list(
-      ops = ifelse(nrow(team_batting) > 0, team_batting$team_ops, NA),
-      woba = ifelse(nrow(team_batting) > 0, team_batting$team_woba, NA), 
-      era_plus = ifelse(nrow(team_pitching) > 0, team_pitching$team_era_plus, NA),
-      fip = ifelse(nrow(team_pitching) > 0, team_pitching$team_fip, NA)
+      ops = team_ops,
+      woba = team_woba,
+      era_plus = team_era_plus,  # Note: This is actually ERA- from FanGraphs
+      fip = team_fip
     )
     
-    cat("    Team stats retrieved successfully\n")
+    cat("    Team stats retrieved successfully from FanGraphs\n")
     return(result)
     
   }, error = function(e) {

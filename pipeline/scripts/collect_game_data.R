@@ -22,8 +22,12 @@ collect_game_data <- function(start_date = DEFAULT_START_DATE,
   games <- get_game_schedule(start_date, end_date)
   cat("Found", nrow(games), "games\n")
   
-  # Step 2: Process each game
+  # Step 2: Process each game (limit to first game for testing)
   cat("Processing game data...\n")
+  
+  # Limit to first game only for testing
+  games <- games[1, ]
+  cat("Limited to first game for testing\n")
   
   # Process games one by one with detailed logging
   game_data_list <- list()
@@ -37,12 +41,12 @@ collect_game_data <- function(start_date = DEFAULT_START_DATE,
                 game$official_date,
                 game$game_pk))
     
+    # Get starting pitchers - fail immediately if not found
+    cat("  - Getting starting pitchers...\n")
+    pitchers <- get_starting_pitchers(game$game_pk, game$official_date)
+    cat(sprintf("    Home: %s, Away: %s\n", pitchers$home_pitcher, pitchers$away_pitcher))
+    
     tryCatch({
-      # Get starting pitchers
-      cat("  - Getting starting pitchers...\n")
-      pitchers <- get_starting_pitchers(game$game_pk, game$official_date)
-      cat(sprintf("    Home: %s, Away: %s\n", pitchers$home_pitcher, pitchers$away_pitcher))
-      
       # Get point-in-time pitcher stats
       cat("  - Getting pitcher stats...\n")
       home_pitcher_stats <- get_pitcher_stats(pitchers$home_pitcher, game$official_date)
@@ -88,7 +92,7 @@ collect_game_data <- function(start_date = DEFAULT_START_DATE,
       # Add game with NA stats to maintain structure
       game_data_list[[i]] <- game %>%
         mutate(
-          pitchers = list(list(home_pitcher = NA, away_pitcher = NA)),
+          pitchers = list(pitchers),
           home_pitcher_stats = list(list(name = NA, era = NA, whip = NA, k = NA, bb = NA, ip = NA)),
           away_pitcher_stats = list(list(name = NA, era = NA, whip = NA, k = NA, bb = NA, ip = NA)),
           home_team_stats = list(list(ops = NA, woba = NA, era_plus = NA, fip = NA)),

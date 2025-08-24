@@ -1,0 +1,46 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Entities first -->
+    <Compile Include="Entities\ScheduleEntity.fs"/>
+    <Compile Include="Entities\EmptyFastbreakCard.fs"/>
+    <Compile Include="Entities\FastbreakSelections.fs"/>
+    <Compile Include="Entities\StatSheet.fs"/>
+    <Compile Include="Entities\Leaderboard.fs"/>
+    <Compile Include="Entities\RefreshToken.fs"/>
+    <!-- Utils in dependency order -->
+    <Compile Include="Utils\asyncMap.fs"/>
+    <Compile Include="Utils\deserializeBody.fs"/>
+    <Compile Include="Utils\generateRandomUsername.fs"/>
+    <Compile Include="Utils\jwtUtils.fs"/>
+    <Compile Include="Utils\refreshTokenUtils.fs"/>
+    <Compile Include="Utils\tokenAuthPipeline.fs"/>
+    <Compile Include="Utils\tryGetSubject.fs"/>
+    <Compile Include="Utils\tryGetAuthenticatedUser.fs"/>
+    <Compile Include="Utils\googleAuthPipeline.fs"/>
+    <Compile Include="Utils\apiRouter.fs"/>
+    <Compile Include="Utils\profile.fs"/>
+    <Compile Include="Utils\getStatSheetForUser.fs"/>
+    <Compile Include="Utils\lockedCardsForUser.fs"/>
+    <Compile Include="Utils\getWeekDays.fs"/>
+    <Compile Include="Utils\createCurrentWeek.fs"/>
+    <Compile Include="Utils\calculateLockedCardStreak.fs"/>
+    <Compile Include="Utils\getHighestAndPerfectCards.fs"/>
+    <Compile Include="Utils\getLockedCardsToAnalyze.fs"/>
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="MongoDB.Bson" Version="3.0.0"/>
+    <PackageReference Include="MongoDB.Driver" Version="3.0.0"/>
+    <PackageReference Include="Saturn" Version="0.17.0"/>
+    <PackageReference Include="Google.Apis.Auth" Version="1.69.0"/>
+    <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.2.1"/>
+    <PackageReference Include="Giraffe" Version="6.4.0"/>
+  </ItemGroup>
+
+</Project>

@@ -11,3 +11,5 @@ xcuserdata
 .claude
 # Sentry Config File
 sentry.properties
+
+.fake

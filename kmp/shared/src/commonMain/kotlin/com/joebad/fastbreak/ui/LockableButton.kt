@@ -171,7 +171,7 @@ fun LockableButton(
         modifier = modifier
             .fillMaxWidth()
             .padding(bottom = 2.dp)
-            .zIndex(zIndex),
+            .zIndex(1f),
         contentAlignment = Alignment.Center
     ) {
         // Bottom border (shadow)
@@ -365,6 +365,20 @@ fun LockableButton(
                     )
                 }
             }
+
+
+
         }
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(6.dp)
+            .offset(y = -4.dp)
+            .background(colors.accent)
+            .zIndex(0f)
+    ) {
+        androidx.compose.material3.Text(text = " ")
     }
 }

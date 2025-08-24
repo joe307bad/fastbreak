@@ -116,7 +116,6 @@ class ScheduleViewModel(
 
             val selectionState = FastbreakSelectionState(
                 selections = selections,
-                totalPoints = 0,
                 cardId = getRandomId(),
                 locked = true,
                 date = dateCode

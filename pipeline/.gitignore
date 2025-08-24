@@ -1,0 +1,26 @@
+# R specific
+.Rhistory
+.Rapp.history
+.RData
+.Ruserdata
+
+# Output files
+output/*.csv
+output/*.json
+
+# Environment files
+.Renviron
+.env
+
+# API keys
+config/secrets.R
+
+# Temporary files
+*.tmp
+*.log
+
+# macOS
+.DS_Store
+
+# RStudio
+.Rproj.user/

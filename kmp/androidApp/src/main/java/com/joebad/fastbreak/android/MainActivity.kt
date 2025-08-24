@@ -5,6 +5,7 @@ import ProfileRepository
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import com.arkivanov.decompose.defaultComponentContext
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -19,8 +20,9 @@ import androidx.compose.ui.Modifier
 import com.joebad.fastbreak.AndroidThemePreference
 import com.joebad.fastbreak.App
 import com.joebad.fastbreak.Theme
-import com.joebad.fastbreak.createRootComponent
+import com.joebad.fastbreak.RootComponent
 import com.joebad.fastbreak.initFontLoader
+import com.joebad.fastbreak.data.cache.CacheInitializer
 import com.joebad.fastbreak.ui.theme.AppTheme
 import com.joebad.fastbreak.utils.AppVersion
 import com.liftric.kvault.KVault
@@ -39,7 +41,11 @@ class MainActivity : ComponentActivity() {
         val profileRepository = ProfileRepository(authRepository)
 
         // TODO: Initialize database and httpClient here when dependencies are available
-        val rootComponent = createRootComponent(authRepository)
+        val rootComponent = RootComponent(
+            componentContext = defaultComponentContext(),
+            authRepository = authRepository, 
+            cache = CacheInitializer.createFastbreakCache()
+        )
         val themePreference = AndroidThemePreference(applicationContext)
 
         setContent {

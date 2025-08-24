@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+    <PropertyGroup>
+        <TargetFramework>net9.0</TargetFramework>
+    </PropertyGroup>
+    <ItemGroup>
+        <Compile Include="Controllers\DailyFastbreakController.fs" />
+        <Compile Include="Controllers\LockCardController.fs" />
+        <Compile Include="Controllers\ProfileController.fs" />
+        <Compile Include="Controllers\AuthController.fs" />
+        <Compile Include="DailyJob\SchedulePuller.fs" />
+        <Compile Include="DailyJob\CalculateFastbreakCardResults.fs" />
+        <Compile Include="DailyJob\CalculateStatSheets.fs" />
+        <Compile Include="DailyJob\CalculateLeaderboards.fs" />
+        <Compile Include="DailyJob\DailyJob.fs" />
+        <Compile Include="Program.fs" />
+        <Content Include=".env" />
+    </ItemGroup>
+    <ItemGroup>
+        <PackageReference Include="DotNetEnv" Version="3.1.1" />
+        <PackageReference Include="Google.Apis.Auth" Version="1.69.0" />
+        <PackageReference Include="Hangfire" Version="1.8.17" />
+        <PackageReference Include="Hangfire.Mongo" Version="1.11.2" />
+        <PackageReference Include="Saturn" Version="0.17.0" />
+        <PackageReference Include="MongoDB.Driver" Version="3.0.0" />
+        <PackageReference Include="MongoDB.Bson" Version="3.0.0" />
+        <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+        <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.2.1" />
+    </ItemGroup>
+    <ItemGroup>
+      <ProjectReference Include="..\Fastbreak.Shared\Fastbreak.Shared.fsproj" />
+    </ItemGroup>
+</Project>

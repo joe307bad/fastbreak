@@ -2,14 +2,12 @@
 # Creates CSV files with comprehensive game statistics including:
 # - Starting pitchers and their performance metrics
 # - Team advanced statistics from FanGraphs (wOBA, ERA-, FIP)
-# - Weather conditions
 # - Game outcomes and scores
 
 # Load configuration and setup
 source("config/setup.R")
 source("config/config.R")
 source("utils/data_utils.R")
-source("utils/weather_utils.R")
 
 # Logging configuration
 LOG_LEVEL <- Sys.getenv("LOG_LEVEL", "INFO")  # DEBUG, INFO, WARN, ERROR
@@ -55,57 +53,57 @@ collect_game_data <- function(start_date = DEFAULT_START_DATE,
   log_message("INFO", sprintf("Found %d games", nrow(games)))
   
   # Step 2: Process each game
-  cat("Processing game data...\n")
-  
-  # Option to limit to single game for testing (set LIMIT_GAMES environment variable)
   if (Sys.getenv("LIMIT_GAMES", "FALSE") == "TRUE") {
     games <- games[1, , drop = FALSE]
-    log_message("INFO", "Limited to single game for testing (LIMIT_GAMES=TRUE)")
+    cat("Limited to single game for testing\n")
   }
   
-  # Process games one by one with detailed logging
   game_data_list <- list()
   
   for (i in 1:nrow(games)) {
     game <- games[i, ]
-    cat(sprintf("Processing game %d/%d: %s vs %s on %s (GamePK: %s)\n", 
+    cat(sprintf("Game %d/%d: %s @ %s (%s)\n", 
                 i, nrow(games), 
                 game$teams_away_team_name, 
                 game$teams_home_team_name,
-                game$official_date,
-                game$game_pk))
+                game$official_date))
     
-    # Get starting pitchers - fail immediately if not found
-    cat("  - Getting starting pitchers...\n")
+    # Get starting pitchers
     pitchers <- get_starting_pitchers(game$game_pk, game$official_date)
-    cat(sprintf("    Home: %s, Away: %s\n", pitchers$home_pitcher, pitchers$away_pitcher))
     
     tryCatch({
-      # Get point-in-time pitcher stats
-      cat("  - Getting pitcher stats...\n")
+      # Get pitcher stats
       home_pitcher_stats <- get_pitcher_stats(pitchers$home_pitcher, game$official_date)
-      cat(sprintf("    Home pitcher stats retrieved: ERA=%s\n", 
-                  ifelse(is.na(home_pitcher_stats$era), "NA", home_pitcher_stats$era)))
-      
       away_pitcher_stats <- get_pitcher_stats(pitchers$away_pitcher, game$official_date)
-      cat(sprintf("    Away pitcher stats retrieved: ERA=%s\n", 
-                  ifelse(is.na(away_pitcher_stats$era), "NA", away_pitcher_stats$era)))
       
-      # Get point-in-time team stats
-      cat("  - Getting team stats...\n")
+      # Get team stats
       home_team_stats <- get_team_stats(game$teams_home_team_name, game$official_date)
-      cat(sprintf("    Home team stats: OPS=%s\n", 
-                  ifelse(is.na(home_team_stats$ops), "NA", home_team_stats$ops)))
-      
       away_team_stats <- get_team_stats(game$teams_away_team_name, game$official_date)
-      cat(sprintf("    Away team stats: OPS=%s\n", 
-                  ifelse(is.na(away_team_stats$ops), "NA", away_team_stats$ops)))
       
-      # Get weather data
-      cat("  - Getting weather data...\n")
-      weather <- get_weather_data(game$teams_home_team_name, game$official_date)
-      cat(sprintf("    Weather: Temp=%s°F, Wind=%s mph\n", 
-                  weather$temperature, weather$wind_speed))
+      # Display comprehensive column-value format
+      cat("  home_pitcher:", pitchers$home_pitcher %||% "null", "\n")
+      cat("  away_pitcher:", pitchers$away_pitcher %||% "null", "\n")
+      cat("  home_pitcher_era:", home_pitcher_stats$era %||% "null", "\n")
+      cat("  away_pitcher_era:", away_pitcher_stats$era %||% "null", "\n")
+      cat("  home_pitcher_whip:", home_pitcher_stats$whip %||% "null", "\n")
+      cat("  away_pitcher_whip:", away_pitcher_stats$whip %||% "null", "\n")
+      cat("  home_pitcher_k:", home_pitcher_stats$k %||% "null", "\n")
+      cat("  away_pitcher_k:", away_pitcher_stats$k %||% "null", "\n")
+      cat("  home_pitcher_bb:", home_pitcher_stats$bb %||% "null", "\n")
+      cat("  away_pitcher_bb:", away_pitcher_stats$bb %||% "null", "\n")
+      cat("  home_pitcher_ip:", home_pitcher_stats$ip %||% "null", "\n")
+      cat("  away_pitcher_ip:", away_pitcher_stats$ip %||% "null", "\n")
+      cat("  home_team_ops:", home_team_stats$ops %||% "null", "\n")
+      cat("  away_team_ops:", away_team_stats$ops %||% "null", "\n")
+      cat("  home_team_woba:", home_team_stats$woba %||% "null", "\n")
+      cat("  away_team_woba:", away_team_stats$woba %||% "null", "\n")
+      cat("  home_team_era_minus:", home_team_stats$era_plus %||% "null", "\n")
+      cat("  away_team_era_minus:", away_team_stats$era_plus %||% "null", "\n")
+      cat("  home_team_fip:", home_team_stats$fip %||% "null", "\n")
+      cat("  away_team_fip:", away_team_stats$fip %||% "null", "\n")
+      cat("  home_score:", game$teams_home_score %||% "null", "\n")
+      cat("  away_score:", game$teams_away_score %||% "null", "\n")
+      cat("  status: success\n\n")
       
       # Add processed data to list
       game_data_list[[i]] <- game %>%
@@ -114,14 +112,34 @@ collect_game_data <- function(start_date = DEFAULT_START_DATE,
           home_pitcher_stats = list(home_pitcher_stats),
           away_pitcher_stats = list(away_pitcher_stats),
           home_team_stats = list(home_team_stats),
-          away_team_stats = list(away_team_stats),
-          weather = list(weather)
+          away_team_stats = list(away_team_stats)
         )
       
-      cat("  ✓ Game processed successfully\n\n")
-      
     }, error = function(e) {
-      cat(sprintf("  ✗ Error processing game: %s\n", e$message))
+      # Display error with all fields as null
+      cat("  home_pitcher:", pitchers$home_pitcher %||% "null", "\n")
+      cat("  away_pitcher:", pitchers$away_pitcher %||% "null", "\n")
+      cat("  home_pitcher_era: null\n")
+      cat("  away_pitcher_era: null\n")
+      cat("  home_pitcher_whip: null\n")
+      cat("  away_pitcher_whip: null\n")
+      cat("  home_pitcher_k: null\n")
+      cat("  away_pitcher_k: null\n")
+      cat("  home_pitcher_bb: null\n")
+      cat("  away_pitcher_bb: null\n")
+      cat("  home_pitcher_ip: null\n")
+      cat("  away_pitcher_ip: null\n")
+      cat("  home_team_ops: null\n")
+      cat("  away_team_ops: null\n")
+      cat("  home_team_woba: null\n")
+      cat("  away_team_woba: null\n")
+      cat("  home_team_era_minus: null\n")
+      cat("  away_team_era_minus: null\n")
+      cat("  home_team_fip: null\n")
+      cat("  away_team_fip: null\n")
+      cat("  home_score:", game$teams_home_score %||% "null", "\n")
+      cat("  away_score:", game$teams_away_score %||% "null", "\n")
+      cat("  status: error -", e$message, "\n\n")
       
       # Add game with NA stats to maintain structure
       game_data_list[[i]] <- game %>%
@@ -130,22 +148,15 @@ collect_game_data <- function(start_date = DEFAULT_START_DATE,
           home_pitcher_stats = list(list(name = NA, era = NA, whip = NA, k = NA, bb = NA, ip = NA)),
           away_pitcher_stats = list(list(name = NA, era = NA, whip = NA, k = NA, bb = NA, ip = NA)),
           home_team_stats = list(list(ops = NA, woba = NA, era_plus = NA, fip = NA)),
-          away_team_stats = list(list(ops = NA, woba = NA, era_plus = NA, fip = NA)),
-          weather = list(list(temperature = NA, wind_speed = NA, wind_direction = NA, precipitation = NA))
+          away_team_stats = list(list(ops = NA, woba = NA, era_plus = NA, fip = NA))
         )
-      cat("  - Continuing with NA values for this game\n\n")
     })
   }
   
-  # Combine all processed games
-  cat("Combining processed game data...\n")
+  # Combine and save results
   game_data <- bind_rows(game_data_list)
-  
-  # Step 3: Format output
-  cat("Formatting output data...\n")
   output_data <- format_output_data(game_data)
   
-  # Step 4: Write to CSV
   output_path <- file.path(OUTPUT_DIR, output_file)
   if (!dir.exists(OUTPUT_DIR)) {
     dir.create(OUTPUT_DIR, recursive = TRUE)

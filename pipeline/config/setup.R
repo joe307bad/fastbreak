@@ -13,7 +13,8 @@ required_packages <- c(
   "lubridate",      # Date/time handling
   "httr",           # HTTP requests for weather APIs
   "jsonlite",       # JSON parsing
-  "glue"            # String interpolation
+  "glue",           # String interpolation
+  "devtools"        # For installing packages from GitHub
 )
 
 # Function to install packages if they don't exist
@@ -30,6 +31,17 @@ install_if_missing <- function(packages) {
 # Install missing packages
 install_if_missing(required_packages)
 
+# Install weatherData from GitHub if not already installed
+if (!"weatherData" %in% installed.packages()[, "Package"]) {
+  cat("Installing weatherData from GitHub...\n")
+  tryCatch({
+    devtools::install_github("Ram-N/weatherData")
+  }, error = function(e) {
+    cat("Failed to install weatherData from GitHub:", e$message, "\n")
+    cat("Weather data collection will use fallback mock data\n")
+  })
+}
+
 # Load all required libraries
 cat("Loading required libraries...\n")
 library(baseballr)
@@ -40,5 +52,13 @@ library(lubridate)
 library(httr)
 library(jsonlite)
 library(glue)
+
+# Try to load weatherData, continue without it if it fails
+tryCatch({
+  library(weatherData)
+  cat("weatherData package loaded successfully\n")
+}, error = function(e) {
+  cat("weatherData package not available - will use fallback mock data\n")
+})
 
 cat("Setup complete! All packages loaded successfully.\n")

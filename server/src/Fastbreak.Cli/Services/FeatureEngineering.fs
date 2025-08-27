@@ -7,18 +7,6 @@ open System
 module FeatureEngineering =
     
     // Helper functions for normalization
-    let normalizeTemperature (temp: float) : float32 =
-        let clamped = max (float FeatureConstants.MIN_TEMPERATURE) (min (float FeatureConstants.MAX_TEMPERATURE) temp)
-        float32 ((clamped - float FeatureConstants.MIN_TEMPERATURE) / (float FeatureConstants.MAX_TEMPERATURE - float FeatureConstants.MIN_TEMPERATURE))
-    
-    let normalizeWindSpeed (speed: float) : float32 =
-        let clamped = max 0.0 (min (float FeatureConstants.MAX_WIND_SPEED) speed)
-        float32 (clamped / float FeatureConstants.MAX_WIND_SPEED)
-    
-    let normalizePrecipitation (precip: float) : float32 =
-        if precip <= 0.0 then 0.0f
-        elif precip <= 0.1 then 0.5f  // Light precipitation
-        else 1.0f  // Heavy precipitation
     
     let calculateERAAdvantage (era: float) : float32 =
         (FeatureConstants.LEAGUE_AVG_ERA - float32 era) / FeatureConstants.LEAGUE_AVG_ERA
@@ -40,16 +28,6 @@ module FeatureEngineering =
         let awayElo = eloRatings.TryFind(game.AwayTeam) |> Option.defaultValue EloCalculator.DEFAULT_RATING
         let eloDiff = homeElo - awayElo
         
-        // Weather features
-        let weatherFeatures = 
-            match game.Weather with
-            | Some w -> 
-                let temp = normalizeTemperature w.Temperature
-                let wind = normalizeWindSpeed w.WindSpeed
-                let windFactor = FeatureConstants.getWindFactor w.WindDirection (float32 w.WindSpeed)
-                let precip = normalizePrecipitation w.Precipitation
-                (temp, wind, windFactor, precip)
-            | None -> (0.5f, 0.5f, 0.0f, 0.0f)  // Default neutral values
         
         // Pitcher features
         let (homeERAAdv, awayERAAdv, homeWHIPAdv, awayWHIPAdv, homeKRate, awayKRate) =
@@ -75,7 +53,6 @@ module FeatureEngineering =
             | None -> (0.0f, 0.0f, 0.0f)  // Neutral values
         
         // Interaction terms
-        let eloWeatherInteraction = float32 eloDiff * (let _, _, wf, _ = weatherFeatures in wf)
         let pitcherMatchupAdvantage = (homeERAAdv - awayERAAdv) + (homeWHIPAdv - awayWHIPAdv) + (homeKRate - awayKRate)
         
         // Label (target variable)
@@ -85,10 +62,6 @@ module FeatureEngineering =
             HomeElo = float32 homeElo
             AwayElo = float32 awayElo
             EloDifference = float32 eloDiff
-            Temperature = let t, _, _, _ = weatherFeatures in t
-            WindSpeed = let _, w, _, _ = weatherFeatures in w
-            WindFactor = let _, _, wf, _ = weatherFeatures in wf
-            PrecipitationLevel = let _, _, _, p = weatherFeatures in p
             HomeERAAdvantage = homeERAAdv
             AwayERAAdvantage = awayERAAdv
             HomeWHIPAdvantage = homeWHIPAdv
@@ -98,7 +71,6 @@ module FeatureEngineering =
             OPSDifferential = opsDiff
             ERAPlusDifferential = eraPlusDiff
             FIPDifferential = fipDiff
-            EloWeatherInteraction = eloWeatherInteraction
             PitcherMatchupAdvantage = pitcherMatchupAdvantage
             HomeWin = homeWin
         }
@@ -122,8 +94,7 @@ module FeatureEngineering =
             let count = features.Length
             let homeWins = features |> List.sumBy (fun f -> if f.HomeWin then 1 else 0)
             let avgEloDiff = features |> List.averageBy (fun f -> float f.EloDifference)
-            let avgTemp = features |> List.averageBy (fun f -> float f.Temperature)
             let avgOPSDiff = features |> List.averageBy (fun f -> float f.OPSDifferential)
             
-            sprintf "Feature Statistics:\n- Games: %d\n- Home wins: %d (%.1f%%)\n- Avg Elo diff: %.1f\n- Avg temp (norm): %.2f\n- Avg OPS diff: %.3f"
-                count homeWins (float homeWins / float count * 100.0) avgEloDiff avgTemp avgOPSDiff
+            sprintf "Feature Statistics:\n- Games: %d\n- Home wins: %d (%.1f%%)\n- Avg Elo diff: %.1f\n- Avg OPS diff: %.3f"
+                count homeWins (float homeWins / float count * 100.0) avgEloDiff avgOPSDiff

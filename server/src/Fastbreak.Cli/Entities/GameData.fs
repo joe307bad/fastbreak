@@ -2,12 +2,6 @@ namespace Fastbreak.Cli.Entities
 
 open System
 
-type WeatherData = {
-    Temperature: float
-    WindSpeed: float
-    WindDirection: string
-    Precipitation: float
-}
 
 type PitcherData = {
     Name: string
@@ -34,7 +28,6 @@ type GameData = {
     HomeScore: int
     AwayScore: int
     Date: DateTime
-    Weather: WeatherData option
     HomePitcher: PitcherData option
     AwayPitcher: PitcherData option
     Metrics: SabrMetrics option
@@ -49,19 +42,6 @@ type EloRating = {
 
 module SampleData =
     
-    let sampleWeather1 = {
-        Temperature = 72.0
-        WindSpeed = 8.5
-        WindDirection = "SW"
-        Precipitation = 0.0
-    }
-    
-    let sampleWeather2 = {
-        Temperature = 65.0
-        WindSpeed = 12.0
-        WindDirection = "NW"
-        Precipitation = 0.1
-    }
     
     let samplePitcher1 = {
         Name = "Ace Starter"
@@ -107,7 +87,6 @@ module SampleData =
             HomeScore = 7
             AwayScore = 4
             Date = DateTime(2024, 4, 15)
-            Weather = Some sampleWeather1
             HomePitcher = Some samplePitcher1
             AwayPitcher = Some samplePitcher2
             Metrics = Some sampleMetrics1
@@ -119,7 +98,6 @@ module SampleData =
             HomeScore = 3
             AwayScore = 8
             Date = DateTime(2024, 4, 16)
-            Weather = Some sampleWeather2
             HomePitcher = Some samplePitcher2
             AwayPitcher = Some samplePitcher1
             Metrics = Some sampleMetrics2
@@ -131,7 +109,6 @@ module SampleData =
             HomeScore = 5
             AwayScore = 2
             Date = DateTime(2024, 4, 20)
-            Weather = Some { Temperature = 68.0; WindSpeed = 6.0; WindDirection = "W"; Precipitation = 0.0 }
             HomePitcher = Some { Name = "West Coast Ace"; ERA = 2.95; WHIP = 1.08; Strikeouts = 198; Walks = 42; InningsPitched = 195.1 }
             AwayPitcher = Some { Name = "Power Righty"; ERA = 3.15; WHIP = 1.18; Strikeouts = 215; Walks = 55; InningsPitched = 201.2 }
             Metrics = Some { HomeOPS = 0.756; AwayOPS = 0.823; HomeERAPlus = 108; AwayERAPlus = 105; HomeFIP = 3.25; AwayFIP = 3.38 }
@@ -143,7 +120,6 @@ module SampleData =
             HomeScore = 1
             AwayScore = 9
             Date = DateTime(2024, 4, 21)
-            Weather = Some { Temperature = 71.0; WindSpeed = 4.5; WindDirection = "SW"; Precipitation = 0.0 }
             HomePitcher = Some { Name = "Struggling Starter"; ERA = 4.85; WHIP = 1.45; Strikeouts = 95; Walks = 65; InningsPitched = 125.0 }
             AwayPitcher = Some { Name = "Cy Young Candidate"; ERA = 2.12; WHIP = 0.95; Strikeouts = 245; Walks = 35; InningsPitched = 215.1 }
             Metrics = Some { HomeOPS = 0.645; AwayOPS = 0.887; HomeERAPlus = 85; AwayERAPlus = 135; HomeFIP = 4.95; AwayFIP = 2.85 }
@@ -155,7 +131,6 @@ module SampleData =
             HomeScore = 6
             AwayScore = 5
             Date = DateTime(2024, 5, 1)
-            Weather = Some { Temperature = 84.0; WindSpeed = 15.0; WindDirection = "S"; Precipitation = 0.0 }
             HomePitcher = Some { Name = "Texas Heat"; ERA = 3.65; WHIP = 1.28; Strikeouts = 155; Walks = 48; InningsPitched = 167.1 }
             AwayPitcher = Some { Name = "Houston Rocket"; ERA = 3.21; WHIP = 1.15; Strikeouts = 178; Walks = 41; InningsPitched = 189.2 }
             Metrics = Some { HomeOPS = 0.778; AwayOPS = 0.745; HomeERAPlus = 102; AwayERAPlus = 108; HomeFIP = 3.78; AwayFIP = 3.55 }

@@ -2,13 +2,15 @@ open Argu
 open Fastbreak.Cli.Commands
 
 type GenerateEloPlusArgs =
-    | [<AltCommandLine("-f")>] File of path:string
+    | [<AltCommandLine("-f"); Mandatory>] File of path:string
     | [<AltCommandLine("-p")>] Progress of interval:int
+    | [<AltCommandLine("-m")>] Markdown of path:string
     interface IArgParserTemplate with
         member this.Usage =
             match this with
-            | File _ -> "CSV file path for game data (optional, uses sample data if not specified)"
+            | File _ -> "CSV file path for game data (required)"
             | Progress _ -> "report progress every N lines (default: 10)"
+            | Markdown _ -> "output markdown report to specified file path"
 
 type CliArgs =
     | [<CliPrefix(CliPrefix.None)>] Generate_Elo_Plus of ParseResults<GenerateEloPlusArgs>

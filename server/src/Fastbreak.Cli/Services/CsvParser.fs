@@ -58,25 +58,13 @@ module CsvParser =
                     match date, homeScore, awayScore with
                     | Some d, Some hs, Some as_ when not (String.IsNullOrWhiteSpace(homeTeam)) && not (String.IsNullOrWhiteSpace(awayTeam)) ->
                         // Optional fields with safe parsing
-                        let weather = 
-                            if fields.Length > 9 then
-                                match parseFloat fields.[6], parseFloat fields.[7], parseFloat fields.[9] with
-                                | Some temp, Some wind, Some precip when fields.Length > 8 && not (String.IsNullOrWhiteSpace(fields.[8])) ->
-                                    Some {
-                                        Temperature = temp
-                                        WindSpeed = wind
-                                        WindDirection = fields.[8]
-                                        Precipitation = precip
-                                    }
-                                | _ -> None
-                            else None
                         
                         let homePitcher =
-                            if fields.Length > 15 then
-                                match parseFloat fields.[11], parseFloat fields.[12], parseInt fields.[13], parseInt fields.[14], parseFloat fields.[15] with
-                                | Some era, Some whip, Some k, Some bb, Some ip when not (String.IsNullOrWhiteSpace(fields.[10])) ->
+                            if fields.Length > 11 then
+                                match parseFloat fields.[7], parseFloat fields.[8], parseInt fields.[9], parseInt fields.[10], parseFloat fields.[11] with
+                                | Some era, Some whip, Some k, Some bb, Some ip when not (String.IsNullOrWhiteSpace(fields.[6])) ->
                                     Some {
-                                        Name = fields.[10]
+                                        Name = fields.[6]
                                         ERA = era
                                         WHIP = whip
                                         Strikeouts = k
@@ -87,11 +75,11 @@ module CsvParser =
                             else None
                         
                         let awayPitcher =
-                            if fields.Length > 21 then
-                                match parseFloat fields.[17], parseFloat fields.[18], parseInt fields.[19], parseInt fields.[20], parseFloat fields.[21] with
-                                | Some era, Some whip, Some k, Some bb, Some ip when not (String.IsNullOrWhiteSpace(fields.[16])) ->
+                            if fields.Length > 17 then
+                                match parseFloat fields.[13], parseFloat fields.[14], parseInt fields.[15], parseInt fields.[16], parseFloat fields.[17] with
+                                | Some era, Some whip, Some k, Some bb, Some ip when not (String.IsNullOrWhiteSpace(fields.[12])) ->
                                     Some {
-                                        Name = fields.[16]
+                                        Name = fields.[12]
                                         ERA = era
                                         WHIP = whip
                                         Strikeouts = k
@@ -102,8 +90,8 @@ module CsvParser =
                             else None
                         
                         let metrics =
-                            if fields.Length > 27 then
-                                match parseFloat fields.[22], parseFloat fields.[23], parseFloat fields.[24], parseFloat fields.[25], parseFloat fields.[26], parseFloat fields.[27] with
+                            if fields.Length > 23 then
+                                match parseFloat fields.[18], parseFloat fields.[19], parseFloat fields.[20], parseFloat fields.[21], parseFloat fields.[22], parseFloat fields.[23] with
                                 | Some hops, Some aops, Some herp, Some aerp, Some hfip, Some afip ->
                                     Some {
                                         HomeOPS = hops
@@ -123,7 +111,6 @@ module CsvParser =
                             HomeScore = hs
                             AwayScore = as_
                             Date = d
-                            Weather = weather
                             HomePitcher = homePitcher
                             AwayPitcher = awayPitcher
                             Metrics = metrics

@@ -14,11 +14,6 @@ module EloPlus =
         printfn "Game: %s vs %s (%s) - Winner: %s" 
             game.AwayTeam game.HomeTeam score winner
         
-        match game.Weather with
-        | Some weather -> 
-            printfn "  Weather: %.1f°F, Wind: %.1f mph %s, Precipitation: %.1f\"" 
-                weather.Temperature weather.WindSpeed weather.WindDirection weather.Precipitation
-        | None -> printfn "  Weather: No data"
         
         match game.HomePitcher, game.AwayPitcher with
         | Some hp, Some ap ->
@@ -55,8 +50,7 @@ module EloPlus =
             | CsvParser.FileError msg ->
                 Error msg
         | None ->
-            printfn "Using sample game data (5 games)"
-            Ok (SampleData.sampleGames, "sample-data")
+            Error "File path is required. Use -f or --file to specify a CSV file path."
     
     let generateEloPlusRatings (args: ParseResults<'T>) =
         printfn "=== Elo+ Rating Generation ==="
@@ -68,6 +62,16 @@ module EloPlus =
                 let argStrings = System.Environment.GetCommandLineArgs()
                 let fileIndex = Array.tryFindIndex (fun s -> s = "--file" || s = "-f") argStrings
                 match fileIndex with
+                | Some i when i + 1 < argStrings.Length -> Some argStrings.[i + 1]
+                | _ -> None
+            with
+            | _ -> None
+        
+        let markdownPath = 
+            try
+                let argStrings = System.Environment.GetCommandLineArgs()
+                let markdownIndex = Array.tryFindIndex (fun s -> s = "--markdown" || s = "-m") argStrings
+                match markdownIndex with
                 | Some i when i + 1 < argStrings.Length -> Some argStrings.[i + 1]
                 | _ -> None
             with
@@ -180,8 +184,6 @@ module EloPlus =
                     printfn "\nSample Feature Vector (Game 1):"
                     printfn "HomeElo: %.1f, AwayElo: %.1f, EloDiff: %.1f" 
                         firstFeature.HomeElo firstFeature.AwayElo firstFeature.EloDifference
-                    printfn "Temperature: %.2f, WindSpeed: %.2f, WindFactor: %.2f" 
-                        firstFeature.Temperature firstFeature.WindSpeed firstFeature.WindFactor
                     printfn "HomeERA+: %.2f, AwayERA+: %.2f, OPSDiff: %.3f" 
                         firstFeature.HomeERAAdvantage firstFeature.AwayERAAdvantage firstFeature.OPSDifferential
                     printfn "HomeWin: %b" firstFeature.HomeWin
@@ -238,5 +240,40 @@ module EloPlus =
                     |> List.iter (printfn "%s")
                 else
                     printfn "\n❌ No Elo+ ratings calculated - insufficient game data or ML model training failed"
+
+                // Generate markdown report if requested
+                match markdownPath with
+                | Some mdPath ->
+                    printfn "\n=== Generating Markdown Report ==="
+                    printfn "==============================="
+                    
+                    let mlTrainingResult = 
+                        if features.Length >= 10 then
+                            try
+                                Some (MLModelTrainer.trainModel features MLModelTrainer.defaultConfig)
+                            with
+                            | _ -> None
+                        else None
+                    
+                    let reportData = {
+                        MarkdownReportGenerator.ReportData.Games = games
+                        MarkdownReportGenerator.ReportData.DataSource = dataSource
+                        MarkdownReportGenerator.ReportData.ProcessingTime = processingTime
+                        MarkdownReportGenerator.ReportData.EloRatings = finalRatings
+                        MarkdownReportGenerator.ReportData.EloPlusRatings = eloPlusRatings
+                        MarkdownReportGenerator.ReportData.FeatureStats = if features.Length > 0 then Some (FeatureEngineering.getFeatureStatistics features) else None
+                        MarkdownReportGenerator.ReportData.MLTrainingResult = mlTrainingResult
+                        MarkdownReportGenerator.ReportData.EloPlusStats = if not (Map.isEmpty eloPlusRatings) then Some (EloPlusCalculator.getEloPlusStatistics eloPlusRatings) else None
+                    }
+                    
+                    let markdownContent = MarkdownReportGenerator.generateReport reportData
+                    
+                    match MarkdownReportGenerator.saveReportToFile mdPath markdownContent with
+                    | Ok () -> printfn "✅ Markdown report saved to: %s" mdPath
+                    | Error errorMsg -> 
+                        printError errorMsg
+                        printfn "❌ Failed to save markdown report"
+                | None -> 
+                    printfn "\n💡 Use -m or --markdown <path> to generate a markdown report"
 
                 0

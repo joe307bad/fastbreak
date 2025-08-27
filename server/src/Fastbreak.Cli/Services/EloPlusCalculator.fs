@@ -129,11 +129,10 @@ module EloPlusCalculator =
                     // In production, you'd save/load the model
                     let featureColumns = [|
                         "HomeElo"; "AwayElo"; "EloDifference";
-                        "Temperature"; "WindSpeed"; "WindFactor"; "PrecipitationLevel";
                         "HomeERAAdvantage"; "AwayERAAdvantage"; "HomeWHIPAdvantage"; "AwayWHIPAdvantage";
                         "HomeStrikeoutRate"; "AwayStrikeoutRate";
                         "OPSDifferential"; "ERAPlusDifferential"; "FIPDifferential";
-                        "EloWeatherInteraction"; "PitcherMatchupAdvantage"
+                        "PitcherMatchupAdvantage"
                     |]
                     
                     let trainDataView = mlCtx.Data.LoadFromEnumerable(features)
@@ -190,5 +189,5 @@ module EloPlusCalculator =
             
             let teamsWithML = ratingsList |> List.filter (fun r -> r.MLConfidence.IsSome) |> List.length
             
-            sprintf "Elo+ Statistics:\n- Avg Standard Elo: %.1f\n- Avg Elo+: %.1f\n- Avg ML Adjustment: %.1f\n- Max Adjustment: %.1f\n- Min Adjustment: %.1f\n- Teams with ML data: %d/%d"
+            sprintf "- Avg Standard Elo: %.1f\n- Avg Elo+: %.1f\n- Avg ML Adjustment: %.1f\n- Max Adjustment: %.1f\n- Min Adjustment: %.1f\n- Teams with ML data: %d/%d"
                 avgStandardElo avgEloPlus avgAdjustment maxAdjustment minAdjustment teamsWithML ratingsList.Length

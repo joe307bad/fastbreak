@@ -13,6 +13,7 @@
     <Compile Include="Services\FeatureEngineering.fs" />
     <Compile Include="Services\MLModelTrainer.fs" />
     <Compile Include="Services\EloPlusCalculator.fs" />
+    <Compile Include="Services\MarkdownReportGenerator.fs" />
     <Compile Include="Commands\EloPlus.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>

@@ -51,11 +51,10 @@ module MLModelTrainer =
         // Define features for training
         let featureColumns = [|
             "HomeElo"; "AwayElo"; "EloDifference";
-            "Temperature"; "WindSpeed"; "WindFactor"; "PrecipitationLevel";
             "HomeERAAdvantage"; "AwayERAAdvantage"; "HomeWHIPAdvantage"; "AwayWHIPAdvantage";
             "HomeStrikeoutRate"; "AwayStrikeoutRate";
             "OPSDifferential"; "ERAPlusDifferential"; "FIPDifferential";
-            "EloWeatherInteraction"; "PitcherMatchupAdvantage"
+            "PitcherMatchupAdvantage"
         |]
         
         // Training pipeline (Logistic Regression for binary classification) 

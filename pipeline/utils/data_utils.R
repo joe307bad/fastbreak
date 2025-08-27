@@ -1,5 +1,14 @@
 # Utility functions for baseball data processing
 
+#' Rate limiting delay for API calls
+#' @param min_seconds Minimum seconds to wait (default: 0)
+#' @param max_seconds Maximum seconds to wait (default: 5)
+rate_limit_delay <- function(min_seconds = 0, max_seconds = 5) {
+  delay_seconds <- runif(1, min_seconds, max_seconds)
+  cat(sprintf("Waiting %.1f seconds...\n", delay_seconds))
+  Sys.sleep(delay_seconds)
+}
+
 #' Get starting pitchers for a specific game
 #' @param game_pk MLB game primary key
 #' @param game_date Date of the game
@@ -9,6 +18,9 @@ get_starting_pitchers <- function(game_pk, game_date) {
     cat("Loading pitcher stats...\n")
     pbp <- mlb_pbp(game_pk)
     cat("Pitcher stats resolved from MLB, status code 200\n")
+    
+    # Rate limiting delay
+    rate_limit_delay()
     
     if (is.null(pbp) || nrow(pbp) == 0) {
       stop(sprintf("No play-by-play data available for game %s", game_pk))
@@ -66,20 +78,44 @@ get_pitcher_stats <- function(pitcher_name, as_of_date) {
     
     # Get pitcher stats using bref_daily_pitcher
     cat("Loading pitcher stats...\n")
-    pitcher_data <- bref_daily_pitcher(
-      t1 = format(t1_date, "%Y-%m-%d"),  # Season start
-      t2 = format(t2_date, "%Y-%m-%d")
-    )
-    cat("Pitcher stats resolved from Baseball Reference, status code 200\n")
+    cat(sprintf("Date range: %s to %s\n", format(t1_date, "%Y-%m-%d"), format(t2_date, "%Y-%m-%d")))
     
+    pitcher_data <- tryCatch({
+      # Suppress console output from baseballr package
+      capture.output({
+        result <- bref_daily_pitcher(
+          t1 = format(t1_date, "%Y-%m-%d"),  # Season start
+          t2 = format(t2_date, "%Y-%m-%d")
+        )
+      }, type = "message")
+      result
+    }, warning = function(w) {
+      # cat("Warning from bref_daily_pitcher:", w$message, "\n")
+      data.frame()  # Return empty data frame on warning
+    }, error = function(e) {
+      # cat("Error from bref_daily_pitcher:", e$message, "\n")
+      data.frame()  # Return empty data frame on error
+    })
+    
+    cat(sprintf("Pitcher stats resolved from Baseball Reference, got %d rows\n", nrow(pitcher_data)))
+    
+    # Rate limiting delay
+    rate_limit_delay()
+    
+    pitcher_filtered <- NULL
     if (nrow(pitcher_data) > 0) {
+      cat(sprintf("Looking for pitcher: '%s'\n", pitcher_name))
+      # cat(sprintf("Available pitchers: %s\n", paste(head(pitcher_data$Name, 5), collapse = ", ")))
+      
       # Filter for specific pitcher
       pitcher_filtered <- pitcher_data %>%
         filter(Name == pitcher_name) %>%
         slice_tail(n = 1)  # Get most recent entry
+        
+      # cat(sprintf("Found %d matches for pitcher '%s'\n", nrow(pitcher_filtered), pitcher_name))
     }
     
-    if (nrow(pitcher_data) > 0 && nrow(pitcher_filtered) > 0) {
+    if (!is.null(pitcher_filtered) && nrow(pitcher_filtered) > 0) {
       list(
         name = pitcher_filtered$Name,
         era = pitcher_filtered$ERA,
@@ -160,6 +196,9 @@ get_team_stats <- function(team_name, as_of_date) {
     )
     cat("Team batting stats resolved from FanGraphs, status code 200\n")
     
+    # Rate limiting delay
+    rate_limit_delay()
+    
     # Extract team batting stats
     if (nrow(fg_batting) > 0) {
       team_batting <- fg_batting %>%
@@ -187,6 +226,9 @@ get_team_stats <- function(team_name, as_of_date) {
       enddate = format(t2_date, "%Y-%m-%d")
     )
     cat("Team pitching stats resolved from FanGraphs, status code 200\n")
+    
+    # Rate limiting delay
+    rate_limit_delay()
     
     # Extract team pitching stats
     if (nrow(fg_pitching) > 0) {
@@ -222,6 +264,24 @@ get_team_stats <- function(team_name, as_of_date) {
 #' Format collected data into final output structure
 #' @param game_data Raw game data with nested stats
 format_output_data <- function(game_data) {
+  # Helper function to safely extract numeric values
+  safe_extract_num <- function(lst, field) {
+    sapply(lst, function(x) {
+      val <- x[[field]] %||% NA
+      if (is.null(val) || is.na(val) || val == "null") return(NA_real_)
+      as.numeric(val)
+    })
+  }
+  
+  # Helper function to safely extract character values  
+  safe_extract_chr <- function(lst, field) {
+    sapply(lst, function(x) {
+      val <- x[[field]] %||% NA
+      if (is.null(val) || is.na(val) || val == "null") return(NA_character_)
+      as.character(val)
+    })
+  }
+  
   game_data %>%
     select(
       game_pk,
@@ -250,30 +310,30 @@ format_output_data <- function(game_data) {
       AwayScore = teams_away_score,
       
       # Home pitcher stats
-      HomePitcherName = map_chr(home_pitcher_stats, ~.x$name %||% NA),
-      HomePitcherERA = map_dbl(home_pitcher_stats, ~.x$era %||% NA),
-      HomePitcherWHIP = map_dbl(home_pitcher_stats, ~.x$whip %||% NA),
-      HomePitcherK = map_dbl(home_pitcher_stats, ~.x$k %||% NA),
-      HomePitcherBB = map_dbl(home_pitcher_stats, ~.x$bb %||% NA),
-      HomePitcherIP = map_dbl(home_pitcher_stats, ~.x$ip %||% NA),
+      HomePitcherName = safe_extract_chr(home_pitcher_stats, "name"),
+      HomePitcherERA = safe_extract_num(home_pitcher_stats, "era"),
+      HomePitcherWHIP = safe_extract_num(home_pitcher_stats, "whip"),
+      HomePitcherK = safe_extract_num(home_pitcher_stats, "k"),
+      HomePitcherBB = safe_extract_num(home_pitcher_stats, "bb"),
+      HomePitcherIP = safe_extract_num(home_pitcher_stats, "ip"),
       
       # Away pitcher stats  
-      AwayPitcherName = map_chr(away_pitcher_stats, ~.x$name %||% NA),
-      AwayPitcherERA = map_dbl(away_pitcher_stats, ~.x$era %||% NA),
-      AwayPitcherWHIP = map_dbl(away_pitcher_stats, ~.x$whip %||% NA),
-      AwayPitcherK = map_dbl(away_pitcher_stats, ~.x$k %||% NA),
-      AwayPitcherBB = map_dbl(away_pitcher_stats, ~.x$bb %||% NA),
-      AwayPitcherIP = map_dbl(away_pitcher_stats, ~.x$ip %||% NA),
+      AwayPitcherName = safe_extract_chr(away_pitcher_stats, "name"),
+      AwayPitcherERA = safe_extract_num(away_pitcher_stats, "era"),
+      AwayPitcherWHIP = safe_extract_num(away_pitcher_stats, "whip"),
+      AwayPitcherK = safe_extract_num(away_pitcher_stats, "k"),
+      AwayPitcherBB = safe_extract_num(away_pitcher_stats, "bb"),
+      AwayPitcherIP = safe_extract_num(away_pitcher_stats, "ip"),
       
       # Team stats
-      HomeOPS = map_dbl(home_team_stats, ~.x$ops %||% NA),
-      AwayOPS = map_dbl(away_team_stats, ~.x$ops %||% NA),
-      HomeWOBA = map_dbl(home_team_stats, ~.x$woba %||% NA),
-      AwayWOBA = map_dbl(away_team_stats, ~.x$woba %||% NA),
-      HomeERAPlus = map_dbl(home_team_stats, ~.x$era_plus %||% NA),
-      AwayERAPlus = map_dbl(away_team_stats, ~.x$era_plus %||% NA),
-      HomeFIP = map_dbl(home_team_stats, ~.x$fip %||% NA),
-      AwayFIP = map_dbl(away_team_stats, ~.x$fip %||% NA)
+      HomeOPS = safe_extract_num(home_team_stats, "ops"),
+      AwayOPS = safe_extract_num(away_team_stats, "ops"),
+      HomeWOBA = safe_extract_num(home_team_stats, "woba"),
+      AwayWOBA = safe_extract_num(away_team_stats, "woba"),
+      HomeERAPlus = safe_extract_num(home_team_stats, "era_plus"),
+      AwayERAPlus = safe_extract_num(away_team_stats, "era_plus"),
+      HomeFIP = safe_extract_num(home_team_stats, "fip"),
+      AwayFIP = safe_extract_num(away_team_stats, "fip")
     ) %>%
     select(
       GameId, Date, HomeTeam, AwayTeam, HomeScore, AwayScore,

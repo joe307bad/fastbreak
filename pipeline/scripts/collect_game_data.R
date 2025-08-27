@@ -189,6 +189,9 @@ get_game_schedule <- function(start_date, end_date) {
       !is.na(teams_home_score)
     )
   
+  # Rate limiting delay
+  rate_limit_delay()
+  
   return(schedule)
 }
 

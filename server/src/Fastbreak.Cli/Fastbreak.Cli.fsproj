@@ -8,10 +8,14 @@
   <ItemGroup>
     <Compile Include="Entities\GameData.fs" />
     <Compile Include="Services\EloCalculator.fs" />
+    <Compile Include="Services\VanillaEloCalculator.fs" />
     <Compile Include="Services\CsvParser.fs" />
     <Compile Include="Services\MLFeatures.fs" />
     <Compile Include="Services\FeatureEngineering.fs" />
     <Compile Include="Services\MLModelTrainer.fs" />
+    <Compile Include="Services\DataSplitter.fs" />
+    <Compile Include="Services\EvaluationMetrics.fs" />
+    <Compile Include="Services\HyperparameterOptimizer.fs" />
     <Compile Include="Services\EloPlusCalculator.fs" />
     <Compile Include="Services\MarkdownReportGenerator.fs" />
     <Compile Include="Commands\EloPlus.fs" />

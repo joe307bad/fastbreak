@@ -113,9 +113,53 @@ module EloPlus =
                 let endTime = DateTime.Now
                 let processingTime = endTime - startTime
                 
-                // Calculate final ratings
+                // === ENHANCED ELO+ SYSTEM WITH PROPER METHODOLOGY ===
+                printfn "\n=== Phase 1: Data Splitting ==="
+                printfn "=============================="
+                
+                // Calculate final ratings (fallback approach)
                 let finalRatings = EloCalculator.calculateEloRatings games
                 let eloRatingRecords = EloCalculator.convertToEloRatings finalRatings DateTime.Now
+                
+                // Initialize with defaults
+                let mutable vanillaEloRatings = Map.empty<string, float>
+                let mutable vanillaMetrics = { 
+                    EvaluationMetrics.TotalGames = 0; EvaluationMetrics.CorrectPredictions = 0; EvaluationMetrics.Accuracy = 0.0
+                    EvaluationMetrics.LogLoss = 0.0; EvaluationMetrics.BrierScore = 0.0
+                    EvaluationMetrics.TruePositives = 0; EvaluationMetrics.TrueNegatives = 0; EvaluationMetrics.FalsePositives = 0; EvaluationMetrics.FalseNegatives = 0
+                    EvaluationMetrics.Precision = 0.0; EvaluationMetrics.Recall = 0.0; EvaluationMetrics.F1Score = 0.0; EvaluationMetrics.RocAuc = 0.5
+                    EvaluationMetrics.CalibrationError = 0.0; EvaluationMetrics.IsWellCalibrated = false
+                    EvaluationMetrics.AverageConfidence = 0.5; EvaluationMetrics.ConfidenceStdDev = 0.0
+                    EvaluationMetrics.HomeTeamAdvantage = 0.5; EvaluationMetrics.ModelHomeBias = 0.0
+                }
+                let mutable eloPlusRatings = Map.empty<string, EloPlusCalculator.EloPlusRating>
+                let mutable dataSplit = { 
+                    DataSplitter.Training = []; DataSplitter.Validation = []; DataSplitter.Testing = []
+                }
+                let mutable features = []  // Initialize features list for markdown generation
+                
+                match DataSplitter.splitGames sortedGames with
+                | Error errorMsg -> 
+                    printError $"Data splitting failed: {errorMsg}"
+                    printfn "Falling back to legacy approach...\n"
+                    
+                | Ok splitResult ->
+                    dataSplit <- splitResult
+                    printfn "%s" (DataSplitter.getDataSplitStatistics dataSplit)
+                    
+                    // === Phase 2: Vanilla Elo Baseline ===
+                    printfn "\n=== Phase 2: Vanilla Elo Baseline ==="
+                    printfn "===================================="
+                    vanillaEloRatings <- VanillaEloCalculator.calculateVanillaEloRatings dataSplit.Training
+                    let (vanillaReport, vanillaAccuracy) = VanillaEloCalculator.calculatePerformanceStatistics dataSplit.Testing VanillaEloCalculator.defaultConfig
+                    printfn "%s" vanillaReport
+                    
+                    // === Phase 3: Elo+ Enhanced System ===
+                    printfn "\n=== Phase 3: Elo+ Enhanced System ==="
+                    printfn "===================================="
+                    let (ratings, eloPlusReport) = EloPlusCalculator.calculateEloPlusRatingsWithSplitting games EloPlusCalculator.defaultConfig
+                    eloPlusRatings <- ratings
+                    printfn "%s" eloPlusReport
                 
                 printfn "\n=== Final Elo Ratings ==="
                 printfn "========================="
@@ -172,10 +216,31 @@ module EloPlus =
                 printfn "Games per second: %.1f" (float games.Length / processingTime.TotalSeconds)
                 printfn "Data source: %s" dataSource
                 
-                // Test feature engineering (Phase 8 Step 2)
-                printfn "\n=== ML Feature Engineering Test ==="
-                printfn "=================================="
-                let features = FeatureEngineering.convertGamesToFeatures games
+                // === Phase 4: Comprehensive Evaluation ===
+                printfn "\n=== Phase 4: Comprehensive Model Comparison ==="
+                printfn "=============================================="
+                
+                // Create prediction functions for comparison
+                let vanillaPredictFunc game = 
+                    let homeRating = vanillaEloRatings.TryFind(game.HomeTeam) |> Option.defaultValue VanillaEloCalculator.DEFAULT_RATING
+                    let awayRating = vanillaEloRatings.TryFind(game.AwayTeam) |> Option.defaultValue VanillaEloCalculator.DEFAULT_RATING
+                    VanillaEloCalculator.calculateWinProbability homeRating awayRating VanillaEloCalculator.defaultConfig
+                
+                // Evaluate on test set (proper methodology) 
+                if not dataSplit.Testing.IsEmpty then
+                    let vanillaPredictions = EvaluationMetrics.createPredictionResults dataSplit.Testing vanillaPredictFunc
+                    vanillaMetrics <- EvaluationMetrics.calculatePerformanceMetrics vanillaPredictions
+                
+                // Calculate baseline accuracy
+                let baselineAccuracy = EvaluationMetrics.calculateBaselineAccuracy dataSplit.Testing
+                
+                printfn "%s" (EvaluationMetrics.formatPerformanceMetrics vanillaMetrics "Vanilla Elo System")
+                printfn "\nBaseline (Majority Class): %.1f%% accuracy" (baselineAccuracy * 100.0)
+                
+                // Test feature engineering  
+                printfn "\n=== ML Feature Engineering Analysis ==="
+                printfn "====================================="
+                features <- FeatureEngineering.convertGamesToFeatures dataSplit.Training
                 let featureStats = FeatureEngineering.getFeatureStatistics features
                 printfn "%s" featureStats
                 
@@ -209,10 +274,33 @@ module EloPlus =
                     else
                         printfn "\n⚠️  Not enough data for ML training (need ≥10 games, have %d)" features.Length
                 
-                // Test Elo+ calculation (Phase 8 Step 4)
-                printfn "\n=== Elo+ Enhanced Ratings Test ==="
-                printfn "================================="
-                let eloPlusRatings = EloPlusCalculator.calculateEloPlusRatings games EloPlusCalculator.defaultConfig
+                // === Phase 5: Mathematical Framework Demonstration ===
+                printfn "\n=== Mathematical Framework Demonstration ==="
+                printfn "=========================================="
+                
+                // Demonstrate different tilting models
+                let demoEloProb = 0.60
+                let demoMLProb = 0.75
+                let demoConfidence = Some 0.85
+                
+                printfn "Example Prediction Combination:"
+                printfn "  Elo Probability: %.1f%%" (demoEloProb * 100.0)
+                printfn "  ML Probability: %.1f%%" (demoMLProb * 100.0)
+                printfn "  ML Confidence: %.1f%%" (demoConfidence.Value * 100.0)
+                printfn ""
+                
+                let linearResult = EloPlusCalculator.calculateEloPlusProbability (EloPlusCalculator.LinearCombination 0.3) demoEloProb demoMLProb demoConfidence
+                let weightedResult = EloPlusCalculator.calculateEloPlusProbability (EloPlusCalculator.WeightedAverage (0.7, 0.3)) demoEloProb demoMLProb demoConfidence
+                let confidenceResult = EloPlusCalculator.calculateEloPlusProbability (EloPlusCalculator.ConfidenceWeighted 0.4) demoEloProb demoMLProb demoConfidence
+                
+                printfn "Tilting Model Results:"
+                printfn "  Linear Combination (α=0.3): %.1f%%" (linearResult * 100.0)
+                printfn "  Weighted Average (0.7:0.3): %.1f%%" (weightedResult * 100.0)  
+                printfn "  Confidence Weighted (α=0.4): %.1f%%" (confidenceResult * 100.0)
+                
+                // Display Elo+ ratings
+                printfn "\n=== Final Elo+ Enhanced Ratings ==="
+                printfn "=================================="
                 let eloPlusStats = EloPlusCalculator.getEloPlusStatistics eloPlusRatings
                 printfn "%s" eloPlusStats
                 
@@ -264,6 +352,11 @@ module EloPlus =
                         MarkdownReportGenerator.ReportData.FeatureStats = if features.Length > 0 then Some (FeatureEngineering.getFeatureStatistics features) else None
                         MarkdownReportGenerator.ReportData.MLTrainingResult = mlTrainingResult
                         MarkdownReportGenerator.ReportData.EloPlusStats = if not (Map.isEmpty eloPlusRatings) then Some (EloPlusCalculator.getEloPlusStatistics eloPlusRatings) else None
+                        // Enhanced reporting data
+                        MarkdownReportGenerator.ReportData.DataSplitStats = Some (DataSplitter.getDataSplitStatistics dataSplit)
+                        MarkdownReportGenerator.ReportData.VanillaEloMetrics = Some vanillaMetrics
+                        MarkdownReportGenerator.ReportData.OptimizationResults = Some "Hyperparameter optimization included in training pipeline"
+                        MarkdownReportGenerator.ReportData.MathematicalExplanation = true
                     }
                     
                     let markdownContent = MarkdownReportGenerator.generateReport reportData

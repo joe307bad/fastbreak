@@ -6,20 +6,50 @@ open System
 
 module EloPlusCalculator =
     
+    // Mathematical formulation for combining Elo and ML predictions
+    // P_final = f(P_elo, P_ml, α) where α is the tilting parameter
+    type TiltingModel = 
+        | LinearCombination of alpha: float              // P_final = (1-α) × P_elo + α × P_ml
+        | WeightedAverage of eloWeight: float * mlWeight: float    // P_final = (w_elo × P_elo + w_ml × P_ml) / (w_elo + w_ml)
+        | ConfidenceWeighted of alpha: float             // P_final = P_elo + α × conf_ml × (P_ml - P_elo)
+    
     // Configuration for Elo+ enhancement
     type EloPlusConfig = {
         MLModelPath: string option
+        TiltingModel: TiltingModel  // Mathematical approach for combining predictions
         ConfidenceThreshold: float  // Only apply ML adjustments when confidence > threshold
-        MaxAdjustment: float        // Maximum Elo adjustment (in points)
-        LearningRate: float         // How aggressively to apply ML adjustments
+        MaxAdjustment: float        // Maximum Elo adjustment (in points) - legacy parameter
+        LearningRate: float         // How aggressively to apply ML adjustments - legacy parameter
     }
     
-    // Default configuration
+    // Calculate Elo+ probability using the specified tilting model
+    // This is the core mathematical innovation of the Elo+ system
+    let calculateEloPlusProbability (model: TiltingModel) (eloProb: float) (mlProb: float) (confidence: float option) : float =
+        match model with
+        | LinearCombination alpha ->
+            // Linear interpolation between Elo and ML predictions
+            // When α = 0: Pure Elo, When α = 1: Pure ML, When α = 0.5: Equal weight
+            (1.0 - alpha) * eloProb + alpha * mlProb
+            
+        | WeightedAverage (eloWeight, mlWeight) ->
+            // Weighted average approach allowing different trust levels
+            let totalWeight = eloWeight + mlWeight
+            if totalWeight = 0.0 then eloProb
+            else (eloWeight * eloProb + mlWeight * mlProb) / totalWeight
+            
+        | ConfidenceWeighted alpha ->
+            // Confidence-modulated adjustment - only tilt when ML model is confident
+            match confidence with
+            | Some conf -> eloProb + alpha * conf * (mlProb - eloProb)
+            | None -> eloProb  // Fall back to pure Elo if no confidence available
+
+    // Default configuration using Linear Combination with moderate ML influence
     let defaultConfig = {
         MLModelPath = None
+        TiltingModel = LinearCombination 0.3  // Trust Elo 70%, ML 30%
         ConfidenceThreshold = 0.6   // 60% confidence threshold
-        MaxAdjustment = 50.0        // Max ±50 Elo points adjustment
-        LearningRate = 0.3          // 30% of the ML confidence applied
+        MaxAdjustment = 50.0        // Max ±50 Elo points adjustment (legacy)
+        LearningRate = 0.3          // 30% of the ML confidence applied (legacy)
     }
     
     // Enhanced Elo rating with ML prediction
@@ -115,8 +145,172 @@ module EloPlusCalculator =
         |> Map.add game.HomeTeam homeEloPlusRating
         |> Map.add game.AwayTeam awayEloPlusRating
     
-    // Calculate Elo+ ratings for all games with ML enhancement
-    let calculateEloPlusRatings (games: GameData list) (config: EloPlusConfig) : Map<string, EloPlusRating> =
+    // Calculate Elo+ ratings using proper train/validation/test methodology
+    let calculateEloPlusRatingsWithSplitting (games: GameData list) (config: EloPlusConfig) : Map<string, EloPlusRating> * string =
+        match DataSplitter.splitGames games with
+        | Error msg -> (Map.empty, $"Data splitting failed: {msg}")
+        | Ok split ->
+            // Phase 1: Train baseline Elo on training data only
+            let trainingEloRatings = VanillaEloCalculator.calculateVanillaEloRatings split.Training
+            
+            // Phase 2: Train ML model on training data only
+            let mlContext, mlModel = 
+                if split.Training.Length >= 10 then
+                    try
+                        let features = FeatureEngineering.convertGamesToFeatures split.Training
+                        let mlCtx = MLContext(seed = Nullable(42))
+                        let result = MLModelTrainer.trainModel features MLModelTrainer.defaultConfig
+                        
+                        // Create the actual ML.NET model pipeline
+                        let featureColumns = [|
+                            "HomeElo"; "AwayElo"; "EloDifference";
+                            "HomeERAAdvantage"; "AwayERAAdvantage"; "HomeWHIPAdvantage"; "AwayWHIPAdvantage";
+                            "HomeStrikeoutRate"; "AwayStrikeoutRate";
+                            "OPSDifferential"; "ERAPlusDifferential"; "FIPDifferential";
+                            "PitcherMatchupAdvantage"
+                        |]
+                        
+                        let trainDataView = mlCtx.Data.LoadFromEnumerable(features)
+                        let trainer = mlCtx.BinaryClassification.Trainers.LbfgsLogisticRegression(labelColumnName = "Label")
+                        let pipeline = 
+                            Microsoft.ML.Data.EstimatorChain()
+                                .Append(mlCtx.Transforms.Concatenate("Features", featureColumns))
+                                .Append(trainer)
+                        let model = pipeline.Fit(trainDataView) :> ITransformer
+                        
+                        printfn "ML model trained for Elo+ calculation (Accuracy: %.1f%%)" (result.Accuracy * 100.0)
+                        (Some mlCtx, Some model)
+                    with
+                    | ex ->
+                        printfn "ML training failed, using standard Elo: %s" ex.Message
+                        (None, None)
+                else
+                    printfn "Not enough data for ML model, using standard Elo"
+                    (None, None)
+            
+            // Phase 3: Optimize tilting parameter on validation data
+            let optimizedAlpha = 
+                match HyperparameterOptimizer.optimizeAlphaParameter split.Training split.Validation HyperparameterOptimizer.defaultOptimizationConfig with
+                | Ok result -> result.BestAlpha
+                | Error _ -> 0.3  // Fall back to default
+            
+            // Phase 4: Calculate final Elo+ ratings using optimized parameters
+            let optimizedConfig = { config with TiltingModel = LinearCombination optimizedAlpha }
+            // Calculate Elo+ ratings with actual ML adjustments
+            let standardEloRatings = VanillaEloCalculator.calculateVanillaEloRatings (split.Training @ split.Validation)
+                
+            // Initialize mutable ratings dictionary for tracking
+            let mutableRatings = System.Collections.Generic.Dictionary<string, EloPlusRating>()
+            for KeyValue(teamName, eloRating) in standardEloRatings do
+                mutableRatings.[teamName] <- {
+                    Team = teamName
+                    StandardElo = decimal eloRating
+                    MLConfidence = None
+                    EloPlusAdjustment = 0.0
+                    FinalEloPlus = decimal eloRating
+                    LastUpdated = DateTime.Now
+                }
+            
+            // Process validation games to calculate actual ML-based adjustments
+            let validationGamesWithML = 
+                match mlContext, mlModel with
+                | Some ctx, Some model ->
+                    split.Validation
+                    |> List.choose (fun game ->
+                        try
+                            // Get current ratings for this game
+                            let homeElo = mutableRatings.[game.HomeTeam].StandardElo
+                            let awayElo = mutableRatings.[game.AwayTeam].StandardElo
+                            
+                            // Create feature vector for ML prediction
+                            let ratingsMap = Map [game.HomeTeam, homeElo; game.AwayTeam, awayElo]
+                            let features = FeatureEngineering.convertToFeatures ratingsMap game
+                            
+                            // Get actual ML prediction with confidence
+                            let prediction = MLModelTrainer.makePrediction ctx model features
+                            let mlProb = float prediction.HomeWinProbability
+                            let mlConfidence = if prediction.HomeWin then mlProb else (1.0 - mlProb)
+                            
+                            // Calculate Elo probability for comparison
+                            let eloProb = VanillaEloCalculator.calculateWinProbability (float homeElo) (float awayElo) VanillaEloCalculator.defaultConfig
+                            
+                            Some (game, eloProb, mlProb, mlConfidence)
+                        with
+                        | _ -> None)
+                | _ -> []
+            
+            // Apply ML adjustments based on actual predictions
+            let finalRatings =
+                if validationGamesWithML.IsEmpty then
+                    // No ML model available, return standard Elo as Elo+
+                    standardEloRatings
+                    |> Map.map (fun teamName eloRating -> {
+                        Team = teamName
+                        StandardElo = decimal eloRating
+                        MLConfidence = None
+                        EloPlusAdjustment = 0.0
+                        FinalEloPlus = decimal eloRating
+                        LastUpdated = DateTime.Now
+                    })
+                else
+                    // Calculate team-specific adjustments based on ML performance
+                    let teamAdjustments = System.Collections.Generic.Dictionary<string, float * float * int>()
+                    
+                    // Accumulate ML vs Elo differences for each team
+                    for (game, eloProb, mlProb, mlConfidence) in validationGamesWithML do
+                        let homeAdj = optimizedAlpha * mlConfidence * (mlProb - eloProb) * 50.0
+                        let awayAdj = optimizedAlpha * mlConfidence * ((1.0 - mlProb) - (1.0 - eloProb)) * 50.0
+                        
+                        let (homeSum, homeConf, homeCount) = 
+                            teamAdjustments.TryGetValue(game.HomeTeam) |> function
+                            | (true, (sum, conf, count)) -> (sum, conf, count)
+                            | (false, _) -> (0.0, 0.0, 0)
+                        
+                        let (awaySum, awayConf, awayCount) = 
+                            teamAdjustments.TryGetValue(game.AwayTeam) |> function
+                            | (true, (sum, conf, count)) -> (sum, conf, count)
+                            | (false, _) -> (0.0, 0.0, 0)
+                        
+                        teamAdjustments.[game.HomeTeam] <- (homeSum + homeAdj, homeConf + mlConfidence, homeCount + 1)
+                        teamAdjustments.[game.AwayTeam] <- (awaySum + awayAdj, awayConf + mlConfidence, awayCount + 1)
+                    
+                    // Apply averaged adjustments to each team
+                    standardEloRatings
+                    |> Map.map (fun teamName eloRating ->
+                        match teamAdjustments.TryGetValue(teamName) with
+                        | (true, (adjSum, confSum, count)) when count > 0 ->
+                            let avgAdjustment = adjSum / float count
+                            let avgConfidence = confSum / float count
+                            {
+                                Team = teamName
+                                StandardElo = decimal eloRating
+                                MLConfidence = Some avgConfidence
+                                EloPlusAdjustment = avgAdjustment
+                                FinalEloPlus = decimal eloRating + decimal avgAdjustment
+                                LastUpdated = DateTime.Now
+                            }
+                        | _ ->
+                            // No ML data for this team
+                            {
+                                Team = teamName
+                                StandardElo = decimal eloRating
+                                MLConfidence = None
+                                EloPlusAdjustment = 0.0
+                                FinalEloPlus = decimal eloRating
+                                LastUpdated = DateTime.Now
+                            })
+            
+            let report = sprintf """Elo+ Training Pipeline Results:
+====================================
+Data Split: %d training, %d validation, %d test games
+Optimized α: %.3f
+ML Model: %s
+Final Ratings: %d teams""" split.Training.Length split.Validation.Length split.Testing.Length optimizedAlpha (if mlModel.IsSome then "Successfully trained" else "Training failed") (Map.count finalRatings)
+            
+            (finalRatings, report)
+
+    // Legacy method for backward compatibility (will be deprecated)  
+    let calculateEloPlusRatingsLegacy (games: GameData list) (config: EloPlusConfig) : Map<string, EloPlusRating> =
         // Train ML model if we have enough data
         let mlContext, trainedModel = 
             if games.Length >= 10 then
@@ -160,6 +354,10 @@ module EloPlusCalculator =
         sortedGames
         |> List.fold (fun ratings game ->
             processGameEloPlus mlContext trainedModel ratings game config) currentRatings
+    
+    // Maintain original method for backward compatibility  
+    let calculateEloPlusRatings (games: GameData list) (config: EloPlusConfig) : Map<string, EloPlusRating> =
+        calculateEloPlusRatingsLegacy games config
     
     // Convert EloPlusRating to standard EloRating for compatibility
     let convertToEloRating (eloPlusRating: EloPlusRating) : EloRating =

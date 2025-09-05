@@ -1,11 +1,11 @@
 name: Build KMP
 
-on:
-  push:
-    branches:
-      - main
-    paths:
-      - 'kmp/**'
+# on:
+#   push:
+#     branches:
+#       - main
+#     paths:
+#       - 'kmp/**'
 
 permissions:
   contents: write

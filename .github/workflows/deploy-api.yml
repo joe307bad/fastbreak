@@ -1,11 +1,11 @@
 name: Deploy API
 
-on:
-  push:
-    branches:
-      - main
-    paths:
-      - 'api/**'
+# on:
+#   push:
+#     branches:
+#       - main
+#     paths:
+#       - 'api/**'
 
 permissions:
   contents: write

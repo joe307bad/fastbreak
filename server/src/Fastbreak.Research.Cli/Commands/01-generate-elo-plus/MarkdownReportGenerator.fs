@@ -1,8 +1,8 @@
-namespace Fastbreak.Cli.Services
+namespace Fastbreak.Research.Cli.Commands.GenerateEloPlus
 
 open System
 open System.Text
-open Fastbreak.Cli.Entities
+open Fastbreak.Research.Cli.Commands.GenerateEloPlus
 
 module MarkdownReportGenerator =
     

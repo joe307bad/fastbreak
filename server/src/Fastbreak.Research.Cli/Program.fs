@@ -1,5 +1,5 @@
 open Argu
-open Fastbreak.Cli.Commands
+open Fastbreak.Research.Cli.Commands.GenerateEloPlus
 
 type GenerateEloPlusArgs =
     | [<AltCommandLine("-f"); Mandatory>] File of path:string
@@ -13,21 +13,26 @@ type GenerateEloPlusArgs =
             | Markdown _ -> "output markdown report to specified file path"
 
 type CliArgs =
-    | [<CliPrefix(CliPrefix.None)>] Generate_Elo_Plus of ParseResults<GenerateEloPlusArgs>
+    | [<CustomCommandLine("01-generate-elo-plus"); CliPrefix(CliPrefix.None)>] Generate_Elo_Plus_01 of ParseResults<GenerateEloPlusArgs>
+    | Version
     interface IArgParserTemplate with
         member this.Usage =
             match this with
-            | Generate_Elo_Plus _ -> "generate Elo+ ratings using ML.NET"
+            | Generate_Elo_Plus_01 _ -> "generate Elo+ ratings using ML.NET"
+            | Version -> "display version information"
 
 [<EntryPoint>]
 let main args =
-    let parser = ArgumentParser.Create<CliArgs>(programName = "fastbreak-cli")
+    let parser = ArgumentParser.Create<CliArgs>(programName = "fastbreak-research")
     
     try
         let results = parser.ParseCommandLine(inputs = args, raiseOnUsage = true)
         
         match results.GetAllResults() with
-        | [Generate_Elo_Plus subArgs] -> EloPlus.generateEloPlusRatings subArgs
+        | [Generate_Elo_Plus_01 subArgs] -> EloPlus.generateEloPlusRatings subArgs
+        | [Version] -> 
+            printfn "Fastbreak Research CLI v0.1.0"
+            0
         | [] -> 
             printfn "%s" (parser.PrintUsage())
             0

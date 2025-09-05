@@ -1,4 +1,4 @@
-namespace Fastbreak.Cli.Services
+namespace Fastbreak.Research.Cli.Commands.GenerateEloPlus
 
 open Microsoft.ML.Data
 open System

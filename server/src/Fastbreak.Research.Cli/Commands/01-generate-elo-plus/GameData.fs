@@ -1,4 +1,4 @@
-namespace Fastbreak.Cli.Entities
+namespace Fastbreak.Research.Cli.Commands.GenerateEloPlus
 
 open System
 

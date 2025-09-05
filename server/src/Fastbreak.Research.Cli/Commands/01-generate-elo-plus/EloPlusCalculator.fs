@@ -1,7 +1,7 @@
-namespace Fastbreak.Cli.Services
+namespace Fastbreak.Research.Cli.Commands.GenerateEloPlus
 
 open Microsoft.ML
-open Fastbreak.Cli.Entities
+open Fastbreak.Research.Cli.Commands.GenerateEloPlus
 open System
 
 module EloPlusCalculator =

@@ -1,6 +1,6 @@
-namespace Fastbreak.Cli.Services
+namespace Fastbreak.Research.Cli.Commands.GenerateEloPlus
 
-open Fastbreak.Cli.Entities
+open Fastbreak.Research.Cli.Commands.GenerateEloPlus
 open System
 
 module EvaluationMetrics =

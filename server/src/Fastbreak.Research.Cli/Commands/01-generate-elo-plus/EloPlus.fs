@@ -1,9 +1,8 @@
-namespace Fastbreak.Cli.Commands
+namespace Fastbreak.Research.Cli.Commands.GenerateEloPlus
 
 open System
 open Argu
-open Fastbreak.Cli.Entities
-open Fastbreak.Cli.Services
+open Fastbreak.Research.Cli.Commands.GenerateEloPlus
 
 module EloPlus =
     
@@ -231,11 +230,8 @@ module EloPlus =
                     let vanillaPredictions = EvaluationMetrics.createPredictionResults dataSplit.Testing vanillaPredictFunc
                     vanillaMetrics <- EvaluationMetrics.calculatePerformanceMetrics vanillaPredictions
                 
-                // Calculate baseline accuracy
-                let baselineAccuracy = EvaluationMetrics.calculateBaselineAccuracy dataSplit.Testing
-                
                 printfn "%s" (EvaluationMetrics.formatPerformanceMetrics vanillaMetrics "Vanilla Elo System")
-                printfn "\nBaseline (Majority Class): %.1f%% accuracy" (baselineAccuracy * 100.0)
+                printfn "\nBaseline (Vanilla Elo): %.1f%% accuracy" (vanillaMetrics.Accuracy * 100.0)
                 
                 // Test feature engineering  
                 printfn "\n=== ML Feature Engineering Analysis ==="
@@ -257,8 +253,8 @@ module EloPlus =
                     if features.Length >= 10 then // Need enough data for training/testing
                         printfn "\n=== ML.NET Model Training Test ==="
                         printfn "================================="
-                        let baseline = MLModelTrainer.calculateBaseline features
-                        printfn "Baseline accuracy: %.1f%% (always predict majority class)" (baseline * 100.0)
+                        let baseline = vanillaMetrics.Accuracy
+                        printfn "Baseline accuracy: %.1f%% (vanilla Elo predictions)" (baseline * 100.0)
                         
                         try
                             let result = MLModelTrainer.trainModel features MLModelTrainer.defaultConfig

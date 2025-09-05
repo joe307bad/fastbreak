@@ -1,0 +1,18 @@
+Package: fastbreak-pipeline
+Title: Baseball Data Pipeline for Fastbreak Elo+ System
+Version: 0.1.0
+Description: R pipeline for collecting and processing baseball game data including
+    weather, pitcher stats, and team metrics for the Fastbreak Elo+ rating system.
+Depends: R (>= 4.0.0)
+Imports:
+    baseballr,
+    tidyverse,
+    dplyr,
+    readr,
+    lubridate,
+    httr,
+    jsonlite
+Suggests:
+    testthat
+Encoding: UTF-8
+LazyData: true

@@ -12,6 +12,7 @@ permissions:
 
 jobs:
   build-kmp:
+    if: false 
     name: Build KMP
     runs-on: ubuntu-latest
     

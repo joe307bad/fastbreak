@@ -12,6 +12,7 @@ permissions:
 
 jobs:
   deploy:
+    if: false 
     name: Deploy API
     runs-on: ubuntu-latest
     env:

@@ -2,7 +2,6 @@ package com.joebad.fastbreak
 
 import AuthRepository
 import GoogleUser
-import com.joebad.fastbreak.ui.navigation.MainNavigationScreen
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Surface
 import androidx.compose.runtime.Composable
@@ -15,14 +14,17 @@ import com.arkivanov.decompose.ComponentContext
 import com.arkivanov.decompose.DefaultComponentContext
 import com.arkivanov.decompose.DelicateDecomposeApi
 import com.arkivanov.decompose.extensions.compose.stack.Children
-import com.arkivanov.decompose.extensions.compose.stack.animation.fade
+import com.arkivanov.decompose.extensions.compose.stack.animation.slide
 import com.arkivanov.decompose.extensions.compose.stack.animation.stackAnimation
 import com.arkivanov.decompose.extensions.compose.subscribeAsState
 import com.arkivanov.decompose.router.stack.ChildStack
 import com.arkivanov.decompose.router.stack.StackNavigation
 import com.arkivanov.decompose.router.stack.childStack
+import com.arkivanov.decompose.router.stack.pop
+import com.arkivanov.decompose.router.stack.push
 import com.arkivanov.decompose.router.stack.replaceAll
 import com.arkivanov.decompose.value.Value
+import com.arkivanov.essenty.backhandler.BackCallback
 import com.arkivanov.essenty.lifecycle.LifecycleRegistry
 import com.joebad.fastbreak.data.cache.CacheInitializer
 import com.joebad.fastbreak.data.cache.FastbreakCache
@@ -31,6 +33,9 @@ import com.joebad.fastbreak.data.global.AppDataViewModel
 import com.joebad.fastbreak.data.profile.ProfileAction
 import com.joebad.fastbreak.data.profile.ProfileSideEffect
 import com.joebad.fastbreak.data.profile.ProfileViewModel
+import com.joebad.fastbreak.model.dtos.EmptyFastbreakCardItem
+import com.joebad.fastbreak.ui.screens.GameDetailsScreen
+import com.joebad.fastbreak.ui.screens.HomeScreen
 import com.joebad.fastbreak.ui.screens.LoginScreen
 import com.joebad.fastbreak.ui.theme.LocalColors
 
@@ -68,8 +73,24 @@ class LoginComponent(
 
 class HomeComponent(
     componentContext: ComponentContext,
-    val onLogout: () -> Unit
+    val onLogout: () -> Unit,
+    val onGameDetailsClick: (EmptyFastbreakCardItem) -> Unit
 ) : ComponentContext by componentContext
+
+class GameDetailsComponent(
+    componentContext: ComponentContext,
+    val game: EmptyFastbreakCardItem,
+    val onBackClick: () -> Unit
+) : ComponentContext by componentContext {
+    
+    private val backCallback = BackCallback(isEnabled = true) {
+        onBackClick()
+    }
+    
+    init {
+        backHandler.register(backCallback)
+    }
+}
 
 class RootComponent(
     componentContext: ComponentContext,
@@ -103,8 +124,15 @@ class RootComponent(
 
     @OptIn(DelicateDecomposeApi::class)
     fun goToHome() {
-        // The new LoadDailyData action will be called from the UI when needed
-        // with the appropriate dateString and userId parameters
+        navigation.replaceAll(Config.Home)
+    }
+    
+    fun navigateToGameDetails(game: EmptyFastbreakCardItem) {
+        navigation.push(Config.GameDetails(game))
+    }
+    
+    fun navigateBack() {
+        navigation.pop()
     }
 
     private fun createChild(config: Config, componentContext: ComponentContext): Child {
@@ -125,6 +153,17 @@ class RootComponent(
                     onLogout = { 
                         authRepository.clearUser()
                         navigation.replaceAll(Config.Login) 
+                    },
+                    onGameDetailsClick = ::navigateToGameDetails
+                )
+            )
+            
+            is Config.GameDetails -> Child.GameDetails(
+                GameDetailsComponent(
+                    componentContext = componentContext,
+                    game = config.game,
+                    onBackClick = {
+                        navigation.pop()
                     }
                 )
             )
@@ -134,11 +173,13 @@ class RootComponent(
     sealed class Config {
         object Login : Config()
         object Home : Config()
+        data class GameDetails(val game: EmptyFastbreakCardItem) : Config()
     }
 
     sealed class Child {
         data class Login(val component: LoginComponent) : Child()
         data class Home(val component: HomeComponent) : Child()
+        data class GameDetails(val component: GameDetailsComponent) : Child()
     }
 }
 
@@ -185,7 +226,7 @@ fun App(
 
             Children(
                 stack = childStack.value,
-                animation = stackAnimation(fade())
+                animation = stackAnimation(slide())
             ) { child ->
                 when (val instance = child.instance) {
                     is RootComponent.Child.Login -> {
@@ -210,11 +251,20 @@ fun App(
 
                     is RootComponent.Child.Home -> {
                         val appDataState by dependencies.appDataViewModel.container.stateFlow.collectAsState()
-                        MainNavigationScreen(
+                        HomeScreen(
                             appDataState = appDataState,
                             onLogout = instance.component.onLogout,
                             authRepository = dependencies.authRepository,
-                            fastbreakCache = dependencies.fastbreakCache
+                            fastbreakCache = dependencies.fastbreakCache,
+                            onGameDetailsClick = instance.component.onGameDetailsClick
+                        )
+                    }
+                    
+                    is RootComponent.Child.GameDetails -> {
+                        GameDetailsScreen(
+                            game = instance.component.game,
+                            colors = colors,
+                            onBackClick = instance.component.onBackClick
                         )
                     }
                 }

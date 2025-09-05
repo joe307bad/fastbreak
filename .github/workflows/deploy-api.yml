@@ -1,17 +1,18 @@
 name: Deploy API
 
-# on:
-#   push:
-#     branches:
-#       - main
-#     paths:
-#       - 'api/**'
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'api/**'
 
 permissions:
   contents: write
 
 jobs:
   deploy:
+    if: false 
     name: Deploy API
     runs-on: ubuntu-latest
     env:

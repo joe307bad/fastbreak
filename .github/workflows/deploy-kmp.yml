@@ -1,17 +1,18 @@
 name: Build KMP
 
-# on:
-#   push:
-#     branches:
-#       - main
-#     paths:
-#       - 'kmp/**'
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'kmp/**'
 
 permissions:
   contents: write
 
 jobs:
   build-kmp:
+    if: false 
     name: Build KMP
     runs-on: ubuntu-latest
     

@@ -20,6 +20,7 @@
     <Compile Include="Commands\01-generate-elo-plus\MarkdownReportGenerator.fs" />
     <Compile Include="Commands\01-generate-elo-plus\EloPlus.fs" />
     <Content Include="Commands\01-generate-elo-plus\test.csv" />
+    <Compile Include="Commands\02-nfl-fantasy-breakout-predict\NflFantasyBreakout.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 

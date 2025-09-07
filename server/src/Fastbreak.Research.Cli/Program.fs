@@ -1,5 +1,6 @@
 open Argu
 open Fastbreak.Research.Cli.Commands.GenerateEloPlus
+open Fastbreak.Research.Cli.Commands.NflFantasyBreakoutPredict
 
 type GenerateEloPlusArgs =
     | [<AltCommandLine("-f"); Mandatory>] File of path:string
@@ -12,13 +13,22 @@ type GenerateEloPlusArgs =
             | Progress _ -> "report progress every N lines (default: 10)"
             | Markdown _ -> "output markdown report to specified file path"
 
+type NflFantasyBreakoutArgs =
+    | Dummy
+    interface IArgParserTemplate with
+        member this.Usage =
+            match this with
+            | Dummy -> "placeholder argument"
+
 type CliArgs =
     | [<CustomCommandLine("01-generate-elo-plus"); CliPrefix(CliPrefix.None)>] Generate_Elo_Plus_01 of ParseResults<GenerateEloPlusArgs>
+    | [<CustomCommandLine("nfl-fantasy-breakout"); CliPrefix(CliPrefix.None)>] Nfl_Fantasy_Breakout of ParseResults<NflFantasyBreakoutArgs>
     | Version
     interface IArgParserTemplate with
         member this.Usage =
             match this with
             | Generate_Elo_Plus_01 _ -> "generate Elo+ ratings using ML.NET"
+            | Nfl_Fantasy_Breakout _ -> "NFL Fantasy Breakout Prediction"
             | Version -> "display version information"
 
 [<EntryPoint>]
@@ -30,6 +40,7 @@ let main args =
         
         match results.GetAllResults() with
         | [Generate_Elo_Plus_01 subArgs] -> EloPlus.generateEloPlusRatings subArgs
+        | [Nfl_Fantasy_Breakout subArgs] -> NflFantasyBreakout.runNflFantasyBreakout subArgs
         | [Version] -> 
             printfn "Fastbreak Research CLI v0.1.0"
             0

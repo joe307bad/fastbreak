@@ -13,3 +13,5 @@ xcuserdata
 sentry.properties
 
 .fake
+pipeline/02-fantasy-breakout-predict/*.csv
+pipeline/02-fantasy-breakout-predict/*.png

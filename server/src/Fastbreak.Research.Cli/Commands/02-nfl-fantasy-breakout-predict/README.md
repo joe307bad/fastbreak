@@ -20,8 +20,9 @@ Generates a CSV with defensive metrics for each team:
 dotnet run -- --second-year-sleepers --year <YEAR>
 ```
 Identifies fantasy players with:
-- ADP (Average Draft Position) > 100
-- Focus on second-year players with breakout potential
+- use library(fantasypros)
+- Get players with ADP (Average Draft Position) > 100
+- Only get players who are in their second year
 
 ### Step 3: Early Season Analysis
 ```bash

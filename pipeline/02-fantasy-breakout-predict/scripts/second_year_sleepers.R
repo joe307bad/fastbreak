@@ -35,6 +35,7 @@ if (year < 2020 || year > current_year) {
 }
 
 cat("Loading NFL roster data for", year, "season...\n")
+cat("[DEBUG] Starting roster data fetch at:", format(Sys.time(), "%Y-%m-%d %H:%M:%S"), "\n")
 
 # Add random sleep between 1-3 seconds to avoid rate limiting
 sleep_time <- runif(1, min = 1, max = 3)
@@ -43,6 +44,7 @@ Sys.sleep(sleep_time)
 
 # Load roster data
 rosters <- fast_scraper_roster(year)
+cat("[DEBUG] Loaded", nrow(rosters), "roster entries\n")
 
 # Load ADP data from FantasyPros
 cat("Fetching ADP data from FantasyPros...\n")
@@ -51,28 +53,30 @@ cat("Waiting", round(sleep_time, 2), "seconds...\n")
 Sys.sleep(sleep_time)
 
 # Get actual ECR data from FantasyPros
+cat("[DEBUG] Fetching ECR data from FantasyPros at:", format(Sys.time(), "%Y-%m-%d %H:%M:%S"), "\n")
 ecr_data <- tryCatch({
   # Get all rankings and filter for ECR > 100, then take first 200+ players
+  # EXCLUDING QUARTERBACKS as per TODO #1
   all_rankings <- fp_rankings(page = 'consensus-cheatsheets', year = year, scoring = 'HALF') %>%
     filter(
       ecr > 100,  # Start from players ranked worse than 100
-      pos %in% c("QB", "RB", "WR", "TE")  # Only skill positions
+      pos %in% c("RB", "WR", "TE")  # Only RB, WR, TE positions (QBs excluded)
     ) %>%
     arrange(ecr) %>%  # Sort by ECR (best to worst)
     head(200) %>%     # Take first 200 players
     select(player = player_name, position = pos, team, ecr) %>%
     mutate(
-      # Clean up position names to match nflfastR
+      # Clean up position names to match nflfastR (QBs excluded)
       position = case_when(
         position == "RB" ~ "RB",
         position == "WR" ~ "WR", 
         position == "TE" ~ "TE",
-        position == "QB" ~ "QB",
         TRUE ~ position
       )
     )
   
-  cat("Fetched", nrow(all_rankings), "players with ECR > 100\n")
+  cat("Fetched", nrow(all_rankings), "players with ECR > 100 (excluding QBs)\n")
+  cat("[DEBUG] Position breakdown:", table(all_rankings$position), "\n")
   cat("ECR range:", min(all_rankings$ecr), "to", max(all_rankings$ecr), "\n")
   
   all_rankings
@@ -84,6 +88,7 @@ ecr_data <- tryCatch({
 
 # Load previous year stats for context
 cat("Loading previous season stats...\n")
+cat("[DEBUG] Fetching stats for year", year - 1, "at:", format(Sys.time(), "%Y-%m-%d %H:%M:%S"), "\n")
 sleep_time <- runif(1, min = 1, max = 3)
 cat("Waiting", round(sleep_time, 2), "seconds...\n")
 Sys.sleep(sleep_time)
@@ -100,6 +105,8 @@ prev_year_stats <- load_player_stats(year - 1) %>%
   ) %>%
   rename(player_name = player_display_name)
 
+cat("[DEBUG] Loaded", nrow(prev_year_stats), "players' previous year stats\n")
+
 # Clean names for matching function
 clean_name <- function(name) {
   gsub("[^A-Za-z0-9 ]", "", tolower(trimws(name)))
@@ -107,6 +114,7 @@ clean_name <- function(name) {
 
 # Load snap count data for previous year (Year 1)
 cat("Loading previous season (Year 1) snap count data...\n")
+cat("[DEBUG] Fetching snap counts for year", year - 1, "at:", format(Sys.time(), "%Y-%m-%d %H:%M:%S"), "\n")
 sleep_time <- runif(1, min = 1, max = 3)
 cat("Waiting", round(sleep_time, 2), "seconds...\n")
 Sys.sleep(sleep_time)
@@ -123,8 +131,11 @@ prev_year_snaps <- load_snap_counts(year - 1) %>%
   # Clean player names for matching
   mutate(clean_snap_name = clean_name(player))
 
+cat("[DEBUG] Loaded", nrow(prev_year_snaps), "players' Year 1 snap counts\n")
+
 # Load snap count data for current year (Year 2)
 cat("Loading current season (Year 2) snap count data...\n")
+cat("[DEBUG] Fetching snap counts for year", year, "at:", format(Sys.time(), "%Y-%m-%d %H:%M:%S"), "\n")
 sleep_time <- runif(1, min = 1, max = 3)
 cat("Waiting", round(sleep_time, 2), "seconds...\n")
 Sys.sleep(sleep_time)
@@ -141,13 +152,16 @@ current_year_snaps <- load_snap_counts(year) %>%
   # Clean player names for matching
   mutate(clean_snap_name = clean_name(player))
 
+cat("[DEBUG] Loaded", nrow(current_year_snaps), "players' Year 2 snap counts\n")
+
 # First, match ECR data with rosters to identify second-year players
 cat("Matching FantasyPros ECR data with second-year players...\n")
 
-# Get second-year rosters with cleaned names
+# Get second-year rosters with cleaned names (EXCLUDING QBs)
+cat("[DEBUG] Filtering second-year players (excluding QBs)...\n")
 second_year_rosters <- rosters %>%
   filter(
-    position %in% c("QB", "RB", "WR", "TE"),
+    position %in% c("RB", "WR", "TE"),  # Exclude QBs as per TODO #1
     entry_year == (year - 1)  # Players who entered the league last year
   ) %>%
   mutate(
@@ -172,18 +186,23 @@ second_year_rosters <- rosters %>%
     weight
   )
 
+cat("[DEBUG] Found", nrow(second_year_rosters), "second-year players (RB/WR/TE only)\n")
+cat("[DEBUG] Position breakdown:", table(second_year_rosters$position), "\n")
+
 # Match ECR data with second-year players
 ecr_with_clean_names <- ecr_data %>%
   mutate(clean_name = clean_name(player))
 
 # Find second-year players who have ECR data between 100-200
+cat("[DEBUG] Matching ECR data with second-year players...\n")
 sleeper_candidates <- second_year_rosters %>%
   inner_join(
     ecr_with_clean_names %>% select(clean_name, position, player_ecr = player, ecr),
     by = c("clean_name", "position")
   )
 
-cat("Found", nrow(sleeper_candidates), "second-year players with ECR 100-200\n")
+cat("Found", nrow(sleeper_candidates), "second-year players with ECR > 100 (RB/WR/TE only)\n")
+cat("[DEBUG] Final position breakdown:", table(sleeper_candidates$position), "\n")
 
 # Join with previous year stats
 sleeper_candidates <- sleeper_candidates %>%
@@ -236,9 +255,8 @@ sleepers <- sleeper_candidates %>%
       TRUE ~ 0
     ),
     
-    # Position-based thresholds for sleeper status
+    # Position-based thresholds for sleeper status (QBs excluded)
     ppg_threshold = case_when(
-      position == "QB" ~ 10,
       position == "RB" ~ 6,
       position == "WR" ~ 6,
       position == "TE" ~ 4,
@@ -325,7 +343,7 @@ table_viz <- final_sleepers %>%
   gt() %>%
   tab_header(
     title = paste("Second-Year Fantasy Sleepers -", year, "Season"),
-    subtitle = "Second-year players from top 200 FantasyPros ECR rankings (101+)"
+    subtitle = "Second-year RB/WR/TE players from FantasyPros ECR rankings (101+, QBs excluded)"
   ) %>%
   cols_label(
     sleeper_rank = "Rank",
@@ -418,8 +436,9 @@ Sys.sleep(sleep_time)
 gtsave(table_viz, png_file, expand = 10)
 
 # Print summary
-cat("\n=== Second-Year Sleepers for", year, "Season ===\n")
-cat("Total second-year sleepers identified:", nrow(final_sleepers), "\n\n")
+cat("\n=== Second-Year Sleepers for", year, "Season (RB/WR/TE only) ===\n")
+cat("Total second-year sleepers identified:", nrow(final_sleepers), "\n")
+cat("[DEBUG] Script completed at:", format(Sys.time(), "%Y-%m-%d %H:%M:%S"), "\n\n")
 
 if (nrow(final_sleepers) > 0) {
   cat("Top 10 Sleepers (by sleeper score):\n")
@@ -453,7 +472,7 @@ if (nrow(final_sleepers) > 0) {
     head(5)
   print(team_summary)
 } else {
-  cat("No second-year sleepers found with estimated ADP > 100\n")
+  cat("No second-year sleepers found with ECR > 100 (excluding QBs)\n")
 }
 
 cat("\nResults saved to:\n")

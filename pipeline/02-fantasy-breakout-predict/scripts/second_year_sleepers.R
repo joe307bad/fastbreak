@@ -140,13 +140,29 @@ sleep_time <- runif(1, min = 1, max = 3)
 cat("Waiting", round(sleep_time, 2), "seconds...\n")
 Sys.sleep(sleep_time)
 
-current_year_snaps <- load_snap_counts(year) %>%
+# First get weekly snap data for Year 2 to calculate week-to-week changes
+year2_weekly_snaps <- load_snap_counts(year) %>%
   filter(game_type == "REG") %>%
+  arrange(pfr_player_id, week) %>%
+  group_by(pfr_player_id, player, position, team) %>%
+  mutate(
+    # Calculate the change in snap share from week to week
+    snap_pct_lag = lag(offense_pct),
+    weekly_snap_change = offense_pct - snap_pct_lag
+  ) %>%
+  ungroup()
+
+# Calculate aggregated stats including average week-to-week change
+current_year_snaps <- year2_weekly_snaps %>%
   group_by(pfr_player_id, player, position, team) %>%
   summarise(
     total_games_y2 = n_distinct(week),
     total_off_snaps_y2 = sum(offense_snaps, na.rm = TRUE),
     avg_snap_pct_y2 = round(mean(offense_pct, na.rm = TRUE), 1),
+    # Get week 1 snap share for baseline
+    w1_snap_share = first(offense_pct[week == min(week)], default = NA),
+    # Calculate average snap share change between each week of Y2
+    y2_snap_share_change = round(mean(weekly_snap_change, na.rm = TRUE), 2),
     .groups = "drop"
   ) %>%
   # Clean player names for matching
@@ -230,12 +246,14 @@ sleeper_candidates <- sleeper_candidates %>%
 # Join with current year (Year 2) snap count data
 sleeper_candidates <- sleeper_candidates %>%
   left_join(
-    current_year_snaps %>% select(clean_snap_name, position, avg_snap_pct_y2, total_games_y2),
+    current_year_snaps %>% select(clean_snap_name, position, avg_snap_pct_y2, total_games_y2, w1_snap_share, y2_snap_share_change),
     by = c("clean_name" = "clean_snap_name", "position")
   ) %>%
   mutate(
     avg_snap_pct_y2 = coalesce(avg_snap_pct_y2, 0),
     total_games_y2 = coalesce(total_games_y2, 0),
+    w1_snap_share = coalesce(w1_snap_share, 0),
+    y2_snap_share_change = coalesce(y2_snap_share_change, 0),
     # Calculate snap percentage change from Y1 to Y2
     snap_pct_change = avg_snap_pct_y2 - avg_snap_pct_y1
   ) %>%
@@ -310,6 +328,7 @@ final_sleepers <- sleepers %>%
     snap_pct_y1 = avg_snap_pct_y1,
     snap_pct_y2 = avg_snap_pct_y2,
     snap_pct_change,
+    y2_snap_share_change,
     games_y2 = total_games_y2,
     sleeper_score,
     ecr,
@@ -317,7 +336,8 @@ final_sleepers <- sleepers %>%
   ) %>%
   mutate(
     sleeper_score = round(sleeper_score, 0),
-    snap_pct_change = round(snap_pct_change, 1)
+    snap_pct_change = round(snap_pct_change, 1),
+    y2_snap_share_change = round(y2_snap_share_change, 2)
   )
 
 # Add random sleep before saving
@@ -358,13 +378,14 @@ table_viz <- final_sleepers %>%
     snap_pct_y1 = "Snap% Y1",
     snap_pct_y2 = "Snap% Y2",
     snap_pct_change = "Snap Δ",
+    y2_snap_share_change = "Y2 Avg Δ",
     games_y2 = "Games Y2",
     sleeper_score = "Score",
     ecr = "ECR",
     season = "Season"
   ) %>%
   fmt_number(
-    columns = c(ppg_prev, snap_pct_y1, snap_pct_y2, snap_pct_change),
+    columns = c(ppg_prev, snap_pct_y1, snap_pct_y2, snap_pct_change, y2_snap_share_change),
     decimals = 1
   ) %>%
   fmt_missing(
@@ -421,7 +442,7 @@ table_viz <- final_sleepers %>%
   ) %>%
   cols_align(
     align = "right",
-    columns = c(ppg_prev, snap_pct_y1, snap_pct_y2, snap_pct_change, sleeper_score, ecr)
+    columns = c(ppg_prev, snap_pct_y1, snap_pct_y2, snap_pct_change, y2_snap_share_change, sleeper_score, ecr)
   ) %>%
   cols_hide(
     columns = c(season)  # Hide season column in display
@@ -442,9 +463,9 @@ cat("[DEBUG] Script completed at:", format(Sys.time(), "%Y-%m-%d %H:%M:%S"), "\n
 
 if (nrow(final_sleepers) > 0) {
   cat("Top 10 Sleepers (by sleeper score):\n")
-  print(final_sleepers %>% 
-        head(10) %>% 
-        select(sleeper_rank, player, position, team, ppg_prev, snap_pct_y1, snap_pct_y2, snap_pct_change, sleeper_score, ecr))
+  print(final_sleepers %>%
+        head(10) %>%
+        select(sleeper_rank, player, position, team, ppg_prev, snap_pct_y1, snap_pct_y2, snap_pct_change, y2_snap_share_change, sleeper_score, ecr))
   
   # Position breakdown
   cat("\nSleepers by Position:\n")

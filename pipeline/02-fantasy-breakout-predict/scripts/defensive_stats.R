@@ -88,9 +88,13 @@ defensive_stats <- regular_season %>%
   arrange(points_allowed_per_game, total_yards_allowed_per_game)
 
 # Add power ranking based on points allowed per game
+# Also add separate rankings for rush and pass defense
 defensive_stats <- defensive_stats %>%
   mutate(
     defense_rank = row_number(),
+    # Add rankings for rush and pass defense (1 = best, 32 = worst)
+    rush_defense_rank = rank(rushing_yards_allowed_per_game, ties.method = "min"),
+    pass_defense_rank = rank(passing_yards_allowed_per_game, ties.method = "min"),
     season = year
   ) %>%
   select(
@@ -99,7 +103,9 @@ defensive_stats <- defensive_stats %>%
     season,
     games_played,
     points_allowed_per_game,
+    rush_defense_rank,
     rushing_yards_allowed_per_game,
+    pass_defense_rank,
     passing_yards_allowed_per_game,
     turnovers_per_game,
     total_yards_allowed_per_game
@@ -135,7 +141,9 @@ table_viz <- defensive_stats %>%
     season = "Season",
     games_played = "Games",
     points_allowed_per_game = "Pts/Game",
+    rush_defense_rank = "Rush Rank",
     rushing_yards_allowed_per_game = "Rush Yds/Game",
+    pass_defense_rank = "Pass Rank",
     passing_yards_allowed_per_game = "Pass Yds/Game",
     turnovers_per_game = "TO/Game",
     total_yards_allowed_per_game = "Total Yds/Game"
@@ -146,39 +154,52 @@ table_viz <- defensive_stats %>%
                 total_yards_allowed_per_game),
     decimals = 1
   ) %>%
-  data_color(
-    columns = points_allowed_per_game,
-    colors = scales::col_numeric(
-      palette = c("green", "yellow", "orange"),
-      domain = c(min(defensive_stats$points_allowed_per_game), 
-                 max(defensive_stats$points_allowed_per_game))
-    )
-  ) %>%
+  # First apply row highlighting for top 5 and bottom 5
   tab_style(
     style = list(
       cell_fill(color = "#E8F5E9"),
-      cell_text(weight = "bold")
+      cell_text(weight = "bold", color = "black")
     ),
     locations = cells_body(
+      columns = c(defense_rank, team, season, games_played,
+                  rushing_yards_allowed_per_game, passing_yards_allowed_per_game,
+                  turnovers_per_game, total_yards_allowed_per_game),
       rows = defense_rank <= 5
     )
   ) %>%
   tab_style(
     style = list(
       cell_fill(color = "#FFEBEE"),
-      cell_text(weight = "bold")
+      cell_text(weight = "bold", color = "black")
     ),
     locations = cells_body(
+      columns = c(defense_rank, team, season, games_played,
+                  rushing_yards_allowed_per_game, passing_yards_allowed_per_game,
+                  turnovers_per_game, total_yards_allowed_per_game),
       rows = defense_rank >= 28
     )
   ) %>%
-  tab_style(
-    style = list(
-      cell_text(color = "black")
-    ),
-    locations = cells_body(
-      columns = points_allowed_per_game,
-      rows = defense_rank >= 31
+  # Then apply gradient colors that override the row highlighting
+  data_color(
+    columns = points_allowed_per_game,
+    colors = scales::col_numeric(
+      palette = c("#006400", "#228B22", "#90EE90", "#FFFF99", "#FFB347", "#FF6B6B", "#8B0000"),
+      domain = c(min(defensive_stats$points_allowed_per_game),
+                 max(defensive_stats$points_allowed_per_game))
+    )
+  ) %>%
+  data_color(
+    columns = rush_defense_rank,
+    colors = scales::col_numeric(
+      palette = c("#004225", "#006400", "#228B22", "#90EE90", "#FFFACD", "#FFE4B5", "#FFA07A", "#FF6347", "#DC143C"),
+      domain = c(1, 32)
+    )
+  ) %>%
+  data_color(
+    columns = pass_defense_rank,
+    colors = scales::col_numeric(
+      palette = c("#004225", "#006400", "#228B22", "#90EE90", "#FFFACD", "#FFE4B5", "#FFA07A", "#FF6347", "#DC143C"),
+      domain = c(1, 32)
     )
   ) %>%
   tab_options(
@@ -194,6 +215,10 @@ table_viz <- defensive_stats %>%
   cols_align(
     align = "left",
     columns = team
+  ) %>%
+  cols_align(
+    align = "center",
+    columns = c(rush_defense_rank, pass_defense_rank)
   )
 
 # Save as PNG with rate limiting

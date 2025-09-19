@@ -59,10 +59,14 @@ Rscript scripts/second_year_sleepers.R 2025 3 --exclude-current-week-fp second_y
 - Only analyzes RB, WR, and TE positions (excludes QBs)
 - Only analyzes players in their second year
 - **Excludes players with >10 fantasy points in the previous week** (maintains true "sleeper" status)
+- **Excludes injured players** using nflfastR injury reports for the specified week (Out, Doubtful, IR, PUP)
+- **Excludes practice squad players** using nflfastR roster data (only active roster players included)
+- **Requires meaningful playing time** (≥10% snap share in recent weeks or ≥5 snaps in most recent week)
 - **Enhanced snap count analysis:**
   - Y1 and Y2 snap percentages
   - Snap percentage change from Y1 to Y2
   - Y2 average weekly snap share change
+  - **2-week sliding window snap trend analysis** (rewards players with increasing snap counts)
 - **Defensive matchup integration:**
   - Automatically loads defense rankings if `defense_rankings_[year].csv` exists
   - Maps each player's next opponent
@@ -86,9 +90,9 @@ Rscript scripts/second_year_sleepers.R 2025 3 --exclude-current-week-fp second_y
 - Includes all players, even those with 0.0 fantasy points (UDFAs)
 - Displays columns: w1, w2, w3, etc. (depending on current week)
 
-#### Sleeper Score Calculation (Max: 160 points)
+#### Sleeper Score Calculation (Max: 175 points)
 
-The sleeper score is calculated by combining five weighted components:
+The sleeper score is calculated by combining six weighted components:
 
 **1. Draft Value (0-50 points)**
 - Undrafted Free Agent (UDFA): 50 points
@@ -132,7 +136,18 @@ The sleeper score is calculated by combining five weighted components:
   - Opponent ranked 9-12: 5 points
   - Opponent ranked 1-8 (best defenses): 0 points
 
-**Total Score = Draft Value + Performance Score + Age Score + ECR Score + Matchup Score**
+**6. Sliding Window Snap Trend Score (0-15 points)** *(for week 3+)*
+- **2-week sliding window analysis** of snap count percentage changes
+- **Example for Week 8:** Analyzes snap % deltas from Week 6→7 and Week 7→8, then averages them
+- **Scoring scale:**
+  - Average delta ≥10%: 15 points (major snap count increase)
+  - Average delta ≥5%: 12 points (significant increase)
+  - Average delta ≥2%: 8 points (moderate increase)
+  - Average delta >0%: 5 points (small increase)
+  - Average delta ≥-2%: 2 points (stable/slight decrease)
+  - Average delta <-2%: 0 points (declining snap count)
+
+**Total Score = Draft Value + Performance Score + Age Score + ECR Score + Matchup Score + Sliding Window Score**
 
 Higher scores indicate better sleeper candidates, typically late-round/undrafted young players with limited Year 1 production, favorable expert rankings, and advantageous defensive matchups.
 
@@ -149,6 +164,7 @@ Higher scores indicate better sleeper candidates, typically late-round/undrafted
 - `Y2 Snap%` - Average snap percentage in Year 2
 - `Snap Δ` - Change in snap percentage from Y1 to Y2
 - `Y2 Avg Δ` - Average weekly snap share change in Year 2
+- `2W Trend` - 2-week sliding window average snap percentage delta (recent trend)
 
 **Performance Data:**
 - `Games Y1` - Games played in Year 1

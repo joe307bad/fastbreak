@@ -178,6 +178,38 @@ year2_weekly_snaps <- load_snap_counts(year) %>%
   ) %>%
   ungroup()
 
+# Calculate 2-week sliding window snap % delta for recent trend analysis
+# For week 8, this looks at weeks 6-7 and 7-8 deltas and averages them
+sliding_window_snaps <- NULL
+if (week >= 3) {  # Need at least 3 weeks to calculate 2-week window
+  # Define the sliding window: look at previous 2 weeks relative to current week
+  window_weeks <- c(week - 2, week - 1, week)
+
+  sliding_window_snaps <- year2_weekly_snaps %>%
+    filter(week %in% window_weeks) %>%
+    arrange(pfr_player_id, week) %>%
+    group_by(pfr_player_id, player, position, team) %>%
+    mutate(
+      # Calculate week-to-week snap % changes within the window
+      snap_pct_prev = lag(offense_pct),
+      window_snap_delta = offense_pct - snap_pct_prev
+    ) %>%
+    # Calculate average delta over the 2-week sliding window
+    summarise(
+      sliding_window_avg_delta = round(mean(window_snap_delta, na.rm = TRUE), 2),
+      window_weeks_played = sum(!is.na(window_snap_delta)),
+      .groups = "drop"
+    ) %>%
+    # Only keep players who played in at least 1 of the delta calculations
+    filter(window_weeks_played > 0) %>%
+    mutate(clean_snap_name = clean_name(player))
+
+  cat("[DEBUG] Calculated sliding window snap deltas for", nrow(sliding_window_snaps), "players\n")
+  cat("[DEBUG] Window: weeks", paste(window_weeks, collapse = ", "), "(analyzing deltas between consecutive weeks)\n")
+} else {
+  cat("[DEBUG] Week", week, "too early for sliding window analysis (need week 3+)\n")
+}
+
 # Calculate aggregated stats including average week-to-week change
 current_year_snaps <- year2_weekly_snaps %>%
   group_by(pfr_player_id, player, position, team) %>%
@@ -193,6 +225,19 @@ current_year_snaps <- year2_weekly_snaps %>%
   ) %>%
   # Clean player names for matching
   mutate(clean_snap_name = clean_name(player))
+
+# Join sliding window data if available
+if (!is.null(sliding_window_snaps) && nrow(sliding_window_snaps) > 0) {
+  current_year_snaps <- current_year_snaps %>%
+    left_join(
+      sliding_window_snaps %>% select(clean_snap_name, sliding_window_avg_delta),
+      by = "clean_snap_name"
+    ) %>%
+    mutate(sliding_window_avg_delta = coalesce(sliding_window_avg_delta, 0))
+} else {
+  current_year_snaps <- current_year_snaps %>%
+    mutate(sliding_window_avg_delta = 0)
+}
 
 cat("[DEBUG] Loaded", nrow(current_year_snaps), "players' Year 2 snap counts\n")
 
@@ -289,6 +334,99 @@ if (file.exists(defense_rankings_file)) {
   cat("Loaded defense rankings for", nrow(defense_rankings), "teams\n")
 } else {
   cat("No defense rankings file found. Continuing without matchup adjustments.\n")
+}
+
+# Load roster and injury data once for the season
+cat("Loading roster and injury data for", year, "season...\n")
+sleep_time <- runif(1, min = 1, max = 3)
+cat("Waiting", round(sleep_time, 2), "seconds...\n")
+Sys.sleep(sleep_time)
+
+# Load data once at the beginning
+rosters_data <- NULL
+injuries_data <- NULL
+
+tryCatch({
+  rosters_data <- load_rosters(seasons = year)
+  cat("Loaded", nrow(rosters_data), "roster entries for", year, "season\n")
+  cat("[DEBUG] Roster data columns:", paste(names(rosters_data), collapse = ", "), "\n")
+}, error = function(e) {
+  cat("Warning: Could not load roster data:", e$message, "\n")
+  rosters_data <<- NULL
+})
+
+tryCatch({
+  injuries_data <- load_injuries(seasons = year)
+  cat("Loaded", nrow(injuries_data), "injury entries for", year, "season\n")
+  cat("[DEBUG] Injury data columns:", paste(names(injuries_data), collapse = ", "), "\n")
+}, error = function(e) {
+  cat("Warning: Could not load injury data:", e$message, "\n")
+  injuries_data <<- NULL
+})
+
+# Create simple lookup vector for active roster players
+active_players <- NULL
+if (!is.null(rosters_data)) {
+  active_players <- unique(rosters_data$full_name)
+  active_players <- active_players[!is.na(active_players)]
+  cat("Created active player lookup with", length(active_players), "unique player names\n")
+}
+
+# Function to check player status for a given week
+check_player_status <- function(player_name, check_week,
+                               active_roster = active_players,
+                               injury_data = injuries_data) {
+
+  # Check if on active roster
+  on_roster <- !is.null(active_roster) && player_name %in% active_roster
+
+  if (!on_roster) {
+    return(list(
+      on_roster = FALSE,
+      injury_status = "Not on roster",
+      available = FALSE
+    ))
+  }
+
+  # Check injury status for that week
+  if (!is.null(injury_data)) {
+    player_injury <- injury_data %>%
+      filter(
+        full_name == player_name,
+        week == !!check_week
+      )
+
+    if (nrow(player_injury) == 0) {
+      # No injury report = healthy/available
+      return(list(
+        on_roster = TRUE,
+        injury_status = "Healthy",
+        available = TRUE
+      ))
+    } else {
+      injury_status <- player_injury$report_status[1]  # Take first if multiple entries
+
+      # Determine availability based on injury status
+      available <- case_when(
+        tolower(injury_status) %in% c("out", "ir", "injured reserve", "pup", "o") ~ FALSE,
+        tolower(injury_status) %in% c("questionable", "doubtful", "q", "d") ~ FALSE,  # Conservative approach
+        TRUE ~ TRUE  # probable, healthy, etc.
+      )
+
+      return(list(
+        on_roster = TRUE,
+        injury_status = injury_status,
+        available = available
+      ))
+    }
+  } else {
+    # No injury data available, assume healthy if on roster
+    return(list(
+      on_roster = TRUE,
+      injury_status = "Unknown",
+      available = TRUE
+    ))
+  }
 }
 
 # Load NFL schedule for the current week to get next opponents
@@ -405,7 +543,7 @@ sleeper_candidates <- sleeper_candidates %>%
 # Join with current year (Year 2) snap count data
 sleeper_candidates <- sleeper_candidates %>%
   left_join(
-    current_year_snaps %>% select(clean_snap_name, position, avg_snap_pct_y2, total_games_y2, w1_snap_share, y2_snap_share_change),
+    current_year_snaps %>% select(clean_snap_name, position, avg_snap_pct_y2, total_games_y2, w1_snap_share, y2_snap_share_change, sliding_window_avg_delta),
     by = c("clean_name" = "clean_snap_name", "position")
   ) %>%
   mutate(
@@ -413,6 +551,7 @@ sleeper_candidates <- sleeper_candidates %>%
     total_games_y2 = coalesce(total_games_y2, 0),
     w1_snap_share = coalesce(w1_snap_share, 0),
     y2_snap_share_change = coalesce(y2_snap_share_change, 0),
+    sliding_window_avg_delta = coalesce(sliding_window_avg_delta, 0),
     # Calculate snap percentage change from Y1 to Y2
     snap_pct_change = avg_snap_pct_y2 - avg_snap_pct_y1
   )
@@ -539,7 +678,83 @@ if (!is.null(opponent_mapping)) {
     )
 }
 
-# Remove helper columns - only remove clean_fp_name if it exists
+# Note: Keep clean_name column for now - will remove after filtering
+
+cat("[DEBUG] Sleeper candidates columns after all joins:", paste(names(sleeper_candidates), collapse = ", "), "\n")
+
+# Filter out injured and practice squad players using improved nflreadr approach
+if (!is.null(active_players) || !is.null(injuries_data)) {
+  initial_count <- nrow(sleeper_candidates)
+
+  # Apply player status filtering
+  sleeper_candidates <- sleeper_candidates %>%
+    rowwise() %>%
+    mutate(
+      player_available = check_player_status(player, week, active_players, injuries_data)$available
+    ) %>%
+    ungroup() %>%
+    filter(player_available) %>%
+    select(-player_available)
+
+  filtered_count <- nrow(sleeper_candidates)
+  cat("[DEBUG] Player status filtering: Started with", initial_count, "candidates\n")
+  cat("[DEBUG] After filtering out injured/practice squad players:", filtered_count, "candidates remain\n")
+  cat("[DEBUG] Excluded", initial_count - filtered_count, "players due to roster/injury status in week", week, "\n")
+} else {
+  cat("[DEBUG] No roster or injury data available - skipping player status filtering\n")
+}
+
+# Additional filtering: Require meaningful snap counts in recent weeks
+# This helps identify players who are actually getting playing time
+if (week >= 2) {
+  initial_count <- nrow(sleeper_candidates)
+
+  # Filter for players who have had at least 10% snap share in any of the last 2 weeks
+  # or at least 5 snaps in the most recent week
+  min_recent_weeks <- max(1, week - 1)
+  recent_snap_players <- year2_weekly_snaps %>%
+    filter(week >= min_recent_weeks & week <= !!week) %>%
+    group_by(pfr_player_id, player) %>%
+    summarise(
+      max_recent_snap_pct = max(offense_pct, na.rm = TRUE),
+      recent_snaps = sum(offense_snaps, na.rm = TRUE),
+      recent_weeks_played = n(),
+      .groups = "drop"
+    ) %>%
+    filter(max_recent_snap_pct >= 10 | (recent_snaps >= 5 & recent_weeks_played >= 1)) %>%
+    mutate(clean_snap_name = clean_name(player))
+
+  cat("[DEBUG] Recent snap players count:", nrow(recent_snap_players), "\n")
+  if (nrow(recent_snap_players) > 0 && !is.null(recent_snap_players$clean_snap_name)) {
+    # Additional safety check for the clean_snap_name column
+    valid_snap_names <- recent_snap_players$clean_snap_name[!is.na(recent_snap_players$clean_snap_name)]
+    cat("[DEBUG] Valid snap names count:", length(valid_snap_names), "\n")
+
+    if (length(valid_snap_names) > 0) {
+      cat("[DEBUG] Sample valid snap names:", head(valid_snap_names, 3), "\n")
+      cat("[DEBUG] Sample sleeper candidate names:", head(sleeper_candidates$clean_name, 3), "\n")
+      cat("[DEBUG] clean_name column class:", class(sleeper_candidates$clean_name), "\n")
+      cat("[DEBUG] valid_snap_names class:", class(valid_snap_names), "\n")
+
+      # Convert to character vectors to ensure compatibility
+      clean_names_vec <- as.character(sleeper_candidates$clean_name)
+      valid_snap_names_vec <- as.character(valid_snap_names)
+
+      # Find matching indices
+      matching_indices <- clean_names_vec %in% valid_snap_names_vec
+      sleeper_candidates <- sleeper_candidates[matching_indices, ]
+    } else {
+      cat("[DEBUG] No valid snap names found - skipping snap count filtering\n")
+    }
+
+    filtered_count <- nrow(sleeper_candidates)
+    cat("[DEBUG] Snap count filtering: Started with", initial_count, "candidates\n")
+    cat("[DEBUG] After snap count filtering:", filtered_count, "candidates remain\n")
+    cat("[DEBUG] Excluded", initial_count - filtered_count, "players with minimal recent snap counts\n")
+  }
+}
+
+# Remove helper columns before final processing
 if ("clean_fp_name" %in% names(sleeper_candidates)) {
   sleeper_candidates <- sleeper_candidates %>%
     select(-clean_name, -clean_fp_name)
@@ -547,8 +762,6 @@ if ("clean_fp_name" %in% names(sleeper_candidates)) {
   sleeper_candidates <- sleeper_candidates %>%
     select(-clean_name)
 }
-
-cat("[DEBUG] Sleeper candidates columns after all joins:", paste(names(sleeper_candidates), collapse = ", "), "\n")
 
 # Create a sleeper score based on various factors
 # Higher score = better sleeper candidate
@@ -594,10 +807,21 @@ sleepers <- sleeper_candidates %>%
     ecr_range_min = min(ecr, na.rm = TRUE),
     ecr_range_max = max(ecr, na.rm = TRUE),
     ecr_score = round(20 - ((ecr - ecr_range_min) / (ecr_range_max - ecr_range_min)) * 20, 0),
-    
-    # Calculate total sleeper score (now includes matchup score)
-    # Max score increased from 130 to 160 with matchup bonus
-    sleeper_score = draft_value + performance_score + age_score + ecr_score + matchup_score
+
+    # Sliding window snap trend bonus (higher weight for increasing snap counts)
+    # Scale: positive deltas get up to 15 points, negative deltas get 0
+    sliding_window_score = case_when(
+      sliding_window_avg_delta >= 10 ~ 15,   # Major snap count increase
+      sliding_window_avg_delta >= 5 ~ 12,    # Significant increase
+      sliding_window_avg_delta >= 2 ~ 8,     # Moderate increase
+      sliding_window_avg_delta > 0 ~ 5,      # Small increase
+      sliding_window_avg_delta >= -2 ~ 2,    # Stable/slight decrease
+      TRUE ~ 0                               # Declining snap count
+    ),
+
+    # Calculate total sleeper score (now includes matchup + sliding window)
+    # Max score increased from 160 to 175 with sliding window bonus
+    sleeper_score = draft_value + performance_score + age_score + ecr_score + matchup_score + sliding_window_score
   ) %>%
   arrange(desc(sleeper_score), ecr) %>%
   mutate(
@@ -648,16 +872,13 @@ if (!exclude_current_fp) {
       position,
       team,
       opponent,
-      relevant_def_rank,
-      matchup_score,
-      age,
-      draft_number,
       games_played_prev = games,
       ppg_prev = ppg,
       snap_pct_y1 = avg_snap_pct_y1,
       snap_pct_y2 = avg_snap_pct_y2,
       snap_pct_change,
       y2_snap_share_change,
+      sliding_window_avg_delta,
       games_y2 = total_games_y2,
       prev_week_fp,
       current_week_fp,
@@ -671,6 +892,7 @@ if (!exclude_current_fp) {
       sleeper_score = round(sleeper_score, 0),
       snap_pct_change = round(snap_pct_change, 1),
       y2_snap_share_change = round(y2_snap_share_change, 2),
+      sliding_window_avg_delta = round(sliding_window_avg_delta, 2),
       prev_week_fp = round(prev_week_fp, 1),
       current_week_fp = round(current_week_fp, 1),
       fp_delta = round(fp_delta, 1),
@@ -680,8 +902,8 @@ if (!exclude_current_fp) {
   # When excluding current week FP, also exclude matchup columns and include historical FP data
   base_cols <- c("sleeper_rank", "player", "position", "team", "opponent",
                  "games_played_prev", "ppg_prev", "avg_snap_pct_y1", "avg_snap_pct_y2",
-                 "snap_pct_change", "y2_snap_share_change", "games_y2", "sleeper_score",
-                 "ecr", "season")
+                 "snap_pct_change", "y2_snap_share_change", "sliding_window_avg_delta",
+                 "games_y2", "sleeper_score", "ecr", "season")
 
   # Get any weekly FP columns that exist in the data
   fp_weekly_cols <- grep("^w[0-9]+$", names(sleepers), value = TRUE)
@@ -697,7 +919,8 @@ if (!exclude_current_fp) {
       analysis_week = !!week,
       sleeper_score = round(sleeper_score, 0),
       snap_pct_change = round(snap_pct_change, 1),
-      y2_snap_share_change = round(y2_snap_share_change, 2)
+      y2_snap_share_change = round(y2_snap_share_change, 2),
+      sliding_window_avg_delta = round(sliding_window_avg_delta, 2)
     )
 
   # Note: Include all players, even UDFAs with 0.0 fantasy points
@@ -759,16 +982,13 @@ if (nrow(final_sleepers) > 0) {
         position = "Pos",
         team = "Team",
         opponent = "Opp",
-        relevant_def_rank = "Def Rank",
-        matchup_score = "Match Pts",
-        age = "Age",
-        draft_number = "Draft #",
         games_played_prev = "Games Y1",
         ppg_prev = "PPG Y1",
         snap_pct_y1 = "Snap% Y1",
         snap_pct_y2 = "Snap% Y2",
         snap_pct_change = "Snap Δ",
         y2_snap_share_change = "Y2 Avg Δ",
+        sliding_window_avg_delta = "2W Trend",
         games_y2 = "Games Y2",
         prev_week_fp = paste("W", week-1, "FP"),
         current_week_fp = paste("W", week, "FP"),
@@ -816,6 +1036,9 @@ if (nrow(final_sleepers) > 0) {
     }
     if ("y2_snap_share_change" %in% names(final_sleepers)) {
       base_labels[["y2_snap_share_change"]] <- "Y2 Avg Δ"
+    }
+    if ("sliding_window_avg_delta" %in% names(final_sleepers)) {
+      base_labels[["sliding_window_avg_delta"]] <- "2W Trend"
     }
     if ("games_y2" %in% names(final_sleepers)) {
       base_labels[["games_y2"]] <- "Games Y2"
@@ -873,7 +1096,8 @@ if (nrow(final_sleepers) > 0) {
     }
   } else {
     numeric_cols <- c("ppg_prev", "avg_snap_pct_y1", "avg_snap_pct_y2",
-                      "snap_pct_change", "y2_snap_share_change")
+                      "snap_pct_change", "y2_snap_share_change",
+                      "sliding_window_avg_delta")
     numeric_cols <- numeric_cols[numeric_cols %in% names(final_sleepers)]
 
     # Add weekly FP columns for formatting
@@ -958,9 +1182,9 @@ if (nrow(final_sleepers) > 0) {
   # Apply top 10 shading based on available columns
   if (!exclude_current_fp) {
     styling_cols <- c("sleeper_rank", "player", "position", "team", "opponent",
-                      "age", "draft_number", "games_played_prev", "ppg_prev",
-                      "snap_pct_y1", "snap_pct_y2", "snap_pct_change",
-                      "y2_snap_share_change", "games_y2", "prev_week_fp",
+                      "games_played_prev", "ppg_prev", "snap_pct_y1", "snap_pct_y2",
+                      "snap_pct_change", "y2_snap_share_change",
+                      "sliding_window_avg_delta", "games_y2", "prev_week_fp",
                       "current_week_fp", "sleeper_score", "ecr")
     styling_cols <- styling_cols[styling_cols %in% names(final_sleepers)]
     if (length(styling_cols) > 0) {
@@ -977,7 +1201,7 @@ if (nrow(final_sleepers) > 0) {
     styling_cols <- c("sleeper_rank", "player", "position", "team", "opponent",
                       "games_played_prev", "ppg_prev", "avg_snap_pct_y1",
                       "avg_snap_pct_y2", "snap_pct_change", "y2_snap_share_change",
-                      "games_y2", "sleeper_score", "ecr")
+                      "sliding_window_avg_delta", "games_y2", "sleeper_score", "ecr")
     styling_cols <- styling_cols[styling_cols %in% names(final_sleepers)]
 
     # Add weekly FP columns for styling
@@ -1126,8 +1350,7 @@ if (nrow(final_sleepers) > 0) {
   cat("Top 10 Sleepers (by sleeper score):\n")
   if (!exclude_current_fp) {
     display_cols <- c("sleeper_rank", "player", "position", "team", "opponent",
-                      "relevant_def_rank", "matchup_score", "ppg_prev",
-                      "prev_week_fp", "current_week_fp", "fp_delta",
+                      "ppg_prev", "prev_week_fp", "current_week_fp", "fp_delta",
                       "hit_status", "sleeper_score", "ecr")
     display_cols <- display_cols[display_cols %in% names(final_sleepers)]
     print(final_sleepers %>%

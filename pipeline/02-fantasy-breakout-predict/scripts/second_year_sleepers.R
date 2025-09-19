@@ -389,7 +389,8 @@ check_player_status <- function(player_name, check_week,
   }
 
   # Check injury status for that week
-  if (!is.null(injury_data)) {
+  if (!is.null(injury_data) && nrow(injury_data) > 0 &&
+      "full_name" %in% names(injury_data)) {
     player_injury <- injury_data %>%
       filter(
         full_name == player_name,

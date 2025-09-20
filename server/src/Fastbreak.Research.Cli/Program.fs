@@ -14,15 +14,15 @@ type GenerateEloPlusArgs =
             | Markdown _ -> "output markdown report to specified file path"
 
 type NflFantasyBreakoutArgs =
-    | Dummy
+    | [<AltCommandLine("-d"); Mandatory>] Data of path:string
     interface IArgParserTemplate with
         member this.Usage =
             match this with
-            | Dummy -> "placeholder argument"
+            | Data _ -> "directory path containing CSV files for ML analysis (required)"
 
 type CliArgs =
     | [<CustomCommandLine("01-generate-elo-plus"); CliPrefix(CliPrefix.None)>] Generate_Elo_Plus_01 of ParseResults<GenerateEloPlusArgs>
-    | [<CustomCommandLine("nfl-fantasy-breakout"); CliPrefix(CliPrefix.None)>] Nfl_Fantasy_Breakout of ParseResults<NflFantasyBreakoutArgs>
+    | [<CustomCommandLine("02-nfl-fantasy-breakout"); CliPrefix(CliPrefix.None)>] Nfl_Fantasy_Breakout of ParseResults<NflFantasyBreakoutArgs>
     | Version
     interface IArgParserTemplate with
         member this.Usage =

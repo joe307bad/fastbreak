@@ -47,6 +47,23 @@ Rscript scripts/second_year_sleepers.R 2024 5 second_year_sleepers_2024.csv
 Rscript scripts/second_year_sleepers.R 2025 3 --exclude-current-week-fp second_year_sleepers_2025_w3.csv
 ```
 
+### Step 5: Batch Analysis (Multiple Weeks)
+```bash
+Rscript scripts/run_sleeper_analysis_batch.R [year] [start_week] [end_week] [--combine]
+# Examples:
+Rscript scripts/run_sleeper_analysis_batch.R 2024           # Run weeks 3-17 for 2024
+Rscript scripts/run_sleeper_analysis_batch.R 2024 5 10      # Run weeks 5-10 for 2024
+Rscript scripts/run_sleeper_analysis_batch.R 2024 3 17 --combine  # Run and combine raw data
+```
+Batch processes multiple weeks of sleeper analysis:
+- Automatically runs `second_year_sleepers.R` for each week in range
+- Default range: weeks 3-17 (full fantasy season)
+- Creates organized output directory: `sleeper_analysis_[year]/`
+- Progress tracking and error handling
+- 5-second delay between weeks for API rate limiting
+- `--combine` flag merges all raw CSV files for ML training
+- Outputs: Individual week files plus optional combined raw data file
+
 #### **Arguments:**
 - `[year]` - NFL season year
 - `[week]` - Current NFL week for analysis

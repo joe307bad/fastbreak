@@ -900,43 +900,21 @@ if (!exclude_current_fp) {
       hit_status = ifelse(fp_delta > 5, "HIT", "")
     )
 } else {
-  # When excluding current week FP, also exclude matchup columns and include historical FP data
+  # When excluding current week FP, show only rank, name, team, opponent and score components
   base_cols <- c("sleeper_rank", "player", "position", "team", "opponent",
-                 "games_played_prev", "ppg_prev", "avg_snap_pct_y1", "avg_snap_pct_y2",
-                 "snap_pct_change", "y2_snap_share_change", "sliding_window_avg_delta",
-                 "games_y2", "sleeper_score", "ecr", "season")
+                 "draft_value", "performance_score", "age_score", "ecr_score",
+                 "matchup_score", "sliding_window_score", "sleeper_score", "ecr")
 
-  # Get any weekly FP columns that exist in the data
-  fp_weekly_cols <- grep("^w[0-9]+$", names(sleepers), value = TRUE)
-  summary_fp_cols <- c("total_fp", "avg_fp", "games_played")
-  summary_fp_cols <- summary_fp_cols[summary_fp_cols %in% names(sleepers)]
-
-  all_cols <- c(base_cols, fp_weekly_cols, summary_fp_cols)
-  all_cols <- all_cols[all_cols %in% names(sleepers)]  # Only select columns that exist
+  # Only use the base columns (no weekly FP or summary columns)
+  all_cols <- base_cols[base_cols %in% names(sleepers)]  # Only select columns that exist
 
   final_sleepers <- sleepers %>%
     select(all_of(all_cols)) %>%
     mutate(
-      analysis_week = !!week,
-      sleeper_score = round(sleeper_score, 0),
-      snap_pct_change = round(snap_pct_change, 1),
-      y2_snap_share_change = round(y2_snap_share_change, 2),
-      sliding_window_avg_delta = round(sliding_window_avg_delta, 2)
+      sleeper_score = round(sleeper_score, 0)
     )
 
-  # Note: Include all players, even UDFAs with 0.0 fantasy points
-
-  # Round weekly FP columns if they exist
-  if (length(fp_weekly_cols) > 0) {
-    final_sleepers <- final_sleepers %>%
-      mutate(across(all_of(fp_weekly_cols), ~ round(.x, 1)))
-  }
-
-  # Round summary FP columns if they exist
-  if ("total_fp" %in% names(final_sleepers)) {
-    final_sleepers <- final_sleepers %>%
-      mutate(total_fp = round(total_fp, 1))
-  }
+  # Note: Showing only sleeper score components for analysis
 }
 
 # Debug after select and mutate
@@ -949,6 +927,198 @@ Sys.sleep(sleep_time)
 
 # Save to CSV
 write_csv(final_sleepers, output_file)
+
+# Create comprehensive raw data output for machine learning
+raw_output_file <- paste0(output_prefix, "_", year, "_w", week, "_raw.csv")
+cat("\nGenerating raw data for ML analysis...\n")
+
+# First, calculate additional metrics before creating raw_data
+additional_metrics <- sleepers %>%
+  mutate(
+    # Efficiency metrics
+    fp_per_snap_y1 = if_else(total_off_snaps > 0,
+                              round(total_fantasy_points / total_off_snaps, 3), 0),
+    fp_per_game_y1 = if_else(games > 0,
+                              round(total_fantasy_points / games, 2), 0),
+
+    # Snap consistency metrics (Year 2)
+    snap_pct_variance = if_else(avg_snap_pct_y2 > 0,
+                                round(abs(w1_snap_share - avg_snap_pct_y2), 2), 0),
+
+    # Binary threshold indicators
+    crossed_10pct_snaps = as.integer(avg_snap_pct_y2 >= 10),
+    crossed_20pct_snaps = as.integer(avg_snap_pct_y2 >= 20),
+    crossed_30pct_snaps = as.integer(avg_snap_pct_y2 >= 30),
+
+    # Opportunity indicators
+    snap_increase_momentum = round(y2_snap_share_change + sliding_window_avg_delta, 2),
+    has_positive_trend = as.integer(sliding_window_avg_delta > 0),
+    significant_snap_jump = as.integer(snap_pct_change >= 10),
+
+    # Draft capital categories
+    is_udfa = as.integer(is.na(draft_number)),
+    is_day3_pick = as.integer(!is.na(draft_number) & draft_number > 100),
+    is_early_pick = as.integer(!is.na(draft_number) & draft_number <= 50),
+
+    # Physical profile indicators (position-specific)
+    rb_size_score = if_else(position == "RB" & !is.na(weight),
+                            round((weight - 200) / 20, 2), 0),
+    wr_height_score = if_else(position == "WR" & !is.na(height),
+                              round((height - 70) / 5, 2), 0),
+    te_size_score = if_else(position == "TE" & !is.na(weight),
+                            round((weight - 240) / 20, 2), 0),
+
+    # Experience and age factors
+    is_young_breakout = as.integer(age <= 23),
+    rookie_year_usage = if_else(total_off_snaps > 0,
+                                round(total_off_snaps / (17 * 60), 2), 0), # Approx % of possible snaps
+
+    # Matchup quality indicators
+    elite_matchup = as.integer(relevant_def_rank >= 28),
+    good_matchup = as.integer(relevant_def_rank >= 20 & relevant_def_rank < 28),
+    tough_matchup = as.integer(relevant_def_rank <= 8),
+
+    # Calculate PPG threshold (position-specific)
+    ppg_threshold_value = case_when(
+      position == "RB" ~ 6,
+      position == "WR" ~ 6,
+      position == "TE" ~ 4,
+      TRUE ~ 5
+    )
+  )
+
+# Prepare raw data with all available features
+raw_data <- additional_metrics %>%
+  select(
+    # Player identifiers
+    player_id,
+    player,
+    position,
+    team,
+
+    # Draft and physical attributes
+    draft_number,
+    college,
+    height,
+    weight,
+    age,
+    entry_year,
+    years_exp,
+
+    # Year 1 (Previous Year) Stats
+    games_played_y1 = games,
+    total_fantasy_points_y1 = total_fantasy_points,
+    ppg_y1 = ppg,
+    total_off_snaps_y1 = total_off_snaps,
+    avg_snap_pct_y1,
+    fp_per_snap_y1,
+    fp_per_game_y1,
+
+    # Year 2 (Current Year) Snap Data
+    total_games_y2,
+    avg_snap_pct_y2,
+    w1_snap_share,
+    snap_pct_change,
+    y2_snap_share_change,
+    sliding_window_avg_delta,
+    snap_pct_variance,
+    snap_increase_momentum,
+
+    # Binary indicators
+    crossed_10pct_snaps,
+    crossed_20pct_snaps,
+    crossed_30pct_snaps,
+    has_positive_trend,
+    significant_snap_jump,
+    is_udfa,
+    is_day3_pick,
+    is_early_pick,
+    is_young_breakout,
+    elite_matchup,
+    good_matchup,
+    tough_matchup,
+
+    # Physical scores
+    rb_size_score,
+    wr_height_score,
+    te_size_score,
+    rookie_year_usage,
+
+    # Matchup and Defense Data
+    opponent,
+    rush_defense_rank,
+    pass_defense_rank,
+    relevant_def_rank,
+    matchup_score,
+
+    # ECR and Rankings
+    ecr,
+    ecr_range_min,
+    ecr_range_max,
+
+    # Sleeper Score Components
+    draft_value,
+    performance_score,
+    age_score,
+    ecr_score,
+    sliding_window_score,
+    sleeper_score,
+    ppg_threshold_value,
+
+    # Meta information
+    season,
+    analysis_week = !!week
+  )
+
+# Add fantasy points data based on exclude_current_fp flag
+if (!exclude_current_fp && "prev_week_fp" %in% names(sleepers)) {
+  raw_data <- raw_data %>%
+    mutate(
+      prev_week_fp = sleepers$prev_week_fp,
+      current_week_fp = sleepers$current_week_fp,
+      fp_delta = sleepers$fp_delta
+    )
+} else if (exclude_current_fp) {
+  # Add all weekly fantasy points columns if available
+  fp_weekly_cols <- grep("^w[0-9]+$", names(sleepers), value = TRUE)
+  if (length(fp_weekly_cols) > 0) {
+    for (col in fp_weekly_cols) {
+      raw_data[[col]] <- sleepers[[col]]
+    }
+  }
+
+  # Add summary FP columns if they exist
+  if ("total_fp" %in% names(sleepers)) {
+    raw_data$total_fp_y2 <- sleepers$total_fp
+  }
+  if ("avg_fp" %in% names(sleepers)) {
+    raw_data$avg_fp_y2 <- sleepers$avg_fp
+  }
+  if ("games_played" %in% names(sleepers)) {
+    raw_data$games_played_y2_fp <- sleepers$games_played
+  }
+}
+
+# Add player status if available (from injury/roster checks)
+if ("player_available" %in% names(sleepers)) {
+  raw_data$player_available <- sleepers$player_available
+}
+
+# Round numeric columns for cleaner output
+numeric_cols <- c("ppg_y1", "avg_snap_pct_y1", "avg_snap_pct_y2",
+                  "snap_pct_change", "y2_snap_share_change", "sliding_window_avg_delta",
+                  "w1_snap_share", "sleeper_score")
+
+for (col in numeric_cols) {
+  if (col %in% names(raw_data)) {
+    raw_data[[col]] <- round(raw_data[[col]], 2)
+  }
+}
+
+# Save raw data
+write_csv(raw_data, raw_output_file)
+cat("Raw ML data saved to:", raw_output_file, "\n")
+cat("Raw data contains", nrow(raw_data), "players with", ncol(raw_data), "features\n")
 
 # Create PNG table visualization
 cat("\nGenerating table visualization...\n")
@@ -1154,18 +1324,17 @@ if (nrow(final_sleepers) > 0) {
       )
   }
 
-  if ("matchup_score" %in% names(final_sleepers)) {
-    table_viz <- table_viz %>%
-      data_color(
-        columns = matchup_score,
-        colors = scales::col_numeric(
-          palette = c("white", "#E8F5E9", "#66BB6A", "#43A047", "#2E7D32"),
-          domain = c(0, 30)
-        )
+  # Apply top 10 shading to ALL columns
+  table_viz <- table_viz %>%
+    tab_style(
+      style = cell_fill(color = "#E8F5E9"),
+      locations = cells_body(
+        columns = everything(),
+        rows = sleeper_rank <= 10
       )
-  }
+    )
 
-  # Apply HIT status styling only if FP columns are included
+  # Apply HIT status styling only if FP columns are included (AFTER top 10 styling to override)
   if (!exclude_current_fp) {
     table_viz <- table_viz %>%
       tab_style(
@@ -1178,54 +1347,6 @@ if (nrow(final_sleepers) > 0) {
           rows = hit_status == "HIT"
         )
       )
-  }
-
-  # Apply top 10 shading based on available columns
-  if (!exclude_current_fp) {
-    styling_cols <- c("sleeper_rank", "player", "position", "team", "opponent",
-                      "games_played_prev", "ppg_prev", "snap_pct_y1", "snap_pct_y2",
-                      "snap_pct_change", "y2_snap_share_change",
-                      "sliding_window_avg_delta", "games_y2", "prev_week_fp",
-                      "current_week_fp", "sleeper_score", "ecr")
-    styling_cols <- styling_cols[styling_cols %in% names(final_sleepers)]
-    if (length(styling_cols) > 0) {
-      table_viz <- table_viz %>%
-        tab_style(
-          style = cell_fill(color = "#E8F5E9"),
-          locations = cells_body(
-            columns = all_of(styling_cols),
-            rows = sleeper_rank <= 10
-          )
-        )
-    }
-  } else {
-    styling_cols <- c("sleeper_rank", "player", "position", "team", "opponent",
-                      "games_played_prev", "ppg_prev", "avg_snap_pct_y1",
-                      "avg_snap_pct_y2", "snap_pct_change", "y2_snap_share_change",
-                      "sliding_window_avg_delta", "games_y2", "sleeper_score", "ecr")
-    styling_cols <- styling_cols[styling_cols %in% names(final_sleepers)]
-
-    # Add weekly FP columns for styling
-    fp_weekly_cols <- grep("^w[0-9]+$", names(final_sleepers), value = TRUE)
-    if (length(fp_weekly_cols) > 0) {
-      styling_cols <- c(styling_cols, fp_weekly_cols)
-    }
-
-    # Add summary FP columns for styling
-    summary_cols <- c("total_fp", "avg_fp", "games_played")
-    summary_cols <- summary_cols[summary_cols %in% names(final_sleepers)]
-    styling_cols <- c(styling_cols, summary_cols)
-
-    if (length(styling_cols) > 0) {
-      table_viz <- table_viz %>%
-        tab_style(
-          style = cell_fill(color = "#E8F5E9"),
-          locations = cells_body(
-            columns = all_of(styling_cols),
-            rows = sleeper_rank <= 10
-          )
-        )
-    }
   }
 
   table_viz <- table_viz %>%
@@ -1323,10 +1444,19 @@ if (nrow(final_sleepers) > 0) {
     }
   }
 
-  table_viz <- table_viz %>%
-    cols_hide(
-      columns = c(season, analysis_week)  # Hide columns
-    )
+  # Only hide columns if they exist
+  cols_to_hide <- c()
+  if ("season" %in% names(final_sleepers)) {
+    cols_to_hide <- c(cols_to_hide, "season")
+  }
+  if ("analysis_week" %in% names(final_sleepers)) {
+    cols_to_hide <- c(cols_to_hide, "analysis_week")
+  }
+
+  if (length(cols_to_hide) > 0) {
+    table_viz <- table_viz %>%
+      cols_hide(columns = all_of(cols_to_hide))
+  }
 
   # Save as PNG with rate limiting
   sleep_time <- runif(1, min = 1, max = 3)
@@ -1376,18 +1506,29 @@ if (nrow(final_sleepers) > 0) {
             select(all_of(display_cols)))
   }
 
-  # Position breakdown
-  cat("\nSleepers by Position:\n")
-  position_summary <- final_sleepers %>%
-    group_by(position) %>%
-    summarise(
-      count = n(),
-      avg_score = round(mean(sleeper_score, na.rm = TRUE), 1),
-      avg_ecr = round(mean(ecr, na.rm = TRUE), 0),
-      .groups = "drop"
-    ) %>%
-    arrange(desc(count))
-  print(position_summary)
+  # Position breakdown (only if position column exists)
+  if ("position" %in% names(final_sleepers)) {
+    cat("\nSleepers by Position:\n")
+
+    # Build summarise list dynamically based on available columns
+    summary_exprs <- list(count = quote(n()))
+
+    if ("sleeper_score" %in% names(final_sleepers)) {
+      summary_exprs$avg_score <-
+        quote(round(mean(sleeper_score, na.rm = TRUE), 1))
+    }
+
+    if ("ecr" %in% names(final_sleepers)) {
+      summary_exprs$avg_ecr <- quote(round(mean(ecr, na.rm = TRUE), 0))
+    }
+
+    position_summary <- final_sleepers %>%
+      group_by(position) %>%
+      summarise(!!!summary_exprs, .groups = "drop") %>%
+      arrange(desc(count))
+
+    print(position_summary)
+  }
 
   # Team breakdown
   cat("\nTop 5 Teams with Most Sleepers:\n")
@@ -1407,4 +1548,5 @@ if (nrow(final_sleepers) > 0) {
 
 cat("\nResults saved to:\n")
 cat("  CSV:", output_file, "\n")
+cat("  Raw ML data:", raw_output_file, "\n")
 cat("  PNG:", png_file, "\n")

@@ -10,6 +10,9 @@ suppressPackageStartupMessages({
   library(ggplot2)
   library(tidyr)
   library(stringr)
+  library(gridExtra)
+  library(grid)
+  library(zoo)
 })
 
 # Parse command line arguments
@@ -185,49 +188,177 @@ plot_data <- all_results %>%
     )
   )
 
-# Create the line plot with y-axis set to 10
-p <- ggplot(plot_data, aes(x = week, y = hits, color = category)) +
+# Calculate moving averages for trend lines
+ma_window <- 3  # 3-week moving average
+plot_data_ma <- plot_data %>%
+  group_by(category) %>%
+  arrange(week) %>%
+  mutate(
+    ma_hits = zoo::rollmean(hits, ma_window, fill = NA, align = "center")
+  ) %>%
+  ungroup()
+
+# Calculate overall averages for reference lines
+avg_top10 <- mean(all_results$top_10_hits)
+avg_top3 <- mean(all_results$top_3_hits)
+
+# Identify exceptional weeks (>= 7 hits for top 10, >= 2 hits for top 3)
+exceptional_weeks <- all_results %>%
+  filter(top_10_hits >= 7 | top_3_hits >= 2) %>%
+  pull(week)
+
+# Create the enhanced line plot
+p <- ggplot(plot_data_ma, aes(x = week, y = hits, color = category)) +
+  # Add shaded regions for exceptional performance weeks
+  geom_rect(
+    data = data.frame(week = exceptional_weeks),
+    aes(xmin = week - 0.4, xmax = week + 0.4, ymin = -Inf, ymax = Inf),
+    fill = "gold", alpha = 0.1, inherit.aes = FALSE
+  ) +
+  # Add average reference lines
+  geom_hline(yintercept = avg_top10, linetype = "dashed",
+             color = "#2E8B57", alpha = 0.5, linewidth = 0.8) +
+  geom_hline(yintercept = avg_top3, linetype = "dashed",
+             color = "#FF6347", alpha = 0.5, linewidth = 0.8) +
+  # Add trend lines (moving average)
+  geom_line(aes(y = ma_hits, group = category),
+            linewidth = 1, alpha = 0.4, linetype = "dotted") +
+  # Main lines
   geom_line(linewidth = 1.5, alpha = 0.9) +
-  geom_point(size = 3) +
-  geom_text(aes(label = hits), vjust = -0.8, size = 3.5, fontface = "bold") +
+  # Add area fill under lines for visual weight
+  geom_area(alpha = 0.1, position = "identity") +
+  # Points with conditional sizing based on performance
+  geom_point(aes(size = ifelse(
+    (category == "Top 10 Sleepers" & hits >= 7) |
+    (category == "Top 3 Sleepers" & hits >= 2),
+    "Exceptional", "Normal"
+  ))) +
+  # Value labels with conditional coloring
+  geom_text(aes(label = hits,
+                fontface = ifelse(
+                  (category == "Top 10 Sleepers" & hits >= 7) |
+                  (category == "Top 3 Sleepers" & hits >= 2),
+                  "bold", "plain")),
+            vjust = -0.8, size = 3.5, show.legend = FALSE) +
+  # Add annotations for averages
+  annotate("text", x = min(all_results$week), y = avg_top10,
+           label = paste("Top 10 Avg:", round(avg_top10, 1)),
+           hjust = 0, vjust = -0.5, color = "#2E8B57",
+           size = 3, fontface = "italic") +
+  annotate("text", x = min(all_results$week), y = avg_top3,
+           label = paste("Top 3 Avg:", round(avg_top3, 1)),
+           hjust = 0, vjust = -0.5, color = "#FF6347",
+           size = 3, fontface = "italic") +
   labs(
     title = paste("Second-Year Sleeper Hits -", target_year, "Season"),
-    subtitle = "Number of successful 'HIT' predictions for top-ranked sleepers",
+    subtitle = paste("Number of successful 'HIT' predictions for top-ranked sleepers",
+                     "\nGold highlights = Exceptional weeks | Dotted lines = 3-week moving average"),
     x = "Week",
     y = "Number of Hits",
-    color = "Sleeper Category"
+    color = "Sleeper Category",
+    size = "Performance"
   ) +
   theme_minimal() +
   theme(
     plot.title = element_text(size = 18, face = "bold", hjust = 0.5),
-    plot.subtitle = element_text(size = 14, hjust = 0.5, color = "gray60"),
+    plot.subtitle = element_text(size = 12, hjust = 0.5, color = "gray60"),
     legend.position = "bottom",
     legend.title = element_text(face = "bold", size = 12),
     legend.text = element_text(size = 11),
+    legend.box = "horizontal",
     panel.grid.minor = element_blank(),
+    panel.grid.major.x = element_line(color = "gray90"),
     axis.text = element_text(size = 11),
     axis.title = element_text(size = 12, face = "bold"),
-    plot.margin = margin(20, 20, 120, 20)
+    plot.margin = margin(20, 20, 20, 20)
   ) +
-  scale_color_manual(values = c("Top 10 Sleepers" = "#2E8B57", "Top 3 Sleepers" = "#FF6347")) +
+  scale_color_manual(values = c("Top 10 Sleepers" = "#2E8B57",
+                                "Top 3 Sleepers" = "#FF6347")) +
+  scale_size_manual(values = c("Normal" = 3, "Exceptional" = 5),
+                    guide = guide_legend(title = "Performance")) +
   scale_y_continuous(limits = c(0, 10), breaks = seq(0, 10, by = 1)) +
   scale_x_continuous(breaks = all_results$week)
 
-# Create statistics text
-stats_text <- paste0(
-  "Statistics for ", target_year, " Season:\n",
-  "• ", pct_weeks_top3_hit, "% of weeks with ≥1 top 3 hit (", weeks_with_top3_hit, "/", nrow(all_results), " weeks)\n",
-  "• ", pct_weeks_3plus_top10, "% of weeks with >3 top 10 hits (", weeks_with_3plus_top10_hits, "/", nrow(all_results), " weeks)\n",
-  "• ", pct_weeks_5plus_top10, "% of weeks with >5 top 10 hits (", weeks_with_5plus_top10_hits, "/", nrow(all_results), " weeks)"
+# Calculate additional metrics for the enhanced table
+overall_top10_rate <- round(sum(all_results$top_10_hits) /
+                            sum(all_results$top_10_candidates) * 100, 1)
+overall_top3_rate <- round(sum(all_results$top_3_hits) /
+                           sum(all_results$top_3_candidates) * 100, 1)
+best_week <- all_results$week[which.max(all_results$top_10_hits)]
+worst_week <- all_results$week[which.min(all_results$top_10_hits)]
+consistency <- round(sd(all_results$top_10_hits), 2)
+
+# Create enhanced statistics table with more metrics
+stats_df <- data.frame(
+  Metric = c(
+    "Overall Top 10 Hit Rate",
+    "Overall Top 3 Hit Rate",
+    "Weeks with ≥1 Top 3 Hit",
+    "Weeks with >3 Top 10 Hits",
+    "Weeks with >5 Top 10 Hits",
+    "Best Performance Week",
+    "Hit Rate Consistency (SD)"
+  ),
+  Value = c(
+    paste0(overall_top10_rate, "%"),
+    paste0(overall_top3_rate, "%"),
+    paste0(weeks_with_top3_hit, " / ", nrow(all_results)),
+    paste0(weeks_with_3plus_top10_hits, " / ", nrow(all_results)),
+    paste0(weeks_with_5plus_top10_hits, " / ", nrow(all_results)),
+    paste0("Week ", best_week, " (",
+           max(all_results$top_10_hits), " hits)"),
+    paste0("±", consistency, " hits")
+  ),
+  Percentage = c(
+    paste0("(", sum(all_results$top_10_hits), "/",
+           sum(all_results$top_10_candidates), ")"),
+    paste0("(", sum(all_results$top_3_hits), "/",
+           sum(all_results$top_3_candidates), ")"),
+    paste0(pct_weeks_top3_hit, "%"),
+    paste0(pct_weeks_3plus_top10, "%"),
+    paste0(pct_weeks_5plus_top10, "%"),
+    "",
+    ""
+  ),
+  stringsAsFactors = FALSE
 )
 
-# Add the statistics as a text annotation
-p_final <- p +
-  labs(caption = stats_text) +
-  theme(
-    plot.caption = element_text(size = 12, hjust = 0.5, color = "black",
-                               margin = margin(t = 20), face = "bold")
+# Rename columns for better presentation
+colnames(stats_df) <- c("Performance Metric", "Value", "Detail")
+
+# Create a table grob with larger font and better formatting
+stats_table <- tableGrob(
+  stats_df,
+  rows = NULL,
+  theme = ttheme_default(
+    base_size = 14,  # Slightly reduced for more metrics
+    base_colour = "black",
+    base_family = "",
+    colhead = list(
+      bg_params = list(fill = "#2E8B57", alpha = 0.8),
+      fg_params = list(col = "white", fontface = "bold", cex = 1.2)
+    ),
+    core = list(
+      bg_params = list(fill = c("#F0F0F0", "white"), alpha = 0.8),
+      fg_params = list(col = "black", fontface = "plain", cex = 1.0)
+    )
   )
+)
+
+# Create bottom padding
+bottom_padding <- rectGrob(
+  gp = gpar(col = NA, fill = NA),
+  height = unit(0.5, "cm")
+)
+
+# Combine plot and statistics table without title
+p_final <- arrangeGrob(
+  p,
+  stats_table,
+  bottom_padding,
+  ncol = 1,
+  heights = unit(c(3, 1, 0.2), "null")
+)
 
 # Save the plot
 output_png <- paste0("sleeper_hits_analysis_", target_year, ".png")

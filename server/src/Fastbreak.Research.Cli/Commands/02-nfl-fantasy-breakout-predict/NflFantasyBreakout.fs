@@ -53,6 +53,187 @@ let formatFileSize (bytes: int64) =
     elif bytes < 1024L * 1024L * 1024L then sprintf "%.1f MB" (float bytes / (1024.0 * 1024.0))
     else sprintf "%.1f GB" (float bytes / (1024.0 * 1024.0 * 1024.0))
 
+type WeeklyMetrics = {
+    Week: int
+    TopTenSleeperHits: int
+    TopThreeSleeperHits: int
+    MLModelSuccessfulHits: int
+}
+
+let extractWeekNumber (fileName: string) =
+    try
+        let parts = fileName.Split('_')
+        let weekPart = parts |> Array.tryFind (fun p -> p.StartsWith("w"))
+        match weekPart with
+        | Some w ->
+            let weekStr = w.Substring(1) // Remove 'w' prefix
+            match System.Int32.TryParse(weekStr) with
+            | true, weekNum -> Some weekNum
+            | false, _ -> None
+        | None -> None
+    with
+    | _ -> None
+
+let generateWeeklyMetricsCsv (rawFiles: string[]) (sleeperFiles: string[]) (dataPath: string) =
+    try
+        printfn "\n=== GENERATING WEEKLY METRICS CSV ==="
+
+        // Group files by week
+        let weeklyRawFiles =
+            rawFiles
+            |> Array.choose (fun f ->
+                match extractWeekNumber (Path.GetFileName(f)) with
+                | Some week -> Some (week, f)
+                | None -> None)
+            |> Array.groupBy fst
+            |> Map.ofArray
+
+        let weeklySleeperFiles =
+            sleeperFiles
+            |> Array.choose (fun f ->
+                match extractWeekNumber (Path.GetFileName(f)) with
+                | Some week -> Some (week, f)
+                | None -> None)
+            |> Array.groupBy fst
+            |> Map.ofArray
+
+        let allWeeks =
+            [weeklyRawFiles.Keys; weeklySleeperFiles.Keys]
+            |> Seq.concat
+            |> Set.ofSeq
+            |> Set.toArray
+            |> Array.sort
+
+        let weeklyMetrics = ResizeArray<WeeklyMetrics>()
+
+        for week in allWeeks do
+            printfn "Processing week %d..." week
+
+            let topTenHits = ref 0
+            let topThreeHits = ref 0
+            let mlHits = ref 0
+
+            // Process sleeper score files for this week
+            match weeklySleeperFiles.TryFind week with
+            | Some weekFiles ->
+                for (_, sleeperFile) in weekFiles do
+                    try
+                        let lines = File.ReadAllLines(sleeperFile)
+                        if lines.Length > 1 then
+                            let header = lines.[0].Split(',')
+                            let hitStatusIdx = Array.tryFindIndex ((=) "hit_status") header
+                            let sleeperRankIdx = Array.tryFindIndex ((=) "sleeper_rank") header
+
+                            match hitStatusIdx, sleeperRankIdx with
+                            | Some hitIdx, Some rankIdx ->
+                                let allHits =
+                                    lines.[1..]
+                                    |> Array.choose (fun line ->
+                                        let fields = line.Split(',')
+                                        if fields.Length > max hitIdx rankIdx then
+                                            let hitStatus = if hitIdx < fields.Length then fields.[hitIdx].Trim() else ""
+                                            let isHit = hitStatus = "HIT"
+                                            let rank =
+                                                match System.Int32.TryParse(fields.[rankIdx]) with
+                                                | true, r -> Some r
+                                                | false, _ -> None
+                                            match rank with
+                                            | Some r when isHit -> Some (r, isHit)
+                                            | _ -> None
+                                        else None)
+
+                                // Count hits in top 10 and top 3 ranks
+                                let top10Hits = allHits |> Array.filter (fun (rank, _) -> rank <= 10) |> Array.length
+                                let top3Hits = allHits |> Array.filter (fun (rank, _) -> rank <= 3) |> Array.length
+
+                                topTenHits := !topTenHits + top10Hits
+                                topThreeHits := !topThreeHits + top3Hits
+                            | _ ->
+                                printfn "Warning: hit_status or sleeper_rank column not found in %s" sleeperFile
+                    with
+                    | ex -> printfn "Error processing sleeper file %s: %s" sleeperFile ex.Message
+            | None -> ()
+
+            // Process ML model predictions for this week
+            match weeklyRawFiles.TryFind week with
+            | Some weekFiles ->
+                for (_, rawFile) in weekFiles do
+                    try
+                        let lines = File.ReadAllLines(rawFile)
+                        if lines.Length > 1 then
+                            let header = lines.[0].Split(',')
+                            let fpDeltaIdx = Array.tryFindIndex ((=) "fp_delta") header
+                            let sleeperScoreIdx = Array.tryFindIndex ((=) "sleeper_score") header
+                            let prevWeekFpIdx = Array.tryFindIndex ((=) "prev_week_fp") header
+
+                            match fpDeltaIdx, sleeperScoreIdx, prevWeekFpIdx with
+                            | Some fpIdx, Some sleeperIdx, Some prevFpIdx ->
+                                for line in lines.[1..] do
+                                    let fields = line.Split(',')
+                                    if fields.Length > max fpIdx (max sleeperIdx prevFpIdx) then
+                                        let fpDelta =
+                                            match System.Single.TryParse(fields.[fpIdx]) with
+                                            | true, x -> x
+                                            | false, _ -> 0.0f
+
+                                        let sleeperScore =
+                                            match System.Single.TryParse(fields.[sleeperIdx]) with
+                                            | true, x -> x
+                                            | false, _ -> 0.0f
+
+                                        let prevWeekFp =
+                                            match System.Single.TryParse(fields.[prevFpIdx]) with
+                                            | true, x -> x
+                                            | false, _ -> 0.0f
+
+                                        // Apply simple ML model logic
+                                        let snapScore = if prevWeekFp > 0.0f then 1.0f else 0.0f
+                                        let momentumScore = if fpDelta > 0.0f then 1.0f else 0.0f
+                                        let sleeperNormalized = sleeperScore / 200.0f
+                                        let combinedScore = (sleeperNormalized * 0.6f) + (snapScore * 0.2f) + (momentumScore * 0.2f)
+
+                                        let mlPrediction = combinedScore >= 0.5f
+                                        let actualBreakout = fpDelta >= 5.0f // Using same threshold as trainer
+
+                                        if mlPrediction && actualBreakout then
+                                            mlHits := !mlHits + 1
+                            | _ -> ()
+                    with
+                    | ex -> printfn "Error processing raw file %s: %s" rawFile ex.Message
+            | None -> ()
+
+            weeklyMetrics.Add({
+                Week = week
+                TopTenSleeperHits = !topTenHits
+                TopThreeSleeperHits = !topThreeHits
+                MLModelSuccessfulHits = !mlHits
+            })
+
+        // Write CSV file
+        let csvPath = Path.Combine(dataPath, "weekly_metrics.csv")
+        let csvLines = ResizeArray<string>()
+        csvLines.Add("Week,TopTenSleeperHits,TopThreeSleeperHits,MLModelSuccessfulHits")
+
+        for metrics in weeklyMetrics do
+            csvLines.Add(sprintf "%d,%d,%d,%d" metrics.Week metrics.TopTenSleeperHits metrics.TopThreeSleeperHits metrics.MLModelSuccessfulHits)
+
+        File.WriteAllLines(csvPath, csvLines)
+
+        printfn "Weekly metrics CSV generated: %s" csvPath
+        printfn "Contains %d weeks of data" weeklyMetrics.Count
+
+        // Print summary
+        printfn "\nWeekly Metrics Summary:"
+        printfn "%-4s %-15s %-17s %-18s" "Week" "Top10 Sleeper" "Top3 Sleeper" "ML Model Hits"
+        printfn "%s" (String.replicate 60 "-")
+        for metrics in weeklyMetrics do
+            printfn "%-4d %-15d %-17d %-18d" metrics.Week metrics.TopTenSleeperHits metrics.TopThreeSleeperHits metrics.MLModelSuccessfulHits
+
+    with
+    | ex ->
+        printfn "Error generating weekly metrics CSV: %s" ex.Message
+        printfn "Stack trace: %s" ex.StackTrace
+
 let runNflFantasyBreakout (args: ParseResults<'T>) =
     // Extract data path using manual argument parsing for now
     let argStrings = System.Environment.GetCommandLineArgs()
@@ -175,6 +356,9 @@ let runNflFantasyBreakout (args: ParseResults<'T>) =
 
                         // Print prediction analysis
                         printPredictionSummary predictions
+
+                        // Generate weekly metrics CSV
+                        generateWeeklyMetricsCsv rawFiles sleeperFiles dataPath
 
                         0
                     with

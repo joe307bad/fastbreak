@@ -22,6 +22,38 @@ dotnet run 02-nfl-fantasy-breakout --data /path/to/csv/directory
 dotnet run 02-nfl-fantasy-breakout --data /Users/joebad/Source/fastbreak/pipeline/02-fantasy-breakout-predict/sleeper_analysis_2024
 ```
 
+## Complete Execution Workflow
+
+To generate weekly performance analysis and visualization:
+
+### Step 1: Generate Weekly Metrics CSV
+Run the F# command to analyze data and generate weekly hit counts:
+
+```bash
+cd server/src/Fastbreak.Research.Cli
+dotnet run 02-nfl-fantasy-breakout --data /path/to/sleeper_analysis_2024
+```
+
+This generates:
+- Model performance analysis and comparison
+- `weekly_metrics.csv` file with three metrics per week:
+  - Top 10 sleeper score hits
+  - Top 3 sleeper score hits
+  - ML model successful predictions
+
+### Step 2: Generate Visualization
+Run the R script to create a comparative line graph:
+
+```bash
+cd pipeline/02-fantasy-breakout-predict
+Rscript scripts/plot_weekly_metrics.R sleeper_analysis_2024/weekly_metrics.csv output_plot.png
+```
+
+This produces:
+- Multi-line graph comparing the three performance metrics over time
+- Summary statistics and efficiency ratios
+- High-resolution PNG plot for analysis
+
 ## What It Does
 
 ### 1. **Data Analysis**
@@ -49,6 +81,14 @@ dotnet run 02-nfl-fantasy-breakout --data /Users/joebad/Source/fastbreak/pipelin
 - Shows top 10 predicted breakouts with confidence scores
 - Identifies missed breakouts (actual breakouts not predicted)
 - Provides player-level insights for fantasy decision making
+
+### 6. **Weekly Metrics CSV Generation**
+- Generates `weekly_metrics.csv` containing weekly hit counts for visualization
+- Tracks three performance metrics across all NFL weeks:
+  - Top 10 sleeper score hits per week
+  - Top 3 sleeper score hits per week
+  - ML model successful predictions per week
+- Enables comparative analysis of methodology performance over time
 
 ## Sample Output
 

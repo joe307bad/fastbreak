@@ -9,34 +9,35 @@ This command analyzes CSV data from the R-based fantasy breakout prediction pipe
 ## Usage
 
 ```bash
-dotnet run 02-nfl-fantasy-breakout --data /path/to/csv/directory
+dotnet run 02-nfl-fantasy-breakout --data /path/to/csv/directory --output /path/to/output.json
 ```
 
 ### Arguments
 
 - `--data` (required): Directory path containing CSV files from the fantasy breakout prediction pipeline
+- `--output` (required): Path where the weekly metrics JSON file should be saved
 
 ### Example
 
 ```bash
-dotnet run 02-nfl-fantasy-breakout --data /Users/joebad/Source/fastbreak/pipeline/02-fantasy-breakout-predict/sleeper_analysis_2024
+dotnet run 02-nfl-fantasy-breakout --data /Users/joebad/Source/fastbreak/pipeline/02-fantasy-breakout-predict/sleeper_analysis_2024 --output /Users/joebad/Source/fastbreak/pipeline/02-fantasy-breakout-predict/sleeper_analysis_2024/weekly_metrics.json
 ```
 
 ## Complete Execution Workflow
 
 To generate weekly performance analysis and visualization:
 
-### Step 1: Generate Weekly Metrics CSV
+### Step 1: Generate Weekly Metrics JSON
 Run the F# command to analyze data and generate weekly hit counts:
 
 ```bash
 cd server/src/Fastbreak.Research.Cli
-dotnet run 02-nfl-fantasy-breakout --data /path/to/sleeper_analysis_2024
+dotnet run 02-nfl-fantasy-breakout --data /path/to/sleeper_analysis_2024 --output /path/to/output/weekly_metrics.json
 ```
 
 This generates:
 - Model performance analysis and comparison
-- `weekly_metrics.csv` file with three metrics per week:
+- Weekly metrics JSON file at the specified output location with three metrics per week:
   - Top 10 sleeper score hits
   - Top 3 sleeper score hits
   - ML model successful predictions
@@ -82,8 +83,8 @@ This produces:
 - Identifies missed breakouts (actual breakouts not predicted)
 - Provides player-level insights for fantasy decision making
 
-### 6. **Weekly Metrics CSV Generation**
-- Generates `weekly_metrics.csv` containing weekly hit counts for visualization
+### 6. **Weekly Metrics JSON Generation**
+- Generates weekly metrics JSON at the specified output path containing hit counts for visualization
 - Tracks three performance metrics across all NFL weeks:
   - Top 10 sleeper score hits per week
   - Top 3 sleeper score hits per week

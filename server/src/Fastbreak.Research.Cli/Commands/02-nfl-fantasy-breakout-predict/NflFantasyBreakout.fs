@@ -74,9 +74,9 @@ let extractWeekNumber (fileName: string) =
     with
     | _ -> None
 
-let generateWeeklyMetricsCsv (rawFiles: string[]) (sleeperFiles: string[]) (dataPath: string) =
+let generateWeeklyMetricsJson (rawFiles: string[]) (sleeperFiles: string[]) (outputPath: string) =
     try
-        printfn "\n=== GENERATING WEEKLY METRICS CSV ==="
+        printfn "\n=== GENERATING WEEKLY METRICS JSON ==="
 
         // Group files by week
         let weeklyRawFiles =
@@ -157,6 +157,8 @@ let generateWeeklyMetricsCsv (rawFiles: string[]) (sleeperFiles: string[]) (data
             // Process ML model predictions for this week
             match weeklyRawFiles.TryFind week with
             | Some weekFiles ->
+                let weeklyMLPredictions = ResizeArray<{| CombinedScore: float32; ActualBreakout: bool |}>()
+
                 for (_, rawFile) in weekFiles do
                     try
                         let lines = File.ReadAllLines(rawFile)
@@ -191,15 +193,28 @@ let generateWeeklyMetricsCsv (rawFiles: string[]) (sleeperFiles: string[]) (data
                                         let momentumScore = if fpDelta > 0.0f then 1.0f else 0.0f
                                         let sleeperNormalized = sleeperScore / 200.0f
                                         let combinedScore = (sleeperNormalized * 0.6f) + (snapScore * 0.2f) + (momentumScore * 0.2f)
-
-                                        let mlPrediction = combinedScore >= 0.5f
                                         let actualBreakout = fpDelta >= 5.0f // Using same threshold as trainer
 
-                                        if mlPrediction && actualBreakout then
-                                            mlHits := !mlHits + 1
+                                        // Store all predictions with their scores for ranking
+                                        weeklyMLPredictions.Add({| CombinedScore = combinedScore; ActualBreakout = actualBreakout |})
                             | _ -> ()
                     with
                     | ex -> printfn "Error processing raw file %s: %s" rawFile ex.Message
+
+                // Sort by combined score descending and take top 10 predictions (like sleeper top 10)
+                let allPredictionsArray = weeklyMLPredictions.ToArray()
+                let top10MLPredictions =
+                    allPredictionsArray
+                    |> Array.sortByDescending (fun p -> p.CombinedScore)
+                    |> Array.take (min 10 allPredictionsArray.Length)
+
+                // Count hits only from top 10 ML predictions (fair comparison with sleeper top 10)
+                let top10MLHits =
+                    top10MLPredictions
+                    |> Array.filter (fun p -> p.ActualBreakout)
+                    |> Array.length
+
+                mlHits := !mlHits + top10MLHits
             | None -> ()
 
             weeklyMetrics.Add({
@@ -209,17 +224,18 @@ let generateWeeklyMetricsCsv (rawFiles: string[]) (sleeperFiles: string[]) (data
                 MLModelSuccessfulHits = !mlHits
             })
 
-        // Write CSV file
-        let csvPath = Path.Combine(dataPath, "weekly_metrics.csv")
-        let csvLines = ResizeArray<string>()
-        csvLines.Add("Week,TopTenSleeperHits,TopThreeSleeperHits,MLModelSuccessfulHits")
+        // Write JSON file
+        let jsonPath = outputPath
+        let jsonObjects = ResizeArray<string>()
 
         for metrics in weeklyMetrics do
-            csvLines.Add(sprintf "%d,%d,%d,%d" metrics.Week metrics.TopTenSleeperHits metrics.TopThreeSleeperHits metrics.MLModelSuccessfulHits)
+            let jsonObject = sprintf "        { Week: %d, TopTenSleeperHits: %d, TopThreeSleeperHits: %d, MLModelSuccessfulHits: %d }" metrics.Week metrics.TopTenSleeperHits metrics.TopThreeSleeperHits metrics.MLModelSuccessfulHits
+            jsonObjects.Add(jsonObject)
 
-        File.WriteAllLines(csvPath, csvLines)
+        let jsonContent = "[\n" + String.concat ",\n" jsonObjects + "\n    ];"
+        File.WriteAllText(jsonPath, jsonContent)
 
-        printfn "Weekly metrics CSV generated: %s" csvPath
+        printfn "Weekly metrics JSON generated: %s" jsonPath
         printfn "Contains %d weeks of data" weeklyMetrics.Count
 
         // Print summary
@@ -231,19 +247,24 @@ let generateWeeklyMetricsCsv (rawFiles: string[]) (sleeperFiles: string[]) (data
 
     with
     | ex ->
-        printfn "Error generating weekly metrics CSV: %s" ex.Message
+        printfn "Error generating weekly metrics JSON: %s" ex.Message
         printfn "Stack trace: %s" ex.StackTrace
 
 let runNflFantasyBreakout (args: ParseResults<'T>) =
-    // Extract data path using manual argument parsing for now
+    // Extract paths using manual argument parsing (similar to EloPlus)
     let argStrings = System.Environment.GetCommandLineArgs()
     let dataIndex = Array.tryFindIndex (fun s -> s = "--data" || s = "-d") argStrings
-    match dataIndex with
-    | Some i when i + 1 < argStrings.Length ->
+    let outputIndex = Array.tryFindIndex (fun s -> s = "--output" || s = "-o") argStrings
+
+    match dataIndex, outputIndex with
+    | Some i, Some o when i + 1 < argStrings.Length && o + 1 < argStrings.Length ->
         let dataPath = argStrings.[i + 1]
+        let outputPath = argStrings.[o + 1]
+
         printfn "NFL Fantasy Breakout ML Data Analysis"
         printfn "======================================"
         printfn "Data Directory: %s" dataPath
+        printfn "Output CSV: %s" outputPath
         printfn ""
 
         if not (Directory.Exists(dataPath)) then
@@ -357,8 +378,8 @@ let runNflFantasyBreakout (args: ParseResults<'T>) =
                         // Print prediction analysis
                         printPredictionSummary predictions
 
-                        // Generate weekly metrics CSV
-                        generateWeeklyMetricsCsv rawFiles sleeperFiles dataPath
+                        // Generate weekly metrics JSON
+                        generateWeeklyMetricsJson rawFiles sleeperFiles outputPath
 
                         0
                     with
@@ -369,7 +390,11 @@ let runNflFantasyBreakout (args: ParseResults<'T>) =
                 else
                     printfn "No training data files found for ML training."
                     0
-    | None ->
-        printfn "ERROR: --data argument is required"
-        printfn "Usage: dotnet run 02-nfl-fantasy-breakout --data /path/to/csv/directory"
+    | _, _ ->
+        printfn "ERROR: Both --data and --output arguments are required"
+        printfn "Usage: dotnet run 02-nfl-fantasy-breakout --data /path/to/csv/directory --output /path/to/output.json"
+        printfn ""
+        printfn "Arguments:"
+        printfn "  --data, -d     Directory containing CSV files from the fantasy breakout prediction pipeline"
+        printfn "  --output, -o   Path where the weekly metrics JSON file should be saved"
         1

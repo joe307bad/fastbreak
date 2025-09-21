@@ -142,25 +142,38 @@ The tool expects CSV files in the specified directory with the following structu
 
 ## Machine Learning Approach
 
+⚠️ **IMPORTANT METHODOLOGICAL NOTE**: The current "ML Model" is not a true machine learning vs composite scoring comparison. The ML model uses the sleeper score (which IS the composite method) as its primary feature with 60% weight. This makes it an **enhanced composite scoring approach** rather than an independent ML methodology.
+
 ### Sleeper Score Model
 - **Method**: Single threshold (100+ sleeper score)
 - **Pros**: Simple, interpretable
 - **Cons**: Conservative, misses many breakouts
 
-### ML Model
-- **Method**: Weighted combination of multiple factors
+### "ML Model" (Actually Enhanced Composite Scoring)
+- **Method**: Weighted combination incorporating the original composite score
+- **Critical Limitation**: Uses sleeper score as 60% of the prediction
 - **Features**:
-  - Sleeper score (60% weight)
+  - **Sleeper score (60% weight)** ← This IS the composite method being compared against
   - Playing time indicator (20% weight)
   - Performance momentum (20% weight)
 - **Threshold**: 0.5 combined score
 
+### What This Actually Compares
+- **Baseline**: Pure sleeper score with 100-point threshold
+- **Enhanced**: Sleeper score + additional features with weighted combination
+- **Result**: The improvement comes from feature engineering, not ML vs composite methodology
+
 ## Use Cases
 
 1. **Fantasy Football Analysis**: Identify undervalued players likely to break out
-2. **Methodology Research**: Compare traditional vs ML approaches in sports analytics
-3. **Model Validation**: Evaluate prediction accuracy using historical data
-4. **Feature Importance**: Understand which factors best predict breakouts
+2. **Composite Score Enhancement**: Demonstrate how additional features improve baseline composite scoring
+3. **Feature Engineering Research**: Evaluate impact of adding playing time and momentum factors
+4. **Model Validation**: Evaluate prediction accuracy using historical data
+
+**NOT SUITABLE FOR**:
+- True machine learning vs composite scoring comparisons
+- Claims about ML superiority over traditional methods
+- Research requiring methodologically independent approaches
 
 ## Dependencies
 
@@ -170,10 +183,17 @@ The tool expects CSV files in the specified directory with the following structu
 
 ## Performance Benchmarks
 
+⚠️ **INTERPRETATION WARNING**: These results compare baseline sleeper scoring vs enhanced sleeper scoring, NOT composite vs machine learning methodologies.
+
 Based on 2024 NFL season data (243 total records):
-- **ML Model**: 71.2% accuracy, 51.6% precision, 72.7% recall
-- **Sleeper Score**: 61.6% accuracy, 33.3% precision, 27.3% recall
+- **Enhanced Composite Model**: 71.2% accuracy, 51.6% precision, 72.7% recall
+- **Baseline Sleeper Score**: 61.6% accuracy, 33.3% precision, 27.3% recall
 - **Improvement**: +9.6% accuracy, +45.5% better breakout detection
+
+**What These Numbers Actually Show**:
+- Adding playing time and momentum features to composite scoring improves performance
+- The 45.5% recall improvement comes from feature engineering, not ML superiority
+- This demonstrates the value of multi-factor composite models vs single-threshold approaches
 
 ## Future Enhancements
 

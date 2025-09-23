@@ -790,7 +790,7 @@ sleepers <- sleeper_candidates %>%
     performance_score = case_when(
       ppg < ppg_threshold & ppg > 0 ~ 30,  # Low production but played
       ppg == 0 & games > 0 ~ 20,           # Played but minimal fantasy points
-      ppg == 0 & games == 0 ~ 40,          # Didn't play (redshirt/injury)
+      # ppg == 0 & games == 0 ~ 40,          # Didn't play (redshirt/injury)
       ppg >= ppg_threshold & ppg < ppg_threshold * 1.5 ~ 20,  # Moderate production
       TRUE ~ 0
     ),

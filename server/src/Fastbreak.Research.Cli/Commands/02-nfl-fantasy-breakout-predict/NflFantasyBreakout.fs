@@ -92,6 +92,7 @@ type PlayerPrediction = {
 type WeeklyPrediction = {
     [<JsonPropertyName("week")>] Week: int
     [<JsonPropertyName("totalPlayers")>] TotalPlayers: int
+    [<JsonPropertyName("allPlayers")>] AllPlayers: PlayerPrediction[]
     [<JsonPropertyName("mlTop10Predictions")>] MLTop10Predictions: PlayerPrediction[]
     [<JsonPropertyName("sleeperTop10Predictions")>] SleeperTop10Predictions: PlayerPrediction[]
     [<JsonPropertyName("mlTop10Hits")>] MLTop10Hits: int
@@ -189,8 +190,9 @@ let generateComprehensiveJson (weeklyOutputs: WeeklyCsvOutput[]) (outputPath: st
             weeklyPredictions.Add({
                 Week = output.Week
                 TotalPlayers = output.Players.Length
-                MLTop10Predictions = mlTop10 |> Array.map convertToJsonPlayer
-                SleeperTop10Predictions = sleeperTop10 |> Array.map convertToJsonPlayer
+                AllPlayers = output.Players |> Array.map convertToJsonPlayer
+                MLTop10Predictions = sortedByML |> Array.map convertToJsonPlayer
+                SleeperTop10Predictions = sortedBySleeper |> Array.map convertToJsonPlayer
                 MLTop10Hits = mlTop10Hits
                 MLTop3Hits = mlTop3Hits
                 SleeperTop10Hits = sleeperTop10Hits

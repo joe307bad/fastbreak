@@ -228,108 +228,117 @@ let trainMLNetClassifier (rawFilePaths: string[]) (outputDirectory: string) =
 
         let combinedData = mlContext.Data.LoadFromEnumerable(allDataRecords)
 
-        // Split data for training and testing
-        let dataSplit = mlContext.Data.TrainTestSplit(combinedData, testFraction = 0.2, seed = Nullable(42))
+        // Check if we have enough positive samples for training
+        let positiveCount = allDataRecords |> Seq.filter (fun r -> r.IsBreakout) |> Seq.length
+        let negativeCount = allDataRecords |> Seq.filter (fun r -> not r.IsBreakout) |> Seq.length
 
-        // Define the feature columns to use
-        let featureColumns = [|
-            "SleeperScore"; "PrevWeekFp"; "SnapPctChange"; "SlidingWindowAvgDelta"
-            "SnapIncreaseMomentum"; "HasPositiveTrend"; "SignificantSnapJump"
-            "PerformanceScore"; "AgeScore"; "EcrScore"; "MatchupScore"
-            "YearsExp"; "AvgSnapPctY1"; "FpPerSnapY1"; "AvgSnapPctY2"
-        |]
+        printfn "Data distribution: %d positive samples, %d negative samples" positiveCount negativeCount
 
-        // Create the training pipeline
-        let trainer = mlContext.BinaryClassification.Trainers.SdcaLogisticRegression(
-            labelColumnName = "Label",
-            featureColumnName = "Features",
-            l2Regularization = Nullable(0.1f),
-            l1Regularization = Nullable(0.01f),
-            maximumNumberOfIterations = Nullable(100))
+        if positiveCount < 3 || negativeCount < 3 || allDataRecords.Count < 10 then
+            failwithf "ERROR: Insufficient data for ML training. Found %d positive and %d negative samples (need at least 3 of each)" positiveCount negativeCount
+        else
+            // Split data for training and testing
+            let dataSplit = mlContext.Data.TrainTestSplit(combinedData, testFraction = 0.2, seed = Nullable(42))
 
-        let pipeline =
-            EstimatorChain()
-                .Append(mlContext.Transforms.Concatenate("Features", featureColumns))
-                .Append(mlContext.Transforms.NormalizeMinMax("Features", "Features"))
-                .Append(trainer)
+            // Define the feature columns to use
+            let featureColumns = [|
+                "SleeperScore"; "PrevWeekFp"; "SnapPctChange"; "SlidingWindowAvgDelta"
+                "SnapIncreaseMomentum"; "HasPositiveTrend"; "SignificantSnapJump"
+                "PerformanceScore"; "AgeScore"; "EcrScore"; "MatchupScore"
+                "YearsExp"; "AvgSnapPctY1"; "FpPerSnapY1"; "AvgSnapPctY2"
+            |]
 
-        printfn "Training model..."
-        let model = pipeline.Fit(dataSplit.TrainSet)
+            // Create the training pipeline
+            let trainer = mlContext.BinaryClassification.Trainers.SdcaLogisticRegression(
+                labelColumnName = "Label",
+                featureColumnName = "Features",
+                l2Regularization = Nullable(0.1f),
+                l1Regularization = Nullable(0.01f),
+                maximumNumberOfIterations = Nullable(100))
 
-        // Evaluate the model
-        let predictions = model.Transform(dataSplit.TestSet)
-        let metrics = mlContext.BinaryClassification.Evaluate(predictions, "Label")
+            let pipeline =
+                EstimatorChain()
+                    .Append(mlContext.Transforms.Concatenate("Features", featureColumns))
+                    .Append(mlContext.Transforms.NormalizeMinMax("Features", "Features"))
+                    .Append(trainer)
 
-        printfn "\n=== MODEL METRICS ==="
-        printfn "Accuracy: %.2f%%" (metrics.Accuracy * 100.0)
-        printfn "AUC: %.3f" metrics.AreaUnderRocCurve
-        printfn "F1 Score: %.3f" metrics.F1Score
-        printfn "Precision: %.2f%%" (metrics.PositivePrecision * 100.0)
-        printfn "Recall: %.2f%%" (metrics.PositiveRecall * 100.0)
+            printfn "Training model..."
+            let model = pipeline.Fit(dataSplit.TrainSet)
 
-        // Generate predictions for each week
-        let weeklyOutputs = ResizeArray<WeeklyCsvOutput>()
+            // Evaluate the model
+            let predictions = model.Transform(dataSplit.TestSet)
+            let metrics = mlContext.BinaryClassification.Evaluate(predictions, "Label")
 
-        for i in 0 .. rawFilePaths.Length - 1 do
-            let path = rawFilePaths.[i]
-            let weekNum = extractWeekNumber (Path.GetFileName(path))
-            let positionMap = loadPositionData path
+            printfn "\n=== MODEL METRICS ==="
+            printfn "Accuracy: %.2f%%" (metrics.Accuracy * 100.0)
+            printfn "AUC: %.3f" metrics.AreaUnderRocCurve
+            printfn "F1 Score: %.3f" metrics.F1Score
+            printfn "Precision: %.2f%%" (metrics.PositivePrecision * 100.0)
+            printfn "Recall: %.2f%%" (metrics.PositiveRecall * 100.0)
 
-            match loadRawData mlContext path positionMap with
-            | Some weekData ->
-                let weekPredictions = model.Transform(weekData)
-                let predictionEngine = mlContext.Model.CreatePredictionEngine<FantasyBreakoutInput, FantasyBreakoutPrediction>(model)
+            // Generate predictions for each week
+            let weeklyOutputs = ResizeArray<WeeklyCsvOutput>()
 
-                // Get the data as enumerable for processing
-                let dataEnum = mlContext.Data.CreateEnumerable<FantasyBreakoutInput>(weekData, reuseRowObject = false)
-                let players = ResizeArray<PlayerPredictionOutput>()
+            for i in 0 .. rawFilePaths.Length - 1 do
+                let path = rawFilePaths.[i]
+                let weekNum = extractWeekNumber (Path.GetFileName(path))
+                let positionMap = loadPositionData path
 
-                for input in dataEnum do
-                    let prediction = predictionEngine.Predict(input)
-                    let actualBreakout = input.FpDelta >= FANTASY_POINT_BREAKOUT_THRESHOLD
+                match loadRawData mlContext path positionMap with
+                | Some weekData ->
+                    let weekPredictions = model.Transform(weekData)
+                    let predictionEngine = mlContext.Model.CreatePredictionEngine<FantasyBreakoutInput, FantasyBreakoutPrediction>(model)
 
-                    players.Add({
-                        Player = input.Player
-                        Position = input.Position
-                        Team = input.Team
+                    // Get the data as enumerable for processing
+                    let dataEnum = mlContext.Data.CreateEnumerable<FantasyBreakoutInput>(weekData, reuseRowObject = false)
+                    let players = ResizeArray<PlayerPredictionOutput>()
+
+                    for input in dataEnum do
+                        let prediction = predictionEngine.Predict(input)
+                        let actualBreakout = input.FpDelta >= FANTASY_POINT_BREAKOUT_THRESHOLD
+
+                        players.Add({
+                            Player = input.Player
+                            Position = input.Position
+                            Team = input.Team
+                            Week = weekNum
+                            MLConfidence = prediction.Probability
+                            SleeperScore = input.SleeperScore
+                            SleeperHit = false  // Will be calculated after sorting
+                            MLHit = false  // Will be calculated after sorting
+                            FpDelta = input.FpDelta
+                            ActualBreakout = actualBreakout
+                        })
+
+                    // Sort by sleeper score and mark top 10 hits
+                    let sortedBySleeper = players.ToArray() |> Array.sortByDescending (fun p -> p.SleeperScore)
+                    let sleeperTop10 = sortedBySleeper |> Array.take (min 10 sortedBySleeper.Length)
+
+                    // Mark sleeper hits (top 10 by sleeper score that actually broke out)
+                    for player in sortedBySleeper do
+                        let isInTop10 = sleeperTop10 |> Array.exists (fun p -> p.Player = player.Player && p.Week = player.Week)
+                        player.SleeperHit <- isInTop10 && player.ActualBreakout
+
+                    // Sort by ML confidence and mark top 10 hits
+                    let sortedByML = players.ToArray() |> Array.sortByDescending (fun p -> p.MLConfidence)
+                    let mlTop10 = sortedByML |> Array.take (min 10 sortedByML.Length)
+
+                    // Mark ML hits (top 10 by ML confidence that actually broke out)
+                    for player in sortedByML do
+                        let isInTop10 = mlTop10 |> Array.exists (fun p -> p.Player = player.Player && p.Week = player.Week)
+                        player.MLHit <- isInTop10 && player.ActualBreakout
+
+                    let csvPath = Path.Combine(outputDirectory, sprintf "week_%d_predictions.csv" weekNum)
+                    weeklyOutputs.Add({
                         Week = weekNum
-                        MLConfidence = prediction.Probability
-                        SleeperScore = input.SleeperScore
-                        SleeperHit = false  // Will be calculated after sorting
-                        MLHit = false  // Will be calculated after sorting
-                        FpDelta = input.FpDelta
-                        ActualBreakout = actualBreakout
+                        FilePath = csvPath
+                        Players = players.ToArray()
                     })
 
-                // Sort by sleeper score and mark top 10 hits
-                let sortedBySleeper = players.ToArray() |> Array.sortByDescending (fun p -> p.SleeperScore)
-                let sleeperTop10 = sortedBySleeper |> Array.take (min 10 sortedBySleeper.Length)
+                    printfn "Processed Week %d: %d players" weekNum players.Count
+                | None -> ()
 
-                // Mark sleeper hits (top 10 by sleeper score that actually broke out)
-                for player in sortedBySleeper do
-                    let isInTop10 = sleeperTop10 |> Array.exists (fun p -> p.Player = player.Player && p.Week = player.Week)
-                    player.SleeperHit <- isInTop10 && player.ActualBreakout
-
-                // Sort by ML confidence and mark top 10 hits
-                let sortedByML = players.ToArray() |> Array.sortByDescending (fun p -> p.MLConfidence)
-                let mlTop10 = sortedByML |> Array.take (min 10 sortedByML.Length)
-
-                // Mark ML hits (top 10 by ML confidence that actually broke out)
-                for player in sortedByML do
-                    let isInTop10 = mlTop10 |> Array.exists (fun p -> p.Player = player.Player && p.Week = player.Week)
-                    player.MLHit <- isInTop10 && player.ActualBreakout
-
-                let csvPath = Path.Combine(outputDirectory, sprintf "week_%d_predictions.csv" weekNum)
-                weeklyOutputs.Add({
-                    Week = weekNum
-                    FilePath = csvPath
-                    Players = players.ToArray()
-                })
-
-                printfn "Processed Week %d: %d players" weekNum players.Count
-            | None -> ()
-
-        (weeklyOutputs.ToArray(), metrics.Accuracy, metrics.F1Score)
+            (weeklyOutputs.ToArray(), metrics.Accuracy, metrics.F1Score)
 
 let generateWeeklyCsvFiles (outputs: WeeklyCsvOutput[]) =
     printfn "\n=== GENERATING WEEKLY CSV FILES ==="

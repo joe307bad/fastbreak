@@ -222,6 +222,65 @@ Rscript scripts/second_year_sleepers.R 2025 3 --exclude-current-week-fp second_y
 
 The sleeper script will automatically detect and integrate the defense rankings file if it exists in the same directory, enhancing the sleeper scores with position-specific defensive matchup analysis.
 
+### Step 6: Visualize ML Predictions
+```bash
+Rscript scripts/visualize_predictions.R
+```
+Creates a visual table from weekly predictions JSON data:
+- **Input**: `weekly-predictions.json` (ML model output)
+- **Output**: `fantasy_predictions_table.png` (formatted table visualization)
+- **Features**:
+  - Displays top players by ML confidence
+  - Shows player name, position, ML confidence, and sleeper score
+  - Highlights top 10 predictions with green background
+  - Auto-sizes PNG to fit content width
+  - Responsive table formatting with professional styling
+
+**Required R packages**: `jsonlite`, `ggplot2`, `dplyr`, `gridExtra`, `grid`
+
+## Data Structures
+
+### Weekly Predictions JSON Format
+The `weekly-predictions.json` file contains ML model output with the following structure:
+
+```json
+{
+  "week": 4,
+  "totalPlayers": 15,
+  "allPlayers": [...],
+  "mlTop10Predictions": [
+    {
+      "player": "Braelon Allen",
+      "position": "RB",
+      "team": "Unknown",
+      "mlConfidence": 0.8,
+      "sleeperScore": 120,
+      "mlHit": false,
+      "sleeperHit": false,
+      "fpDelta": -6.7
+    }
+  ],
+  "sleeperTop10Predictions": [...],
+  "mlTop10Hits": 0,
+  "mlTop3Hits": 0,
+  "sleeperTop10Hits": 0,
+  "sleeperTop3Hits": 0,
+  "mlPrecisionTop10": 0,
+  "sleeperPrecisionTop10": 0
+}
+```
+
+**Key Fields**:
+- `week`: NFL week number
+- `totalPlayers`: Total number of players analyzed
+- `mlTop10Predictions`: Top 10 players by ML confidence score
+- `sleeperTop10Predictions`: Top 10 players by sleeper score
+- `player`: Player name
+- `position`: Player position (RB/WR/TE)
+- `mlConfidence`: ML model confidence score (0-1)
+- `sleeperScore`: Traditional sleeper ranking score
+- `fpDelta`: Fantasy points change from previous week
+
 ## Notes
 - All scripts include built-in rate limiting delays (1-3 seconds) to avoid API restrictions
 - Scripts require internet connection for data fetching

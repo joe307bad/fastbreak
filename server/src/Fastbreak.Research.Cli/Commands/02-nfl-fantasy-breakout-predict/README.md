@@ -20,40 +20,59 @@ dotnet run 02-nfl-fantasy-breakout --data /path/to/csv/directory --output /path/
 ### Example
 
 ```bash
-dotnet run 02-nfl-fantasy-breakout --data /Users/joebad/Source/fastbreak/pipeline/02-fantasy-breakout-predict/sleeper_analysis_2024 --output /Users/joebad/Source/fastbreak/pipeline/02-fantasy-breakout-predict/sleeper_analysis_2024/weekly_metrics.json
+dotnet run 02-nfl-fantasy-breakout --data pipeline/02-fantasy-breakout-predict/sleeper_analysis_2024 --output ./output-2024.json
 ```
 
 ## Complete Execution Workflow
 
 To generate weekly performance analysis and visualization:
 
-### Step 1: Generate Weekly Metrics JSON
-Run the F# command to analyze data and generate weekly hit counts:
-
-```bash
-cd server/src/Fastbreak.Research.Cli
-dotnet run 02-nfl-fantasy-breakout --data /path/to/sleeper_analysis_2024 --output /path/to/output/weekly_metrics.json
-```
-
-This generates:
-- Model performance analysis and comparison
-- Weekly metrics JSON file at the specified output location with three metrics per week:
-  - Top 10 sleeper score hits
-  - Top 3 sleeper score hits
-  - ML model successful predictions
-
-### Step 2: Generate Visualization
-Run the R script to create a comparative line graph:
+### Step 1: Generate Training Data with Sleeper Scores
+Run the R script to generate the season data including sleeper scores and features for ML training:
 
 ```bash
 cd pipeline/02-fantasy-breakout-predict
-Rscript scripts/plot_weekly_metrics.R sleeper_analysis_2024/weekly_metrics.csv output_plot.png
+Rscript scripts/run_sleeper_analysis_batch.R 2025 3 4
 ```
 
-This produces:
-- Multi-line graph comparing the three performance metrics over time
-- Summary statistics and efficiency ratios
-- High-resolution PNG plot for analysis
+Arguments: `<year> <start_week> <end_week>`
+- This generates CSV files with sleeper scores and raw training data
+- Output is saved in `sleeper_analysis_<year>/` directory
+- If batching multiple years/seasons, put all outputs in the same folder
+
+### Step 2: Generate Batch Predictions and Visualizations
+The batch script from Step 1 automatically generates:
+- PNG visualizations for each week's predictions
+- CSV files with detailed weekly predictions and results
+- All outputs saved in the `sleeper_analysis_<year>/` directory
+
+### Step 3: Train ML Model and Generate Summary Comparison
+Run the F# command to train the ML model and compare with sleeper scores:
+
+```bash
+cd server/src/Fastbreak.Research.Cli
+dotnet run 02-nfl-fantasy-breakout -d pipeline/02-fantasy-breakout-predict/sleeper_analysis_2024 -o ./output-2025.json
+```
+
+### Step 4: Generate PNG of the current weeks predictions with sleeper score + model confidence
+Take a single week from the `output-2024.json` from the `dotnet run 02-nfl-fantasy-breakout` result and paste it into its own `json` file at `pipeline/02-fantasy-breakout-predict/weekly-predictions.json`. Then run the following command to get a PNG of the predictions for the coming week to show off to your friends.
+
+```
+cd pipeline/02-fantasy-breakout-predict
+Rscript scripts/visualize_predictions.R
+```
+
+Arguments:
+- `-d`: Directory containing the output from Steps 1-2 (sleeper analysis data)
+- `-o`: Output path for the summary JSON comparing sleeper score with ML rankings
+
+This generates:
+- ML model training and evaluation
+- Summary JSON with weekly metrics comparing:
+  - Top 10 sleeper score hits
+  - Top 3 sleeper score hits
+  - ML model successful predictions
+- Performance comparison between methodologies
 
 ## What It Does
 
@@ -182,8 +201,6 @@ The tool expects CSV files in the specified directory with the following structu
 - **Input Data**: CSV files from R-based breakout prediction pipeline
 
 ## Performance Benchmarks
-
-⚠️ **INTERPRETATION WARNING**: These results compare baseline sleeper scoring vs enhanced sleeper scoring, NOT composite vs machine learning methodologies.
 
 Based on 2024 NFL season data (243 total records):
 - **Enhanced Composite Model**: 71.2% accuracy, 51.6% precision, 72.7% recall

@@ -3,7 +3,10 @@ module Fastbreak.Research.Cli.Commands.NflFantasyBreakoutPredict.NflFantasyBreak
 open Argu
 open System
 open System.IO
+open System.Text.Json
+open System.Text.Json.Serialization
 open Fastbreak.Research.Cli.Commands.NflFantasyBreakoutPredict.FantasyBreakoutTrainer
+open Fastbreak.Research.Cli.Commands.NflFantasyBreakoutPredict.MLNetBreakoutClassifier
 
 type CsvInfo = {
     FileName: string
@@ -74,180 +77,258 @@ let extractWeekNumber (fileName: string) =
     with
     | _ -> None
 
-let generateWeeklyMetricsJson (rawFiles: string[]) (sleeperFiles: string[]) (outputPath: string) =
+// Define types for JSON structure
+type PlayerPrediction = {
+    [<JsonPropertyName("player")>] Player: string
+    [<JsonPropertyName("position")>] Position: string
+    [<JsonPropertyName("team")>] Team: string
+    [<JsonPropertyName("mlConfidence")>] MLConfidence: float32
+    [<JsonPropertyName("sleeperScore")>] SleeperScore: float32
+    [<JsonPropertyName("mlHit")>] MLHit: bool
+    [<JsonPropertyName("sleeperHit")>] SleeperHit: bool
+    [<JsonPropertyName("fpDelta")>] FpDelta: float32
+}
+
+type WeeklyPrediction = {
+    [<JsonPropertyName("week")>] Week: int
+    [<JsonPropertyName("totalPlayers")>] TotalPlayers: int
+    [<JsonPropertyName("mlTop10Predictions")>] MLTop10Predictions: PlayerPrediction[]
+    [<JsonPropertyName("sleeperTop10Predictions")>] SleeperTop10Predictions: PlayerPrediction[]
+    [<JsonPropertyName("mlTop10Hits")>] MLTop10Hits: int
+    [<JsonPropertyName("mlTop3Hits")>] MLTop3Hits: int
+    [<JsonPropertyName("sleeperTop10Hits")>] SleeperTop10Hits: int
+    [<JsonPropertyName("sleeperTop3Hits")>] SleeperTop3Hits: int
+    [<JsonPropertyName("mlPrecisionTop10")>] MLPrecisionTop10: float
+    [<JsonPropertyName("sleeperPrecisionTop10")>] SleeperPrecisionTop10: float
+}
+
+type CaseStudyExample = {
+    [<JsonPropertyName("player")>] Player: string
+    [<JsonPropertyName("position")>] Position: string
+    [<JsonPropertyName("team")>] Team: string
+    [<JsonPropertyName("week")>] Week: int
+    [<JsonPropertyName("mlConfidence")>] MLConfidence: float32
+    [<JsonPropertyName("sleeperScore")>] SleeperScore: float32
+    [<JsonPropertyName("fpDelta")>] FpDelta: float32
+    [<JsonPropertyName("analysis")>] Analysis: string
+}
+
+type CaseStudy = {
+    [<JsonPropertyName("biggestMLSuccesses")>] BiggestMLSuccesses: CaseStudyExample[]
+    [<JsonPropertyName("biggestSleeperMisses")>] BiggestSleeperMisses: CaseStudyExample[]
+    [<JsonPropertyName("highConfidenceMLHits")>] HighConfidenceMLHits: CaseStudyExample[]
+}
+
+type OverallStats = {
+    [<JsonPropertyName("totalAnalyzedGames")>] TotalAnalyzedGames: int
+    [<JsonPropertyName("totalAnalyzedPlayers")>] TotalAnalyzedPlayers: int
+    [<JsonPropertyName("totalWeeks")>] TotalWeeks: int
+    [<JsonPropertyName("mlTotalTop10Hits")>] MLTotalTop10Hits: int
+    [<JsonPropertyName("mlTotalTop10Opportunities")>] MLTotalTop10Opportunities: int
+    [<JsonPropertyName("mlAccuracyTop10")>] MLAccuracyTop10: float
+    [<JsonPropertyName("sleeperTotalTop10Hits")>] SleeperTotalTop10Hits: int
+    [<JsonPropertyName("sleeperTotalTop10Opportunities")>] SleeperTotalTop10Opportunities: int
+    [<JsonPropertyName("sleeperAccuracyTop10")>] SleeperAccuracyTop10: float
+}
+
+type ComprehensiveOutput = {
+    [<JsonPropertyName("generatedAt")>] GeneratedAt: string
+    [<JsonPropertyName("overallStats")>] OverallStats: OverallStats
+    [<JsonPropertyName("caseStudy")>] CaseStudy: CaseStudy
+    [<JsonPropertyName("weeklyPredictions")>] WeeklyPredictions: WeeklyPrediction[]
+}
+
+let generateComprehensiveJson (weeklyOutputs: WeeklyCsvOutput[]) (outputPath: string) =
     try
-        printfn "\n=== GENERATING WEEKLY METRICS JSON ==="
+        printfn "\n=== GENERATING COMPREHENSIVE JSON OUTPUT ==="
 
-        // Group files by week
-        let weeklyRawFiles =
-            rawFiles
-            |> Array.choose (fun f ->
-                match extractWeekNumber (Path.GetFileName(f)) with
-                | Some week -> Some (week, f)
-                | None -> None)
-            |> Array.groupBy fst
-            |> Map.ofArray
+        // Process each week's data
+        let weeklyPredictions = ResizeArray<WeeklyPrediction>()
+        let mutable totalMLHits = 0
+        let mutable totalSleeperHits = 0
+        let mutable totalMLOpportunities = 0
+        let mutable totalSleeperOpportunities = 0
+        let mutable totalPlayers = 0
 
-        let weeklySleeperFiles =
-            sleeperFiles
-            |> Array.choose (fun f ->
-                match extractWeekNumber (Path.GetFileName(f)) with
-                | Some week -> Some (week, f)
-                | None -> None)
-            |> Array.groupBy fst
-            |> Map.ofArray
+        for output in weeklyOutputs |> Array.sortBy (fun o -> o.Week) do
+            let sortedByML = output.Players |> Array.sortByDescending (fun p -> p.MLConfidence)
+            let sortedBySleeper = output.Players |> Array.sortByDescending (fun p -> p.SleeperScore)
 
-        let allWeeks =
-            [weeklyRawFiles.Keys; weeklySleeperFiles.Keys]
-            |> Seq.concat
-            |> Set.ofSeq
-            |> Set.toArray
-            |> Array.sort
+            let mlTop10 = sortedByML |> Array.take (min 10 sortedByML.Length)
+            let mlTop3 = sortedByML |> Array.take (min 3 sortedByML.Length)
+            let sleeperTop10 = sortedBySleeper |> Array.take (min 10 sortedBySleeper.Length)
+            let sleeperTop3 = sortedBySleeper |> Array.take (min 3 sortedBySleeper.Length)
 
-        let weeklyMetrics = ResizeArray<WeeklyMetrics>()
+            let mlTop10Hits = mlTop10 |> Array.filter (fun p -> p.ActualBreakout) |> Array.length
+            let mlTop3Hits = mlTop3 |> Array.filter (fun p -> p.ActualBreakout) |> Array.length
+            let sleeperTop10Hits = sleeperTop10 |> Array.filter (fun p -> p.ActualBreakout) |> Array.length
+            let sleeperTop3Hits = sleeperTop3 |> Array.filter (fun p -> p.ActualBreakout) |> Array.length
 
-        for week in allWeeks do
-            printfn "Processing week %d..." week
+            totalMLHits <- totalMLHits + mlTop10Hits
+            totalSleeperHits <- totalSleeperHits + sleeperTop10Hits
+            totalMLOpportunities <- totalMLOpportunities + mlTop10.Length
+            totalSleeperOpportunities <- totalSleeperOpportunities + sleeperTop10.Length
+            totalPlayers <- totalPlayers + output.Players.Length
 
-            let topTenHits = ref 0
-            let topThreeHits = ref 0
-            let mlHits = ref 0
+            let mlPrecisionTop10 = if mlTop10.Length > 0 then float mlTop10Hits / float mlTop10.Length else 0.0
+            let sleeperPrecisionTop10 = if sleeperTop10.Length > 0 then float sleeperTop10Hits / float sleeperTop10.Length else 0.0
 
-            // Process sleeper score files for this week
-            match weeklySleeperFiles.TryFind week with
-            | Some weekFiles ->
-                for (_, sleeperFile) in weekFiles do
-                    try
-                        let lines = File.ReadAllLines(sleeperFile)
-                        if lines.Length > 1 then
-                            let header = lines.[0].Split(',')
-                            let hitStatusIdx = Array.tryFindIndex ((=) "hit_status") header
-                            let sleeperRankIdx = Array.tryFindIndex ((=) "sleeper_rank") header
+            // Convert to JSON types
+            let convertToJsonPlayer (p: PlayerPredictionOutput) =
+                {
+                    Player = p.Player
+                    Position = p.Position
+                    Team = p.Team
+                    MLConfidence = p.MLConfidence
+                    SleeperScore = p.SleeperScore
+                    MLHit = p.MLHit
+                    SleeperHit = p.SleeperHit
+                    FpDelta = p.FpDelta
+                }
 
-                            match hitStatusIdx, sleeperRankIdx with
-                            | Some hitIdx, Some rankIdx ->
-                                let allHits =
-                                    lines.[1..]
-                                    |> Array.choose (fun line ->
-                                        let fields = line.Split(',')
-                                        if fields.Length > max hitIdx rankIdx then
-                                            let hitStatus = if hitIdx < fields.Length then fields.[hitIdx].Trim() else ""
-                                            let isHit = hitStatus = "HIT"
-                                            let rank =
-                                                match System.Int32.TryParse(fields.[rankIdx]) with
-                                                | true, r -> Some r
-                                                | false, _ -> None
-                                            match rank with
-                                            | Some r when isHit -> Some (r, isHit)
-                                            | _ -> None
-                                        else None)
-
-                                // Count hits in top 10 and top 3 ranks
-                                let top10Hits = allHits |> Array.filter (fun (rank, _) -> rank <= 10) |> Array.length
-                                let top3Hits = allHits |> Array.filter (fun (rank, _) -> rank <= 3) |> Array.length
-
-                                topTenHits := !topTenHits + top10Hits
-                                topThreeHits := !topThreeHits + top3Hits
-                            | _ ->
-                                printfn "Warning: hit_status or sleeper_rank column not found in %s" sleeperFile
-                    with
-                    | ex -> printfn "Error processing sleeper file %s: %s" sleeperFile ex.Message
-            | None -> ()
-
-            // Process ML model predictions for this week
-            match weeklyRawFiles.TryFind week with
-            | Some weekFiles ->
-                let weeklyMLPredictions = ResizeArray<{| CombinedScore: float32; ActualBreakout: bool |}>()
-
-                for (_, rawFile) in weekFiles do
-                    try
-                        let lines = File.ReadAllLines(rawFile)
-                        if lines.Length > 1 then
-                            let header = lines.[0].Split(',')
-                            let fpDeltaIdx = Array.tryFindIndex ((=) "fp_delta") header
-                            let sleeperScoreIdx = Array.tryFindIndex ((=) "sleeper_score") header
-                            let prevWeekFpIdx = Array.tryFindIndex ((=) "prev_week_fp") header
-
-                            match fpDeltaIdx, sleeperScoreIdx, prevWeekFpIdx with
-                            | Some fpIdx, Some sleeperIdx, Some prevFpIdx ->
-                                for line in lines.[1..] do
-                                    let fields = line.Split(',')
-                                    if fields.Length > max fpIdx (max sleeperIdx prevFpIdx) then
-                                        let fpDelta =
-                                            match System.Single.TryParse(fields.[fpIdx]) with
-                                            | true, x -> x
-                                            | false, _ -> 0.0f
-
-                                        let sleeperScore =
-                                            match System.Single.TryParse(fields.[sleeperIdx]) with
-                                            | true, x -> x
-                                            | false, _ -> 0.0f
-
-                                        let prevWeekFp =
-                                            match System.Single.TryParse(fields.[prevFpIdx]) with
-                                            | true, x -> x
-                                            | false, _ -> 0.0f
-
-                                        // Apply simple ML model logic
-                                        let snapScore = if prevWeekFp > 0.0f then 1.0f else 0.0f
-                                        let momentumScore = if fpDelta > 0.0f then 1.0f else 0.0f
-                                        let sleeperNormalized = sleeperScore / 200.0f
-                                        let combinedScore = (sleeperNormalized * 0.6f) + (snapScore * 0.2f) + (momentumScore * 0.2f)
-                                        let actualBreakout = fpDelta >= 5.0f // Using same threshold as trainer
-
-                                        // Store all predictions with their scores for ranking
-                                        weeklyMLPredictions.Add({| CombinedScore = combinedScore; ActualBreakout = actualBreakout |})
-                            | _ -> ()
-                    with
-                    | ex -> printfn "Error processing raw file %s: %s" rawFile ex.Message
-
-                // Sort by combined score descending and take top 10 predictions (like sleeper top 10)
-                let allPredictionsArray = weeklyMLPredictions.ToArray()
-                let top10MLPredictions =
-                    allPredictionsArray
-                    |> Array.sortByDescending (fun p -> p.CombinedScore)
-                    |> Array.take (min 10 allPredictionsArray.Length)
-
-                // Count hits only from top 10 ML predictions (fair comparison with sleeper top 10)
-                let top10MLHits =
-                    top10MLPredictions
-                    |> Array.filter (fun p -> p.ActualBreakout)
-                    |> Array.length
-
-                mlHits := !mlHits + top10MLHits
-            | None -> ()
-
-            weeklyMetrics.Add({
-                Week = week
-                TopTenSleeperHits = !topTenHits
-                TopThreeSleeperHits = !topThreeHits
-                MLModelSuccessfulHits = !mlHits
+            weeklyPredictions.Add({
+                Week = output.Week
+                TotalPlayers = output.Players.Length
+                MLTop10Predictions = mlTop10 |> Array.map convertToJsonPlayer
+                SleeperTop10Predictions = sleeperTop10 |> Array.map convertToJsonPlayer
+                MLTop10Hits = mlTop10Hits
+                MLTop3Hits = mlTop3Hits
+                SleeperTop10Hits = sleeperTop10Hits
+                SleeperTop3Hits = sleeperTop3Hits
+                MLPrecisionTop10 = mlPrecisionTop10
+                SleeperPrecisionTop10 = sleeperPrecisionTop10
             })
 
-        // Write JSON file
-        let jsonPath = outputPath
-        let jsonObjects = ResizeArray<string>()
+        let mlAccuracy = if totalMLOpportunities > 0 then float totalMLHits / float totalMLOpportunities else 0.0
+        let sleeperAccuracy = if totalSleeperOpportunities > 0 then float totalSleeperHits / float totalSleeperOpportunities else 0.0
 
-        for metrics in weeklyMetrics do
-            let jsonObject = sprintf "        { Week: %d, TopTenSleeperHits: %d, TopThreeSleeperHits: %d, MLModelSuccessfulHits: %d }" metrics.Week metrics.TopTenSleeperHits metrics.TopThreeSleeperHits metrics.MLModelSuccessfulHits
-            jsonObjects.Add(jsonObject)
+        // Generate case study examples
+        let allPlayers = ResizeArray<{| Player: PlayerPredictionOutput; Week: int |}>()
+        for output in weeklyOutputs do
+            for player in output.Players do
+                allPlayers.Add({| Player = player; Week = output.Week |})
 
-        let jsonContent = "[\n" + String.concat ",\n" jsonObjects + "\n    ];"
-        File.WriteAllText(jsonPath, jsonContent)
+        // Find biggest ML successes (High ML confidence AND they actually broke out with high FP delta)
+        let biggestMLSuccesses =
+            allPlayers
+            |> Seq.filter (fun p -> p.Player.MLConfidence >= 0.45f && p.Player.ActualBreakout)
+            |> Seq.sortByDescending (fun p -> p.Player.FpDelta)
+            |> Seq.take (min 5 (allPlayers |> Seq.filter (fun p -> p.Player.MLConfidence >= 0.45f && p.Player.ActualBreakout) |> Seq.length))
+            |> Seq.map (fun p -> {
+                Player = p.Player.Player
+                Position = p.Player.Position
+                Team = p.Player.Team
+                Week = p.Week
+                MLConfidence = p.Player.MLConfidence
+                SleeperScore = p.Player.SleeperScore
+                FpDelta = p.Player.FpDelta
+                Analysis = sprintf "ML model showed high confidence (%.1f%%) in this %.1f-point breakout while Sleeper score was %.0f"
+                    (p.Player.MLConfidence * 100.0f)
+                    p.Player.FpDelta
+                    p.Player.SleeperScore
+            })
+            |> Array.ofSeq
 
-        printfn "Weekly metrics JSON generated: %s" jsonPath
-        printfn "Contains %d weeks of data" weeklyMetrics.Count
+        // Find biggest Sleeper misses (cases where sleeper didn't get the hit in top 10)
+        let biggestSleeperMisses =
+            allPlayers
+            |> Seq.filter (fun p ->
+                not p.Player.SleeperHit && p.Player.ActualBreakout && p.Player.FpDelta >= 15.0f)
+            |> Seq.sortByDescending (fun p -> p.Player.FpDelta)
+            |> Seq.take (min 5 (allPlayers |> Seq.filter (fun p ->
+                not p.Player.SleeperHit && p.Player.ActualBreakout && p.Player.FpDelta >= 15.0f) |> Seq.length))
+            |> Seq.map (fun p -> {
+                Player = p.Player.Player
+                Position = p.Player.Position
+                Team = p.Player.Team
+                Week = p.Week
+                MLConfidence = p.Player.MLConfidence
+                SleeperScore = p.Player.SleeperScore
+                FpDelta = p.Player.FpDelta
+                Analysis = if not p.Player.SleeperHit && p.Player.ActualBreakout then
+                            sprintf "Sleeper missed this major %.1f-point breakout (score: %.0f) while ML model showed %.1f%% confidence"
+                                p.Player.FpDelta p.Player.SleeperScore (p.Player.MLConfidence * 100.0f)
+                           else
+                            sprintf "Sleeper score was %.0f for this %.1f-point outcome while ML model showed %.1f%% confidence"
+                                p.Player.SleeperScore p.Player.FpDelta (p.Player.MLConfidence * 100.0f)
+            })
+            |> Array.ofSeq
 
-        // Print summary
-        printfn "\nWeekly Metrics Summary:"
-        printfn "%-4s %-15s %-17s %-18s" "Week" "Top10 Sleeper" "Top3 Sleeper" "ML Model Hits"
-        printfn "%s" (String.replicate 60 "-")
-        for metrics in weeklyMetrics do
-            printfn "%-4d %-15d %-17d %-18d" metrics.Week metrics.TopTenSleeperHits metrics.TopThreeSleeperHits metrics.MLModelSuccessfulHits
+        // Find cases where ML model was significantly more confident than Sleeper score warranted
+        let highConfidenceMLHits =
+            allPlayers
+            |> Seq.filter (fun p ->
+                p.Player.ActualBreakout &&
+                p.Player.MLConfidence >= 0.4f &&
+                (p.Player.MLConfidence * 100.0f) > p.Player.SleeperScore)
+            |> Seq.sortByDescending (fun p -> p.Player.MLConfidence - (p.Player.SleeperScore / 100.0f))
+            |> Seq.take (min 5 (allPlayers |> Seq.filter (fun p ->
+                p.Player.ActualBreakout &&
+                p.Player.MLConfidence >= 0.4f &&
+                (p.Player.MLConfidence * 100.0f) > p.Player.SleeperScore) |> Seq.length))
+            |> Seq.map (fun p -> {
+                Player = p.Player.Player
+                Position = p.Player.Position
+                Team = p.Player.Team
+                Week = p.Week
+                MLConfidence = p.Player.MLConfidence
+                SleeperScore = p.Player.SleeperScore
+                FpDelta = p.Player.FpDelta
+                Analysis = sprintf "ML model showed better intuition: %.1f%% confidence vs Sleeper's %.0f score for this %.1f-point breakout"
+                    (p.Player.MLConfidence * 100.0f)
+                    p.Player.SleeperScore
+                    p.Player.FpDelta
+            })
+            |> Array.ofSeq
+
+        let caseStudy = {
+            BiggestMLSuccesses = biggestMLSuccesses
+            BiggestSleeperMisses = biggestSleeperMisses
+            HighConfidenceMLHits = highConfidenceMLHits
+        }
+
+        let comprehensiveOutput = {
+            GeneratedAt = System.DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")
+            OverallStats = {
+                TotalAnalyzedGames = weeklyPredictions.Count
+                TotalAnalyzedPlayers = totalPlayers
+                TotalWeeks = weeklyPredictions.Count
+                MLTotalTop10Hits = totalMLHits
+                MLTotalTop10Opportunities = totalMLOpportunities
+                MLAccuracyTop10 = mlAccuracy
+                SleeperTotalTop10Hits = totalSleeperHits
+                SleeperTotalTop10Opportunities = totalSleeperOpportunities
+                SleeperAccuracyTop10 = sleeperAccuracy
+            }
+            CaseStudy = caseStudy
+            WeeklyPredictions = weeklyPredictions.ToArray()
+        }
+
+        // Serialize to JSON with pretty printing
+        let options = JsonSerializerOptions()
+        options.WriteIndented <- true
+
+        let jsonString = JsonSerializer.Serialize(comprehensiveOutput, options)
+        File.WriteAllText(outputPath, jsonString)
+
+        printfn "Comprehensive JSON output generated: %s" outputPath
+        printfn "\n=== OVERALL STATISTICS ==="
+        printfn "Total Analyzed Weeks: %d" comprehensiveOutput.OverallStats.TotalWeeks
+        printfn "Total Analyzed Players: %d" comprehensiveOutput.OverallStats.TotalAnalyzedPlayers
+        printfn "\nML Model Performance:"
+        printfn "  Top 10 Hits: %d / %d (%.1f%% accuracy)"
+            comprehensiveOutput.OverallStats.MLTotalTop10Hits
+            comprehensiveOutput.OverallStats.MLTotalTop10Opportunities
+            (comprehensiveOutput.OverallStats.MLAccuracyTop10 * 100.0)
+        printfn "\nSleeper Score Performance:"
+        printfn "  Top 10 Hits: %d / %d (%.1f%% accuracy)"
+            comprehensiveOutput.OverallStats.SleeperTotalTop10Hits
+            comprehensiveOutput.OverallStats.SleeperTotalTop10Opportunities
+            (comprehensiveOutput.OverallStats.SleeperAccuracyTop10 * 100.0)
 
     with
     | ex ->
-        printfn "Error generating weekly metrics JSON: %s" ex.Message
+        printfn "Error generating comprehensive JSON: %s" ex.Message
         printfn "Stack trace: %s" ex.StackTrace
 
 let runNflFantasyBreakout (args: ParseResults<'T>) =
@@ -261,10 +342,10 @@ let runNflFantasyBreakout (args: ParseResults<'T>) =
         let dataPath = argStrings.[i + 1]
         let outputPath = argStrings.[o + 1]
 
-        printfn "NFL Fantasy Breakout ML Data Analysis"
-        printfn "======================================"
+        printfn "NFL Fantasy Breakout ML.NET Classification Analysis"
+        printfn "===================================================="
         printfn "Data Directory: %s" dataPath
-        printfn "Output CSV: %s" outputPath
+        printfn "Output Directory: %s" outputPath
         printfn ""
 
         if not (Directory.Exists(dataPath)) then
@@ -356,35 +437,40 @@ let runNflFantasyBreakout (args: ParseResults<'T>) =
                 printfn "- Target labels: %d files with %d total records" sleeperFiles.Length (if sleeperFiles.Length > 0 then Array.sumBy (fun info -> info.LineCount - 1) (sleeperFiles |> Array.choose analyzeCsvFile) else 0)
                 printfn ""
 
-                // Train ML.NET model
+                // Train ML.NET binary classification model
                 if rawFiles.Length > 0 then
                     try
-                        printfn "=== STARTING ML TRAINING ==="
-                        let (result, predictions) = trainModel rawFiles sleeperFiles
+                        // Create output directory if it doesn't exist
+                        let outputDir = Path.GetDirectoryName(outputPath)
+                        if not (String.IsNullOrEmpty(outputDir)) && not (Directory.Exists(outputDir)) then
+                            Directory.CreateDirectory(outputDir) |> ignore
+
+                        printfn "=== STARTING ML.NET BINARY CLASSIFICATION ==="
+
+                        // Train the ML.NET classifier and get weekly outputs
+                        let (weeklyOutputs, accuracy, f1Score) = trainMLNetClassifier rawFiles outputDir
+
+                        // Generate comprehensive JSON output only
+                        generateComprehensiveJson weeklyOutputs outputPath
 
                         printfn "\n=== FINAL RESULTS ==="
-                        printfn "Model Performance:"
-                        printfn "- Training Accuracy: %.1f%%" (result.TrainAccuracy * 100.0)
-                        printfn "- Test Accuracy: %.1f%%" (result.TestAccuracy * 100.0)
-                        printfn "- Precision: %.1f%%" (result.Precision * 100.0)
-                        printfn "- Recall: %.1f%%" (result.Recall * 100.0)
-                        printfn "- F1 Score: %.3f" result.F1Score
+                        printfn "ML.NET Model Performance:"
+                        printfn "- Test Accuracy: %.2f%%" (accuracy * 100.0)
+                        printfn "- F1 Score: %.3f" f1Score
                         printfn ""
-                        printfn "Data Split:"
-                        printfn "- Training: %d records" result.TrainCount
-                        printfn "- Testing: %d records" result.TestCount
-                        printfn "- Breakouts in test set: %d" result.BreakoutCount
+                        printfn "Output File:"
+                        printfn "- Comprehensive JSON: %s" outputPath
 
-                        // Print prediction analysis
-                        printPredictionSummary predictions
-
-                        // Generate weekly metrics JSON
-                        generateWeeklyMetricsJson rawFiles sleeperFiles outputPath
+                        // Also run the comparison with simple models for reference
+                        printfn "\n=== COMPARISON WITH SIMPLE MODELS ==="
+                        let (simpleResult, _) = trainModel rawFiles sleeperFiles
+                        printfn "Simple ML Model Accuracy: %.2f%%" (simpleResult.TestAccuracy * 100.0)
+                        printfn "Sleeper Score Baseline: %.2f%%" (simpleResult.Precision * 100.0)
 
                         0
                     with
                     | ex ->
-                        printfn "ERROR during ML training: %s" ex.Message
+                        printfn "ERROR during ML.NET training: %s" ex.Message
                         printfn "Stack trace: %s" ex.StackTrace
                         1
                 else
@@ -392,9 +478,9 @@ let runNflFantasyBreakout (args: ParseResults<'T>) =
                     0
     | _, _ ->
         printfn "ERROR: Both --data and --output arguments are required"
-        printfn "Usage: dotnet run 02-nfl-fantasy-breakout --data /path/to/csv/directory --output /path/to/output.json"
+        printfn "Usage: dotnet run 02-nfl-fantasy-breakout --data /path/to/csv/directory --output /path/to/output/directory"
         printfn ""
         printfn "Arguments:"
         printfn "  --data, -d     Directory containing CSV files from the fantasy breakout prediction pipeline"
-        printfn "  --output, -o   Path where the weekly metrics JSON file should be saved"
+        printfn "  --output, -o   Directory where the weekly CSV files and summary report should be saved"
         1

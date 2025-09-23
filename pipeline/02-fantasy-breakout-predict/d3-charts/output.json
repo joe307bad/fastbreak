@@ -1,0 +1,3303 @@
+{
+  "generatedAt": "2025-09-21 19:54:11",
+  "overallStats": {
+    "totalAnalyzedGames": 15,
+    "totalAnalyzedPlayers": 243,
+    "totalWeeks": 15,
+    "mlTotalTop10Hits": 70,
+    "mlTotalTop10Opportunities": 150,
+    "mlAccuracyTop10": 0.4666666666666667,
+    "sleeperTotalTop10Hits": 50,
+    "sleeperTotalTop10Opportunities": 150,
+    "sleeperAccuracyTop10": 0.3333333333333333
+  },
+  "caseStudy": {
+    "biggestMLSuccesses": [
+      {
+        "player": "Chase Brown",
+        "position": "RB",
+        "team": "CIN",
+        "week": 13,
+        "mlConfidence": 0.4811857,
+        "sleeperScore": 84,
+        "fpDelta": 19,
+        "analysis": "ML model showed high confidence (48.1%) in this 19.0-point breakout while Sleeper score was 84"
+      },
+      {
+        "player": "Andrei Iosivas",
+        "position": "WR",
+        "team": "CIN",
+        "week": 9,
+        "mlConfidence": 0.45240688,
+        "sleeperScore": 93,
+        "fpDelta": 8,
+        "analysis": "ML model showed high confidence (45.2%) in this 8.0-point breakout while Sleeper score was 93"
+      }
+    ],
+    "biggestSleeperMisses": [
+      {
+        "player": "Jordan Addison",
+        "position": "WR",
+        "team": "MIN",
+        "week": 14,
+        "mlConfidence": 0.3684334,
+        "sleeperScore": 76,
+        "fpDelta": 29.9,
+        "analysis": "Sleeper missed this major 29.9-point breakout (score: 76) while ML model showed 36.8% confidence"
+      },
+      {
+        "player": "Jordan Addison",
+        "position": "WR",
+        "team": "Unknown",
+        "week": 4,
+        "mlConfidence": 0.3946176,
+        "sleeperScore": 66,
+        "fpDelta": 22.9,
+        "analysis": "Sleeper missed this major 22.9-point breakout (score: 66) while ML model showed 39.5% confidence"
+      },
+      {
+        "player": "Quentin Johnston",
+        "position": "WR",
+        "team": "LAC",
+        "week": 9,
+        "mlConfidence": 0.3735944,
+        "sleeperScore": 57,
+        "fpDelta": 22,
+        "analysis": "Sleeper missed this major 22.0-point breakout (score: 57) while ML model showed 37.4% confidence"
+      },
+      {
+        "player": "Jaxon Smith-Njigba",
+        "position": "WR",
+        "team": "SEA",
+        "week": 11,
+        "mlConfidence": 0.44534585,
+        "sleeperScore": 67,
+        "fpDelta": 21.8,
+        "analysis": "Sleeper missed this major 21.8-point breakout (score: 67) while ML model showed 44.5% confidence"
+      },
+      {
+        "player": "Josh Downs",
+        "position": "WR",
+        "team": "IND",
+        "week": 8,
+        "mlConfidence": 0.37533706,
+        "sleeperScore": 68,
+        "fpDelta": 20.9,
+        "analysis": "Sleeper missed this major 20.9-point breakout (score: 68) while ML model showed 37.5% confidence"
+      }
+    ],
+    "highConfidenceMLHits": []
+  },
+  "weeklyPredictions": [
+    {
+      "week": 3,
+      "totalPlayers": 19,
+      "mlTop10Predictions": [
+        {
+          "player": "Chase Brown",
+          "position": "RB",
+          "team": "CIN",
+          "mlConfidence": 0.41313562,
+          "sleeperScore": 112,
+          "mlHit": true,
+          "sleeperHit": true,
+          "fpDelta": 5.8
+        },
+        {
+          "player": "Demario Douglas",
+          "position": "WR",
+          "team": "NE",
+          "mlConfidence": 0.40400803,
+          "sleeperScore": 100,
+          "mlHit": true,
+          "sleeperHit": true,
+          "fpDelta": 14.8
+        },
+        {
+          "player": "Jaleel McLaughlin",
+          "position": "RB",
+          "team": "DEN",
+          "mlConfidence": 0.40323597,
+          "sleeperScore": 98,
+          "mlHit": true,
+          "sleeperHit": true,
+          "fpDelta": 7.8
+        },
+        {
+          "player": "Roschon Johnson",
+          "position": "RB",
+          "team": "CHI",
+          "mlConfidence": 0.39409435,
+          "sleeperScore": 101,
+          "mlHit": true,
+          "sleeperHit": true,
+          "fpDelta": 10.2
+        },
+        {
+          "player": "Tre Tucker",
+          "position": "WR",
+          "team": "LV",
+          "mlConfidence": 0.39388427,
+          "sleeperScore": 79,
+          "mlHit": true,
+          "sleeperHit": false,
+          "fpDelta": 19.3
+        },
+        {
+          "player": "Emanuel Wilson",
+          "position": "RB",
+          "team": "GB",
+          "mlConfidence": 0.3797263,
+          "sleeperScore": 113,
+          "mlHit": true,
+          "sleeperHit": true,
+          "fpDelta": 15.6
+        },
+        {
+          "player": "Josh Downs",
+          "position": "WR",
+          "team": "IND",
+          "mlConfidence": 0.36455697,
+          "sleeperScore": 81,
+          "mlHit": true,
+          "sleeperHit": false,
+          "fpDelta": 5.2
+        },
+        {
+          "player": "Luke Musgrave",
+          "position": "TE",
+          "team": "GB",
+          "mlConfidence": 0.36278284,
+          "sleeperScore": 51,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": -0.3
+        },
+        {
+          "player": "Michael Wilson",
+          "position": "WR",
+          "team": "ARI",
+          "mlConfidence": 0.3589551,
+          "sleeperScore": 88,
+          "mlHit": true,
+          "sleeperHit": true,
+          "fpDelta": 9.3
+        },
+        {
+          "player": "Tucker Kraft",
+          "position": "TE",
+          "team": "GB",
+          "mlConfidence": 0.35616848,
+          "sleeperScore": 59,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": 0.8
+        }
+      ],
+      "sleeperTop10Predictions": [
+        {
+          "player": "Emanuel Wilson",
+          "position": "RB",
+          "team": "GB",
+          "mlConfidence": 0.3797263,
+          "sleeperScore": 113,
+          "mlHit": true,
+          "sleeperHit": true,
+          "fpDelta": 15.6
+        },
+        {
+          "player": "Chase Brown",
+          "position": "RB",
+          "team": "CIN",
+          "mlConfidence": 0.41313562,
+          "sleeperScore": 112,
+          "mlHit": true,
+          "sleeperHit": true,
+          "fpDelta": 5.8
+        },
+        {
+          "player": "Roschon Johnson",
+          "position": "RB",
+          "team": "CHI",
+          "mlConfidence": 0.39409435,
+          "sleeperScore": 101,
+          "mlHit": true,
+          "sleeperHit": true,
+          "fpDelta": 10.2
+        },
+        {
+          "player": "Demario Douglas",
+          "position": "WR",
+          "team": "NE",
+          "mlConfidence": 0.40400803,
+          "sleeperScore": 100,
+          "mlHit": true,
+          "sleeperHit": true,
+          "fpDelta": 14.8
+        },
+        {
+          "player": "Jaleel McLaughlin",
+          "position": "RB",
+          "team": "DEN",
+          "mlConfidence": 0.40323597,
+          "sleeperScore": 98,
+          "mlHit": true,
+          "sleeperHit": true,
+          "fpDelta": 7.8
+        },
+        {
+          "player": "Xavier Gipson",
+          "position": "WR",
+          "team": "NYJ",
+          "mlConfidence": 0.2876314,
+          "sleeperScore": 98,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": 3.6
+        },
+        {
+          "player": "Deuce Vaughn",
+          "position": "RB",
+          "team": "DAL",
+          "mlConfidence": 0.31882972,
+          "sleeperScore": 92,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": -0.4
+        },
+        {
+          "player": "Tyler Scott",
+          "position": "WR",
+          "team": "CHI",
+          "mlConfidence": 0.26505512,
+          "sleeperScore": 92,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": 0
+        },
+        {
+          "player": "Trey Palmer",
+          "position": "WR",
+          "team": "TB",
+          "mlConfidence": 0.2588636,
+          "sleeperScore": 89,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": 0
+        },
+        {
+          "player": "Michael Wilson",
+          "position": "WR",
+          "team": "ARI",
+          "mlConfidence": 0.3589551,
+          "sleeperScore": 88,
+          "mlHit": true,
+          "sleeperHit": true,
+          "fpDelta": 9.3
+        }
+      ],
+      "mlTop10Hits": 8,
+      "mlTop3Hits": 3,
+      "sleeperTop10Hits": 6,
+      "sleeperTop3Hits": 3,
+      "mlPrecisionTop10": 0.8,
+      "sleeperPrecisionTop10": 0.6
+    },
+    {
+      "week": 4,
+      "totalPlayers": 17,
+      "mlTop10Predictions": [
+        {
+          "player": "Chase Brown",
+          "position": "RB",
+          "team": "Unknown",
+          "mlConfidence": 0.40330076,
+          "sleeperScore": 115,
+          "mlHit": true,
+          "sleeperHit": true,
+          "fpDelta": 14.3
+        },
+        {
+          "player": "Jordan Addison",
+          "position": "WR",
+          "team": "Unknown",
+          "mlConfidence": 0.3946176,
+          "sleeperScore": 66,
+          "mlHit": true,
+          "sleeperHit": false,
+          "fpDelta": 22.9
+        },
+        {
+          "player": "Jaxon Smith-Njigba",
+          "position": "WR",
+          "team": "Unknown",
+          "mlConfidence": 0.38805714,
+          "sleeperScore": 100,
+          "mlHit": true,
+          "sleeperHit": true,
+          "fpDelta": 6.2
+        },
+        {
+          "player": "Dontayvion Wicks",
+          "position": "WR",
+          "team": "Unknown",
+          "mlConfidence": 0.38593146,
+          "sleeperScore": 120,
+          "mlHit": true,
+          "sleeperHit": true,
+          "fpDelta": 24.8
+        },
+        {
+          "player": "Tank Bigsby",
+          "position": "RB",
+          "team": "Unknown",
+          "mlConfidence": 0.3824416,
+          "sleeperScore": 74,
+          "mlHit": true,
+          "sleeperHit": false,
+          "fpDelta": 8.1
+        },
+        {
+          "player": "Jaleel McLaughlin",
+          "position": "RB",
+          "team": "Unknown",
+          "mlConfidence": 0.3672822,
+          "sleeperScore": 116,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": -2.8
+        },
+        {
+          "player": "Tucker Kraft",
+          "position": "TE",
+          "team": "Unknown",
+          "mlConfidence": 0.36045882,
+          "sleeperScore": 92,
+          "mlHit": true,
+          "sleeperHit": true,
+          "fpDelta": 12.9
+        },
+        {
+          "player": "Josh Downs",
+          "position": "WR",
+          "team": "Unknown",
+          "mlConfidence": 0.3390285,
+          "sleeperScore": 94,
+          "mlHit": true,
+          "sleeperHit": true,
+          "fpDelta": 17
+        },
+        {
+          "player": "Eric Gray",
+          "position": "RB",
+          "team": "Unknown",
+          "mlConfidence": 0.3353288,
+          "sleeperScore": 98,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": 0.1
+        },
+        {
+          "player": "Luke Musgrave",
+          "position": "TE",
+          "team": "Unknown",
+          "mlConfidence": 0.33006206,
+          "sleeperScore": 78,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": 3
+        }
+      ],
+      "sleeperTop10Predictions": [
+        {
+          "player": "Dontayvion Wicks",
+          "position": "WR",
+          "team": "Unknown",
+          "mlConfidence": 0.38593146,
+          "sleeperScore": 120,
+          "mlHit": true,
+          "sleeperHit": true,
+          "fpDelta": 24.8
+        },
+        {
+          "player": "Deuce Vaughn",
+          "position": "RB",
+          "team": "Unknown",
+          "mlConfidence": 0.31595147,
+          "sleeperScore": 119,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": -2.3
+        },
+        {
+          "player": "Jaleel McLaughlin",
+          "position": "RB",
+          "team": "Unknown",
+          "mlConfidence": 0.3672822,
+          "sleeperScore": 116,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": -2.8
+        },
+        {
+          "player": "Chase Brown",
+          "position": "RB",
+          "team": "Unknown",
+          "mlConfidence": 0.40330076,
+          "sleeperScore": 115,
+          "mlHit": true,
+          "sleeperHit": true,
+          "fpDelta": 14.3
+        },
+        {
+          "player": "Emari Demercado",
+          "position": "RB",
+          "team": "Unknown",
+          "mlConfidence": 0.31364396,
+          "sleeperScore": 115,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": 2.7
+        },
+        {
+          "player": "Xavier Gipson",
+          "position": "WR",
+          "team": "Unknown",
+          "mlConfidence": 0.29326063,
+          "sleeperScore": 111,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": -2
+        },
+        {
+          "player": "Jaxon Smith-Njigba",
+          "position": "WR",
+          "team": "Unknown",
+          "mlConfidence": 0.38805714,
+          "sleeperScore": 100,
+          "mlHit": true,
+          "sleeperHit": true,
+          "fpDelta": 6.2
+        },
+        {
+          "player": "Eric Gray",
+          "position": "RB",
+          "team": "Unknown",
+          "mlConfidence": 0.3353288,
+          "sleeperScore": 98,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": 0.1
+        },
+        {
+          "player": "Josh Downs",
+          "position": "WR",
+          "team": "Unknown",
+          "mlConfidence": 0.3390285,
+          "sleeperScore": 94,
+          "mlHit": true,
+          "sleeperHit": true,
+          "fpDelta": 17
+        },
+        {
+          "player": "Tucker Kraft",
+          "position": "TE",
+          "team": "Unknown",
+          "mlConfidence": 0.36045882,
+          "sleeperScore": 92,
+          "mlHit": true,
+          "sleeperHit": true,
+          "fpDelta": 12.9
+        }
+      ],
+      "mlTop10Hits": 7,
+      "mlTop3Hits": 3,
+      "sleeperTop10Hits": 5,
+      "sleeperTop3Hits": 1,
+      "mlPrecisionTop10": 0.7,
+      "sleeperPrecisionTop10": 0.5
+    },
+    {
+      "week": 5,
+      "totalPlayers": 15,
+      "mlTop10Predictions": [
+        {
+          "player": "Andrei Iosivas",
+          "position": "WR",
+          "team": "CIN",
+          "mlConfidence": 0.41360736,
+          "sleeperScore": 113,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": 1
+        },
+        {
+          "player": "Jaleel McLaughlin",
+          "position": "RB",
+          "team": "DEN",
+          "mlConfidence": 0.3831725,
+          "sleeperScore": 111,
+          "mlHit": true,
+          "sleeperHit": true,
+          "fpDelta": 5.9
+        },
+        {
+          "player": "Demario Douglas",
+          "position": "WR",
+          "team": "NE",
+          "mlConfidence": 0.36660117,
+          "sleeperScore": 100,
+          "mlHit": true,
+          "sleeperHit": true,
+          "fpDelta": 7.6
+        },
+        {
+          "player": "Quentin Johnston",
+          "position": "WR",
+          "team": "LAC",
+          "mlConfidence": 0.36394593,
+          "sleeperScore": 52,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": -2.3
+        },
+        {
+          "player": "Eric Gray",
+          "position": "RB",
+          "team": "NYG",
+          "mlConfidence": 0.36222866,
+          "sleeperScore": 78,
+          "mlHit": true,
+          "sleeperHit": true,
+          "fpDelta": 6.3
+        },
+        {
+          "player": "Emanuel Wilson",
+          "position": "RB",
+          "team": "GB",
+          "mlConfidence": 0.36001945,
+          "sleeperScore": 105,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": -0.2
+        },
+        {
+          "player": "Michael Wilson",
+          "position": "WR",
+          "team": "ARI",
+          "mlConfidence": 0.35924107,
+          "sleeperScore": 55,
+          "mlHit": true,
+          "sleeperHit": false,
+          "fpDelta": 8
+        },
+        {
+          "player": "Jalin Hyatt",
+          "position": "WR",
+          "team": "NYG",
+          "mlConfidence": 0.3577106,
+          "sleeperScore": 73,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": 0
+        },
+        {
+          "player": "Tank Bigsby",
+          "position": "RB",
+          "team": "JAX",
+          "mlConfidence": 0.34667185,
+          "sleeperScore": 94,
+          "mlHit": true,
+          "sleeperHit": true,
+          "fpDelta": 16.9
+        },
+        {
+          "player": "Roschon Johnson",
+          "position": "RB",
+          "team": "CHI",
+          "mlConfidence": 0.31823936,
+          "sleeperScore": 103,
+          "mlHit": true,
+          "sleeperHit": true,
+          "fpDelta": 5.9
+        }
+      ],
+      "sleeperTop10Predictions": [
+        {
+          "player": "Xavier Gipson",
+          "position": "WR",
+          "team": "NYJ",
+          "mlConfidence": 0.27523735,
+          "sleeperScore": 123,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": -1.6
+        },
+        {
+          "player": "Andrei Iosivas",
+          "position": "WR",
+          "team": "CIN",
+          "mlConfidence": 0.41360736,
+          "sleeperScore": 113,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": 1
+        },
+        {
+          "player": "Jaleel McLaughlin",
+          "position": "RB",
+          "team": "DEN",
+          "mlConfidence": 0.3831725,
+          "sleeperScore": 111,
+          "mlHit": true,
+          "sleeperHit": true,
+          "fpDelta": 5.9
+        },
+        {
+          "player": "Emanuel Wilson",
+          "position": "RB",
+          "team": "GB",
+          "mlConfidence": 0.36001945,
+          "sleeperScore": 105,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": -0.2
+        },
+        {
+          "player": "Roschon Johnson",
+          "position": "RB",
+          "team": "CHI",
+          "mlConfidence": 0.31823936,
+          "sleeperScore": 103,
+          "mlHit": true,
+          "sleeperHit": true,
+          "fpDelta": 5.9
+        },
+        {
+          "player": "Demario Douglas",
+          "position": "WR",
+          "team": "NE",
+          "mlConfidence": 0.36660117,
+          "sleeperScore": 100,
+          "mlHit": true,
+          "sleeperHit": true,
+          "fpDelta": 7.6
+        },
+        {
+          "player": "Emari Demercado",
+          "position": "RB",
+          "team": "ARI",
+          "mlConfidence": 0.30189165,
+          "sleeperScore": 100,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": -2.4
+        },
+        {
+          "player": "Tank Bigsby",
+          "position": "RB",
+          "team": "JAX",
+          "mlConfidence": 0.34667185,
+          "sleeperScore": 94,
+          "mlHit": true,
+          "sleeperHit": true,
+          "fpDelta": 16.9
+        },
+        {
+          "player": "Tyler Scott",
+          "position": "WR",
+          "team": "CHI",
+          "mlConfidence": 0.260309,
+          "sleeperScore": 90,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": 0
+        },
+        {
+          "player": "Eric Gray",
+          "position": "RB",
+          "team": "NYG",
+          "mlConfidence": 0.36222866,
+          "sleeperScore": 78,
+          "mlHit": true,
+          "sleeperHit": true,
+          "fpDelta": 6.3
+        }
+      ],
+      "mlTop10Hits": 6,
+      "mlTop3Hits": 2,
+      "sleeperTop10Hits": 5,
+      "sleeperTop3Hits": 1,
+      "mlPrecisionTop10": 0.6,
+      "sleeperPrecisionTop10": 0.5
+    },
+    {
+      "week": 6,
+      "totalPlayers": 15,
+      "mlTop10Predictions": [
+        {
+          "player": "Andrei Iosivas",
+          "position": "WR",
+          "team": "CIN",
+          "mlConfidence": 0.46633142,
+          "sleeperScore": 82,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": 0.7
+        },
+        {
+          "player": "Jordan Addison",
+          "position": "WR",
+          "team": "MIN",
+          "mlConfidence": 0.45582202,
+          "sleeperScore": 59,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": -6.6
+        },
+        {
+          "player": "Tre Tucker",
+          "position": "WR",
+          "team": "LV",
+          "mlConfidence": 0.45240647,
+          "sleeperScore": 84,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": -4.6
+        },
+        {
+          "player": "Jalin Hyatt",
+          "position": "WR",
+          "team": "NYG",
+          "mlConfidence": 0.41910598,
+          "sleeperScore": 88,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": 1.6
+        },
+        {
+          "player": "Emanuel Wilson",
+          "position": "RB",
+          "team": "GB",
+          "mlConfidence": 0.40933588,
+          "sleeperScore": 105,
+          "mlHit": true,
+          "sleeperHit": true,
+          "fpDelta": 5.8
+        },
+        {
+          "player": "Zach Charbonnet",
+          "position": "RB",
+          "team": "SEA",
+          "mlConfidence": 0.39702627,
+          "sleeperScore": 83,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": -1.5
+        },
+        {
+          "player": "Emari Demercado",
+          "position": "RB",
+          "team": "ARI",
+          "mlConfidence": 0.39373863,
+          "sleeperScore": 87,
+          "mlHit": true,
+          "sleeperHit": true,
+          "fpDelta": 10.4
+        },
+        {
+          "player": "Tyjae Spears",
+          "position": "RB",
+          "team": "TEN",
+          "mlConfidence": 0.38607386,
+          "sleeperScore": 97,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": 2.7
+        },
+        {
+          "player": "Dontayvion Wicks",
+          "position": "WR",
+          "team": "GB",
+          "mlConfidence": 0.36069757,
+          "sleeperScore": 97,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": -2.1
+        },
+        {
+          "player": "Eric Gray",
+          "position": "RB",
+          "team": "NYG",
+          "mlConfidence": 0.35954294,
+          "sleeperScore": 83,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": -5.1
+        }
+      ],
+      "sleeperTop10Predictions": [
+        {
+          "player": "Xavier Gipson",
+          "position": "WR",
+          "team": "NYJ",
+          "mlConfidence": 0.32343635,
+          "sleeperScore": 121,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": 0
+        },
+        {
+          "player": "Emanuel Wilson",
+          "position": "RB",
+          "team": "GB",
+          "mlConfidence": 0.40933588,
+          "sleeperScore": 105,
+          "mlHit": true,
+          "sleeperHit": true,
+          "fpDelta": 5.8
+        },
+        {
+          "player": "Tyler Scott",
+          "position": "WR",
+          "team": "CHI",
+          "mlConfidence": 0.292514,
+          "sleeperScore": 100,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": 0
+        },
+        {
+          "player": "Tyjae Spears",
+          "position": "RB",
+          "team": "TEN",
+          "mlConfidence": 0.38607386,
+          "sleeperScore": 97,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": 2.7
+        },
+        {
+          "player": "Dontayvion Wicks",
+          "position": "WR",
+          "team": "GB",
+          "mlConfidence": 0.36069757,
+          "sleeperScore": 97,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": -2.1
+        },
+        {
+          "player": "Jalin Hyatt",
+          "position": "WR",
+          "team": "NYG",
+          "mlConfidence": 0.41910598,
+          "sleeperScore": 88,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": 1.6
+        },
+        {
+          "player": "Emari Demercado",
+          "position": "RB",
+          "team": "ARI",
+          "mlConfidence": 0.39373863,
+          "sleeperScore": 87,
+          "mlHit": true,
+          "sleeperHit": true,
+          "fpDelta": 10.4
+        },
+        {
+          "player": "Tre Tucker",
+          "position": "WR",
+          "team": "LV",
+          "mlConfidence": 0.45240647,
+          "sleeperScore": 84,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": -4.6
+        },
+        {
+          "player": "Zach Charbonnet",
+          "position": "RB",
+          "team": "SEA",
+          "mlConfidence": 0.39702627,
+          "sleeperScore": 83,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": -1.5
+        },
+        {
+          "player": "Eric Gray",
+          "position": "RB",
+          "team": "NYG",
+          "mlConfidence": 0.35954294,
+          "sleeperScore": 83,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": -5.1
+        }
+      ],
+      "mlTop10Hits": 2,
+      "mlTop3Hits": 0,
+      "sleeperTop10Hits": 2,
+      "sleeperTop3Hits": 1,
+      "mlPrecisionTop10": 0.2,
+      "sleeperPrecisionTop10": 0.2
+    },
+    {
+      "week": 7,
+      "totalPlayers": 15,
+      "mlTop10Predictions": [
+        {
+          "player": "Tre Tucker",
+          "position": "WR",
+          "team": "LV",
+          "mlConfidence": 0.42938378,
+          "sleeperScore": 79,
+          "mlHit": true,
+          "sleeperHit": true,
+          "fpDelta": 7.7
+        },
+        {
+          "player": "Andrei Iosivas",
+          "position": "WR",
+          "team": "CIN",
+          "mlConfidence": 0.42173547,
+          "sleeperScore": 85,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": -5.6
+        },
+        {
+          "player": "Jordan Addison",
+          "position": "WR",
+          "team": "MIN",
+          "mlConfidence": 0.39658546,
+          "sleeperScore": 86,
+          "mlHit": true,
+          "sleeperHit": true,
+          "fpDelta": 9.6
+        },
+        {
+          "player": "Tank Bigsby",
+          "position": "RB",
+          "team": "JAX",
+          "mlConfidence": 0.39097324,
+          "sleeperScore": 89,
+          "mlHit": true,
+          "sleeperHit": true,
+          "fpDelta": 21.4
+        },
+        {
+          "player": "Kendre Miller",
+          "position": "RB",
+          "team": "NO",
+          "mlConfidence": 0.38270757,
+          "sleeperScore": 65,
+          "mlHit": true,
+          "sleeperHit": false,
+          "fpDelta": 5.7
+        },
+        {
+          "player": "Tucker Kraft",
+          "position": "TE",
+          "team": "GB",
+          "mlConfidence": 0.3780262,
+          "sleeperScore": 64,
+          "mlHit": true,
+          "sleeperHit": false,
+          "fpDelta": 8.8
+        },
+        {
+          "player": "Jaleel McLaughlin",
+          "position": "RB",
+          "team": "DEN",
+          "mlConfidence": 0.3743695,
+          "sleeperScore": 128,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": -1
+        },
+        {
+          "player": "Zach Charbonnet",
+          "position": "RB",
+          "team": "SEA",
+          "mlConfidence": 0.37227288,
+          "sleeperScore": 86,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": -2.6
+        },
+        {
+          "player": "Emanuel Wilson",
+          "position": "RB",
+          "team": "GB",
+          "mlConfidence": 0.35258403,
+          "sleeperScore": 90,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": -7.2
+        },
+        {
+          "player": "Cedric Tillman",
+          "position": "WR",
+          "team": "CLE",
+          "mlConfidence": 0.34505323,
+          "sleeperScore": 67,
+          "mlHit": true,
+          "sleeperHit": false,
+          "fpDelta": 18.6
+        }
+      ],
+      "sleeperTop10Predictions": [
+        {
+          "player": "Jaleel McLaughlin",
+          "position": "RB",
+          "team": "DEN",
+          "mlConfidence": 0.3743695,
+          "sleeperScore": 128,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": -1
+        },
+        {
+          "player": "Xavier Gipson",
+          "position": "WR",
+          "team": "NYJ",
+          "mlConfidence": 0.2940312,
+          "sleeperScore": 118,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": 0
+        },
+        {
+          "player": "Emanuel Wilson",
+          "position": "RB",
+          "team": "GB",
+          "mlConfidence": 0.35258403,
+          "sleeperScore": 90,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": -7.2
+        },
+        {
+          "player": "Tank Bigsby",
+          "position": "RB",
+          "team": "JAX",
+          "mlConfidence": 0.39097324,
+          "sleeperScore": 89,
+          "mlHit": true,
+          "sleeperHit": true,
+          "fpDelta": 21.4
+        },
+        {
+          "player": "Jordan Addison",
+          "position": "WR",
+          "team": "MIN",
+          "mlConfidence": 0.39658546,
+          "sleeperScore": 86,
+          "mlHit": true,
+          "sleeperHit": true,
+          "fpDelta": 9.6
+        },
+        {
+          "player": "Zach Charbonnet",
+          "position": "RB",
+          "team": "SEA",
+          "mlConfidence": 0.37227288,
+          "sleeperScore": 86,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": -2.6
+        },
+        {
+          "player": "Andrei Iosivas",
+          "position": "WR",
+          "team": "CIN",
+          "mlConfidence": 0.42173547,
+          "sleeperScore": 85,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": -5.6
+        },
+        {
+          "player": "Tre Tucker",
+          "position": "WR",
+          "team": "LV",
+          "mlConfidence": 0.42938378,
+          "sleeperScore": 79,
+          "mlHit": true,
+          "sleeperHit": true,
+          "fpDelta": 7.7
+        },
+        {
+          "player": "Roschon Johnson",
+          "position": "RB",
+          "team": "CHI",
+          "mlConfidence": 0.3368926,
+          "sleeperScore": 73,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": -5.3
+        },
+        {
+          "player": "Eric Gray",
+          "position": "RB",
+          "team": "NYG",
+          "mlConfidence": 0.3283447,
+          "sleeperScore": 70,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": 0.6
+        }
+      ],
+      "mlTop10Hits": 6,
+      "mlTop3Hits": 2,
+      "sleeperTop10Hits": 3,
+      "sleeperTop3Hits": 0,
+      "mlPrecisionTop10": 0.6,
+      "sleeperPrecisionTop10": 0.3
+    },
+    {
+      "week": 8,
+      "totalPlayers": 18,
+      "mlTop10Predictions": [
+        {
+          "player": "Andrei Iosivas",
+          "position": "WR",
+          "team": "CIN",
+          "mlConfidence": 0.45698875,
+          "sleeperScore": 83,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": 0
+        },
+        {
+          "player": "Chase Brown",
+          "position": "RB",
+          "team": "CIN",
+          "mlConfidence": 0.42399892,
+          "sleeperScore": 87,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": 4.1
+        },
+        {
+          "player": "Jaxon Smith-Njigba",
+          "position": "WR",
+          "team": "SEA",
+          "mlConfidence": 0.41511858,
+          "sleeperScore": 92,
+          "mlHit": true,
+          "sleeperHit": true,
+          "fpDelta": 7.6
+        },
+        {
+          "player": "Tre Tucker",
+          "position": "WR",
+          "team": "LV",
+          "mlConfidence": 0.4029776,
+          "sleeperScore": 71,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": -2.4
+        },
+        {
+          "player": "Jordan Addison",
+          "position": "WR",
+          "team": "MIN",
+          "mlConfidence": 0.38233092,
+          "sleeperScore": 79,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": -5.4
+        },
+        {
+          "player": "Jaleel McLaughlin",
+          "position": "RB",
+          "team": "DEN",
+          "mlConfidence": 0.3822939,
+          "sleeperScore": 131,
+          "mlHit": true,
+          "sleeperHit": true,
+          "fpDelta": 9.1
+        },
+        {
+          "player": "Zach Charbonnet",
+          "position": "RB",
+          "team": "SEA",
+          "mlConfidence": 0.38079756,
+          "sleeperScore": 76,
+          "mlHit": true,
+          "sleeperHit": false,
+          "fpDelta": 9.5
+        },
+        {
+          "player": "Josh Downs",
+          "position": "WR",
+          "team": "IND",
+          "mlConfidence": 0.37533706,
+          "sleeperScore": 68,
+          "mlHit": true,
+          "sleeperHit": false,
+          "fpDelta": 20.9
+        },
+        {
+          "player": "Emanuel Wilson",
+          "position": "RB",
+          "team": "GB",
+          "mlConfidence": 0.36522314,
+          "sleeperScore": 110,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": 1.2
+        },
+        {
+          "player": "Michael Wilson",
+          "position": "WR",
+          "team": "ARI",
+          "mlConfidence": 0.36249974,
+          "sleeperScore": 60,
+          "mlHit": true,
+          "sleeperHit": false,
+          "fpDelta": 11.6
+        }
+      ],
+      "sleeperTop10Predictions": [
+        {
+          "player": "Jaleel McLaughlin",
+          "position": "RB",
+          "team": "DEN",
+          "mlConfidence": 0.3822939,
+          "sleeperScore": 131,
+          "mlHit": true,
+          "sleeperHit": true,
+          "fpDelta": 9.1
+        },
+        {
+          "player": "Emanuel Wilson",
+          "position": "RB",
+          "team": "GB",
+          "mlConfidence": 0.36522314,
+          "sleeperScore": 110,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": 1.2
+        },
+        {
+          "player": "Roschon Johnson",
+          "position": "RB",
+          "team": "CHI",
+          "mlConfidence": 0.3509198,
+          "sleeperScore": 103,
+          "mlHit": false,
+          "sleeperHit": true,
+          "fpDelta": 6.6
+        },
+        {
+          "player": "Xavier Gipson",
+          "position": "WR",
+          "team": "NYJ",
+          "mlConfidence": 0.29525384,
+          "sleeperScore": 98,
+          "mlHit": false,
+          "sleeperHit": true,
+          "fpDelta": 7.1
+        },
+        {
+          "player": "Demario Douglas",
+          "position": "WR",
+          "team": "NE",
+          "mlConfidence": 0.36039588,
+          "sleeperScore": 97,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": -0.2
+        },
+        {
+          "player": "Trey Palmer",
+          "position": "WR",
+          "team": "TB",
+          "mlConfidence": 0.28736463,
+          "sleeperScore": 94,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": 2.3
+        },
+        {
+          "player": "Jaxon Smith-Njigba",
+          "position": "WR",
+          "team": "SEA",
+          "mlConfidence": 0.41511858,
+          "sleeperScore": 92,
+          "mlHit": true,
+          "sleeperHit": true,
+          "fpDelta": 7.6
+        },
+        {
+          "player": "Emari Demercado",
+          "position": "RB",
+          "team": "ARI",
+          "mlConfidence": 0.29450843,
+          "sleeperScore": 87,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": -1.4
+        },
+        {
+          "player": "Chase Brown",
+          "position": "RB",
+          "team": "CIN",
+          "mlConfidence": 0.42399892,
+          "sleeperScore": 87,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": 4.1
+        },
+        {
+          "player": "Andrei Iosivas",
+          "position": "WR",
+          "team": "CIN",
+          "mlConfidence": 0.45698875,
+          "sleeperScore": 83,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": 0
+        }
+      ],
+      "mlTop10Hits": 5,
+      "mlTop3Hits": 1,
+      "sleeperTop10Hits": 4,
+      "sleeperTop3Hits": 2,
+      "mlPrecisionTop10": 0.5,
+      "sleeperPrecisionTop10": 0.4
+    },
+    {
+      "week": 9,
+      "totalPlayers": 12,
+      "mlTop10Predictions": [
+        {
+          "player": "Andrei Iosivas",
+          "position": "WR",
+          "team": "CIN",
+          "mlConfidence": 0.45240688,
+          "sleeperScore": 93,
+          "mlHit": true,
+          "sleeperHit": true,
+          "fpDelta": 8
+        },
+        {
+          "player": "Tre Tucker",
+          "position": "WR",
+          "team": "LV",
+          "mlConfidence": 0.4121472,
+          "sleeperScore": 76,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": -2.8
+        },
+        {
+          "player": "Jordan Addison",
+          "position": "WR",
+          "team": "MIN",
+          "mlConfidence": 0.3960085,
+          "sleeperScore": 84,
+          "mlHit": true,
+          "sleeperHit": true,
+          "fpDelta": 11.9
+        },
+        {
+          "player": "Demario Douglas",
+          "position": "WR",
+          "team": "NE",
+          "mlConfidence": 0.3811256,
+          "sleeperScore": 98,
+          "mlHit": true,
+          "sleeperHit": true,
+          "fpDelta": 7.3
+        },
+        {
+          "player": "Emanuel Wilson",
+          "position": "RB",
+          "team": "GB",
+          "mlConfidence": 0.3791853,
+          "sleeperScore": 87,
+          "mlHit": true,
+          "sleeperHit": true,
+          "fpDelta": 7.6
+        },
+        {
+          "player": "Quentin Johnston",
+          "position": "WR",
+          "team": "LAC",
+          "mlConfidence": 0.3735944,
+          "sleeperScore": 57,
+          "mlHit": true,
+          "sleeperHit": false,
+          "fpDelta": 22
+        },
+        {
+          "player": "Dontayvion Wicks",
+          "position": "WR",
+          "team": "GB",
+          "mlConfidence": 0.36182728,
+          "sleeperScore": 120,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": -3.1
+        },
+        {
+          "player": "Roschon Johnson",
+          "position": "RB",
+          "team": "CHI",
+          "mlConfidence": 0.33335048,
+          "sleeperScore": 96,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": -2.5
+        },
+        {
+          "player": "Emari Demercado",
+          "position": "RB",
+          "team": "ARI",
+          "mlConfidence": 0.31718332,
+          "sleeperScore": 110,
+          "mlHit": true,
+          "sleeperHit": true,
+          "fpDelta": 16
+        },
+        {
+          "player": "Xavier Gipson",
+          "position": "WR",
+          "team": "NYJ",
+          "mlConfidence": 0.27975404,
+          "sleeperScore": 98,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": -7.1
+        }
+      ],
+      "sleeperTop10Predictions": [
+        {
+          "player": "Dontayvion Wicks",
+          "position": "WR",
+          "team": "GB",
+          "mlConfidence": 0.36182728,
+          "sleeperScore": 120,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": -3.1
+        },
+        {
+          "player": "Emari Demercado",
+          "position": "RB",
+          "team": "ARI",
+          "mlConfidence": 0.31718332,
+          "sleeperScore": 110,
+          "mlHit": true,
+          "sleeperHit": true,
+          "fpDelta": 16
+        },
+        {
+          "player": "Demario Douglas",
+          "position": "WR",
+          "team": "NE",
+          "mlConfidence": 0.3811256,
+          "sleeperScore": 98,
+          "mlHit": true,
+          "sleeperHit": true,
+          "fpDelta": 7.3
+        },
+        {
+          "player": "Xavier Gipson",
+          "position": "WR",
+          "team": "NYJ",
+          "mlConfidence": 0.27975404,
+          "sleeperScore": 98,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": -7.1
+        },
+        {
+          "player": "Roschon Johnson",
+          "position": "RB",
+          "team": "CHI",
+          "mlConfidence": 0.33335048,
+          "sleeperScore": 96,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": -2.5
+        },
+        {
+          "player": "Andrei Iosivas",
+          "position": "WR",
+          "team": "CIN",
+          "mlConfidence": 0.45240688,
+          "sleeperScore": 93,
+          "mlHit": true,
+          "sleeperHit": true,
+          "fpDelta": 8
+        },
+        {
+          "player": "Trey Palmer",
+          "position": "WR",
+          "team": "TB",
+          "mlConfidence": 0.26780224,
+          "sleeperScore": 89,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": 0.4
+        },
+        {
+          "player": "Emanuel Wilson",
+          "position": "RB",
+          "team": "GB",
+          "mlConfidence": 0.3791853,
+          "sleeperScore": 87,
+          "mlHit": true,
+          "sleeperHit": true,
+          "fpDelta": 7.6
+        },
+        {
+          "player": "Jordan Addison",
+          "position": "WR",
+          "team": "MIN",
+          "mlConfidence": 0.3960085,
+          "sleeperScore": 84,
+          "mlHit": true,
+          "sleeperHit": true,
+          "fpDelta": 11.9
+        },
+        {
+          "player": "Tre Tucker",
+          "position": "WR",
+          "team": "LV",
+          "mlConfidence": 0.4121472,
+          "sleeperScore": 76,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": -2.8
+        }
+      ],
+      "mlTop10Hits": 6,
+      "mlTop3Hits": 2,
+      "sleeperTop10Hits": 5,
+      "sleeperTop3Hits": 2,
+      "mlPrecisionTop10": 0.6,
+      "sleeperPrecisionTop10": 0.5
+    },
+    {
+      "week": 10,
+      "totalPlayers": 15,
+      "mlTop10Predictions": [
+        {
+          "player": "Tre Tucker",
+          "position": "WR",
+          "team": "LV",
+          "mlConfidence": 0.4200054,
+          "sleeperScore": 59,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": -2.5
+        },
+        {
+          "player": "Jalin Hyatt",
+          "position": "WR",
+          "team": "NYG",
+          "mlConfidence": 0.40924627,
+          "sleeperScore": 88,
+          "mlHit": true,
+          "sleeperHit": true,
+          "fpDelta": 7.9
+        },
+        {
+          "player": "Dontayvion Wicks",
+          "position": "WR",
+          "team": "GB",
+          "mlConfidence": 0.40901822,
+          "sleeperScore": 90,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": 0
+        },
+        {
+          "player": "Andrei Iosivas",
+          "position": "WR",
+          "team": "CIN",
+          "mlConfidence": 0.40802327,
+          "sleeperScore": 110,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": -3.1
+        },
+        {
+          "player": "Tucker Kraft",
+          "position": "TE",
+          "team": "GB",
+          "mlConfidence": 0.39653307,
+          "sleeperScore": 62,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": -7.6
+        },
+        {
+          "player": "Michael Wilson",
+          "position": "WR",
+          "team": "ARI",
+          "mlConfidence": 0.38694978,
+          "sleeperScore": 57,
+          "mlHit": true,
+          "sleeperHit": false,
+          "fpDelta": 5.4
+        },
+        {
+          "player": "Tyjae Spears",
+          "position": "RB",
+          "team": "TEN",
+          "mlConfidence": 0.38367105,
+          "sleeperScore": 82,
+          "mlHit": true,
+          "sleeperHit": true,
+          "fpDelta": 8.1
+        },
+        {
+          "player": "Jaleel McLaughlin",
+          "position": "RB",
+          "team": "DEN",
+          "mlConfidence": 0.37723246,
+          "sleeperScore": 100,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": -3.8
+        },
+        {
+          "player": "Tank Bigsby",
+          "position": "RB",
+          "team": "JAX",
+          "mlConfidence": 0.3571905,
+          "sleeperScore": 66,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": -1.8
+        },
+        {
+          "player": "Emanuel Wilson",
+          "position": "RB",
+          "team": "GB",
+          "mlConfidence": 0.3428041,
+          "sleeperScore": 88,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": -9.9
+        }
+      ],
+      "sleeperTop10Predictions": [
+        {
+          "player": "Andrei Iosivas",
+          "position": "WR",
+          "team": "CIN",
+          "mlConfidence": 0.40802327,
+          "sleeperScore": 110,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": -3.1
+        },
+        {
+          "player": "Xavier Gipson",
+          "position": "WR",
+          "team": "NYJ",
+          "mlConfidence": 0.31189957,
+          "sleeperScore": 106,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": 0
+        },
+        {
+          "player": "Jaleel McLaughlin",
+          "position": "RB",
+          "team": "DEN",
+          "mlConfidence": 0.37723246,
+          "sleeperScore": 100,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": -3.8
+        },
+        {
+          "player": "Roschon Johnson",
+          "position": "RB",
+          "team": "CHI",
+          "mlConfidence": 0.33095118,
+          "sleeperScore": 96,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": -3
+        },
+        {
+          "player": "Dontayvion Wicks",
+          "position": "WR",
+          "team": "GB",
+          "mlConfidence": 0.40901822,
+          "sleeperScore": 90,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": 0
+        },
+        {
+          "player": "Jalin Hyatt",
+          "position": "WR",
+          "team": "NYG",
+          "mlConfidence": 0.40924627,
+          "sleeperScore": 88,
+          "mlHit": true,
+          "sleeperHit": true,
+          "fpDelta": 7.9
+        },
+        {
+          "player": "Emanuel Wilson",
+          "position": "RB",
+          "team": "GB",
+          "mlConfidence": 0.3428041,
+          "sleeperScore": 88,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": -9.9
+        },
+        {
+          "player": "Tyjae Spears",
+          "position": "RB",
+          "team": "TEN",
+          "mlConfidence": 0.38367105,
+          "sleeperScore": 82,
+          "mlHit": true,
+          "sleeperHit": true,
+          "fpDelta": 8.1
+        },
+        {
+          "player": "Trey Palmer",
+          "position": "WR",
+          "team": "TB",
+          "mlConfidence": 0.25587028,
+          "sleeperScore": 74,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": -5.3
+        },
+        {
+          "player": "Zach Charbonnet",
+          "position": "RB",
+          "team": "SEA",
+          "mlConfidence": 0.3424149,
+          "sleeperScore": 68,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": -5.3
+        }
+      ],
+      "mlTop10Hits": 3,
+      "mlTop3Hits": 1,
+      "sleeperTop10Hits": 2,
+      "sleeperTop3Hits": 0,
+      "mlPrecisionTop10": 0.3,
+      "sleeperPrecisionTop10": 0.2
+    },
+    {
+      "week": 11,
+      "totalPlayers": 20,
+      "mlTop10Predictions": [
+        {
+          "player": "Jaxon Smith-Njigba",
+          "position": "WR",
+          "team": "SEA",
+          "mlConfidence": 0.44534585,
+          "sleeperScore": 67,
+          "mlHit": true,
+          "sleeperHit": false,
+          "fpDelta": 21.8
+        },
+        {
+          "player": "Tre Tucker",
+          "position": "WR",
+          "team": "LV",
+          "mlConfidence": 0.43507367,
+          "sleeperScore": 61,
+          "mlHit": true,
+          "sleeperHit": false,
+          "fpDelta": 6.5
+        },
+        {
+          "player": "Andrei Iosivas",
+          "position": "WR",
+          "team": "CIN",
+          "mlConfidence": 0.4162749,
+          "sleeperScore": 82,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": 2.7
+        },
+        {
+          "player": "Tucker Kraft",
+          "position": "TE",
+          "team": "GB",
+          "mlConfidence": 0.3996924,
+          "sleeperScore": 74,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": 0
+        },
+        {
+          "player": "Jaleel McLaughlin",
+          "position": "RB",
+          "team": "DEN",
+          "mlConfidence": 0.3893952,
+          "sleeperScore": 113,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": 0.7
+        },
+        {
+          "player": "Jalin Hyatt",
+          "position": "WR",
+          "team": "NYG",
+          "mlConfidence": 0.38541684,
+          "sleeperScore": 68,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": -7.9
+        },
+        {
+          "player": "Zach Charbonnet",
+          "position": "RB",
+          "team": "SEA",
+          "mlConfidence": 0.38351163,
+          "sleeperScore": 86,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": 2.5
+        },
+        {
+          "player": "Jordan Addison",
+          "position": "WR",
+          "team": "MIN",
+          "mlConfidence": 0.38189843,
+          "sleeperScore": 56,
+          "mlHit": true,
+          "sleeperHit": false,
+          "fpDelta": 10.2
+        },
+        {
+          "player": "Michael Wilson",
+          "position": "WR",
+          "team": "ARI",
+          "mlConfidence": 0.36265966,
+          "sleeperScore": 55,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": -5.4
+        },
+        {
+          "player": "Tyjae Spears",
+          "position": "RB",
+          "team": "TEN",
+          "mlConfidence": 0.35346746,
+          "sleeperScore": 72,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": -5.3
+        }
+      ],
+      "sleeperTop10Predictions": [
+        {
+          "player": "Xavier Gipson",
+          "position": "WR",
+          "team": "NYJ",
+          "mlConfidence": 0.31163672,
+          "sleeperScore": 121,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": 2.7
+        },
+        {
+          "player": "Demario Douglas",
+          "position": "WR",
+          "team": "NE",
+          "mlConfidence": 0.3282292,
+          "sleeperScore": 115,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": 0.9
+        },
+        {
+          "player": "Jaleel McLaughlin",
+          "position": "RB",
+          "team": "DEN",
+          "mlConfidence": 0.3893952,
+          "sleeperScore": 113,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": 0.7
+        },
+        {
+          "player": "Dontayvion Wicks",
+          "position": "WR",
+          "team": "GB",
+          "mlConfidence": 0.35333362,
+          "sleeperScore": 102,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": 0
+        },
+        {
+          "player": "Deuce Vaughn",
+          "position": "RB",
+          "team": "DAL",
+          "mlConfidence": 0.3527771,
+          "sleeperScore": 97,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": 2.7
+        },
+        {
+          "player": "Zach Charbonnet",
+          "position": "RB",
+          "team": "SEA",
+          "mlConfidence": 0.38351163,
+          "sleeperScore": 86,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": 2.5
+        },
+        {
+          "player": "Andrei Iosivas",
+          "position": "WR",
+          "team": "CIN",
+          "mlConfidence": 0.4162749,
+          "sleeperScore": 82,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": 2.7
+        },
+        {
+          "player": "Emari Demercado",
+          "position": "RB",
+          "team": "ARI",
+          "mlConfidence": 0.3049369,
+          "sleeperScore": 82,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": -2.2
+        },
+        {
+          "player": "Roschon Johnson",
+          "position": "RB",
+          "team": "CHI",
+          "mlConfidence": 0.3464794,
+          "sleeperScore": 78,
+          "mlHit": false,
+          "sleeperHit": true,
+          "fpDelta": 10
+        },
+        {
+          "player": "Trey Palmer",
+          "position": "WR",
+          "team": "TB",
+          "mlConfidence": 0.27025747,
+          "sleeperScore": 74,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": 0
+        }
+      ],
+      "mlTop10Hits": 3,
+      "mlTop3Hits": 2,
+      "sleeperTop10Hits": 1,
+      "sleeperTop3Hits": 0,
+      "mlPrecisionTop10": 0.3,
+      "sleeperPrecisionTop10": 0.1
+    },
+    {
+      "week": 12,
+      "totalPlayers": 19,
+      "mlTop10Predictions": [
+        {
+          "player": "Tre Tucker",
+          "position": "WR",
+          "team": "LV",
+          "mlConfidence": 0.41565192,
+          "sleeperScore": 74,
+          "mlHit": true,
+          "sleeperHit": false,
+          "fpDelta": 8.7
+        },
+        {
+          "player": "Michael Wilson",
+          "position": "WR",
+          "team": "ARI",
+          "mlConfidence": 0.4018003,
+          "sleeperScore": 63,
+          "mlHit": true,
+          "sleeperHit": false,
+          "fpDelta": 7.4
+        },
+        {
+          "player": "Jaleel McLaughlin",
+          "position": "RB",
+          "team": "DEN",
+          "mlConfidence": 0.40082458,
+          "sleeperScore": 111,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": 2.5
+        },
+        {
+          "player": "Andrei Iosivas",
+          "position": "WR",
+          "team": "CIN",
+          "mlConfidence": 0.39891326,
+          "sleeperScore": 80,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": -7.6
+        },
+        {
+          "player": "Tucker Kraft",
+          "position": "TE",
+          "team": "GB",
+          "mlConfidence": 0.39351997,
+          "sleeperScore": 59,
+          "mlHit": true,
+          "sleeperHit": false,
+          "fpDelta": 10.6
+        },
+        {
+          "player": "Dontayvion Wicks",
+          "position": "WR",
+          "team": "GB",
+          "mlConfidence": 0.37850156,
+          "sleeperScore": 90,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": 3.5
+        },
+        {
+          "player": "Eric Gray",
+          "position": "RB",
+          "team": "NYG",
+          "mlConfidence": 0.3718183,
+          "sleeperScore": 68,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": 2.6
+        },
+        {
+          "player": "Zach Charbonnet",
+          "position": "RB",
+          "team": "SEA",
+          "mlConfidence": 0.37074876,
+          "sleeperScore": 91,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": -0.3
+        },
+        {
+          "player": "Emanuel Wilson",
+          "position": "RB",
+          "team": "GB",
+          "mlConfidence": 0.36743638,
+          "sleeperScore": 103,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": 2.4
+        },
+        {
+          "player": "Demario Douglas",
+          "position": "WR",
+          "team": "NE",
+          "mlConfidence": 0.34559533,
+          "sleeperScore": 103,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": 1.4
+        }
+      ],
+      "sleeperTop10Predictions": [
+        {
+          "player": "Deuce Vaughn",
+          "position": "RB",
+          "team": "DAL",
+          "mlConfidence": 0.32091883,
+          "sleeperScore": 119,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": -2.7
+        },
+        {
+          "player": "Jaleel McLaughlin",
+          "position": "RB",
+          "team": "DEN",
+          "mlConfidence": 0.40082458,
+          "sleeperScore": 111,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": 2.5
+        },
+        {
+          "player": "Demario Douglas",
+          "position": "WR",
+          "team": "NE",
+          "mlConfidence": 0.34559533,
+          "sleeperScore": 103,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": 1.4
+        },
+        {
+          "player": "Emanuel Wilson",
+          "position": "RB",
+          "team": "GB",
+          "mlConfidence": 0.36743638,
+          "sleeperScore": 103,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": 2.4
+        },
+        {
+          "player": "Xavier Gipson",
+          "position": "WR",
+          "team": "NYJ",
+          "mlConfidence": 0.30223566,
+          "sleeperScore": 96,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": -2.7
+        },
+        {
+          "player": "Jalin Hyatt",
+          "position": "WR",
+          "team": "NYG",
+          "mlConfidence": 0.29577553,
+          "sleeperScore": 95,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": 0
+        },
+        {
+          "player": "Emari Demercado",
+          "position": "RB",
+          "team": "ARI",
+          "mlConfidence": 0.3193053,
+          "sleeperScore": 95,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": 1.4
+        },
+        {
+          "player": "Zach Charbonnet",
+          "position": "RB",
+          "team": "SEA",
+          "mlConfidence": 0.37074876,
+          "sleeperScore": 91,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": -0.3
+        },
+        {
+          "player": "Dontayvion Wicks",
+          "position": "WR",
+          "team": "GB",
+          "mlConfidence": 0.37850156,
+          "sleeperScore": 90,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": 3.5
+        },
+        {
+          "player": "Andrei Iosivas",
+          "position": "WR",
+          "team": "CIN",
+          "mlConfidence": 0.39891326,
+          "sleeperScore": 80,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": -7.6
+        }
+      ],
+      "mlTop10Hits": 3,
+      "mlTop3Hits": 2,
+      "sleeperTop10Hits": 0,
+      "sleeperTop3Hits": 0,
+      "mlPrecisionTop10": 0.3,
+      "sleeperPrecisionTop10": 0
+    },
+    {
+      "week": 13,
+      "totalPlayers": 17,
+      "mlTop10Predictions": [
+        {
+          "player": "Chase Brown",
+          "position": "RB",
+          "team": "CIN",
+          "mlConfidence": 0.4811857,
+          "sleeperScore": 84,
+          "mlHit": true,
+          "sleeperHit": true,
+          "fpDelta": 19
+        },
+        {
+          "player": "Andrei Iosivas",
+          "position": "WR",
+          "team": "CIN",
+          "mlConfidence": 0.44417098,
+          "sleeperScore": 105,
+          "mlHit": true,
+          "sleeperHit": true,
+          "fpDelta": 12.5
+        },
+        {
+          "player": "Tank Bigsby",
+          "position": "RB",
+          "team": "JAX",
+          "mlConfidence": 0.414129,
+          "sleeperScore": 71,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": 4.5
+        },
+        {
+          "player": "Dontayvion Wicks",
+          "position": "WR",
+          "team": "GB",
+          "mlConfidence": 0.39966294,
+          "sleeperScore": 95,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": 3.5
+        },
+        {
+          "player": "Jaleel McLaughlin",
+          "position": "RB",
+          "team": "DEN",
+          "mlConfidence": 0.39105824,
+          "sleeperScore": 121,
+          "mlHit": true,
+          "sleeperHit": true,
+          "fpDelta": 5
+        },
+        {
+          "player": "Zach Charbonnet",
+          "position": "RB",
+          "team": "SEA",
+          "mlConfidence": 0.3741758,
+          "sleeperScore": 86,
+          "mlHit": true,
+          "sleeperHit": true,
+          "fpDelta": 9.9
+        },
+        {
+          "player": "Quentin Johnston",
+          "position": "WR",
+          "team": "LAC",
+          "mlConfidence": 0.3556277,
+          "sleeperScore": 71,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": 3.2
+        },
+        {
+          "player": "Michael Wilson",
+          "position": "WR",
+          "team": "ARI",
+          "mlConfidence": 0.35177338,
+          "sleeperScore": 85,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": 3.1
+        },
+        {
+          "player": "Emanuel Wilson",
+          "position": "RB",
+          "team": "GB",
+          "mlConfidence": 0.35071084,
+          "sleeperScore": 89,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": -2.1
+        },
+        {
+          "player": "Jalin Hyatt",
+          "position": "WR",
+          "team": "NYG",
+          "mlConfidence": 0.30811772,
+          "sleeperScore": 80,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": 2.8
+        }
+      ],
+      "sleeperTop10Predictions": [
+        {
+          "player": "Jaleel McLaughlin",
+          "position": "RB",
+          "team": "DEN",
+          "mlConfidence": 0.39105824,
+          "sleeperScore": 121,
+          "mlHit": true,
+          "sleeperHit": true,
+          "fpDelta": 5
+        },
+        {
+          "player": "Andrei Iosivas",
+          "position": "WR",
+          "team": "CIN",
+          "mlConfidence": 0.44417098,
+          "sleeperScore": 105,
+          "mlHit": true,
+          "sleeperHit": true,
+          "fpDelta": 12.5
+        },
+        {
+          "player": "Xavier Gipson",
+          "position": "WR",
+          "team": "NYJ",
+          "mlConfidence": 0.27096614,
+          "sleeperScore": 97,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": 0.9
+        },
+        {
+          "player": "Dontayvion Wicks",
+          "position": "WR",
+          "team": "GB",
+          "mlConfidence": 0.39966294,
+          "sleeperScore": 95,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": 3.5
+        },
+        {
+          "player": "Eric Gray",
+          "position": "RB",
+          "team": "NYG",
+          "mlConfidence": 0.3077525,
+          "sleeperScore": 95,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": -2.6
+        },
+        {
+          "player": "Trey Palmer",
+          "position": "WR",
+          "team": "TB",
+          "mlConfidence": 0.26196778,
+          "sleeperScore": 94,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": -2.8
+        },
+        {
+          "player": "Emanuel Wilson",
+          "position": "RB",
+          "team": "GB",
+          "mlConfidence": 0.35071084,
+          "sleeperScore": 89,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": -2.1
+        },
+        {
+          "player": "Zach Charbonnet",
+          "position": "RB",
+          "team": "SEA",
+          "mlConfidence": 0.3741758,
+          "sleeperScore": 86,
+          "mlHit": true,
+          "sleeperHit": true,
+          "fpDelta": 9.9
+        },
+        {
+          "player": "Michael Wilson",
+          "position": "WR",
+          "team": "ARI",
+          "mlConfidence": 0.35177338,
+          "sleeperScore": 85,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": 3.1
+        },
+        {
+          "player": "Chase Brown",
+          "position": "RB",
+          "team": "CIN",
+          "mlConfidence": 0.4811857,
+          "sleeperScore": 84,
+          "mlHit": true,
+          "sleeperHit": true,
+          "fpDelta": 19
+        }
+      ],
+      "mlTop10Hits": 4,
+      "mlTop3Hits": 2,
+      "sleeperTop10Hits": 4,
+      "sleeperTop3Hits": 2,
+      "mlPrecisionTop10": 0.4,
+      "sleeperPrecisionTop10": 0.4
+    },
+    {
+      "week": 14,
+      "totalPlayers": 14,
+      "mlTop10Predictions": [
+        {
+          "player": "Tank Bigsby",
+          "position": "RB",
+          "team": "JAX",
+          "mlConfidence": 0.3871043,
+          "sleeperScore": 94,
+          "mlHit": true,
+          "sleeperHit": true,
+          "fpDelta": 8.7
+        },
+        {
+          "player": "Tyjae Spears",
+          "position": "RB",
+          "team": "TEN",
+          "mlConfidence": 0.38260388,
+          "sleeperScore": 100,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": 3
+        },
+        {
+          "player": "Jaleel McLaughlin",
+          "position": "RB",
+          "team": "DEN",
+          "mlConfidence": 0.37436974,
+          "sleeperScore": 101,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": -9.4
+        },
+        {
+          "player": "Jordan Addison",
+          "position": "WR",
+          "team": "MIN",
+          "mlConfidence": 0.3684334,
+          "sleeperScore": 76,
+          "mlHit": true,
+          "sleeperHit": false,
+          "fpDelta": 29.9
+        },
+        {
+          "player": "Dontayvion Wicks",
+          "position": "WR",
+          "team": "GB",
+          "mlConfidence": 0.3667204,
+          "sleeperScore": 120,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": 1.9
+        },
+        {
+          "player": "Quentin Johnston",
+          "position": "WR",
+          "team": "LAC",
+          "mlConfidence": 0.35725468,
+          "sleeperScore": 70,
+          "mlHit": true,
+          "sleeperHit": false,
+          "fpDelta": 12.6
+        },
+        {
+          "player": "Emanuel Wilson",
+          "position": "RB",
+          "team": "GB",
+          "mlConfidence": 0.35308793,
+          "sleeperScore": 87,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": -1.3
+        },
+        {
+          "player": "Demario Douglas",
+          "position": "WR",
+          "team": "NE",
+          "mlConfidence": 0.3485403,
+          "sleeperScore": 95,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": -6
+        },
+        {
+          "player": "Michael Mayer",
+          "position": "TE",
+          "team": "LV",
+          "mlConfidence": 0.3450797,
+          "sleeperScore": 80,
+          "mlHit": true,
+          "sleeperHit": true,
+          "fpDelta": 12.3
+        },
+        {
+          "player": "Emari Demercado",
+          "position": "RB",
+          "team": "ARI",
+          "mlConfidence": 0.31256962,
+          "sleeperScore": 92,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": 3
+        }
+      ],
+      "sleeperTop10Predictions": [
+        {
+          "player": "Dontayvion Wicks",
+          "position": "WR",
+          "team": "GB",
+          "mlConfidence": 0.3667204,
+          "sleeperScore": 120,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": 1.9
+        },
+        {
+          "player": "Jaleel McLaughlin",
+          "position": "RB",
+          "team": "DEN",
+          "mlConfidence": 0.37436974,
+          "sleeperScore": 101,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": -9.4
+        },
+        {
+          "player": "Tyjae Spears",
+          "position": "RB",
+          "team": "TEN",
+          "mlConfidence": 0.38260388,
+          "sleeperScore": 100,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": 3
+        },
+        {
+          "player": "Xavier Gipson",
+          "position": "WR",
+          "team": "NYJ",
+          "mlConfidence": 0.2671491,
+          "sleeperScore": 98,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": -0.9
+        },
+        {
+          "player": "Demario Douglas",
+          "position": "WR",
+          "team": "NE",
+          "mlConfidence": 0.3485403,
+          "sleeperScore": 95,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": -6
+        },
+        {
+          "player": "Tank Bigsby",
+          "position": "RB",
+          "team": "JAX",
+          "mlConfidence": 0.3871043,
+          "sleeperScore": 94,
+          "mlHit": true,
+          "sleeperHit": true,
+          "fpDelta": 8.7
+        },
+        {
+          "player": "Emari Demercado",
+          "position": "RB",
+          "team": "ARI",
+          "mlConfidence": 0.31256962,
+          "sleeperScore": 92,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": 3
+        },
+        {
+          "player": "Jalin Hyatt",
+          "position": "WR",
+          "team": "NYG",
+          "mlConfidence": 0.3000287,
+          "sleeperScore": 90,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": -2.8
+        },
+        {
+          "player": "Emanuel Wilson",
+          "position": "RB",
+          "team": "GB",
+          "mlConfidence": 0.35308793,
+          "sleeperScore": 87,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": -1.3
+        },
+        {
+          "player": "Michael Mayer",
+          "position": "TE",
+          "team": "LV",
+          "mlConfidence": 0.3450797,
+          "sleeperScore": 80,
+          "mlHit": true,
+          "sleeperHit": true,
+          "fpDelta": 12.3
+        }
+      ],
+      "mlTop10Hits": 4,
+      "mlTop3Hits": 1,
+      "sleeperTop10Hits": 2,
+      "sleeperTop3Hits": 0,
+      "mlPrecisionTop10": 0.4,
+      "sleeperPrecisionTop10": 0.2
+    },
+    {
+      "week": 15,
+      "totalPlayers": 12,
+      "mlTop10Predictions": [
+        {
+          "player": "Tre Tucker",
+          "position": "WR",
+          "team": "LV",
+          "mlConfidence": 0.4334143,
+          "sleeperScore": 74,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": 1.1
+        },
+        {
+          "player": "Andrei Iosivas",
+          "position": "WR",
+          "team": "CIN",
+          "mlConfidence": 0.41896367,
+          "sleeperScore": 82,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": -6.6
+        },
+        {
+          "player": "Jaleel McLaughlin",
+          "position": "RB",
+          "team": "DEN",
+          "mlConfidence": 0.38380098,
+          "sleeperScore": 122,
+          "mlHit": true,
+          "sleeperHit": true,
+          "fpDelta": 6.4
+        },
+        {
+          "player": "Tyjae Spears",
+          "position": "RB",
+          "team": "TEN",
+          "mlConfidence": 0.37709448,
+          "sleeperScore": 89,
+          "mlHit": true,
+          "sleeperHit": true,
+          "fpDelta": 23.9
+        },
+        {
+          "player": "Demario Douglas",
+          "position": "WR",
+          "team": "NE",
+          "mlConfidence": 0.3690825,
+          "sleeperScore": 104,
+          "mlHit": true,
+          "sleeperHit": true,
+          "fpDelta": 10.1
+        },
+        {
+          "player": "Kendre Miller",
+          "position": "RB",
+          "team": "NO",
+          "mlConfidence": 0.35517976,
+          "sleeperScore": 97,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": -4.6
+        },
+        {
+          "player": "Emanuel Wilson",
+          "position": "RB",
+          "team": "GB",
+          "mlConfidence": 0.3454421,
+          "sleeperScore": 95,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": 0.2
+        },
+        {
+          "player": "Dontayvion Wicks",
+          "position": "WR",
+          "team": "GB",
+          "mlConfidence": 0.31923017,
+          "sleeperScore": 91,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": -5.5
+        },
+        {
+          "player": "Jalin Hyatt",
+          "position": "WR",
+          "team": "NYG",
+          "mlConfidence": 0.31470576,
+          "sleeperScore": 93,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": 0
+        },
+        {
+          "player": "Jonathan Mingo",
+          "position": "WR",
+          "team": "DAL",
+          "mlConfidence": 0.27298984,
+          "sleeperScore": 64,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": 0
+        }
+      ],
+      "sleeperTop10Predictions": [
+        {
+          "player": "Jaleel McLaughlin",
+          "position": "RB",
+          "team": "DEN",
+          "mlConfidence": 0.38380098,
+          "sleeperScore": 122,
+          "mlHit": true,
+          "sleeperHit": true,
+          "fpDelta": 6.4
+        },
+        {
+          "player": "Demario Douglas",
+          "position": "WR",
+          "team": "NE",
+          "mlConfidence": 0.3690825,
+          "sleeperScore": 104,
+          "mlHit": true,
+          "sleeperHit": true,
+          "fpDelta": 10.1
+        },
+        {
+          "player": "Kendre Miller",
+          "position": "RB",
+          "team": "NO",
+          "mlConfidence": 0.35517976,
+          "sleeperScore": 97,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": -4.6
+        },
+        {
+          "player": "Emanuel Wilson",
+          "position": "RB",
+          "team": "GB",
+          "mlConfidence": 0.3454421,
+          "sleeperScore": 95,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": 0.2
+        },
+        {
+          "player": "Jalin Hyatt",
+          "position": "WR",
+          "team": "NYG",
+          "mlConfidence": 0.31470576,
+          "sleeperScore": 93,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": 0
+        },
+        {
+          "player": "Dontayvion Wicks",
+          "position": "WR",
+          "team": "GB",
+          "mlConfidence": 0.31923017,
+          "sleeperScore": 91,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": -5.5
+        },
+        {
+          "player": "Tyjae Spears",
+          "position": "RB",
+          "team": "TEN",
+          "mlConfidence": 0.37709448,
+          "sleeperScore": 89,
+          "mlHit": true,
+          "sleeperHit": true,
+          "fpDelta": 23.9
+        },
+        {
+          "player": "Andrei Iosivas",
+          "position": "WR",
+          "team": "CIN",
+          "mlConfidence": 0.41896367,
+          "sleeperScore": 82,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": -6.6
+        },
+        {
+          "player": "Trey Palmer",
+          "position": "WR",
+          "team": "TB",
+          "mlConfidence": 0.27251017,
+          "sleeperScore": 77,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": 0
+        },
+        {
+          "player": "Tre Tucker",
+          "position": "WR",
+          "team": "LV",
+          "mlConfidence": 0.4334143,
+          "sleeperScore": 74,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": 1.1
+        }
+      ],
+      "mlTop10Hits": 3,
+      "mlTop3Hits": 1,
+      "sleeperTop10Hits": 3,
+      "sleeperTop3Hits": 2,
+      "mlPrecisionTop10": 0.3,
+      "sleeperPrecisionTop10": 0.3
+    },
+    {
+      "week": 16,
+      "totalPlayers": 17,
+      "mlTop10Predictions": [
+        {
+          "player": "Andrei Iosivas",
+          "position": "WR",
+          "team": "CIN",
+          "mlConfidence": 0.4459891,
+          "sleeperScore": 85,
+          "mlHit": true,
+          "sleeperHit": true,
+          "fpDelta": 12.8
+        },
+        {
+          "player": "Tre Tucker",
+          "position": "WR",
+          "team": "LV",
+          "mlConfidence": 0.422505,
+          "sleeperScore": 89,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": 1.5
+        },
+        {
+          "player": "Tank Bigsby",
+          "position": "RB",
+          "team": "JAX",
+          "mlConfidence": 0.37774897,
+          "sleeperScore": 76,
+          "mlHit": true,
+          "sleeperHit": false,
+          "fpDelta": 5.9
+        },
+        {
+          "player": "Emanuel Wilson",
+          "position": "RB",
+          "team": "GB",
+          "mlConfidence": 0.36732677,
+          "sleeperScore": 118,
+          "mlHit": true,
+          "sleeperHit": true,
+          "fpDelta": 11.7
+        },
+        {
+          "player": "Michael Wilson",
+          "position": "WR",
+          "team": "ARI",
+          "mlConfidence": 0.36702213,
+          "sleeperScore": 78,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": 3.5
+        },
+        {
+          "player": "Tucker Kraft",
+          "position": "TE",
+          "team": "GB",
+          "mlConfidence": 0.36554664,
+          "sleeperScore": 84,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": 4.1
+        },
+        {
+          "player": "Kendre Miller",
+          "position": "RB",
+          "team": "NO",
+          "mlConfidence": 0.3618996,
+          "sleeperScore": 70,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": 0.5
+        },
+        {
+          "player": "Roschon Johnson",
+          "position": "RB",
+          "team": "CHI",
+          "mlConfidence": 0.35870975,
+          "sleeperScore": 75,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": 0.3
+        },
+        {
+          "player": "Dontayvion Wicks",
+          "position": "WR",
+          "team": "GB",
+          "mlConfidence": 0.3524441,
+          "sleeperScore": 112,
+          "mlHit": true,
+          "sleeperHit": true,
+          "fpDelta": 6.9
+        },
+        {
+          "player": "Eric Gray",
+          "position": "RB",
+          "team": "NYG",
+          "mlConfidence": 0.34496891,
+          "sleeperScore": 83,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": 1.2
+        }
+      ],
+      "sleeperTop10Predictions": [
+        {
+          "player": "Emanuel Wilson",
+          "position": "RB",
+          "team": "GB",
+          "mlConfidence": 0.36732677,
+          "sleeperScore": 118,
+          "mlHit": true,
+          "sleeperHit": true,
+          "fpDelta": 11.7
+        },
+        {
+          "player": "Dontayvion Wicks",
+          "position": "WR",
+          "team": "GB",
+          "mlConfidence": 0.3524441,
+          "sleeperScore": 112,
+          "mlHit": true,
+          "sleeperHit": true,
+          "fpDelta": 6.9
+        },
+        {
+          "player": "Tyler Scott",
+          "position": "WR",
+          "team": "CHI",
+          "mlConfidence": 0.25745875,
+          "sleeperScore": 97,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": -1.5
+        },
+        {
+          "player": "Trey Palmer",
+          "position": "WR",
+          "team": "TB",
+          "mlConfidence": 0.27485633,
+          "sleeperScore": 92,
+          "mlHit": false,
+          "sleeperHit": true,
+          "fpDelta": 5.1
+        },
+        {
+          "player": "Tre Tucker",
+          "position": "WR",
+          "team": "LV",
+          "mlConfidence": 0.422505,
+          "sleeperScore": 89,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": 1.5
+        },
+        {
+          "player": "Andrei Iosivas",
+          "position": "WR",
+          "team": "CIN",
+          "mlConfidence": 0.4459891,
+          "sleeperScore": 85,
+          "mlHit": true,
+          "sleeperHit": true,
+          "fpDelta": 12.8
+        },
+        {
+          "player": "Jalin Hyatt",
+          "position": "WR",
+          "team": "NYG",
+          "mlConfidence": 0.32194528,
+          "sleeperScore": 85,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": 1.9
+        },
+        {
+          "player": "Tucker Kraft",
+          "position": "TE",
+          "team": "GB",
+          "mlConfidence": 0.36554664,
+          "sleeperScore": 84,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": 4.1
+        },
+        {
+          "player": "Eric Gray",
+          "position": "RB",
+          "team": "NYG",
+          "mlConfidence": 0.34496891,
+          "sleeperScore": 83,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": 1.2
+        },
+        {
+          "player": "Jonathan Mingo",
+          "position": "WR",
+          "team": "DAL",
+          "mlConfidence": 0.2750432,
+          "sleeperScore": 79,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": 0
+        }
+      ],
+      "mlTop10Hits": 4,
+      "mlTop3Hits": 2,
+      "sleeperTop10Hits": 4,
+      "sleeperTop3Hits": 2,
+      "mlPrecisionTop10": 0.4,
+      "sleeperPrecisionTop10": 0.4
+    },
+    {
+      "week": 17,
+      "totalPlayers": 18,
+      "mlTop10Predictions": [
+        {
+          "player": "Tre Tucker",
+          "position": "WR",
+          "team": "LV",
+          "mlConfidence": 0.4307907,
+          "sleeperScore": 81,
+          "mlHit": true,
+          "sleeperHit": false,
+          "fpDelta": 5.6
+        },
+        {
+          "player": "Jaleel McLaughlin",
+          "position": "RB",
+          "team": "DEN",
+          "mlConfidence": 0.41074973,
+          "sleeperScore": 113,
+          "mlHit": true,
+          "sleeperHit": true,
+          "fpDelta": 9.6
+        },
+        {
+          "player": "Zach Charbonnet",
+          "position": "RB",
+          "team": "SEA",
+          "mlConfidence": 0.3779909,
+          "sleeperScore": 93,
+          "mlHit": true,
+          "sleeperHit": true,
+          "fpDelta": 7.3
+        },
+        {
+          "player": "Tucker Kraft",
+          "position": "TE",
+          "team": "GB",
+          "mlConfidence": 0.3770006,
+          "sleeperScore": 89,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": -2.2
+        },
+        {
+          "player": "Michael Wilson",
+          "position": "WR",
+          "team": "ARI",
+          "mlConfidence": 0.37256852,
+          "sleeperScore": 78,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": 0.5
+        },
+        {
+          "player": "Demario Douglas",
+          "position": "WR",
+          "team": "NE",
+          "mlConfidence": 0.37116057,
+          "sleeperScore": 100,
+          "mlHit": true,
+          "sleeperHit": true,
+          "fpDelta": 6.7
+        },
+        {
+          "player": "Keaton Mitchell",
+          "position": "RB",
+          "team": "BAL",
+          "mlConfidence": 0.3701519,
+          "sleeperScore": 98,
+          "mlHit": true,
+          "sleeperHit": true,
+          "fpDelta": 5.8
+        },
+        {
+          "player": "Quentin Johnston",
+          "position": "WR",
+          "team": "LAC",
+          "mlConfidence": 0.36406922,
+          "sleeperScore": 56,
+          "mlHit": true,
+          "sleeperHit": false,
+          "fpDelta": 5
+        },
+        {
+          "player": "Roschon Johnson",
+          "position": "RB",
+          "team": "CHI",
+          "mlConfidence": 0.35940802,
+          "sleeperScore": 86,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": 0.2
+        },
+        {
+          "player": "Michael Mayer",
+          "position": "TE",
+          "team": "LV",
+          "mlConfidence": 0.34299064,
+          "sleeperScore": 75,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": 2.4
+        }
+      ],
+      "sleeperTop10Predictions": [
+        {
+          "player": "Xavier Gipson",
+          "position": "WR",
+          "team": "NYJ",
+          "mlConfidence": 0.2998508,
+          "sleeperScore": 120,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": 0
+        },
+        {
+          "player": "Jaleel McLaughlin",
+          "position": "RB",
+          "team": "DEN",
+          "mlConfidence": 0.41074973,
+          "sleeperScore": 113,
+          "mlHit": true,
+          "sleeperHit": true,
+          "fpDelta": 9.6
+        },
+        {
+          "player": "Demario Douglas",
+          "position": "WR",
+          "team": "NE",
+          "mlConfidence": 0.37116057,
+          "sleeperScore": 100,
+          "mlHit": true,
+          "sleeperHit": true,
+          "fpDelta": 6.7
+        },
+        {
+          "player": "Keaton Mitchell",
+          "position": "RB",
+          "team": "BAL",
+          "mlConfidence": 0.3701519,
+          "sleeperScore": 98,
+          "mlHit": true,
+          "sleeperHit": true,
+          "fpDelta": 5.8
+        },
+        {
+          "player": "Trey Palmer",
+          "position": "WR",
+          "team": "TB",
+          "mlConfidence": 0.2684797,
+          "sleeperScore": 97,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": -5.1
+        },
+        {
+          "player": "Zach Charbonnet",
+          "position": "RB",
+          "team": "SEA",
+          "mlConfidence": 0.3779909,
+          "sleeperScore": 93,
+          "mlHit": true,
+          "sleeperHit": true,
+          "fpDelta": 7.3
+        },
+        {
+          "player": "Eric Gray",
+          "position": "RB",
+          "team": "NYG",
+          "mlConfidence": 0.33238026,
+          "sleeperScore": 93,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": -1.2
+        },
+        {
+          "player": "Jalin Hyatt",
+          "position": "WR",
+          "team": "NYG",
+          "mlConfidence": 0.31789777,
+          "sleeperScore": 90,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": -1.9
+        },
+        {
+          "player": "Tucker Kraft",
+          "position": "TE",
+          "team": "GB",
+          "mlConfidence": 0.3770006,
+          "sleeperScore": 89,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": -2.2
+        },
+        {
+          "player": "Roschon Johnson",
+          "position": "RB",
+          "team": "CHI",
+          "mlConfidence": 0.35940802,
+          "sleeperScore": 86,
+          "mlHit": false,
+          "sleeperHit": false,
+          "fpDelta": 0.2
+        }
+      ],
+      "mlTop10Hits": 6,
+      "mlTop3Hits": 3,
+      "sleeperTop10Hits": 4,
+      "sleeperTop3Hits": 2,
+      "mlPrecisionTop10": 0.6,
+      "sleeperPrecisionTop10": 0.4
+    }
+  ]
+}

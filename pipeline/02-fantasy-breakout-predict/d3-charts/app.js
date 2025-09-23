@@ -4,58 +4,68 @@ import * as d3 from 'https://esm.sh/d3@7';
 
 const LineChart = () => {
     const svgRef = useRef(null);
-
-    const weeklyData = [
-        { Week: 3, TopTenSleeperHits: 6, TopThreeSleeperHits: 3, MLModelSuccessfulHits: 7 },
-        { Week: 4, TopTenSleeperHits: 5, TopThreeSleeperHits: 1, MLModelSuccessfulHits: 6 },
-        { Week: 5, TopTenSleeperHits: 5, TopThreeSleeperHits: 1, MLModelSuccessfulHits: 6 },
-        { Week: 6, TopTenSleeperHits: 2, TopThreeSleeperHits: 1, MLModelSuccessfulHits: 2 },
-        { Week: 7, TopTenSleeperHits: 3, TopThreeSleeperHits: 0, MLModelSuccessfulHits: 4 },
-        { Week: 8, TopTenSleeperHits: 4, TopThreeSleeperHits: 2, MLModelSuccessfulHits: 7 },
-        { Week: 9, TopTenSleeperHits: 5, TopThreeSleeperHits: 2, MLModelSuccessfulHits: 5 },
-        { Week: 10, TopTenSleeperHits: 2, TopThreeSleeperHits: 0, MLModelSuccessfulHits: 2 },
-        { Week: 11, TopTenSleeperHits: 1, TopThreeSleeperHits: 0, MLModelSuccessfulHits: 2 },
-        { Week: 12, TopTenSleeperHits: 0, TopThreeSleeperHits: 0, MLModelSuccessfulHits: 1 },
-        { Week: 13, TopTenSleeperHits: 3, TopThreeSleeperHits: 1, MLModelSuccessfulHits: 4 },
-        { Week: 14, TopTenSleeperHits: 2, TopThreeSleeperHits: 0, MLModelSuccessfulHits: 4 },
-        { Week: 15, TopTenSleeperHits: 3, TopThreeSleeperHits: 2, MLModelSuccessfulHits: 3 },
-        { Week: 16, TopTenSleeperHits: 4, TopThreeSleeperHits: 2, MLModelSuccessfulHits: 5 },
-        { Week: 17, TopTenSleeperHits: 4, TopThreeSleeperHits: 2, MLModelSuccessfulHits: 6 }
-    ]
-
-    const [data] = useState([
-        {
-            name: 'Top Ten Sleeper Hits',
-            color: '#4a90e2',
-            values: weeklyData.map(d => ({
-                x: d.Week,
-                y: d.TopTenSleeperHits
-            }))
-        },
-        {
-            name: 'Top Three Sleeper Hits',
-            color: '#ff6b6b',
-            values: weeklyData.map(d => ({
-                x: d.Week,
-                y: d.TopThreeSleeperHits
-            }))
-        },
-        {
-            name: 'ML Model Successful Hits',
-            color: '#51cf66',
-            values: weeklyData.map(d => ({
-                x: d.Week,
-                y: d.MLModelSuccessfulHits
-            }))
-        }
-    ]);
+    const [data, setData] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [overallStats, setOverallStats] = useState(null);
 
     useEffect(() => {
-        if (!svgRef.current || !data.length) return;
+        // Load data from output.json
+        fetch('./output.json')
+            .then(response => response.json())
+            .then(jsonData => {
+                setOverallStats(jsonData.overallStats);
 
-        const margin = { top: 40, right: 30, bottom: 60, left: 60 };
-        const width = 800 - margin.left - margin.right;
-        const height = 400 - margin.top - margin.bottom;
+                // Transform the data for D3 charts
+                const transformedData = [
+                    {
+                        name: 'Top Ten Sleeper Hits',
+                        color: '#4a90e2',
+                        values: jsonData.weeklyPredictions.map(d => ({
+                            x: d.week,
+                            y: d.sleeperTop10Hits
+                        }))
+                    },
+                    {
+                        name: 'Top Three Sleeper Hits',
+                        color: '#ff6b6b',
+                        values: jsonData.weeklyPredictions.map(d => ({
+                            x: d.week,
+                            y: d.sleeperTop3Hits
+                        }))
+                    },
+                    {
+                        name: 'ML Model Top 10 Hits',
+                        color: '#51cf66',
+                        values: jsonData.weeklyPredictions.map(d => ({
+                            x: d.week,
+                            y: d.mlTop10Hits
+                        }))
+                    },
+                    {
+                        name: 'ML Model Top 3 Hits',
+                        color: '#ffa726',
+                        values: jsonData.weeklyPredictions.map(d => ({
+                            x: d.week,
+                            y: d.mlTop3Hits
+                        }))
+                    }
+                ];
+
+                setData(transformedData);
+                setLoading(false);
+            })
+            .catch(error => {
+                console.error('Error loading data:', error);
+                setLoading(false);
+            });
+    }, []);
+
+    useEffect(() => {
+        if (!svgRef.current || !data.length || loading) return;
+
+        const margin = { top: 40, right: 150, bottom: 60, left: 60 };
+        const width = 1000 - margin.left - margin.right;
+        const height = 500 - margin.top - margin.bottom;
 
         d3.select(svgRef.current).selectAll("*").remove();
 
@@ -67,17 +77,18 @@ const LineChart = () => {
             .attr("transform", `translate(${margin.left},${margin.top})`);
 
         const allValues = data.flatMap(d => d.values);
+        const weeks = [...new Set(allValues.map(d => d.x))].sort((a, b) => a - b);
 
         const xScale = d3.scaleLinear()
-            .domain([3, 17])
+            .domain(d3.extent(weeks))
             .range([0, width]);
 
         const yScale = d3.scaleLinear()
-            .domain([0, 10])
+            .domain([0, d3.max(allValues, d => d.y) + 1])
             .range([height, 0]);
 
         const sizeScale = d3.scaleLinear()
-            .domain([d3.min(allValues, d => d.y), d3.max(allValues, d => d.y)])
+            .domain([0, d3.max(allValues, d => d.y)])
             .range([3, 8]);
 
         const line = d3.line()
@@ -85,10 +96,31 @@ const LineChart = () => {
             .y(d => yScale(d.y))
             .curve(d3.curveMonotoneX);
 
+        // Add gridlines
+        g.append("g")
+            .attr("class", "grid")
+            .attr("transform", `translate(0,${height})`)
+            .call(d3.axisBottom(xScale)
+                .tickSize(-height)
+                .tickFormat("")
+            )
+            .style("stroke-dasharray", "3,3")
+            .style("opacity", 0.3);
+
+        g.append("g")
+            .attr("class", "grid")
+            .call(d3.axisLeft(yScale)
+                .tickSize(-width)
+                .tickFormat("")
+            )
+            .style("stroke-dasharray", "3,3")
+            .style("opacity", 0.3);
+
+        // Add axes
         g.append("g")
             .attr("class", "axis")
             .attr("transform", `translate(0,${height})`)
-            .call(d3.axisBottom(xScale));
+            .call(d3.axisBottom(xScale).tickFormat(d3.format("d")));
 
         g.append("text")
             .attr("class", "axis-label")
@@ -109,6 +141,7 @@ const LineChart = () => {
             .style("text-anchor", "middle")
             .text("Number of Hits");
 
+        // Remove existing tooltip
         d3.select("body").selectAll(".tooltip").remove();
 
         const tooltip = d3.select("body").append("div")
@@ -118,11 +151,14 @@ const LineChart = () => {
             .style("background", "rgba(0, 0, 0, 0.8)")
             .style("color", "white")
             .style("border-radius", "4px")
-            .style("padding", "5px")
+            .style("padding", "8px")
             .style("font-size", "12px")
-            .style("pointer-events", "none");
+            .style("pointer-events", "none")
+            .style("z-index", "1000");
 
+        // Draw lines and dots
         data.forEach((lineData, i) => {
+            // Draw line
             g.append("path")
                 .datum(lineData.values)
                 .attr("class", "line")
@@ -131,6 +167,7 @@ const LineChart = () => {
                 .attr("fill", "none")
                 .attr("stroke-width", 2);
 
+            // Draw dots
             g.selectAll(`.dot-${i}`)
                 .data(lineData.values)
                 .enter().append("circle")
@@ -139,7 +176,11 @@ const LineChart = () => {
                 .attr("cy", d => yScale(d.y))
                 .attr("r", d => sizeScale(d.y))
                 .attr("fill", lineData.color)
+                .attr("stroke", "white")
+                .attr("stroke-width", 1)
+                .style("cursor", "pointer")
                 .on("mouseover", function(event, d) {
+                    d3.select(this).attr("r", d => sizeScale(d.y) + 2);
                     tooltip.transition()
                         .duration(200)
                         .style("opacity", .9);
@@ -147,38 +188,51 @@ const LineChart = () => {
                         .style("left", (event.pageX + 10) + "px")
                         .style("top", (event.pageY - 28) + "px");
                 })
-                .on("mouseout", function() {
+                .on("mouseout", function(event, d) {
+                    d3.select(this).attr("r", d => sizeScale(d.y));
                     tooltip.transition()
                         .duration(500)
                         .style("opacity", 0);
                 });
         });
 
+        // Add legend
         const legend = g.append("g")
             .attr("class", "legend")
-            .attr("transform", `translate(${width - 100}, 20)`);
+            .attr("transform", `translate(${width + 20}, 20)`);
 
         data.forEach((lineData, i) => {
             const legendRow = legend.append("g")
-                .attr("transform", `translate(0, ${i * 20})`);
+                .attr("transform", `translate(0, ${i * 25})`);
 
             legendRow.append("rect")
-                .attr("width", 10)
-                .attr("height", 10)
+                .attr("width", 12)
+                .attr("height", 12)
                 .attr("fill", lineData.color);
 
             legendRow.append("text")
-                .attr("x", 15)
+                .attr("x", 18)
                 .attr("y", 9)
                 .attr("text-anchor", "start")
                 .style("font-size", "12px")
                 .text(lineData.name);
         });
 
-    }, [data]);
+    }, [data, loading]);
+
+    if (loading) {
+        return React.createElement('div', null,
+            React.createElement('h2', { className: 'chart-title' }, 'Loading...'));
+    }
 
     return React.createElement('div', null,
-        React.createElement('h2', { className: 'chart-title' }, 'Weekly Fantasy Metrics Performance'),
+        React.createElement('div', { className: 'chart-title' },
+            React.createElement('h1', null, 'NFL Fantasy Breakout Prediction Analysis'),
+            overallStats && React.createElement('div', { style: { fontSize: '14px', marginTop: '10px', color: '#666' } },
+                React.createElement('p', null, `Total Weeks Analyzed: ${overallStats.totalWeeks} | Total Players: ${overallStats.totalAnalyzedPlayers}`),
+                React.createElement('p', null, `ML Model Accuracy (Top 10): ${(overallStats.mlAccuracyTop10 * 100).toFixed(1)}% | Sleeper Score Accuracy (Top 10): ${(overallStats.sleeperAccuracyTop10 * 100).toFixed(1)}%`)
+            )
+        ),
         React.createElement('svg', { ref: svgRef })
     );
 };

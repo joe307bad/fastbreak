@@ -3,19 +3,22 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Weekly Fantasy Metrics Performance</title>
+    <title>NFL Fantasy Breakout Prediction Analysis</title>
     <style>
         body {
-            font-family: Arial, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
             margin: 0;
             padding: 20px;
-            background-color: #f5f5f5;
+            background-color: #f8f9fa;
+            line-height: 1.6;
         }
         #root {
             background: white;
-            border-radius: 8px;
-            padding: 20px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            max-width: 1200px;
+            margin: 0 auto;
         }
         .line {
             fill: none;
@@ -33,10 +36,24 @@
             font-weight: bold;
         }
         .chart-title {
-            font-size: 18px;
-            font-weight: bold;
             text-align: center;
-            margin-bottom: 20px;
+            margin-bottom: 30px;
+        }
+        .chart-title h1 {
+            font-size: 28px;
+            font-weight: 600;
+            color: #2c3e50;
+            margin: 0 0 10px 0;
+        }
+        .chart-title p {
+            margin: 5px 0;
+            font-weight: 500;
+        }
+        .grid {
+            stroke: #e9ecef;
+        }
+        .legend text {
+            font-family: inherit;
         }
     </style>
 </head>

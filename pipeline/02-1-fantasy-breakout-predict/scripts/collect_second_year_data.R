@@ -192,40 +192,40 @@ check_player_status <- function(player_name, check_week,
   }
 }
 
+# Load ECR data once (single snapshot, not per-week)
+cat("Fetching ECR data from FantasyPros (single snapshot)...\n")
+safe_sleep()
+
+ecr_data <- tryCatch({
+  fp_rankings(page = 'consensus-cheatsheets', year = year, scoring = 'HALF') %>%
+    filter(
+      ecr > 100,  # Only include players ranked worse than 100
+      pos %in% c("RB", "WR", "TE")
+    ) %>%
+    arrange(ecr) %>%  # Sort by ECR (best to worst)
+    head(200) %>%     # Take first 200 players
+    select(player = player_name, position = pos, team, ecr) %>%
+    mutate(
+      position = case_when(
+        position == "RB" ~ "RB",
+        position == "WR" ~ "WR",
+        position == "TE" ~ "TE",
+        TRUE ~ position
+      ),
+      clean_name = clean_name(player)
+    )
+}, error = function(e) {
+  cat("Error: Could not fetch ECR data:", e$message, "\n")
+  quit(status = 1)
+})
+
+cat("Loaded", nrow(ecr_data), "players from ECR snapshot\n")
+
 # Loop through weeks 3-18
 for (week in 3:18) {
   cat("\n=== Processing Week", week, "===\n")
 
   tryCatch({
-    # Load ECR data for this week
-    cat("Fetching ECR data from FantasyPros for week", week, "...\n")
-    safe_sleep()
-
-    ecr_data <- tryCatch({
-      fp_rankings(page = 'consensus-cheatsheets', year = year, scoring = 'HALF', week = week) %>%
-        filter(
-          ecr > 100,  # Only include players ranked worse than 100
-          pos %in% c("RB", "WR", "TE")
-        ) %>%
-        select(player = player_name, position = pos, team, ecr) %>%
-        mutate(
-          position = case_when(
-            position == "RB" ~ "RB",
-            position == "WR" ~ "WR",
-            position == "TE" ~ "TE",
-            TRUE ~ position
-          ),
-          clean_name = clean_name(player)
-        )
-    }, error = function(e) {
-      cat("Warning: Could not fetch ECR data for week", week, ":", e$message, "\n")
-      NULL
-    })
-
-    if (is.null(ecr_data)) {
-      cat("Skipping week", week, "due to missing ECR data\n")
-      next
-    }
 
     # Load current year snap counts up to this week
     cat("Loading snap count data through week", week, "...\n")
@@ -323,6 +323,11 @@ for (week in 3:18) {
         names_prefix = "week_"
       )
 
+    # Get previous week fantasy points
+    prev_week_fp <- load_player_stats(year) %>%
+      filter(season_type == "REG", week == max(1, !!week - 1)) %>%
+      select(player_id, prev_week_fp = fantasy_points_ppr)
+
     # Load schedule and opponent data
     cat("Loading schedule for week", week, "...\n")
     safe_sleep()
@@ -392,7 +397,8 @@ for (week in 3:18) {
 
     # Join recent fantasy points
     ml_data <- ml_data %>%
-      left_join(recent_fp, by = "player_id")
+      left_join(recent_fp, by = "player_id") %>%
+      left_join(prev_week_fp, by = "player_id")
 
     # Add opponent data if available
     if (!is.null(opponent_mapping)) {
@@ -574,7 +580,7 @@ for (week in 3:18) {
         fp_per_snap_y2,
 
         # Recent weeks FP (if available)
-        starts_with("week_"),
+        prev_week_fp, starts_with("week_"),
 
         # Derived features
         snap_pct_change, snap_pct_variance, fp_consistency_y2, snap_consistency_y2,
@@ -603,16 +609,13 @@ for (week in 3:18) {
 
     # Filter out players with >10 fantasy points in previous week
     if (week > 1) {
-      prev_week_col <- paste0("week_", week - 1)
-      if (prev_week_col %in% names(final_data)) {
-        initial_count <- nrow(final_data)
-        final_data <- final_data %>%
-          filter(is.na(!!sym(prev_week_col)) | !!sym(prev_week_col) <= 10)
-        filtered_count <- nrow(final_data)
-        cat("[DEBUG] Filtered out", initial_count - filtered_count,
-            "players with >10 FP in", prev_week_col, "\n")
-        cat("[DEBUG] Remaining candidates:", filtered_count, "\n")
-      }
+      initial_count <- nrow(final_data)
+      final_data <- final_data %>%
+        filter(is.na(prev_week_fp) | prev_week_fp <= 10)
+      filtered_count <- nrow(final_data)
+      cat("[DEBUG] Filtered out", initial_count - filtered_count,
+          "players with >10 FP in previous week\n")
+      cat("[DEBUG] Remaining candidates:", filtered_count, "\n")
     }
 
     # Generate output filename

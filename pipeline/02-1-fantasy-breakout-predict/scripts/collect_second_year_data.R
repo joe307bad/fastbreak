@@ -439,12 +439,6 @@ for (week in 3:18) {
     ml_data <- ml_data %>%
       filter(player_available)
     filtered_count <- nrow(ml_data)
-    cat("[DEBUG] Player status filtering: Started with", initial_count,
-        "candidates\n")
-    cat("[DEBUG] After filtering out injured/unavailable players:",
-        filtered_count, "candidates remain\n")
-    cat("[DEBUG] Excluded", initial_count - filtered_count,
-        "players due to roster/injury status in week", week, "\n")
 
     # Filter for meaningful snap counts in recent weeks
     if (week >= 2) {
@@ -478,12 +472,6 @@ for (week in 3:18) {
       }
 
       filtered_count <- nrow(ml_data)
-      cat("[DEBUG] Snap count filtering: Started with", initial_count,
-          "candidates\n")
-      cat("[DEBUG] After snap count filtering:", filtered_count,
-          "candidates remain\n")
-      cat("[DEBUG] Excluded", initial_count - filtered_count,
-          "players with minimal recent snap counts\n")
     }
 
     # Calculate derived features
@@ -558,7 +546,6 @@ for (week in 3:18) {
 
     # Select final columns for output
     cat("Selecting final columns...\n")
-    cat("Available columns:", paste(names(ml_data), collapse=", "), "\n")
 
     final_data <- tryCatch({
       ml_data %>%
@@ -600,8 +587,6 @@ for (week in 3:18) {
         select(-any_of("clean_name"))
     }, error = function(e) {
       cat("ERROR in select():", e$message, "\n")
-      cat("Available column names:\n")
-      print(names(ml_data))
       stop(e)  # Re-throw the error
     })
 
@@ -613,9 +598,6 @@ for (week in 3:18) {
       final_data <- final_data %>%
         filter(is.na(prev_week_fp) | prev_week_fp <= 10)
       filtered_count <- nrow(final_data)
-      cat("[DEBUG] Filtered out", initial_count - filtered_count,
-          "players with >10 FP in previous week\n")
-      cat("[DEBUG] Remaining candidates:", filtered_count, "\n")
     }
 
     # Generate output filename

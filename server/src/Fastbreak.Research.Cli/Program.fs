@@ -14,13 +14,13 @@ type GenerateEloPlusArgs =
             | Markdown _ -> "output markdown report to specified file path"
 
 type NflFantasyBreakoutArgs =
-    | [<AltCommandLine("-d"); Mandatory>] Data of path:string
-    | [<AltCommandLine("-o"); Mandatory>] Output of path:string
+    | [<CliPrefix(CliPrefix.None)>] Verify_Data
+    | [<CliPrefix(CliPrefix.None)>] Calculate_Sleeper_Score
     interface IArgParserTemplate with
         member this.Usage =
             match this with
-            | Data _ -> "directory path containing CSV files for ML analysis (required)"
-            | Output _ -> "path where the weekly metrics JSON file should be saved (required)"
+            | Verify_Data -> "verify data sources are accessible"
+            | Calculate_Sleeper_Score -> "calculate sleeper scores for fantasy players"
 
 type CliArgs =
     | [<CustomCommandLine("01-generate-elo-plus"); CliPrefix(CliPrefix.None)>] Generate_Elo_Plus_01 of ParseResults<GenerateEloPlusArgs>

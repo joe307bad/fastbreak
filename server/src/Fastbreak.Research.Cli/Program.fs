@@ -17,12 +17,14 @@ type NflFantasyBreakoutArgs =
     | [<CliPrefix(CliPrefix.None)>] Verify_Data
     | [<CliPrefix(CliPrefix.None)>] Calculate_Sleeper_Score
     | [<AltCommandLine("--players")>] Sleeper_Players of path:string
+    | [<AltCommandLine("--png")>] Png_Output of path:string
     interface IArgParserTemplate with
         member this.Usage =
             match this with
             | Verify_Data -> "verify data sources are accessible"
             | Calculate_Sleeper_Score -> "calculate sleeper scores for fantasy players"
             | Sleeper_Players _ -> "path to CSV file containing player data (e.g., second_year_2024_week3.csv)"
+            | Png_Output _ -> "directory path to save PNG output (e.g., ~/Downloads)"
 
 type CliArgs =
     | [<CustomCommandLine("01-generate-elo-plus"); CliPrefix(CliPrefix.None)>] Generate_Elo_Plus_01 of ParseResults<GenerateEloPlusArgs>

@@ -4,6 +4,9 @@ open System
 open System.IO
 open System.Globalization
 open Argu
+open Plotly.NET
+open Plotly.NET.LayoutObjects
+open Plotly.NET.TraceObjects
 
 module NflFantasyBreakout =
 
@@ -170,7 +173,105 @@ module NflFantasyBreakout =
             })
         |> Array.toList
 
-    let calculateSleeperScore (playersFile: string) =
+    let generateSleeperScoreTable (scores: SleeperScore list) (outputPath: string) =
+        // Simple approach: read CSV and display it as-is
+        // Just use the first 10 columns for simplicity
+
+        let headers = ["Player"; "Pos"; "Team"; "Opp"; "Draft"; "Perf"; "Age"; "ECR"; "Def"; "Snap"; "Total"]
+
+        // Build each row as a list of strings
+        let tableRows =
+            scores |> List.map (fun s ->
+                [
+                    s.Player
+                    s.Position
+                    s.Team
+                    s.Opponent
+                    sprintf "%.0f" s.DraftValueScore
+                    sprintf "%.0f" s.PerformanceScore
+                    sprintf "%.0f" s.AgeScore
+                    sprintf "%.1f" s.EcrScore
+                    sprintf "%.0f" s.DefenseMatchupScore
+                    sprintf "%.0f" s.SnapTrendScore
+                    sprintf "%.1f" s.TotalScore
+                ]
+            )
+
+        // Create color scale for total score
+        let totalValues = scores |> List.map (fun s -> s.TotalScore)
+        let minTotal = totalValues |> List.min
+        let maxTotal = totalValues |> List.max
+
+        let getCellColor (v: float) =
+            if maxTotal = minTotal then "rgb(240, 240, 255)"
+            else
+                let ratio = (v - minTotal) / (maxTotal - minTotal)
+                // Low score (ratio=0): Light blue rgb(200, 220, 255)
+                // High score (ratio=1): Red rgb(255, 100, 100)
+                let r = int (200.0 + ratio * 55.0)   // 200 -> 255
+                let g = int (220.0 - ratio * 120.0)  // 220 -> 100
+                let b = int (255.0 - ratio * 155.0)  // 255 -> 100
+                sprintf "rgb(%d, %d, %d)" r g b
+
+        // Use tableRows directly - DON'T transpose!
+        // Chart.Table actually DOES expect row-oriented data in its cells parameter
+
+        // Create color for each cell (organized by rows)
+        let whiteColorStr = "rgb(255, 255, 255)"
+        let cellColorRows =
+            tableRows |> List.mapi (fun idx row ->
+                row |> List.mapi (fun colIdx _ ->
+                    if colIdx = 10 then // Total column gets heatmap
+                        getCellColor totalValues.[idx]
+                    else
+                        whiteColorStr
+                )
+            )
+
+        let table =
+            Chart.Table(
+                headers,
+                tableRows,
+                CellsMultiAlign = [
+                    StyleParam.HorizontalAlign.Left      // Player
+                    StyleParam.HorizontalAlign.Center    // Pos
+                    StyleParam.HorizontalAlign.Center    // Team
+                    StyleParam.HorizontalAlign.Center    // Opp
+                    StyleParam.HorizontalAlign.Right     // Draft
+                    StyleParam.HorizontalAlign.Right     // Perf
+                    StyleParam.HorizontalAlign.Right     // Age
+                    StyleParam.HorizontalAlign.Right     // ECR
+                    StyleParam.HorizontalAlign.Right     // Def
+                    StyleParam.HorizontalAlign.Right     // Snap
+                    StyleParam.HorizontalAlign.Right     // Total
+                ],
+                CellsFillColor = Color.fromColors (cellColorRows |> List.concat |> List.map Color.fromString)
+            )
+            |> Chart.withTitle "NFL Fantasy Sleeper Scores"
+            |> Chart.withSize (1400.0, 800.0)
+
+        // Expand tilde in path
+        let expandedPath =
+            if outputPath.StartsWith("~") then
+                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), outputPath.Substring(2))
+            else
+                outputPath
+
+        // Ensure directory exists
+        if not (Directory.Exists(expandedPath)) then
+            Directory.CreateDirectory(expandedPath) |> ignore
+
+        // Generate filename with timestamp
+        let timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss")
+        let filename = sprintf "sleeper_scores_%s.html" timestamp
+        let fullPath = Path.Combine(expandedPath, filename)
+
+        // Save Plotly chart as HTML
+        table |> Chart.saveHtml(fullPath)
+
+        fullPath
+
+    let calculateSleeperScore (playersFile: string) (pngOutputPath: string option) =
         loadEnvFile()
 
         let defensiveRankingsFile = Environment.GetEnvironmentVariable("DEFENSIVE_POWER_RANKINGS_FILE")
@@ -291,6 +392,20 @@ module NflFantasyBreakout =
 
             printfn ""
             printfn "✅ Calculated sleeper scores for %d players" sleeperScores.Length
+
+            // Generate HTML table if requested
+            match pngOutputPath with
+            | Some path ->
+                try
+                    printfn ""
+                    printfn "Generating HTML table..."
+                    let savedPath = generateSleeperScoreTable sleeperScores path
+                    printfn "✅ HTML table saved to: %s" savedPath
+                with
+                | ex ->
+                    printfn "❌ Error generating HTML: %s" ex.Message
+            | None -> ()
+
             0
 
     let runNflFantasyBreakout (args: ParseResults<'T>) =
@@ -311,16 +426,30 @@ module NflFantasyBreakout =
             if hasVerifyData then
                 verifyData()
             elif hasCalculateScore then
-                // Extract the players file path from command line args
+                // Extract the players file path and png output path from command line args
                 let argStrings = Environment.GetCommandLineArgs()
                 let playersIndex = Array.tryFindIndex (fun s -> s = "--players") argStrings
+                let pngIndex = Array.tryFindIndex (fun (s: string) -> s.StartsWith("--png")) argStrings
+
+                let pngPath =
+                    match pngIndex with
+                    | Some i ->
+                        // Handle --png=path or --png path
+                        if argStrings.[i].Contains("=") then
+                            Some ((argStrings.[i].Split('=') : string array).[1])
+                        elif i + 1 < argStrings.Length then
+                            Some argStrings.[i + 1]
+                        else
+                            None
+                    | None -> None
+
                 match playersIndex with
                 | Some i when i + 1 < argStrings.Length ->
                     let playersFile = argStrings.[i + 1]
-                    calculateSleeperScore playersFile
+                    calculateSleeperScore playersFile pngPath
                 | _ ->
                     printfn "ERROR: --players argument is required for calculate-sleeper-score"
-                    printfn "Usage: dotnet run 02-nfl-fantasy-breakout calculate-sleeper-score --players <csv_path>"
+                    printfn "Usage: dotnet run 02-nfl-fantasy-breakout calculate-sleeper-score --players <csv_path> [--png <output_dir>]"
                     1
             else
                 printfn "ERROR: Unknown subcommand"

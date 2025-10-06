@@ -228,6 +228,23 @@ module NflFantasyBreakout =
                 )
             )
 
+        // According to Plotly.NET docs, we need to:
+        // 1. Create colors row by row
+        // 2. Transpose to column orientation
+        // 3. Convert each column to Color.fromColors
+        // 4. Then wrap all columns with Color.fromColors
+
+        let cellcolor =
+            cellColorRows
+            |> Seq.map (fun row ->
+                row
+                |> Seq.map Color.fromString)
+            |> Seq.transpose  // Transpose from rows to columns
+            |> Seq.map Color.fromColors  // Convert each column list to Color
+            |> Color.fromColors  // Wrap all columns
+
+        printfn "Cell colors created successfully"
+
         let table =
             Chart.Table(
                 headers,
@@ -245,7 +262,7 @@ module NflFantasyBreakout =
                     StyleParam.HorizontalAlign.Right     // Snap
                     StyleParam.HorizontalAlign.Right     // Total
                 ],
-                CellsFillColor = Color.fromColors (cellColorRows |> List.concat |> List.map Color.fromString)
+                CellsFillColor = cellcolor
             )
             |> Chart.withTitle "NFL Fantasy Sleeper Scores"
             |> Chart.withSize (1400.0, 800.0)

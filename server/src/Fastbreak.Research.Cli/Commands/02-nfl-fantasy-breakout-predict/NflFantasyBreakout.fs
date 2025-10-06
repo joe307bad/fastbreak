@@ -177,7 +177,7 @@ module NflFantasyBreakout =
         // Simple approach: read CSV and display it as-is
         // Just use the first 10 columns for simplicity
 
-        let headers = ["Player"; "Pos"; "Team"; "Opp"; "Draft"; "Perf"; "Age"; "ECR"; "Def"; "Snap"; "Total"]
+        let headers = ["Player"; "Pos"; "Team"; "Opp"; "Sleeper Score"]
 
         // Build each row as a list of strings
         let tableRows =
@@ -187,12 +187,6 @@ module NflFantasyBreakout =
                     s.Position
                     s.Team
                     s.Opponent
-                    sprintf "%.0f" s.DraftValueScore
-                    sprintf "%.0f" s.PerformanceScore
-                    sprintf "%.0f" s.AgeScore
-                    sprintf "%.1f" s.EcrScore
-                    sprintf "%.0f" s.DefenseMatchupScore
-                    sprintf "%.0f" s.SnapTrendScore
                     sprintf "%.1f" s.TotalScore
                 ]
             )
@@ -221,7 +215,7 @@ module NflFantasyBreakout =
         let cellColorRows =
             tableRows |> List.mapi (fun idx row ->
                 row |> List.mapi (fun colIdx _ ->
-                    if colIdx = 10 then // Total column gets heatmap
+                    if colIdx = 4 then // Sleeper Score column (last column) gets heatmap
                         getCellColor totalValues.[idx]
                     else
                         whiteColorStr
@@ -254,18 +248,19 @@ module NflFantasyBreakout =
                     StyleParam.HorizontalAlign.Center    // Pos
                     StyleParam.HorizontalAlign.Center    // Team
                     StyleParam.HorizontalAlign.Center    // Opp
-                    StyleParam.HorizontalAlign.Right     // Draft
-                    StyleParam.HorizontalAlign.Right     // Perf
-                    StyleParam.HorizontalAlign.Right     // Age
-                    StyleParam.HorizontalAlign.Right     // ECR
-                    StyleParam.HorizontalAlign.Right     // Def
-                    StyleParam.HorizontalAlign.Right     // Snap
-                    StyleParam.HorizontalAlign.Right     // Total
+                    StyleParam.HorizontalAlign.Right     // Sleeper Score
                 ],
-                CellsFillColor = cellcolor
+                CellsFillColor = cellcolor,
+                ColumnWidth = 300.0  // Fixed width per column - will apply to all columns equally
             )
             |> Chart.withTitle "NFL Fantasy Sleeper Scores"
-            |> Chart.withSize (1400.0, 800.0)
+            |> Chart.withSize (900.0, 1000.0)  // Wider to accommodate player names without wrapping
+            |> Chart.withConfig(Config.init(ToImageButtonOptions = ConfigObjects.ToImageButtonOptions.init(
+                Format = StyleParam.ImageFormat.PNG,
+                Width = 900,
+                Height = 1000,
+                Scale = 2.0  // 2x scale for higher resolution
+            )))
 
         // Expand tilde in path
         let expandedPath =

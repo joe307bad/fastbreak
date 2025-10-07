@@ -14,14 +14,31 @@ suppressPackageStartupMessages({
 args <- commandArgs(trailingOnly = TRUE)
 
 # Check if correct number of arguments provided
-if (length(args) != 2) {
-  cat("Usage: Rscript collect_second_year_data.R [year] [output_directory]\n")
+if (length(args) < 2 || length(args) > 3) {
+  cat("Usage: Rscript collect_second_year_data.R [year] [output_directory] [--week wN]\n")
   cat("Example: Rscript collect_second_year_data.R 2024 ./data/\n")
+  cat("Example: Rscript collect_second_year_data.R 2024 ./data/ --week w5\n")
   quit(status = 1)
 }
 
 year <- as.integer(args[1])
 output_dir <- args[2]
+
+# Parse optional week argument
+specific_week <- NULL
+if (length(args) == 3) {
+  week_arg <- args[3]
+  if (grepl("^--week$", week_arg)) {
+    cat("Error: --week flag requires a value (e.g., w3, w5)\n")
+    quit(status = 1)
+  } else if (grepl("^w[0-9]+$", tolower(week_arg))) {
+    specific_week <- as.integer(sub("^w", "", tolower(week_arg)))
+    cat("Running for specific week:", specific_week, "\n")
+  } else {
+    cat("Error: Invalid week format. Use format like w3, w5, etc.\n")
+    quit(status = 1)
+  }
+}
 
 # Validate year
 current_year <- as.integer(format(Sys.Date(), "%Y"))
@@ -221,8 +238,15 @@ ecr_data <- tryCatch({
 
 cat("Loaded", nrow(ecr_data), "players from ECR snapshot\n")
 
-# Loop through weeks 3-18
-for (week in 3:18) {
+# Determine which weeks to process
+weeks_to_process <- if (!is.null(specific_week)) {
+  specific_week
+} else {
+  3:18
+}
+
+# Loop through weeks
+for (week in weeks_to_process) {
   cat("\n=== Processing Week", week, "===\n")
 
   tryCatch({
@@ -328,6 +352,26 @@ for (week in 3:18) {
       filter(season_type == "REG", week == max(1, !!week - 1)) %>%
       select(player_id, prev_week_fp = fantasy_points_ppr)
 
+    # Check if current week has occurred and get fantasy points if available
+    current_week_fp <- NULL
+    current_date <- Sys.Date()
+
+    # Try to load current week fantasy points
+    tryCatch({
+      current_week_data <- load_player_stats(year) %>%
+        filter(season_type == "REG", week == !!week)
+
+      if (nrow(current_week_data) > 0) {
+        cat("Current week", week, "data found - adding current_week_fp column\n")
+        current_week_fp <- current_week_data %>%
+          select(player_id, current_week_fp = fantasy_points_ppr)
+      } else {
+        cat("Current week", week, "has not occurred yet\n")
+      }
+    }, error = function(e) {
+      cat("Current week", week, "data not available\n")
+    })
+
     # Load schedule and opponent data
     cat("Loading schedule for week", week, "...\n")
     safe_sleep()
@@ -399,6 +443,15 @@ for (week in 3:18) {
     ml_data <- ml_data %>%
       left_join(recent_fp, by = "player_id") %>%
       left_join(prev_week_fp, by = "player_id")
+
+    # Join current week fantasy points if available
+    if (!is.null(current_week_fp)) {
+      ml_data <- ml_data %>%
+        left_join(current_week_fp, by = "player_id") %>%
+        mutate(fp_week_delta = if_else(!is.na(current_week_fp) & !is.na(prev_week_fp),
+                                        round(current_week_fp - prev_week_fp, 2),
+                                        NA_real_))
+    }
 
     # Add opponent data if available
     if (!is.null(opponent_mapping)) {
@@ -567,7 +620,7 @@ for (week in 3:18) {
         fp_per_snap_y2,
 
         # Recent weeks FP (if available)
-        prev_week_fp, starts_with("week_"),
+        prev_week_fp, starts_with("week_"), any_of("current_week_fp"), any_of("fp_week_delta"),
 
         # Derived features
         snap_pct_change, snap_pct_variance, fp_consistency_y2, snap_consistency_y2,
@@ -617,4 +670,8 @@ for (week in 3:18) {
 
 cat("\n=== Data collection complete ===\n")
 cat("Output directory:", output_dir, "\n")
-cat("Files created for weeks 3-18 of", year, "season\n")
+if (!is.null(specific_week)) {
+  cat("File created for week", specific_week, "of", year, "season\n")
+} else {
+  cat("Files created for weeks 3-18 of", year, "season\n")
+}

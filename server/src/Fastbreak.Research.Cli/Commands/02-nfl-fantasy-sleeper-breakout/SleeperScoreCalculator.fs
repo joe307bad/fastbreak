@@ -18,6 +18,8 @@ module SleeperScoreCalculator =
         Ecr: float
         PpgY1: float
         AnalysisWeek: int
+        FantPtsLastWeek: float option
+        FantPtsThisWeek: float option
     }
 
     type DefenseRanking = {
@@ -38,6 +40,24 @@ module SleeperScoreCalculator =
         DefenseMatchupScore: float
         SnapTrendScore: float
         TotalScore: float
+    }
+
+    type SleeperHit = {
+        Player: string
+        Position: string
+        Team: string
+        Opponent: string
+        DraftValueScore: float
+        PerformanceScore: float
+        AgeScore: float
+        EcrScore: float
+        DefenseMatchupScore: float
+        SnapTrendScore: float
+        TotalScore: float
+        FantPtsLastWeek: float
+        FantPtsThisWeek: float
+        FantPtsDelta: float
+        IsHit: bool
     }
 
     let parsePlayersCsv (filePath: string) : PlayerData list =
@@ -65,22 +85,49 @@ module SleeperScoreCalculator =
             | true, v -> v
             | false, _ -> 0
 
+        // Parse header to find column indices
+        let header = lines.[0].Split(',')
+        let findColumnIndex (columnName: string) =
+            header |> Array.tryFindIndex (fun h -> h = columnName)
+
+        let playerIdIdx = findColumnIndex "player_id" |> Option.defaultValue 0
+        let playerIdx = findColumnIndex "player" |> Option.defaultValue 1
+        let positionIdx = findColumnIndex "position" |> Option.defaultValue 2
+        let teamIdx = findColumnIndex "team" |> Option.defaultValue 3
+        let opponentIdx = findColumnIndex "opponent" |> Option.defaultValue 4
+        let draftNumberIdx = findColumnIndex "draft_number" |> Option.defaultValue 5
+        let ageIdx = findColumnIndex "age" |> Option.defaultValue 9
+        let slidingWindowAvgDeltaIdx = findColumnIndex "sliding_window_avg_delta" |> Option.defaultValue 23
+        let ecrIdx = findColumnIndex "ecr" |> Option.defaultValue 52
+        let ppgY1Idx = findColumnIndex "ppg_y1" |> Option.defaultValue 14
+        let analysisWeekIdx = findColumnIndex "analysis_week" |> Option.defaultValue 55
+        let prevWeekFpIdx = findColumnIndex "prev_week_fp"
+        let currentWeekFpIdx = findColumnIndex "current_week_fp"
+
         lines
         |> Array.skip 1
         |> Array.map (fun line ->
             let parts = line.Split(',')
             {
-                PlayerId = parts.[0]
-                Player = parts.[1]
-                Position = parts.[2]
-                Team = parts.[3]
-                Opponent = parts.[4]
-                DraftNumber = parseOptionalFloat parts.[5]
-                Age = parseInt parts.[9]
-                SlidingWindowAvgDelta = parseFloat parts.[23]
-                Ecr = parseFloat parts.[49]
-                PpgY1 = parseFloat parts.[14]
-                AnalysisWeek = parseInt parts.[52]
+                PlayerId = parts.[playerIdIdx]
+                Player = parts.[playerIdx]
+                Position = parts.[positionIdx]
+                Team = parts.[teamIdx]
+                Opponent = parts.[opponentIdx]
+                DraftNumber = parseOptionalFloat parts.[draftNumberIdx]
+                Age = parseInt parts.[ageIdx]
+                SlidingWindowAvgDelta = parseFloat parts.[slidingWindowAvgDeltaIdx]
+                Ecr = parseFloat parts.[ecrIdx]
+                PpgY1 = parseFloat parts.[ppgY1Idx]
+                AnalysisWeek = parseInt parts.[analysisWeekIdx]
+                FantPtsLastWeek =
+                    match prevWeekFpIdx with
+                    | Some idx when parts.Length > idx -> parseOptionalFloat parts.[idx]
+                    | _ -> None
+                FantPtsThisWeek =
+                    match currentWeekFpIdx with
+                    | Some idx when parts.Length > idx -> parseOptionalFloat parts.[idx]
+                    | _ -> None
             })
         |> Array.toList
 
@@ -97,14 +144,23 @@ module SleeperScoreCalculator =
             | true, v -> v
             | false, _ -> 99
 
+        // Parse header to find column indices
+        let header = lines.[0].Split(',')
+        let findColumnIndex (columnName: string) =
+            header |> Array.tryFindIndex (fun h -> h = columnName)
+
+        let teamIdx = findColumnIndex "team" |> Option.defaultValue 1
+        let rushDefenseRankIdx = findColumnIndex "rush_defense_rank" |> Option.defaultValue 5
+        let passDefenseRankIdx = findColumnIndex "pass_defense_rank" |> Option.defaultValue 7
+
         lines
         |> Array.skip 1
         |> Array.map (fun line ->
             let parts = line.Split(',')
             {
-                Team = parts.[1]  // team is in column 1
-                RushDefenseRank = parseInt parts.[5]  // rush_defense_rank is in column 5
-                PassDefenseRank = parseInt parts.[7]  // pass_defense_rank is in column 7
+                Team = parts.[teamIdx]
+                RushDefenseRank = parseInt parts.[rushDefenseRankIdx]
+                PassDefenseRank = parseInt parts.[passDefenseRankIdx]
             })
         |> Array.toList
 
@@ -183,5 +239,45 @@ module SleeperScoreCalculator =
                 DefenseMatchupScore = defenseScore
                 SnapTrendScore = snapScore
                 TotalScore = total
+            })
+        |> List.sortByDescending (fun s -> s.TotalScore)
+
+    let calculateSleeperHits (players: PlayerData list) (defenseMap: Map<string, DefenseRanking>) : SleeperHit list =
+        // Calculate min/max ECR for normalization
+        let ecrValues = players |> List.map (fun p -> p.Ecr)
+        let minEcr = ecrValues |> List.min
+        let maxEcr = ecrValues |> List.max
+
+        players
+        |> List.map (fun player ->
+            let draftScore = calculateDraftValueScore player.DraftNumber
+            let perfScore = calculatePerformanceScore player.Position player.PpgY1
+            let ageScore = calculateAgeScore player.Age
+            let ecrScore = calculateEcrScore minEcr maxEcr player.Ecr
+            let defenseScore = calculateDefenseMatchupScore defenseMap player.Position player.Opponent
+            let snapScore = calculateSnapTrendScore player.SlidingWindowAvgDelta player.AnalysisWeek
+            let total = draftScore + perfScore + ageScore + ecrScore + defenseScore + snapScore
+
+            let lastWeek = player.FantPtsLastWeek |> Option.defaultValue 0.0
+            let thisWeek = player.FantPtsThisWeek |> Option.defaultValue 0.0
+            let delta = thisWeek - lastWeek
+            let isHit = delta > 5.0
+
+            {
+                Player = player.Player
+                Position = player.Position
+                Team = player.Team
+                Opponent = player.Opponent
+                DraftValueScore = draftScore
+                PerformanceScore = perfScore
+                AgeScore = ageScore
+                EcrScore = ecrScore
+                DefenseMatchupScore = defenseScore
+                SnapTrendScore = snapScore
+                TotalScore = total
+                FantPtsLastWeek = lastWeek
+                FantPtsThisWeek = thisWeek
+                FantPtsDelta = delta
+                IsHit = isHit
             })
         |> List.sortByDescending (fun s -> s.TotalScore)

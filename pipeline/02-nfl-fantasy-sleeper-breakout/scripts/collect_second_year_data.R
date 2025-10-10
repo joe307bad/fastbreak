@@ -14,24 +14,29 @@ suppressPackageStartupMessages({
 args <- commandArgs(trailingOnly = TRUE)
 
 # Check if correct number of arguments provided
-if (length(args) < 2 || length(args) > 3) {
-  cat("Usage: Rscript collect_second_year_data.R [year] [output_directory] [--week wN]\n")
-  cat("Example: Rscript collect_second_year_data.R 2024 ./data/\n")
-  cat("Example: Rscript collect_second_year_data.R 2024 ./data/ --week w5\n")
+if (length(args) < 3 || length(args) > 4) {
+  cat("Usage: Rscript collect_second_year_data.R [year] [output_directory] [defense_rankings_file] [week]\n")
+  cat("Example: Rscript collect_second_year_data.R 2024 ./data/ ./defense_rankings.csv\n")
+  cat("Example: Rscript collect_second_year_data.R 2024 ./data/ ./defense_rankings.csv w5\n")
   quit(status = 1)
 }
 
 year <- as.integer(args[1])
 output_dir <- args[2]
+defense_rankings_file <- args[3]
 
-# Parse optional week argument
+# Validate defense rankings file
+if (!file.exists(defense_rankings_file)) {
+  cat("Error: Defense rankings file not found:", defense_rankings_file, "\n")
+  quit(status = 1)
+}
+cat("Using defense rankings file:", defense_rankings_file, "\n")
+
+# Parse optional week argument (now the 4th argument)
 specific_week <- NULL
-if (length(args) == 3) {
-  week_arg <- args[3]
-  if (grepl("^--week$", week_arg)) {
-    cat("Error: --week flag requires a value (e.g., w3, w5)\n")
-    quit(status = 1)
-  } else if (grepl("^w[0-9]+$", tolower(week_arg))) {
+if (length(args) == 4) {
+  week_arg <- args[4]
+  if (grepl("^w[0-9]+$", tolower(week_arg))) {
     specific_week <- as.integer(sub("^w", "", tolower(week_arg)))
     cat("Running for specific week:", specific_week, "\n")
   } else {
@@ -52,6 +57,12 @@ if (!dir.exists(output_dir)) {
   dir.create(output_dir, recursive = TRUE)
   cat("Created output directory:", output_dir, "\n")
 }
+
+# Load defense rankings
+cat("Loading defense rankings from:", defense_rankings_file, "\n")
+defense_rankings <- read_csv(defense_rankings_file, show_col_types = FALSE) %>%
+  select(team, rush_defense_rank, pass_defense_rank)
+cat("Loaded defense rankings for", nrow(defense_rankings), "teams\n")
 
 # Function to clean names for matching
 clean_name <- function(name) {
@@ -448,9 +459,18 @@ for (week in weeks_to_process) {
     if (!is.null(current_week_fp)) {
       ml_data <- ml_data %>%
         left_join(current_week_fp, by = "player_id") %>%
-        mutate(fp_week_delta = if_else(!is.na(current_week_fp) & !is.na(prev_week_fp),
-                                        round(current_week_fp - prev_week_fp, 2),
-                                        NA_real_))
+        mutate(
+          # Treat NA prev_week_fp as 0 for calculations
+          prev_week_fp_calc = coalesce(prev_week_fp, 0),
+          fp_week_delta = if_else(!is.na(current_week_fp),
+                                  round(current_week_fp - prev_week_fp_calc, 2),
+                                  NA_real_),
+          hit = if_else(!is.na(current_week_fp) &
+                        (current_week_fp - prev_week_fp_calc) >= 5,
+                        1L,
+                        0L)
+        ) %>%
+        select(-prev_week_fp_calc)  # Remove temporary column
     }
 
     # Add opponent data if available
@@ -464,6 +484,26 @@ for (week in weeks_to_process) {
     } else {
       ml_data <- ml_data %>%
         mutate(opponent = "N/A")
+    }
+
+    # Add opponent defensive rankings
+    if (!is.null(opponent_mapping)) {
+      ml_data <- ml_data %>%
+        left_join(
+          defense_rankings %>%
+            rename(
+              opponent_rush_def_rank = rush_defense_rank,
+              opponent_pass_def_rank = pass_defense_rank
+            ),
+          by = c("opponent" = "team")
+        )
+    } else {
+      # No opponent mapping available, set defensive ranks to NA
+      ml_data <- ml_data %>%
+        mutate(
+          opponent_rush_def_rank = NA_integer_,
+          opponent_pass_def_rank = NA_integer_
+        )
     }
 
     # Check player availability
@@ -581,6 +621,86 @@ for (week in weeks_to_process) {
         # Meta data
         season = year,
         analysis_week = week
+        ) %>%
+        # Calculate Sleeper Score components
+        mutate(
+          # 1. Draft Value Score (0-50 points)
+          draft_value_score = case_when(
+            is.na(draft_number) ~ 50,  # UDFA
+            draft_number > 200 ~ 40,
+            draft_number > 150 ~ 30,
+            draft_number > 100 ~ 20,
+            draft_number > 50 ~ 10,
+            TRUE ~ 0
+          ),
+
+          # 2. Performance Score (0-30 points)
+          ppg_threshold = case_when(
+            position %in% c("RB", "WR") ~ 6,
+            position == "TE" ~ 4,
+            TRUE ~ 6
+          ),
+          performance_score = case_when(
+            games_y1 > 0 & ppg_y1 < ppg_threshold ~ 30,
+            games_y1 > 0 & ppg_y1 >= ppg_threshold & ppg_y1 < (ppg_threshold * 1.5) ~ 20,
+            games_y1 > 0 ~ 0,
+            TRUE ~ 0
+          ),
+
+          # 3. Age Score (0-20 points)
+          age_score = case_when(
+            age <= 22 ~ 20,
+            age <= 23 ~ 15,
+            age <= 24 ~ 10,
+            TRUE ~ 0
+          ),
+
+          # 4. ECR Score (0-20 points) - calculated after we have all rows
+          ecr_score = 0,  # Will be calculated in next step
+
+          # 5. Defensive Matchup Score (0-30 points)
+          # RBs evaluated against rush defense, WR/TE against pass defense
+          relevant_def_rank = case_when(
+            position == "RB" ~ opponent_rush_def_rank,
+            position %in% c("WR", "TE") ~ opponent_pass_def_rank,
+            TRUE ~ NA_integer_
+          ),
+          matchup_score = case_when(
+            is.na(relevant_def_rank) ~ 0,
+            relevant_def_rank >= 29 ~ 30,  # Worst defenses (29-32)
+            relevant_def_rank >= 25 ~ 25,
+            relevant_def_rank >= 21 ~ 20,
+            relevant_def_rank >= 17 ~ 15,
+            relevant_def_rank >= 13 ~ 10,
+            relevant_def_rank >= 9 ~ 5,
+            TRUE ~ 0  # Best defenses (1-8)
+          ),
+
+          # 6. Sliding Window Snap Trend Score (0-15 points)
+          snap_trend_score = case_when(
+            sliding_window_avg_delta >= 10 ~ 15,
+            sliding_window_avg_delta >= 5 ~ 12,
+            sliding_window_avg_delta >= 2 ~ 8,
+            sliding_window_avg_delta > 0 ~ 5,
+            sliding_window_avg_delta >= -2 ~ 2,
+            TRUE ~ 0
+          )
+        ) %>%
+        # Calculate ECR Score using min/max from dataset
+        group_by() %>%
+        mutate(
+          min_ecr = min(ecr, na.rm = TRUE),
+          max_ecr = max(ecr, na.rm = TRUE),
+          ecr_score = if_else(max_ecr > min_ecr,
+                             round(20 - ((ecr - min_ecr) / (max_ecr - min_ecr)) * 20, 2),
+                             10)  # If all ECRs are the same, give middle score
+        ) %>%
+        ungroup() %>%
+        select(-min_ecr, -max_ecr, -ppg_threshold, -relevant_def_rank) %>%
+        # Calculate total Sleeper Score
+        mutate(
+          sleeper_score = round(draft_value_score + performance_score + age_score +
+                               ecr_score + matchup_score + snap_trend_score, 2)
         )
     }, error = function(e) {
       cat("ERROR in mutate():", e$message, "\n")
@@ -603,8 +723,11 @@ for (week in weeks_to_process) {
     final_data <- tryCatch({
       ml_data %>%
         select(
+        # Primary columns (first)
+        player_id, player, prev_week_fp, any_of("current_week_fp"), sleeper_score, any_of("hit"),
+
         # Identifiers
-        player_id, player, position, team, opponent,
+        position, team, opponent, any_of("opponent_rush_def_rank"), any_of("opponent_pass_def_rank"),
 
         # Draft and physical
         draft_number, college, height, weight, age, entry_year, years_exp,
@@ -620,7 +743,7 @@ for (week in weeks_to_process) {
         fp_per_snap_y2,
 
         # Recent weeks FP (if available)
-        prev_week_fp, starts_with("week_"), any_of("current_week_fp"), any_of("fp_week_delta"),
+        starts_with("week_"), any_of("fp_week_delta"),
 
         # Derived features
         snap_pct_change, snap_pct_variance, fp_consistency_y2, snap_consistency_y2,
@@ -629,6 +752,10 @@ for (week in weeks_to_process) {
         is_udfa, is_day3_pick, is_early_pick, is_young_breakout,
         rb_size_score, wr_height_score, te_size_score,
         rookie_year_usage,
+
+        # Sleeper Score components
+        draft_value_score, performance_score, age_score, ecr_score,
+        matchup_score, snap_trend_score,
 
         # ECR and availability
         ecr, player_available,

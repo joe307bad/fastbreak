@@ -21,7 +21,6 @@
     <Compile Include="Commands\01-generate-elo-plus\EloPlus.fs" />
     <Content Include="Commands\01-generate-elo-plus\test.csv" />
     <Compile Include="Commands\02-nfl-fantasy-sleeper-breakout\EnvConfig.fs" />
-    <Compile Include="Commands\02-nfl-fantasy-sleeper-breakout\SleeperScoreCalculator.fs" />
     <Compile Include="Commands\02-nfl-fantasy-sleeper-breakout\ConsoleOutputFormatter.fs" />
     <Compile Include="Commands\02-nfl-fantasy-sleeper-breakout\HtmlOutputGenerator.fs" />
     <Compile Include="Commands\02-nfl-fantasy-sleeper-breakout\DataVerification.fs" />

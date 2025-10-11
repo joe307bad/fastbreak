@@ -9,7 +9,6 @@ module DataVerification =
         EnvConfig.loadEnvFile()
 
         let weeklyStatsFolder = Environment.GetEnvironmentVariable("WEEKLY_PLAYER_STATS_DATA_FOLDER")
-        let defensiveRankingsFile = Environment.GetEnvironmentVariable("DEFENSIVE_POWER_RANKINGS_FILE")
 
         printfn "Verifying data sources..."
         printfn ""
@@ -29,21 +28,6 @@ module DataVerification =
             printfn "   Found %d CSV file(s)" csvFiles.Length
             if csvFiles.Length > 0 then
                 csvFiles |> Array.iter (fun file -> printfn "   - %s" (Path.GetFileName(file)))
-
-        printfn ""
-
-        // Verify defensive power rankings file
-        if String.IsNullOrEmpty(defensiveRankingsFile) then
-            printfn "❌ DEFENSIVE_POWER_RANKINGS_FILE is not set"
-            hasErrors <- true
-        elif not (File.Exists(defensiveRankingsFile)) then
-            printfn "❌ DEFENSIVE_POWER_RANKINGS_FILE does not exist: %s" defensiveRankingsFile
-            hasErrors <- true
-        elif not (Path.GetExtension(defensiveRankingsFile).ToLower() = ".csv") then
-            printfn "❌ DEFENSIVE_POWER_RANKINGS_FILE is not a CSV file: %s" defensiveRankingsFile
-            hasErrors <- true
-        else
-            printfn "✅ DEFENSIVE_POWER_RANKINGS_FILE: %s" defensiveRankingsFile
 
         printfn ""
         if hasErrors then

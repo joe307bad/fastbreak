@@ -25,6 +25,8 @@
     <Compile Include="Commands\02-nfl-fantasy-sleeper-breakout\DataLoader.fs" />
     <Compile Include="Commands\02-nfl-fantasy-sleeper-breakout\AlgorithmTrainer.fs" />
     <Compile Include="Commands\02-nfl-fantasy-sleeper-breakout\AlgorithmComparison.fs" />
+    <Compile Include="Commands\02-nfl-fantasy-sleeper-breakout\WeeklyEvaluator.fs" />
+    <Compile Include="Commands\02-nfl-fantasy-sleeper-breakout\PredictNewWeek.fs" />
     <!-- Temporarily commented out - missing SleeperScoreCalculator module -->
     <!-- <Compile Include="Commands\02-nfl-fantasy-sleeper-breakout\ConsoleOutputFormatter.fs" /> -->
     <!-- <Compile Include="Commands\02-nfl-fantasy-sleeper-breakout\HtmlOutputGenerator.fs" /> -->

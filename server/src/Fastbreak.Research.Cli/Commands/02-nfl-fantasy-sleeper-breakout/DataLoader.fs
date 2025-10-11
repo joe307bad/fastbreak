@@ -8,7 +8,7 @@ open DataTypes
 module DataLoader =
 
     /// Parse a single CSV row into PlayerWeeklyStats
-    let private parseRow (headers: string[]) (values: string[]) : PlayerWeeklyStats option =
+    let parseRow (headers: string[]) (values: string[]) : PlayerWeeklyStats option =
         try
             let getValue (name: string) =
                 let index = headers |> Array.findIndex (fun h -> h = name)

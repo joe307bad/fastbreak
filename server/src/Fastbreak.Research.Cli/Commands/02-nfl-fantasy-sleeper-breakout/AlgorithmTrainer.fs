@@ -20,7 +20,7 @@ module AlgorithmTrainer =
     /// Get all numeric feature column names
     let private getFeatureColumns () =
         [|
-            "PrevWeekFp"; "CurrentWeekFp"; "SleeperScore"; "FpWeekDelta"
+            "PrevWeekFp"; "SleeperScore"
             "TotalFpY2"; "AvgFpY2"; "MaxFpY2"; "MinFpY2"; "FpPerSnapY2"; "FpConsistencyY2"
             "TotalFantasyPointsY1"; "PpgY1"; "FpPerSnapY1"
             "W1SnapShare"; "Y2SnapShareChange"; "SlidingWindowAvgDelta"

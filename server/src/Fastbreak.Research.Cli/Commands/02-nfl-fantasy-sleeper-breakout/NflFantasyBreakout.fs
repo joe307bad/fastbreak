@@ -51,7 +51,22 @@ module NflFantasyBreakout =
                     printfn "ERROR: Data folder does not exist: %s" dataFolder
                     1
                 else
-                    WeeklyEvaluator.runWeeklyEvaluation dataFolder
+                    // Extract optional --output argument
+                    let extractPath (pattern: string) =
+                        subcommands
+                        |> List.tryPick (fun cmd ->
+                            let cmdStr = cmd.ToString()
+                            if cmdStr.StartsWith(pattern) then
+                                // The format is either "Pattern value" or "Pattern\n  value"
+                                // Remove the pattern and trim
+                                let afterPattern = cmdStr.Substring(pattern.Length).Trim()
+                                // Remove quotes if present
+                                let cleaned = afterPattern.Trim('"')
+                                Some cleaned
+                            else None)
+
+                    let outputPath = extractPath "Output_Path"
+                    WeeklyEvaluator.runWeeklyEvaluation dataFolder outputPath
             elif hasPredictNewWeek then
                 EnvConfig.loadEnvFile()
                 let dataFolder = Environment.GetEnvironmentVariable("WEEKLY_PLAYER_STATS_DATA_FOLDER")

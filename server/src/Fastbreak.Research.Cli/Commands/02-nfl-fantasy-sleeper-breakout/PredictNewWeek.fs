@@ -153,7 +153,7 @@ module PredictNewWeek =
 
         let featureColumns =
             [|
-                "PrevWeekFp"; "CurrentWeekFp"; "SleeperScore"; "FpWeekDelta"
+                "PrevWeekFp"; "SleeperScore"
                 "TotalFpY2"; "AvgFpY2"; "MaxFpY2"; "MinFpY2"; "FpPerSnapY2"; "FpConsistencyY2"
                 "TotalFantasyPointsY1"; "PpgY1"; "FpPerSnapY1"
                 "W1SnapShare"; "Y2SnapShareChange"; "SlidingWindowAvgDelta"
@@ -237,6 +237,11 @@ module PredictNewWeek =
     /// Generate HTML output with predictions
     let private generateHtmlOutput (predictions: PlayerPrediction list) (outputPath: string) : string =
         printfn "Generating HTML output..."
+
+        // Extract season and week from first prediction
+        let season = if predictions.IsEmpty then 0 else predictions.Head.Stats.Season
+        let week = if predictions.IsEmpty then 0 else predictions.Head.Stats.AnalysisWeek
+        let titleText = sprintf "NFL Fantasy Sleeper Hit Predictions - ML Model - %d Week %d" season week
 
         let headers = [
             "Player"; "Pos"; "Team"; "Opp"; "Sleeper Score";
@@ -330,7 +335,7 @@ module PredictNewWeek =
                 ],
                 CellsFillColor = cellcolor
             )
-            |> Chart.withTitle "NFL Fantasy Sleeper Hit Predictions - ML Model"
+            |> Chart.withTitle titleText
             |> Chart.withConfigStyle(Responsive = true)
             |> Chart.withConfig(Config.init(
                 ToImageButtonOptions = ConfigObjects.ToImageButtonOptions.init(

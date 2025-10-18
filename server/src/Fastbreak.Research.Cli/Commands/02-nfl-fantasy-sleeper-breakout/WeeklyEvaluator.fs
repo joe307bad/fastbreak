@@ -20,6 +20,7 @@ module WeeklyEvaluator =
         SleeperScore: float32
         MlHit: bool
         SleeperHit: bool
+        ActualHit: bool  // Whether the player actually had a breakout hit
         FpDelta: float32
     }
 
@@ -41,49 +42,43 @@ module WeeklyEvaluator =
         PlayerPredictions: PlayerPrediction list
     }
 
-    /// Train model on all data
-    let private trainModelOnAllData (mlContext: MLContext) (allData: IDataView) =
-        printfn "Training LbfgsLogisticRegression on all data..."
-        let stopwatch = Stopwatch.StartNew()
+    /// Get feature columns used in the model
+    let private getFeatureColumns () =
+        [|
+            "PrevWeekFp"; "SleeperScore"
+            "TotalFpY2"; "AvgFpY2"; "MaxFpY2"; "MinFpY2"; "FpPerSnapY2"; "FpConsistencyY2"
+            "TotalFantasyPointsY1"; "PpgY1"; "FpPerSnapY1"
+            "W1SnapShare"; "Y2SnapShareChange"; "SlidingWindowAvgDelta"
+            "MaxSnapPctY2"; "MinSnapPctY2"; "AvgSnapPctY2"
+            "SnapPctChange"; "SnapPctVariance"; "SnapConsistencyY2"
+            "TotalOffSnapsY2"; "TotalOffSnapsY1"; "AvgSnapPctY1"
+            "Height"; "Weight"; "Age"
+            "RbSizeScore"; "WrHeightScore"; "TeSizeScore"
+            "DraftNumber"; "YearsExp"
+            "GamesY1"; "RookieYearUsage"
+            "OpponentRushDefRank"; "OpponentPassDefRank"
+            "Ecr"; "PlayerAvailable"
+            "DraftValueScore"; "PerformanceScore"; "AgeScore"
+            "EcrScore"; "MatchupScore"; "SnapTrendScore"
+            "TotalGamesY2"; "GamesPlayedY2"
+        |]
 
-        // Get feature columns
-        let featureColumns =
-            [|
-                "PrevWeekFp"; "SleeperScore"
-                "TotalFpY2"; "AvgFpY2"; "MaxFpY2"; "MinFpY2"; "FpPerSnapY2"; "FpConsistencyY2"
-                "TotalFantasyPointsY1"; "PpgY1"; "FpPerSnapY1"
-                "W1SnapShare"; "Y2SnapShareChange"; "SlidingWindowAvgDelta"
-                "MaxSnapPctY2"; "MinSnapPctY2"; "AvgSnapPctY2"
-                "SnapPctChange"; "SnapPctVariance"; "SnapConsistencyY2"
-                "TotalOffSnapsY2"; "TotalOffSnapsY1"; "AvgSnapPctY1"
-                "Height"; "Weight"; "Age"
-                "RbSizeScore"; "WrHeightScore"; "TeSizeScore"
-                "DraftNumber"; "YearsExp"
-                "GamesY1"; "RookieYearUsage"
-                "OpponentRushDefRank"; "OpponentPassDefRank"
-                "Ecr"; "PlayerAvailable"
-                "DraftValueScore"; "PerformanceScore"; "AgeScore"
-                "EcrScore"; "MatchupScore"; "SnapTrendScore"
-                "TotalGamesY2"; "GamesPlayedY2"
-            |]
+    /// Build the training pipeline
+    let private buildPipeline (mlContext: MLContext) =
+        let featureColumns = getFeatureColumns()
+        EstimatorChain()
+            .Append(mlContext.Transforms.Categorical.OneHotEncoding(outputColumnName = "PositionEncoded", inputColumnName = "Position"))
+            .Append(mlContext.Transforms.Categorical.OneHotEncoding(outputColumnName = "TeamEncoded", inputColumnName = "Team"))
+            .Append(mlContext.Transforms.Categorical.OneHotEncoding(outputColumnName = "OpponentEncoded", inputColumnName = "Opponent"))
+            .Append(mlContext.Transforms.Concatenate("Features", Array.append featureColumns [| "PositionEncoded"; "TeamEncoded"; "OpponentEncoded" |]))
+            .Append(mlContext.Transforms.NormalizeMinMax("Features"))
+            .Append(mlContext.BinaryClassification.Trainers.LbfgsLogisticRegression(labelColumnName = "Label"))
 
-        // Build pipeline
-        let pipeline =
-            EstimatorChain()
-                .Append(mlContext.Transforms.Categorical.OneHotEncoding(outputColumnName = "PositionEncoded", inputColumnName = "Position"))
-                .Append(mlContext.Transforms.Categorical.OneHotEncoding(outputColumnName = "TeamEncoded", inputColumnName = "Team"))
-                .Append(mlContext.Transforms.Categorical.OneHotEncoding(outputColumnName = "OpponentEncoded", inputColumnName = "Opponent"))
-                .Append(mlContext.Transforms.Concatenate("Features", Array.append featureColumns [| "PositionEncoded"; "TeamEncoded"; "OpponentEncoded" |]))
-                .Append(mlContext.Transforms.NormalizeMinMax("Features"))
-                .Append(mlContext.BinaryClassification.Trainers.LbfgsLogisticRegression(labelColumnName = "Label"))
-
-        let model = pipeline.Fit(allData)
-        stopwatch.Stop()
-
-        printfn "Training completed in %.2f seconds" stopwatch.Elapsed.TotalSeconds
-        printfn ""
-
-        model
+    /// Train model on provided data (excluding a specific week for leave-one-out)
+    let private trainModel (mlContext: MLContext) (trainingData: IDataView) (excludedWeek: string) =
+        printfn "  Training model (excluding %s)..." excludedWeek
+        let pipeline = buildPipeline mlContext
+        pipeline.Fit(trainingData)
 
     /// Evaluate model on a specific week's data
     let private evaluateWeek (mlContext: MLContext) (model: ITransformer) (fileName: string) (weekData: PlayerWeeklyStats list) : WeekEvaluationResult =
@@ -113,6 +108,7 @@ module WeeklyEvaluator =
                     SleeperScore = player.SleeperScore
                     MlHit = pred.PredictedLabel
                     SleeperHit = sleeperHit
+                    ActualHit = player.Hit  // Store the actual hit status
                     FpDelta = if player.Hit then player.CurrentWeekFp - player.PrevWeekFp else 0.0f
                 })
 
@@ -361,10 +357,11 @@ module WeeklyEvaluator =
                 let top10ML = r.PlayerPredictions |> List.sortByDescending (fun p -> p.MlConfidence) |> List.truncate 10
                 let top10Sleeper = r.PlayerPredictions |> List.sortByDescending (fun p -> p.SleeperScore) |> List.truncate 10
 
-                let mlTop10Hits = top10ML |> List.filter (fun p -> p.MlHit) |> List.length
-                let mlTop3Hits = top10ML |> List.truncate 3 |> List.filter (fun p -> p.MlHit) |> List.length
-                let sleeperTop10Hits = top10Sleeper |> List.filter (fun p -> p.SleeperHit) |> List.length
-                let sleeperTop3Hits = top10Sleeper |> List.truncate 3 |> List.filter (fun p -> p.SleeperHit) |> List.length
+                // Count how many of the top recommendations actually had hits
+                let mlTop10Hits = top10ML |> List.filter (fun p -> p.ActualHit) |> List.length
+                let mlTop3Hits = top10ML |> List.truncate 3 |> List.filter (fun p -> p.ActualHit) |> List.length
+                let sleeperTop10Hits = top10Sleeper |> List.filter (fun p -> p.ActualHit) |> List.length
+                let sleeperTop3Hits = top10Sleeper |> List.truncate 3 |> List.filter (fun p -> p.ActualHit) |> List.length
 
                 let mlPrecision = if mlTop10Hits > 0 then float mlTop10Hits / 10.0 else 0.0
                 let sleeperPrecision = if sleeperTop10Hits > 0 then float sleeperTop10Hits / 10.0 else 0.0
@@ -415,9 +412,8 @@ module WeeklyEvaluator =
             if not (Directory.Exists(expandedPath)) then
                 Directory.CreateDirectory(expandedPath) |> ignore
 
-            // Generate filename with timestamp
-            let filenameTimestamp = DateTime.Now.ToString("yyyy-MM-dd_HH-mm-ss")
-            let filename = sprintf "output_%s.json" filenameTimestamp
+            // Generate filename
+            let filename = "output.json"
             let fullPath = Path.Combine(expandedPath, filename)
             File.WriteAllText(fullPath, json)
             printfn ""
@@ -429,46 +425,33 @@ module WeeklyEvaluator =
     /// Run weekly evaluation
     let runWeeklyEvaluation (dataFolder: string) (outputPath: string option) : int =
         try
-            printSectionHeader "NFL Fantasy Sleeper Hit Prediction\nWeekly Evaluation Results"
+            printSectionHeader "NFL Fantasy Sleeper Hit Prediction\nWeekly Evaluation Results (Leave-One-Out Cross-Validation)"
 
             // Initialize ML.NET context
             let mlContext = MLContext(seed = Nullable 42)
 
-            // Load all data for training
-            printfn "Loading all data for training..."
-            let allData = loadAllData dataFolder
+            // Get all CSV files, excluding 2025 data
+            let csvFiles =
+                Directory.GetFiles(dataFolder, "*.csv")
+                |> Array.filter (fun file -> not (file.Contains("2025")))
+                |> Array.sort
 
-            if allData.IsEmpty then
-                printfn "ERROR: No data loaded. Check data folder path."
+            if csvFiles.Length = 0 then
+                printfn "ERROR: No data files found in folder: %s" dataFolder
                 1
             else
-                printfn "Loaded %d total player-weeks from %d CSV files" allData.Length (Directory.GetFiles(dataFolder, "*.csv").Length)
+                printfn "Found %d weeks of data for evaluation" csvFiles.Length
+                printfn "Using leave-one-out cross-validation to prevent data leakage..."
                 printfn ""
 
-                // Convert to IDataView
-                let modelInputs = allData |> List.map toModelInput
-                let dataView = mlContext.Data.LoadFromEnumerable(modelInputs)
-
-                // Train model on all data
-                let model = trainModelOnAllData mlContext dataView
-
-                // Get all CSV files
-                let csvFiles = Directory.GetFiles(dataFolder, "*.csv") |> Array.sort
-
-                printfn "Evaluating model on each week..."
-                printfn ""
-
-                // Evaluate each week separately
-                let results =
+                // Load all data by week
+                let allWeeksData =
                     csvFiles
                     |> Array.map (fun file ->
                         let fileName = Path.GetFileName(file)
-                        printfn "Loading %s..." fileName
-
                         let lines = File.ReadAllLines(file)
                         if lines.Length < 2 then
-                            printfn "  Skipping (no data)"
-                            None
+                            (fileName, [])
                         else
                             let headers = lines.[0].Split(',')
                             let parseRow = DataLoader.parseRow headers
@@ -477,14 +460,40 @@ module WeeklyEvaluator =
                                 |> Array.map (fun line -> line.Split(','))
                                 |> Array.choose parseRow
                                 |> Array.toList
+                            (fileName, weekData))
+                    |> Array.filter (fun (_, data) -> not data.IsEmpty)
 
-                            if weekData.IsEmpty then
-                                printfn "  Skipping (failed to parse)"
-                                None
-                            else
-                                let result = evaluateWeek mlContext model fileName weekData
-                                printWeekResult result
-                                Some result)
+                printfn "Evaluating each week using model trained on other weeks..."
+                printfn ""
+
+                // Evaluate each week separately using leave-one-out cross-validation
+                let results =
+                    allWeeksData
+                    |> Array.map (fun (testFileName, testWeekData) ->
+                        printfn "Evaluating %s..." testFileName
+
+                        // Get training data (all weeks except the test week)
+                        let trainingData =
+                            allWeeksData
+                            |> Array.filter (fun (fileName, _) -> fileName <> testFileName)
+                            |> Array.collect (fun (_, data) -> List.toArray data)
+                            |> Array.toList
+
+                        if trainingData.IsEmpty then
+                            printfn "  ERROR: No training data available"
+                            None
+                        else
+                            // Convert training data to IDataView
+                            let trainingInputs = trainingData |> List.map toModelInput
+                            let trainingDataView = mlContext.Data.LoadFromEnumerable(trainingInputs)
+
+                            // Train model on all weeks except this one
+                            let model = trainModel mlContext trainingDataView testFileName
+
+                            // Evaluate on the held-out week
+                            let result = evaluateWeek mlContext model testFileName testWeekData
+                            printWeekResult result
+                            Some result)
                     |> Array.choose id
                     |> Array.toList
 

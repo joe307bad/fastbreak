@@ -385,6 +385,15 @@ module WeeklyEvaluator =
                 )
 
                 sb.AppendLine("      ],") |> ignore
+                sb.AppendLine("      \"sleeperTop10Predictions\": [") |> ignore
+
+                // Add sleeper player predictions
+                top10Sleeper |> List.iteri (fun j p ->
+                    playerToJson sb p
+                    if j < top10Sleeper.Length - 1 then sb.AppendLine(",") |> ignore else sb.AppendLine() |> ignore
+                )
+
+                sb.AppendLine("      ],") |> ignore
                 sb.AppendFormat("      \"mlTop10Hits\": {0},\n", mlTop10Hits) |> ignore
                 sb.AppendFormat("      \"mlTop3Hits\": {0},\n", mlTop3Hits) |> ignore
                 sb.AppendFormat("      \"sleeperTop10Hits\": {0},\n", sleeperTop10Hits) |> ignore

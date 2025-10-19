@@ -292,6 +292,39 @@ module WeeklyEvaluator =
                 if totalPredictedHits > 0 then float totalTruePositives / float totalPredictedHits
                 else 0.0
 
+            // Calculate average binary classification metrics
+            let avgAccuracy = results |> List.averageBy (fun r -> r.Accuracy)
+            let avgPrecision = results |> List.averageBy (fun r -> r.Precision)
+            let avgRecall = results |> List.averageBy (fun r -> r.Recall)
+            let avgF1Score = results |> List.averageBy (fun r -> r.F1Score)
+
+            // Calculate seasonal breakdowns (early: weeks 3-6, mid: weeks 7-12, late: weeks 13-18)
+            let calculateSeasonalStats (weekRange: int * int) =
+                let (minWeek, maxWeek) = weekRange
+                let seasonalResults =
+                    results
+                    |> List.filter (fun r ->
+                        let (_, week) = extractYearAndWeek r.Week
+                        week >= minWeek && week <= maxWeek)
+
+                let mlHits =
+                    seasonalResults
+                    |> List.sumBy (fun r ->
+                        let top10 = r.PlayerPredictions |> List.sortByDescending (fun p -> p.MlConfidence) |> List.truncate 10
+                        top10 |> List.filter (fun p -> p.ActualHit) |> List.length)
+
+                let sleeperHits =
+                    seasonalResults
+                    |> List.sumBy (fun r ->
+                        let top10 = r.PlayerPredictions |> List.sortByDescending (fun p -> p.SleeperScore) |> List.truncate 10
+                        top10 |> List.filter (fun p -> p.ActualHit) |> List.length)
+
+                (mlHits, sleeperHits)
+
+            let (earlyMlHits, earlySleeperHits) = calculateSeasonalStats (3, 6)
+            let (midMlHits, midSleeperHits) = calculateSeasonalStats (7, 12)
+            let (lateMlHits, lateSleeperHits) = calculateSeasonalStats (13, 18)
+
             // Find biggest ML successes (high confidence ML hits with big fantasy breakouts)
             let allPredictions =
                 results
@@ -323,7 +356,30 @@ module WeeklyEvaluator =
             sb.AppendFormat("    \"sleeperTotalTop10Hits\": {0},\n", sleeperTotalTop10Hits) |> ignore
             sb.AppendFormat("    \"sleeperTotalTop10Opportunities\": {0},\n", totalTop10Opportunities) |> ignore
             sb.AppendFormat("    \"sleeperAccuracyTop10\": {0:0.0000000000000000},\n", sleeperAccuracyTop10) |> ignore
-            sb.AppendFormat("    \"overallMlPredictionAccuracy\": {0:0.0000000000000000}\n", overallMlPredictionAccuracy) |> ignore
+            sb.AppendFormat("    \"overallMlPredictionAccuracy\": {0:0.0000000000000000},\n", overallMlPredictionAccuracy) |> ignore
+            sb.AppendLine("    \"binaryClassificationMetrics\": {") |> ignore
+            sb.AppendFormat("      \"avgAccuracy\": {0:0.0000000000000000},\n", avgAccuracy) |> ignore
+            sb.AppendFormat("      \"avgPrecision\": {0:0.0000000000000000},\n", avgPrecision) |> ignore
+            sb.AppendFormat("      \"avgRecall\": {0:0.0000000000000000},\n", avgRecall) |> ignore
+            sb.AppendFormat("      \"avgF1Score\": {0:0.0000000000000000}\n", avgF1Score) |> ignore
+            sb.AppendLine("    },") |> ignore
+            sb.AppendLine("    \"seasonalBreakdown\": {") |> ignore
+            sb.AppendLine("      \"earlySeason\": {") |> ignore
+            sb.AppendLine("        \"weeks\": \"3-6\",") |> ignore
+            sb.AppendFormat("        \"mlTop10Hits\": {0},\n", earlyMlHits) |> ignore
+            sb.AppendFormat("        \"sleeperTop10Hits\": {0}\n", earlySleeperHits) |> ignore
+            sb.AppendLine("      },") |> ignore
+            sb.AppendLine("      \"midSeason\": {") |> ignore
+            sb.AppendLine("        \"weeks\": \"7-12\",") |> ignore
+            sb.AppendFormat("        \"mlTop10Hits\": {0},\n", midMlHits) |> ignore
+            sb.AppendFormat("        \"sleeperTop10Hits\": {0}\n", midSleeperHits) |> ignore
+            sb.AppendLine("      },") |> ignore
+            sb.AppendLine("      \"lateSeason\": {") |> ignore
+            sb.AppendLine("        \"weeks\": \"13-18\",") |> ignore
+            sb.AppendFormat("        \"mlTop10Hits\": {0},\n", lateMlHits) |> ignore
+            sb.AppendFormat("        \"sleeperTop10Hits\": {0}\n", lateSleeperHits) |> ignore
+            sb.AppendLine("      }") |> ignore
+            sb.AppendLine("    }") |> ignore
             sb.AppendLine("  },") |> ignore
             sb.AppendLine("  \"caseStudy\": {") |> ignore
             sb.AppendLine("    \"biggestMLSuccesses\": [") |> ignore

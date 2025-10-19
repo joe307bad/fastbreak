@@ -15,12 +15,15 @@ const LineChart = () => {
             .then(jsonData => {
                 setOverallStats(jsonData.overallStats);
 
+                // Sort weekly predictions by week to ensure continuous lines
+                const sortedPredictions = jsonData.weeklyPredictions.sort((a, b) => a.week - b.week);
+
                 // Transform the data for D3 charts
                 const transformedData = [
                     {
                         name: 'Top Ten Sleeper Hits',
                         color: '#4a90e2',
-                        values: jsonData.weeklyPredictions.map(d => ({
+                        values: sortedPredictions.map(d => ({
                             x: d.week,
                             y: d.sleeperTop10Hits
                         }))
@@ -28,7 +31,7 @@ const LineChart = () => {
                     {
                         name: 'Top Three Sleeper Hits',
                         color: '#ff6b6b',
-                        values: jsonData.weeklyPredictions.map(d => ({
+                        values: sortedPredictions.map(d => ({
                             x: d.week,
                             y: d.sleeperTop3Hits
                         }))
@@ -36,7 +39,7 @@ const LineChart = () => {
                     {
                         name: 'ML Model Top 10 Hits',
                         color: '#51cf66',
-                        values: jsonData.weeklyPredictions.map(d => ({
+                        values: sortedPredictions.map(d => ({
                             x: d.week,
                             y: d.mlTop10Hits
                         }))
@@ -44,7 +47,7 @@ const LineChart = () => {
                     {
                         name: 'ML Model Top 3 Hits',
                         color: '#ffa726',
-                        values: jsonData.weeklyPredictions.map(d => ({
+                        values: sortedPredictions.map(d => ({
                             x: d.week,
                             y: d.mlTop3Hits
                         }))

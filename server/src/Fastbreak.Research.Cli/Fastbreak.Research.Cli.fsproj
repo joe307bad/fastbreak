@@ -20,16 +20,26 @@
     <Compile Include="Commands\01-generate-elo-plus\MarkdownReportGenerator.fs" />
     <Compile Include="Commands\01-generate-elo-plus\EloPlus.fs" />
     <Content Include="Commands\01-generate-elo-plus\test.csv" />
-    <Compile Include="Commands\02-nfl-fantasy-breakout-predict\FantasyBreakoutModels.fs" />
-    <Compile Include="Commands\02-nfl-fantasy-breakout-predict\FantasyBreakoutTrainer.fs" />
-    <Compile Include="Commands\02-nfl-fantasy-breakout-predict\MLNetBreakoutClassifier.fs" />
-    <Compile Include="Commands\02-nfl-fantasy-breakout-predict\NflFantasyBreakout.fs" />
+    <Compile Include="Commands\02-nfl-fantasy-sleeper-breakout\EnvConfig.fs" />
+    <Compile Include="Commands\02-nfl-fantasy-sleeper-breakout\DataTypes.fs" />
+    <Compile Include="Commands\02-nfl-fantasy-sleeper-breakout\DataLoader.fs" />
+    <Compile Include="Commands\02-nfl-fantasy-sleeper-breakout\AlgorithmTrainer.fs" />
+    <Compile Include="Commands\02-nfl-fantasy-sleeper-breakout\AlgorithmComparison.fs" />
+    <Compile Include="Commands\02-nfl-fantasy-sleeper-breakout\WeeklyEvaluator.fs" />
+    <Compile Include="Commands\02-nfl-fantasy-sleeper-breakout\PredictNewWeek.fs" />
+    <!-- Temporarily commented out - missing SleeperScoreCalculator module -->
+    <!-- <Compile Include="Commands\02-nfl-fantasy-sleeper-breakout\ConsoleOutputFormatter.fs" /> -->
+    <!-- <Compile Include="Commands\02-nfl-fantasy-sleeper-breakout\HtmlOutputGenerator.fs" /> -->
+    <Compile Include="Commands\02-nfl-fantasy-sleeper-breakout\DataVerification.fs" />
+    <Compile Include="Commands\02-nfl-fantasy-sleeper-breakout\NflFantasyBreakout.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Argu" Version="6.2.4" />
     <PackageReference Include="Microsoft.ML" Version="3.0.1" />
+    <PackageReference Include="Plotly.NET" Version="4.2.0" />
+    <PackageReference Include="Plotly.NET.ImageExport" Version="4.2.0" />
   </ItemGroup>
 
 </Project>

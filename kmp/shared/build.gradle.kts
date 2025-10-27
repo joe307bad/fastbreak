@@ -1,203 +1,72 @@
-import com.codingfeline.buildkonfig.compiler.FieldSpec.Type.STRING
-import org.jetbrains.kotlin.konan.properties.Properties
-
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
     alias(libs.plugins.androidLibrary)
-    alias(libs.plugins.jetbrainsCompose)
-    alias(libs.plugins.compose.compiler)
-    id("com.codingfeline.buildkonfig")
-    kotlin("plugin.serialization") version "2.1.0"
-    kotlin("native.cocoapods")
-}
-
-tasks {
-    withType<Test> {
-        enabled = false
-    }
-    register("testClasses") {
-        enabled = false
-    }
+    alias(libs.plugins.composeMultiplatform)
+    alias(libs.plugins.composeCompiler)
+    alias(libs.plugins.kotlinSerialization)
 }
 
 kotlin {
     androidTarget {
-        compilerOptions {
-            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21)
+        compilations.all {
+            kotlinOptions {
+                jvmTarget = "17"
+                freeCompilerArgs += listOf("-opt-in=androidx.compose.material3.ExperimentalMaterial3Api")
+            }
         }
     }
-    iosArm64()
-    iosX64()
-    iosSimulatorArm64()
 
-    cocoapods {
-        version = "1.0"
-        summary = "Fastbreak"
-        homepage = "https://joebad.com/"
-        ios.deploymentTarget = "14.1"
-        podfile = project.file("../iosApp/Podfile")
-        pod("CouchbaseLite", version = "3.1.9", linkOnly = true)
+    sourceSets.all {
+        languageSettings.optIn("androidx.compose.material3.ExperimentalMaterial3Api")
+    }
 
-        pod("GoogleSignIn", linkOnly = true)
-        pod("FirebaseCore", linkOnly = true)
+    listOf(
+        iosX64(),
+        iosArm64(),
+        iosSimulatorArm64()
+    ).forEach {
+        it.binaries.framework {
+            baseName = "shared"
+            isStatic = true
+        }
     }
 
     sourceSets {
+        commonMain.dependencies {
+            implementation(compose.runtime)
+            implementation(compose.foundation)
+            implementation(compose.material3)
+            implementation(compose.ui)
+            implementation(compose.components.resources)
 
-        commonMain {
-            dependencies {
-                api(libs.kotbase)
-                implementation(compose.runtime)
-                implementation(compose.foundation)
-                implementation(compose.material)
-                implementation(compose.ui)
-                @OptIn(org.jetbrains.compose.ExperimentalComposeLibrary::class)
-                implementation(compose.components.resources)
-                implementation(compose.components.uiToolingPreview)
-                implementation("com.arkivanov.decompose:decompose:3.2.2")
-                implementation("com.arkivanov.decompose:extensions-compose:3.2.2")
-                implementation("com.arkivanov.decompose:extensions-compose-experimental:3.2.2")
-                implementation(libs.cupertino.adaptive)
-                implementation(libs.cupertino.iconsExtended)
-                implementation(libs.kotbase)
-                implementation("io.github.mirzemehdi:kmpauth-google:2.0.0")
-                implementation("io.github.mirzemehdi:kmpauth-uihelper:2.0.0")
-                implementation("com.google.guava:guava:27.0.1-android")
-                implementation("com.google.accompanist:accompanist-systemuicontroller:0.34.0")
-                implementation("androidx.datastore:datastore-preferences:1.1.3")
+            // Decompose
+            implementation(libs.decompose)
+            implementation(libs.decompose.compose)
 
-                implementation("io.ktor:ktor-client-core:2.3.6")
-                implementation("io.ktor:ktor-client-serialization:2.3.6")
-                implementation("io.ktor:ktor-client-content-negotiation:2.3.6")
-                implementation("io.ktor:ktor-serialization-kotlinx-json:2.3.6")
+            // Orbit MVI
+            implementation(libs.orbit.core)
+            implementation(libs.orbit.compose)
 
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
-                implementation("org.orbit-mvi:orbit-core:9.0.0")
-                implementation("org.orbit-mvi:orbit-compose:9.0.0")
-
-                implementation("com.appstractive:jwt-kt:1.1.0")
-
-                implementation("com.liftric:kvault:1.12.0")
-                implementation("org.jetbrains.skiko:skiko:0.7.85")
-                implementation("com.squareup.okio:okio:3.6.0") // or latest
-            }
-            resources.srcDirs("src/commonMain/composeResources")
+            // Koala Plot
+            implementation(libs.koalaplot.core)
         }
-
-        val iosX64Main by getting
-        val iosArm64Main by getting
-        val iosSimulatorArm64Main by getting
-        val iosMain by creating {
-            dependsOn(commonMain.get())
-            iosX64Main.dependsOn(this)
-            iosArm64Main.dependsOn(this)
-            iosSimulatorArm64Main.dependsOn(this)
-
-            dependencies {
-                implementation("io.ktor:ktor-client-darwin:2.3.6")
-            }
-            
-            resources.srcDirs("src/commonMain/composeResources")
-        }
-
-//        val androidMain by creating {
-//            dependsOn(commonMain.get())
-//            resources.srcDirs("src/commonMain/resources", "src/commonMain/composeResources")
-//        }
 
         androidMain.dependencies {
-            implementation(libs.compose.ui.tooling.preview)
-            api(libs.androidx.activity.compose)
-            implementation("com.arkivanov.decompose:extensions-android:3.2.2")
-            implementation("io.ktor:ktor-client-cio:2.3.6")
+            implementation(libs.androidx.activity.compose)
         }
     }
 }
 
 android {
-    namespace = "com.joebad.fastbreak"
+    namespace = "com.example.kmpapp"
     compileSdk = 34
+
     defaultConfig {
-        minSdk = 26
+        minSdk = 24
     }
-    packaging.resources.excludes += "/META-INF/{AL2.0,LGPL2.1}"
+
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_21
-        targetCompatibility = JavaVersion.VERSION_21
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
-    sourceSets {
-        getByName("main") {
-            assets.srcDir("src/main/assets")
-        }
-    }
-}
-dependencies {
-    implementation(libs.androidx.appcompat)
-    implementation(libs.material)
-    implementation(libs.androidx.ui.text.google.fonts)
-    implementation(libs.androidx.ui.text.android)
-    implementation(libs.androidx.core.i18n)
-    implementation(libs.androidx.ui.android)
-    implementation(libs.androidx.compiler)
-    implementation(compose.components.resources)
-    implementation(libs.androidx.ui.graphics.android)
-}
-
-buildkonfig {
-    val propertiesProj = Properties()
-    packageName = "com.joebad.fastbreak"
-
-    defaultConfigs {
-        propertiesProj.load(project.rootProject.file("local.properties").inputStream())
-        val apiKey: String = propertiesProj.getProperty("GOOGLE_AUTH_SERVER_ID")
-        val apiBaseUrl: String = propertiesProj.getProperty("API_BASE_URL") ?: "https://fastbreak-api.fly.dev"
-
-        require(apiKey.isNotEmpty()) {
-            "Register your GOOGLE_AUTH_SERVER_ID from developer and place it in local.properties as `GOOGLE_AUTH_SERVER_ID`"
-        }
-
-        buildConfigField(STRING, "GOOGLE_AUTH_SERVER_ID", apiKey)
-        buildConfigField(STRING, "API_BASE_URL", apiBaseUrl)
-        buildConfigField(
-            com.codingfeline.buildkonfig.compiler.FieldSpec.Type.BOOLEAN,
-            "IS_DEBUG",
-            "false"
-        )
-    }
-
-    targetConfigs {
-        create("android") {
-            buildConfigField(
-                com.codingfeline.buildkonfig.compiler.FieldSpec.Type.BOOLEAN,
-                "IS_DEBUG",
-                "true"
-            )
-        }
-        create("ios") {
-            buildConfigField(
-                com.codingfeline.buildkonfig.compiler.FieldSpec.Type.BOOLEAN,
-                "IS_DEBUG",
-                "true"
-            )
-        }
-    }
-}
-
-tasks.register<Copy>("copyFontsToAndroidAssets") {
-    from("src/commonMain/resources/font")
-    into("../androidApp/src/main/assets/font")
-}
-
-tasks.named("preBuild") {
-    dependsOn("copyFontsToAndroidAssets")
-}
-
-compose.resources {
-    publicResClass = true
-    generateResClass = always
-}
-
-tasks.withType<Copy> {
-    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }

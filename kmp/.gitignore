@@ -1,7 +1,31 @@
-kotlin-js-store/**/*
+*.iml
+.gradle
+/local.properties
+/.idea
+.DS_Store
+/build
+/captures
+.externalNativeBuild
+.cxx
+local.properties
+
+# Gradle
+.gradle/
+build/
+
+# Android
+*.apk
+*.ap_
+*.aab
+
+# IntelliJ
+*.iml
+.idea/
+
+# macOS
+.DS_Store
+
+# Kotlin
+*.kotlin_metadata
+
 .kotlin
-/iosApp/Pods
-/iosApp/CouchbaseLite.xcframework
-/shared/shared.podspec
-/androidApp/src/main/assets/font/CodeBold.otf
-/release-keystore.jks

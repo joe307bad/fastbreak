@@ -49,6 +49,14 @@ kotlin {
 
             // Koala Plot
             implementation(libs.koalaplot.core)
+
+            // Cupertino
+            implementation(libs.cupertino)
+            implementation(libs.cupertino.adaptive)
+
+            // Multiplatform Settings
+            implementation(libs.multiplatform.settings)
+            implementation(libs.multiplatform.settings.no.arg)
         }
 
         androidMain.dependencies {

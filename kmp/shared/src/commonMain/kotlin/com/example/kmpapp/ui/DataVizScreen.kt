@@ -3,6 +3,7 @@ package com.example.kmpapp.ui
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -24,7 +25,10 @@ import com.example.kmpapp.navigation.DataVizComponent
 import com.example.kmpapp.viewmodel.DataVizState
 
 @Composable
-fun DataVizScreen(component: DataVizComponent) {
+fun DataVizScreen(
+    component: DataVizComponent,
+    onMenuClick: () -> Unit = {}
+) {
     val state by component.viewModel.state.collectAsState()
 
     Scaffold(
@@ -36,6 +40,14 @@ fun DataVizScreen(component: DataVizComponent) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Back"
+                        )
+                    }
+                },
+                actions = {
+                    IconButton(onClick = onMenuClick) {
+                        Icon(
+                            imageVector = Icons.Default.Menu,
+                            contentDescription = "Menu"
                         )
                     }
                 },

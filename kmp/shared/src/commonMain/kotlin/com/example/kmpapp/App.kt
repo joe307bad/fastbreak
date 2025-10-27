@@ -1,28 +1,56 @@
 package com.example.kmpapp
 
-import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.DrawerValue
+import androidx.compose.material3.ModalNavigationDrawer
+import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberCoroutineScope
 import com.arkivanov.decompose.extensions.compose.stack.Children
 import com.arkivanov.decompose.extensions.compose.stack.animation.slide
 import com.arkivanov.decompose.extensions.compose.stack.animation.stackAnimation
 import com.arkivanov.decompose.extensions.compose.subscribeAsState
 import com.example.kmpapp.navigation.RootComponent
 import com.example.kmpapp.ui.DataVizScreen
+import com.example.kmpapp.ui.DrawerMenu
 import com.example.kmpapp.ui.HomeScreen
+import com.example.kmpapp.ui.theme.AppTheme
+import kotlinx.coroutines.launch
 
 @Composable
 fun App(rootComponent: RootComponent) {
-    MaterialTheme {
-        val stack by rootComponent.stack.subscribeAsState()
+    val themeMode by rootComponent.themeMode.subscribeAsState()
+    val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
+    val scope = rememberCoroutineScope()
 
-        Children(
-            stack = stack,
-            animation = stackAnimation(slide())
+    AppTheme(themeMode = themeMode) {
+        ModalNavigationDrawer(
+            drawerState = drawerState,
+            drawerContent = {
+                DrawerMenu(
+                    currentTheme = themeMode,
+                    onThemeChange = { newTheme ->
+                        rootComponent.toggleTheme(newTheme)
+                    }
+                )
+            }
         ) {
-            when (val child = it.instance) {
-                is RootComponent.Child.Home -> HomeScreen(child.component)
-                is RootComponent.Child.DataViz -> DataVizScreen(child.component)
+            val stack by rootComponent.stack.subscribeAsState()
+
+            Children(
+                stack = stack,
+                animation = stackAnimation(slide())
+            ) {
+                when (val child = it.instance) {
+                    is RootComponent.Child.Home -> HomeScreen(
+                        component = child.component,
+                        onMenuClick = { scope.launch { drawerState.open() } }
+                    )
+                    is RootComponent.Child.DataViz -> DataVizScreen(
+                        component = child.component,
+                        onMenuClick = { scope.launch { drawerState.open() } }
+                    )
+                }
             }
         }
     }

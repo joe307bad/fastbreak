@@ -6,14 +6,26 @@ import com.arkivanov.decompose.router.stack.StackNavigation
 import com.arkivanov.decompose.router.stack.childStack
 import com.arkivanov.decompose.router.stack.pop
 import com.arkivanov.decompose.router.stack.push
+import com.arkivanov.decompose.value.MutableValue
 import com.arkivanov.decompose.value.Value
+import com.example.kmpapp.ui.theme.ThemeMode
+import com.example.kmpapp.ui.theme.ThemeRepository
 import kotlinx.serialization.Serializable
 
 class RootComponent(
-    componentContext: ComponentContext
+    componentContext: ComponentContext,
+    private val themeRepository: ThemeRepository
 ) : ComponentContext by componentContext {
 
     private val navigation = StackNavigation<Config>()
+
+    private val _themeMode = MutableValue(themeRepository.getInitialTheme())
+    val themeMode: Value<ThemeMode> = _themeMode
+
+    fun toggleTheme(mode: ThemeMode) {
+        _themeMode.value = mode
+        themeRepository.saveTheme(mode)
+    }
 
     val stack: Value<ChildStack<*, Child>> = childStack(
         source = navigation,

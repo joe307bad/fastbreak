@@ -57,6 +57,9 @@ kotlin {
             // Multiplatform Settings
             implementation(libs.multiplatform.settings)
             implementation(libs.multiplatform.settings.no.arg)
+
+            // DateTime
+            implementation(libs.kotlinx.datetime)
         }
 
         androidMain.dependencies {

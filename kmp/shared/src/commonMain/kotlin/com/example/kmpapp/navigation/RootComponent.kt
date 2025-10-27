@@ -40,12 +40,13 @@ class RootComponent(
             is Config.Home -> Child.Home(
                 HomeComponent(
                     componentContext = componentContext,
-                    onNavigateToDataViz = { navigation.push(Config.DataViz) }
+                    onNavigateToDataViz = { title -> navigation.push(Config.DataViz(title)) }
                 )
             )
             is Config.DataViz -> Child.DataViz(
                 DataVizComponent(
                     componentContext = componentContext,
+                    title = config.title,
                     onNavigateBack = { navigation.pop() }
                 )
             )
@@ -62,6 +63,6 @@ class RootComponent(
         data object Home : Config
 
         @Serializable
-        data object DataViz : Config
+        data class DataViz(val title: String) : Config
     }
 }

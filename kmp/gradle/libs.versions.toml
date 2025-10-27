@@ -9,6 +9,7 @@ orbit = "9.0.0"
 koalaplot = "0.6.3"
 cupertino = "0.1.0-alpha04"
 multiplatformSettings = "1.2.0"
+kotlinxDatetime = "0.6.1"
 
 [libraries]
 androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "androidx-activityCompose" }
@@ -23,6 +24,7 @@ cupertino = { module = "io.github.alexzhirkevich:cupertino", version.ref = "cupe
 cupertino-adaptive = { module = "io.github.alexzhirkevich:cupertino-adaptive", version.ref = "cupertino" }
 multiplatform-settings = { module = "com.russhwolf:multiplatform-settings", version.ref = "multiplatformSettings" }
 multiplatform-settings-no-arg = { module = "com.russhwolf:multiplatform-settings-no-arg", version.ref = "multiplatformSettings" }
+kotlinx-datetime = { module = "org.jetbrains.kotlinx:kotlinx-datetime", version.ref = "kotlinxDatetime" }
 
 [plugins]
 androidApplication = { id = "com.android.application", version.ref = "agp" }

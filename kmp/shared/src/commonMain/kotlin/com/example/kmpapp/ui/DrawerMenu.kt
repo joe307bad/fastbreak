@@ -17,24 +17,31 @@ fun DrawerMenu(
     onThemeChange: (ThemeMode) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    ModalDrawerSheet(modifier = modifier) {
+    ModalDrawerSheet(
+        modifier = modifier,
+        drawerContainerColor = MaterialTheme.colorScheme.background
+    ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(16.dp)
         ) {
             Text(
-                text = "Settings",
-                style = MaterialTheme.typography.headlineSmall,
+                text = "settings",
+                style = MaterialTheme.typography.titleLarge,
                 modifier = Modifier.padding(bottom = 16.dp)
             )
 
-            HorizontalDivider(modifier = Modifier.padding(bottom = 16.dp))
+            HorizontalDivider(
+                modifier = Modifier.padding(bottom = 16.dp),
+                color = MaterialTheme.colorScheme.outline
+            )
 
             // Theme selector
             Text(
-                text = "Theme",
-                style = MaterialTheme.typography.titleMedium,
+                text = "theme",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(bottom = 8.dp)
             )
 
@@ -49,7 +56,7 @@ fun DrawerMenu(
                     onClick = { onThemeChange(ThemeMode.LIGHT) }
                 ) {
                     Text(
-                        text = "Light",
+                        text = "light",
                         color = if (currentTheme == ThemeMode.LIGHT) Color.Black else MaterialTheme.colorScheme.onSurface
                     )
                 }
@@ -58,7 +65,7 @@ fun DrawerMenu(
                     onClick = { onThemeChange(ThemeMode.DARK) }
                 ) {
                     Text(
-                        text = "Dark",
+                        text = "dark",
                         color = if (currentTheme == ThemeMode.DARK) Color.Black else MaterialTheme.colorScheme.onSurface
                     )
                 }

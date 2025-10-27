@@ -5,6 +5,7 @@ import com.example.kmpapp.viewmodel.DataVizViewModel
 
 class DataVizComponent(
     componentContext: ComponentContext,
+    val title: String,
     val onNavigateBack: () -> Unit
 ) : ComponentContext by componentContext {
 

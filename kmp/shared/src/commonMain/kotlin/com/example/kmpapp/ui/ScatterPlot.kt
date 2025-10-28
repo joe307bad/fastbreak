@@ -15,6 +15,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.TextStyle
@@ -307,25 +308,33 @@ fun FourQuadrantScatterPlot(
                 )
             }
 
-            // Draw trend line (line of best fit)
-            // Calculate y-values at the visible x-range boundaries
-            val trendYStart = slope * visibleMinX + intercept
-            val trendYEnd = slope * visibleMaxX + intercept
+            // Draw trend line and data points with clipping to keep within graph bounds
+            clipRect(
+                left = leftPadding,
+                top = topPadding,
+                right = width - rightPadding,
+                bottom = height - bottomPadding
+            ) {
+                // Draw trend line (line of best fit)
+                // Calculate y-values at the visible x-range boundaries
+                val trendYStart = slope * visibleMinX + intercept
+                val trendYEnd = slope * visibleMaxX + intercept
 
-            // Convert to screen coordinates
-            val trendX1 = leftPadding
-            val trendY1 = height - bottomPadding - (height - topPadding - bottomPadding) * (trendYStart.toFloat() - visibleMinY) / adjustedYRange
-            val trendX2 = width - rightPadding
-            val trendY2 = height - bottomPadding - (height - topPadding - bottomPadding) * (trendYEnd.toFloat() - visibleMinY) / adjustedYRange
+                // Convert to screen coordinates
+                val trendX1 = leftPadding
+                val trendY1 = height - bottomPadding - (height - topPadding - bottomPadding) * (trendYStart.toFloat() - visibleMinY) / adjustedYRange
+                val trendX2 = width - rightPadding
+                val trendY2 = height - bottomPadding - (height - topPadding - bottomPadding) * (trendYEnd.toFloat() - visibleMinY) / adjustedYRange
 
-            // Draw the trend line
-            drawLine(
-                color = Color(0xFFFF6F00).copy(alpha = 0.7f), // Deep orange for visibility
-                start = Offset(trendX1, trendY1),
-                end = Offset(trendX2, trendY2),
-                strokeWidth = 3f,
-                pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 10f))
-            )
+                // Draw the trend line
+                drawLine(
+                    color = Color(0xFFFF6F00).copy(alpha = 0.7f), // Deep orange for visibility
+                    start = Offset(trendX1, trendY1),
+                    end = Offset(trendX2, trendY2),
+                    strokeWidth = 3f,
+                    pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 10f))
+                )
+            }
 
             // Draw axis labels
             val xAxisLabelText = "PFF Offense Grade"
@@ -346,42 +355,49 @@ fun FourQuadrantScatterPlot(
                 style = labelTextStyle.copy(fontWeight = FontWeight.Bold)
             )
 
-            // Plot data points with labels
-            data.forEach { point ->
-                val x = leftPadding + (width - leftPadding - rightPadding) * (point.x.toFloat() - visibleMinX) / adjustedXRange
-                val y = height - bottomPadding - (height - topPadding - bottomPadding) * (point.y.toFloat() - visibleMinY) / adjustedYRange
+            // Plot data points with labels (with clipping)
+            clipRect(
+                left = leftPadding,
+                top = topPadding,
+                right = width - rightPadding,
+                bottom = height - bottomPadding
+            ) {
+                data.forEach { point ->
+                    val x = leftPadding + (width - leftPadding - rightPadding) * (point.x.toFloat() - visibleMinX) / adjustedXRange
+                    val y = height - bottomPadding - (height - topPadding - bottomPadding) * (point.y.toFloat() - visibleMinY) / adjustedYRange
 
-                // Only draw if point is in visible range
-                if (x >= leftPadding && x <= width - rightPadding && y >= topPadding && y <= height - bottomPadding) {
-                    // Determine quadrant based on comparison to data averages (not visible averages)
-                    val pointColor = when {
-                        point.x >= avgPFF && point.y >= avgEPA -> Color(0xFF4CAF50) // Q1 - High PFF, High EPA (Green)
-                        point.x < avgPFF && point.y >= avgEPA -> Color(0xFF2196F3)  // Q2 - Low PFF, High EPA (Blue)
-                        point.x < avgPFF && point.y < avgEPA -> Color(0xFFFF9800)   // Q3 - Low PFF, Low EPA (Orange)
-                        else -> Color(0xFFF44336)                                   // Q4 - High PFF, Low EPA (Red)
+                    // Only draw if point is in visible range
+                    if (x >= leftPadding && x <= width - rightPadding && y >= topPadding && y <= height - bottomPadding) {
+                        // Determine quadrant based on comparison to data averages (not visible averages)
+                        val pointColor = when {
+                            point.x >= avgPFF && point.y >= avgEPA -> Color(0xFF4CAF50) // Q1 - High PFF, High EPA (Green)
+                            point.x < avgPFF && point.y >= avgEPA -> Color(0xFF2196F3)  // Q2 - Low PFF, High EPA (Blue)
+                            point.x < avgPFF && point.y < avgEPA -> Color(0xFFFF9800)   // Q3 - Low PFF, Low EPA (Orange)
+                            else -> Color(0xFFF44336)                                   // Q4 - High PFF, Low EPA (Red)
+                        }
+
+                        // Draw point
+                        drawCircle(
+                            color = pointColor,
+                            radius = 7f,
+                            center = Offset(x, y)
+                        )
+
+                        drawCircle(
+                            color = axisColor,
+                            radius = 7f,
+                            center = Offset(x, y),
+                            style = Stroke(width = 1.5f)
+                        )
+
+                        // Draw QB name label next to point
+                        drawText(
+                            textMeasurer,
+                            point.label,
+                            topLeft = Offset(x + 10f, y - 6f),
+                            style = labelTextStyle
+                        )
                     }
-
-                    // Draw point
-                    drawCircle(
-                        color = pointColor,
-                        radius = 7f,
-                        center = Offset(x, y)
-                    )
-
-                    drawCircle(
-                        color = axisColor,
-                        radius = 7f,
-                        center = Offset(x, y),
-                        style = Stroke(width = 1.5f)
-                    )
-
-                    // Draw QB name label next to point
-                    drawText(
-                        textMeasurer,
-                        point.label,
-                        topLeft = Offset(x + 10f, y - 6f),
-                        style = labelTextStyle
-                    )
                 }
             }
         }

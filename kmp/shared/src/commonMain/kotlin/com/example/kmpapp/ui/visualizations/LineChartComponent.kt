@@ -16,6 +16,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
@@ -237,60 +238,67 @@ fun LineChartComponent(
                 )
             }
 
-            // Draw each series
-            series.forEachIndexed { seriesIndex, lineSeries ->
-                if (lineSeries.dataPoints.size < 2) return@forEachIndexed
+            // Draw each series with clipping to keep within graph bounds
+            clipRect(
+                left = leftPadding,
+                top = topPadding,
+                right = width - rightPadding,
+                bottom = height - bottomPadding
+            ) {
+                series.forEachIndexed { seriesIndex, lineSeries ->
+                    if (lineSeries.dataPoints.size < 2) return@forEachIndexed
 
-                val color = colors[seriesIndex % colors.size]
-                val path = Path()
-                var pathStarted = false
+                    val color = colors[seriesIndex % colors.size]
+                    val path = Path()
+                    var pathStarted = false
 
-                // Draw lines
-                lineSeries.dataPoints.forEach { point ->
-                    val pointX = point.x.toFloat()
-                    val pointY = point.y.toFloat()
+                    // Draw lines
+                    lineSeries.dataPoints.forEach { point ->
+                        val pointX = point.x.toFloat()
+                        val pointY = point.y.toFloat()
 
-                    // Only include points in visible range (with some buffer)
-                    if (pointX >= visibleMinX - xRange * 0.1f && pointX <= visibleMaxX + xRange * 0.1f) {
-                        val x = leftPadding + (width - leftPadding - rightPadding) * (pointX - visibleMinX) / xRange
-                        val y = height - bottomPadding - (height - topPadding - bottomPadding) * (pointY - visibleMinY) / yRange
+                        // Only include points in visible range (with some buffer)
+                        if (pointX >= visibleMinX - xRange * 0.1f && pointX <= visibleMaxX + xRange * 0.1f) {
+                            val x = leftPadding + (width - leftPadding - rightPadding) * (pointX - visibleMinX) / xRange
+                            val y = height - bottomPadding - (height - topPadding - bottomPadding) * (pointY - visibleMinY) / yRange
 
-                        if (!pathStarted) {
-                            path.moveTo(x, y)
-                            pathStarted = true
-                        } else {
-                            path.lineTo(x, y)
+                            if (!pathStarted) {
+                                path.moveTo(x, y)
+                                pathStarted = true
+                            } else {
+                                path.lineTo(x, y)
+                            }
                         }
                     }
-                }
 
-                // Draw the path
-                if (pathStarted) {
-                    drawPath(
-                        path = path,
-                        color = color,
-                        style = Stroke(
-                            width = 3f,
-                            cap = StrokeCap.Round,
-                            join = StrokeJoin.Round
-                        )
-                    )
-                }
-
-                // Draw points (only in visible range)
-                lineSeries.dataPoints.forEach { point ->
-                    val pointX = point.x.toFloat()
-                    val pointY = point.y.toFloat()
-
-                    if (pointX >= visibleMinX && pointX <= visibleMaxX) {
-                        val x = leftPadding + (width - leftPadding - rightPadding) * (pointX - visibleMinX) / xRange
-                        val y = height - bottomPadding - (height - topPadding - bottomPadding) * (pointY - visibleMinY) / yRange
-
-                        drawCircle(
+                    // Draw the path
+                    if (pathStarted) {
+                        drawPath(
+                            path = path,
                             color = color,
-                            radius = 4f,
-                            center = Offset(x, y)
+                            style = Stroke(
+                                width = 3f,
+                                cap = StrokeCap.Round,
+                                join = StrokeJoin.Round
+                            )
                         )
+                    }
+
+                    // Draw points (only in visible range)
+                    lineSeries.dataPoints.forEach { point ->
+                        val pointX = point.x.toFloat()
+                        val pointY = point.y.toFloat()
+
+                        if (pointX >= visibleMinX && pointX <= visibleMaxX) {
+                            val x = leftPadding + (width - leftPadding - rightPadding) * (pointX - visibleMinX) / xRange
+                            val y = height - bottomPadding - (height - topPadding - bottomPadding) * (pointY - visibleMinY) / yRange
+
+                            drawCircle(
+                                color = color,
+                                radius = 4f,
+                                center = Offset(x, y)
+                            )
+                        }
                     }
                 }
             }

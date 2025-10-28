@@ -110,8 +110,47 @@ fun FourQuadrantScatterPlot(
                 .pointerInput(Unit) {
                     detectTransformGestures { _, pan, zoom, _ ->
                         scale = (scale * zoom).coerceIn(0.5f, 3f)
-                        offsetX += pan.x
-                        offsetY += pan.y
+
+                        // Apply pan with limits based on initial data range
+                        val tentativeOffsetX = offsetX + pan.x
+                        val tentativeOffsetY = offsetY + pan.y
+
+                        // Calculate how far the pan would take us
+                        val baseXRange = maxX - minX
+                        val baseYRange = maxY - minY
+                        val centerX = (minX + maxX) / 2
+                        val centerY = (minY + maxY) / 2
+
+                        val canvasWidth = size.width
+                        val canvasHeight = size.height
+                        val leftPad = 80f
+                        val rightPad = 40f
+                        val topPad = 30f
+                        val bottomPad = 60f
+
+                        val zoomedXRange = baseXRange / scale
+                        val zoomedYRange = baseYRange / scale
+
+                        val panXOffset = -tentativeOffsetX / (canvasWidth - leftPad - rightPad) * zoomedXRange
+                        val panYOffset = tentativeOffsetY / (canvasHeight - topPad - bottomPad) * zoomedYRange
+
+                        val visibleMinX = (centerX - zoomedXRange / 2 + panXOffset).toFloat()
+                        val visibleMaxX = (centerX + zoomedXRange / 2 + panXOffset).toFloat()
+                        val visibleMinY = (centerY - zoomedYRange / 2 + panYOffset).toFloat()
+                        val visibleMaxY = (centerY + zoomedYRange / 2 + panYOffset).toFloat()
+
+                        // Limit panning: adjust based on zoom level (more relaxed when zoomed out)
+                        val maxPanBeyond = 0.5f / scale
+                        val allowedMinX = minX.toFloat() - baseXRange.toFloat() * maxPanBeyond
+                        val allowedMaxX = maxX.toFloat() + baseXRange.toFloat() * maxPanBeyond
+                        val allowedMinY = minY.toFloat() - baseYRange.toFloat() * maxPanBeyond
+                        val allowedMaxY = maxY.toFloat() + baseYRange.toFloat() * maxPanBeyond
+
+                        val xInBounds = visibleMinX >= allowedMinX && visibleMaxX <= allowedMaxX
+                        val yInBounds = visibleMinY >= allowedMinY && visibleMaxY <= allowedMaxY
+
+                        if (xInBounds) offsetX = tentativeOffsetX
+                        if (yInBounds) offsetY = tentativeOffsetY
                     }
                 }
         ) {

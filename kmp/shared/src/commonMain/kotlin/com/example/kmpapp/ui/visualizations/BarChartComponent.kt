@@ -216,22 +216,17 @@ fun BarChartComponent(
                     )
                 }
 
-                // Draw X-axis labels (team names) - show every nth label based on zoom, staggered
-                // Show fewer labels: at most 5 labels when zoomed out, more when zoomed in
-                val labelInterval = max(1, (data.size / (5 * scale)).toInt())
-                if (index % labelInterval == 0) {
-                    val labelX = x + barWidth / 2
-                    val measured = textMeasurer.measure(point.label, labelTextStyle.copy(fontSize = 10.sp))
-                    // Stagger labels: even indices at base position, odd indices offset down
-                    val labelIndex = index / labelInterval
-                    val yOffset = if (labelIndex % 2 == 0) 10f else 26f
-                    drawText(
-                        textMeasurer,
-                        point.label,
-                        topLeft = Offset(labelX - measured.size.width / 2, height - bottomPadding + yOffset),
-                        style = labelTextStyle.copy(fontSize = 10.sp)
-                    )
-                }
+                // Draw X-axis labels (team names) - show all labels in staggered rows
+                val labelX = x + barWidth / 2
+                val measured = textMeasurer.measure(point.label, labelTextStyle.copy(fontSize = 9.sp))
+                // Stagger labels: even indices at base position, odd indices offset down
+                val yOffset = if (index % 2 == 0) 10f else 26f
+                drawText(
+                    textMeasurer,
+                    point.label,
+                    topLeft = Offset(labelX - measured.size.width / 2, height - bottomPadding + yOffset),
+                    style = labelTextStyle.copy(fontSize = 9.sp)
+                )
             }
 
             // Draw axis labels

@@ -3,8 +3,8 @@
 
     <application
         android:allowBackup="true"
-        android:icon="@android:drawable/ic_menu_compass"
-        android:label="KMP App"
+        android:icon="@mipmap/ic_launcher"
+        android:label="fastbreak"
         android:theme="@android:style/Theme.Material.Light.NoActionBar">
         <activity
             android:name=".MainActivity"

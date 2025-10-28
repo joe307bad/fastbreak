@@ -1,4 +1,4 @@
-rootProject.name = "KMP-App"
+rootProject.name = "fastbreak"
 enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")
 
 pluginManagement {

@@ -6,11 +6,11 @@ plugins {
 }
 
 android {
-    namespace = "com.example.kmpapp.android"
+    namespace = "com.joebad.fastbreak"
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.example.kmpapp.android"
+        applicationId = "com.joebad.fastbreak"
         minSdk = 24
         targetSdk = 34
         versionCode = 1

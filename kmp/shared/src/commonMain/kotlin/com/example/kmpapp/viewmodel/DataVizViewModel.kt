@@ -1,7 +1,7 @@
 package com.example.kmpapp.viewmodel
 
 import com.example.kmpapp.data.api.MockedDataApi
-import com.example.kmpapp.data.model.ScatterPlotData
+import com.example.kmpapp.data.model.ScatterPlotVisualization
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -31,7 +31,10 @@ class DataVizViewModel(
             _state.value = DataVizState.Loading
 
             try {
-                val data = api.fetchScatterPlotData()
+                val data = api.fetchVisualizationData(
+                    MockedDataApi.Sport.NFL,
+                    MockedDataApi.VizType.SCATTER
+                ) as ScatterPlotVisualization
                 _state.value = DataVizState.Success(data)
             } catch (e: Exception) {
                 _state.value = DataVizState.Error(e.message ?: "Unknown error occurred")
@@ -62,7 +65,7 @@ sealed interface DataVizState {
     /**
      * Success state with loaded data.
      */
-    data class Success(val data: ScatterPlotData) : DataVizState
+    data class Success(val data: ScatterPlotVisualization) : DataVizState
 
     /**
      * Error state when data loading fails.

@@ -3,7 +3,6 @@ package com.example.kmpapp.ui
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material3.*
@@ -12,9 +11,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.arkivanov.decompose.extensions.compose.subscribeAsState
+import com.example.kmpapp.data.api.MockedDataApi
 import com.example.kmpapp.data.model.Sport
-import com.example.kmpapp.data.model.Visualization
-import com.example.kmpapp.data.model.VisualizationData
 import com.example.kmpapp.navigation.HomeComponent
 
 @Composable
@@ -96,16 +94,35 @@ fun HomeScreen(
             )
 
             // Visualization list
-            val visualizations = VisualizationData.getVisualizationsForSport(selectedSport)
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(0.dp)
             ) {
-                items(visualizations) { visualization ->
+                // Scatter Plot
+                item {
                     VisualizationItem(
-                        visualization = visualization,
-                        onClick = { component.onNavigateToDataViz(visualization.title) }
+                        title = "Scatter Plot Analysis",
+                        description = "Compare two metrics across teams or players",
+                        onClick = { component.onNavigateToDataViz(selectedSport, MockedDataApi.VizType.SCATTER) }
+                    )
+                }
+
+                // Bar Chart
+                item {
+                    VisualizationItem(
+                        title = "Bar Chart Comparison",
+                        description = "View and compare individual performance metrics",
+                        onClick = { component.onNavigateToDataViz(selectedSport, MockedDataApi.VizType.BAR) }
+                    )
+                }
+
+                // Line Chart
+                item {
+                    VisualizationItem(
+                        title = "Line Chart Trends",
+                        description = "Track performance trends over time",
+                        onClick = { component.onNavigateToDataViz(selectedSport, MockedDataApi.VizType.LINE) }
                     )
                 }
             }
@@ -115,7 +132,8 @@ fun HomeScreen(
 
 @Composable
 private fun VisualizationItem(
-    visualization: Visualization,
+    title: String,
+    description: String,
     onClick: () -> Unit
 ) {
     Column(
@@ -125,19 +143,13 @@ private fun VisualizationItem(
             .padding(vertical = 12.dp)
     ) {
         Text(
-            text = visualization.title,
+            text = title,
             style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.onBackground
         )
         Spacer(modifier = Modifier.height(4.dp))
         Text(
-            text = visualization.description,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Spacer(modifier = Modifier.height(4.dp))
-        Text(
-            text = "last updated: ${visualization.lastUpdated}",
+            text = description,
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )

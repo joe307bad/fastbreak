@@ -144,6 +144,7 @@ object VisualizationData {
             Sport.NFL -> nflVisualizations
             Sport.NBA -> nbaVisualizations
             Sport.MLB -> mlbVisualizations
+            Sport.NHL -> emptyList() // NHL uses the new visualization system
         }
     }
 }

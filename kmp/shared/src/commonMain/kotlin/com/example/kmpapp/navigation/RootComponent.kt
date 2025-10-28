@@ -8,6 +8,8 @@ import com.arkivanov.decompose.router.stack.pop
 import com.arkivanov.decompose.router.stack.push
 import com.arkivanov.decompose.value.MutableValue
 import com.arkivanov.decompose.value.Value
+import com.example.kmpapp.data.api.MockedDataApi
+import com.example.kmpapp.data.model.Sport
 import com.example.kmpapp.ui.theme.ThemeMode
 import com.example.kmpapp.ui.theme.ThemeRepository
 import kotlinx.serialization.Serializable
@@ -40,13 +42,16 @@ class RootComponent(
             is Config.Home -> Child.Home(
                 HomeComponent(
                     componentContext = componentContext,
-                    onNavigateToDataViz = { title -> navigation.push(Config.DataViz(title)) }
+                    onNavigateToDataViz = { sport, vizType ->
+                        navigation.push(Config.DataViz(sport, vizType))
+                    }
                 )
             )
             is Config.DataViz -> Child.DataViz(
                 DataVizComponent(
                     componentContext = componentContext,
-                    title = config.title,
+                    sport = config.sport,
+                    vizType = config.vizType,
                     onNavigateBack = { navigation.pop() }
                 )
             )
@@ -63,6 +68,6 @@ class RootComponent(
         data object Home : Config
 
         @Serializable
-        data class DataViz(val title: String) : Config
+        data class DataViz(val sport: Sport, val vizType: MockedDataApi.VizType) : Config
     }
 }

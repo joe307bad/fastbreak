@@ -36,4 +36,5 @@ dependencies {
     implementation(libs.androidx.activity.compose)
     implementation(libs.decompose)
     implementation(libs.essenty.lifecycle)
+    implementation(libs.multiplatform.settings.no.arg)
 }

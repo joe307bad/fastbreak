@@ -1,18 +1,15 @@
 package com.example.kmpapp.navigation
 
 import com.arkivanov.decompose.ComponentContext
-import com.example.kmpapp.viewmodel.DataVizViewModel
+import com.example.kmpapp.data.api.MockedDataApi
+import com.example.kmpapp.data.model.Sport
 
 class DataVizComponent(
     componentContext: ComponentContext,
-    val title: String,
+    val sport: Sport,
+    val vizType: MockedDataApi.VizType,
     val onNavigateBack: () -> Unit
 ) : ComponentContext by componentContext {
 
-    val viewModel = DataVizViewModel()
-
-    init {
-        // Load data when component is created
-        viewModel.loadData()
-    }
+    val api = MockedDataApi()
 }

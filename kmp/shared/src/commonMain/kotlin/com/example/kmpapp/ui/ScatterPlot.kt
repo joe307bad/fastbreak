@@ -23,7 +23,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.kmpapp.data.model.DataPoint
+import com.example.kmpapp.data.model.ScatterPlotDataPoint
 import kotlin.math.abs
 import kotlin.math.ceil
 import kotlin.math.floor
@@ -48,7 +48,7 @@ private fun Double.formatTo(decimals: Int): String {
 
 @Composable
 fun FourQuadrantScatterPlot(
-    data: List<DataPoint>,
+    data: List<ScatterPlotDataPoint>,
     modifier: Modifier = Modifier,
     title: String = "4-Quadrant Scatter Plot"
 ) {
@@ -102,20 +102,10 @@ fun FourQuadrantScatterPlot(
         modifier = modifier,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        if (title.isNotEmpty()) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(bottom = 8.dp)
-            )
-        }
-
         Canvas(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(500.dp)
-                .padding(8.dp)
                 .pointerInput(Unit) {
                     detectTransformGestures { _, pan, zoom, _ ->
                         scale = (scale * zoom).coerceIn(0.5f, 3f)
@@ -401,49 +391,20 @@ fun FourQuadrantScatterPlot(
             text = "Pinch to zoom • Drag to pan",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = 8.dp)
+            modifier = Modifier.padding(top = 4.dp, bottom = 2.dp)
         )
 
         // Quadrant legend
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(top = 8.dp),
+                .padding(vertical = 4.dp, horizontal = 8.dp),
             horizontalArrangement = Arrangement.SpaceEvenly
         ) {
             QuadrantLabel("Elite", Color(0xFF4CAF50))
             QuadrantLabel("Efficient", Color(0xFF2196F3))
             QuadrantLabel("Struggling", Color(0xFFFF9800))
             QuadrantLabel("Inefficient", Color(0xFFF44336))
-        }
-
-        // Quadrant descriptions
-        Text(
-            text = "Elite: High PFF & High EPA | Efficient: Low PFF & High EPA | Struggling: Low PFF & Low EPA | Inefficient: High PFF & Low EPA",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = 4.dp, start = 8.dp, end = 8.dp),
-            textAlign = androidx.compose.ui.text.style.TextAlign.Center
-        )
-
-        // Trend line description
-        Row(
-            modifier = Modifier.padding(top = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center
-        ) {
-            Box(
-                modifier = Modifier
-                    .width(30.dp)
-                    .height(2.dp)
-                    .background(Color(0xFFFF6F00).copy(alpha = 0.7f))
-            )
-            Text(
-                text = " Trend Line (Linear Regression)",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(start = 8.dp)
-            )
         }
     }
 }

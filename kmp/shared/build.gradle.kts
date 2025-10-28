@@ -60,6 +60,9 @@ kotlin {
 
             // DateTime
             implementation(libs.kotlinx.datetime)
+
+            // Kotlinx Serialization
+            implementation(libs.kotlinx.serialization.json)
         }
 
         androidMain.dependencies {

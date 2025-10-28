@@ -156,12 +156,17 @@ private fun ErrorContent(message: String, onRetry: () -> Unit) {
 private fun SuccessContent(visualization: VisualizationType) {
     val scrollState = rememberScrollState()
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(scrollState)
-            .padding(16.dp)
+    BoxWithConstraints(
+        modifier = Modifier.fillMaxSize()
     ) {
+        val isLandscape = maxWidth > maxHeight
+
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(scrollState)
+                .padding(16.dp)
+        ) {
         // Title Section
         Column(
             modifier = Modifier
@@ -187,42 +192,48 @@ private fun SuccessContent(visualization: VisualizationType) {
             )
         }
 
-        // Visualization
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 8.dp),
-            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-        ) {
-            Box(modifier = Modifier.padding(16.dp)) {
-                when (visualization) {
-                    is ScatterPlotVisualization -> {
-                        ScatterPlotComponent(
-                            data = visualization.dataPoints,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    }
-                    is BarGraphVisualization -> {
-                        BarChartComponent(
-                            data = visualization.dataPoints,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    }
-                    is LineChartVisualization -> {
-                        LineChartComponent(
-                            series = visualization.series,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    }
-                    else -> {
-                        // TableVisualization or other types
-                        Text(
-                            text = "This visualization type is not yet supported",
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+        // Visualization - with right padding in landscape so users can scroll without triggering pan gestures
+        Row(modifier = Modifier.fillMaxWidth()) {
+            Card(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(vertical = 8.dp),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+            ) {
+                Box(modifier = Modifier.padding(16.dp)) {
+                    when (visualization) {
+                        is ScatterPlotVisualization -> {
+                            ScatterPlotComponent(
+                                data = visualization.dataPoints,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                        is BarGraphVisualization -> {
+                            BarChartComponent(
+                                data = visualization.dataPoints,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                        is LineChartVisualization -> {
+                            LineChartComponent(
+                                series = visualization.series,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                        else -> {
+                            // TableVisualization or other types
+                            Text(
+                                text = "This visualization type is not yet supported",
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
                 }
+            }
+            // Right padding area for scrolling (only in landscape)
+            if (isLandscape) {
+                Spacer(modifier = Modifier.width(40.dp))
             }
         }
 
@@ -242,8 +253,7 @@ private fun SuccessContent(visualization: VisualizationType) {
                 )
             }
         }
-
-        Spacer(modifier = Modifier.height(16.dp))
+        }
     }
 }
 

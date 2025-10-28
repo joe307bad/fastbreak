@@ -135,46 +135,60 @@ private fun LoadingContent() {
 private fun SuccessContent(visualization: VisualizationType) {
     val scrollState = rememberScrollState()
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(scrollState)
+    BoxWithConstraints(
+        modifier = Modifier.fillMaxSize()
     ) {
-        // Visualization - full width, no padding
-        when (visualization) {
-            is ScatterPlotVisualization -> {
-                FourQuadrantScatterPlot(
-                    data = visualization.dataPoints,
-                    title = "",
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
-            is BarGraphVisualization -> {
-                BarChartComponent(
-                    data = visualization.dataPoints,
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
-            is LineChartVisualization -> {
-                LineChartComponent(
-                    series = visualization.series,
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
-            else -> {
-                Text(
-                    text = "This visualization type is not yet supported",
-                    style = MaterialTheme.typography.bodyLarge,
-                    modifier = Modifier.padding(16.dp)
-                )
-            }
-        }
+        val isLandscape = maxWidth > maxHeight
 
-        // Data table - full width, minimal padding
-        DataTableComponent(
-            visualization = visualization,
-            modifier = Modifier.fillMaxWidth()
-        )
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(scrollState)
+        ) {
+            // Visualization - with right padding in landscape so users can scroll without triggering pan gestures
+            Row(modifier = Modifier.fillMaxWidth()) {
+                Box(modifier = Modifier.weight(1f)) {
+                    when (visualization) {
+                        is ScatterPlotVisualization -> {
+                            FourQuadrantScatterPlot(
+                                data = visualization.dataPoints,
+                                title = "",
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                        is BarGraphVisualization -> {
+                            BarChartComponent(
+                                data = visualization.dataPoints,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                        is LineChartVisualization -> {
+                            LineChartComponent(
+                                series = visualization.series,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                        else -> {
+                            Text(
+                                text = "This visualization type is not yet supported",
+                                style = MaterialTheme.typography.bodyLarge,
+                                modifier = Modifier.padding(16.dp)
+                            )
+                        }
+                    }
+                }
+                // Right padding area for scrolling (only in landscape)
+                if (isLandscape) {
+                    Spacer(modifier = Modifier.width(40.dp))
+                }
+            }
+
+            // Data table - full width, minimal padding
+            DataTableComponent(
+                visualization = visualization,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
     }
 }
 

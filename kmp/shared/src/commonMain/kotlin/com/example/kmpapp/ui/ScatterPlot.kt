@@ -116,10 +116,10 @@ fun FourQuadrantScatterPlot(
         ) {
             val width = size.width
             val height = size.height
-            val leftPadding = 70f
+            val leftPadding = 80f
             val rightPadding = 40f
             val topPadding = 30f
-            val bottomPadding = 50f
+            val bottomPadding = 60f
 
             // Calculate visible range based on zoom and pan
             val baseXRange = maxX - minX
@@ -280,7 +280,7 @@ fun FourQuadrantScatterPlot(
                 drawText(
                     textMeasurer,
                     avgLabel,
-                    topLeft = Offset(avgX - measured.size.width / 2, topPadding - 15),
+                    topLeft = Offset(avgX - measured.size.width / 2, topPadding + 5),
                     style = labelTextStyle.copy(fontSize = 10.sp, color = Color(0xFF9C27B0))
                 )
             }
@@ -302,7 +302,7 @@ fun FourQuadrantScatterPlot(
                 drawText(
                     textMeasurer,
                     avgLabel,
-                    topLeft = Offset(leftPadding - measured.size.width - 10, avgY - measured.size.height / 2),
+                    topLeft = Offset(leftPadding + 10f, avgY + 5f),
                     style = labelTextStyle.copy(fontSize = 10.sp, color = Color(0xFF9C27B0))
                 )
             }

@@ -87,10 +87,10 @@ fun LineChartComponent(
         ) {
             val width = size.width
             val height = size.height
-            val leftPadding = 60f
+            val leftPadding = 80f
             val rightPadding = 30f
             val topPadding = 30f
-            val bottomPadding = 50f
+            val bottomPadding = 60f
 
             // Calculate axis ranges
             val allPoints = series.flatMap { it.dataPoints }

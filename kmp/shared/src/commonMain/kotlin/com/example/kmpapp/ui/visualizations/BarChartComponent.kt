@@ -12,6 +12,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
@@ -78,7 +79,7 @@ fun BarChartComponent(
         ) {
             val width = size.width
             val height = size.height
-            val leftPadding = 60f
+            val leftPadding = 80f
             val rightPadding = 30f
             val topPadding = 30f
             val bottomPadding = 70f
@@ -181,42 +182,43 @@ fun BarChartComponent(
                 )
             }
 
-            // Draw bars
+            // Draw bars with clipping
             val barWidth = (width - leftPadding - rightPadding) / (data.size * 1.5f)
             val barSpacing = barWidth * 0.5f
 
-            data.forEachIndexed { index, point ->
-                val x = leftPadding + index * (barWidth + barSpacing)
+            clipRect(
+                left = leftPadding,
+                top = topPadding,
+                right = width - rightPadding,
+                bottom = height - bottomPadding
+            ) {
+                data.forEachIndexed { index, point ->
+                    val x = leftPadding + index * (barWidth + barSpacing)
 
-                // Only draw if bar value is in visible range
-                val barTop = point.value.toFloat()
-                val barBottom = 0f
-
-                if ((barTop >= visibleMinY && barTop <= visibleMaxY) ||
-                    (barBottom >= visibleMinY && barBottom <= visibleMaxY) ||
-                    (barTop > visibleMaxY && barBottom < visibleMinY)) {
-
+                    // Calculate bar position based on value and visible range
                     val topY = height - bottomPadding - (height - topPadding - bottomPadding) * (point.value.toFloat() - visibleMinY) / visibleRange
                     val barHeight = abs(topY - zeroY)
 
                     val y = if (point.value >= 0) {
-                        topY.coerceIn(topPadding, height - bottomPadding)
+                        topY
                     } else {
                         zeroY
                     }
 
-                    val clampedHeight = barHeight.coerceIn(0f, height - topPadding - bottomPadding)
-
                     val color = if (point.value < 0) errorColor else primaryColor
 
+                    // Draw bar without clamping - let Canvas naturally clip
                     drawRect(
                         color = color,
                         topLeft = Offset(x, y),
-                        size = Size(barWidth, clampedHeight)
+                        size = Size(barWidth, barHeight)
                     )
                 }
+            }
 
-                // Draw X-axis labels (team names) - show all labels in staggered rows
+            // Draw X-axis labels (team names) - show all labels in staggered rows
+            data.forEachIndexed { index, point ->
+                val x = leftPadding + index * (barWidth + barSpacing)
                 val labelX = x + barWidth / 2
                 val measured = textMeasurer.measure(point.label, labelTextStyle.copy(fontSize = 9.sp))
                 // Stagger labels: even indices at base position, odd indices offset down

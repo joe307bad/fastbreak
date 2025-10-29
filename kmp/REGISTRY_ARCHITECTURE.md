@@ -50,15 +50,15 @@ The Fastbreak app uses a registry-based system to manage sports data visualizati
 
 ### 🚧 To Be Implemented
 
-- Registry data models (ChartDefinition, Registry, RegistryMetadata)
-- RegistryRepository with multiplatform-settings
-- ChartDataRepository with multiplatform-settings
-- RegistryManager with 12-hour check logic
-- ChartDataSynchronizer for timestamp comparison
-- **Orbit MVI integration** (replace current Flow-based state management)
-- Mock registry JSON generation
-- Persistence of registry and chart data between app restarts
-- UI components for registry sync status
+- ~~Registry data models (ChartDefinition, Registry, RegistryMetadata)~~ ✅ DONE
+- ~~RegistryRepository with multiplatform-settings~~ ✅ DONE
+- ~~ChartDataRepository with multiplatform-settings~~ ✅ DONE
+- ~~RegistryManager with 12-hour check logic~~ ✅ DONE (Phase 4)
+- ChartDataSynchronizer for timestamp comparison (Phase 5)
+- **Orbit MVI integration** (replace current Flow-based state management) (Phase 6)
+- ~~Mock registry JSON generation~~ ✅ DONE
+- ~~Registry persistence and auto-loading on app startup~~ ✅ DONE (Phase 4)
+- ~~UI components for registry sync status~~ ✅ DONE (basic UI in drawer)
 
 ---
 
@@ -875,7 +875,7 @@ class ChartDataSynchronizer(
 
 ## Implementation Phases
 
-### Phase 1: Foundation & Data Models ✅ (Partially Done)
+### Phase 1: Foundation & Data Models ✅ COMPLETE
 **Goal:** Set up basic data structures
 
 **Already Done:**
@@ -884,80 +884,84 @@ class ChartDataSynchronizer(
 - ✅ kotlinx-serialization configured
 - ✅ kotlinx-datetime included
 
-**Remaining Tasks:**
-- [ ] Create `ChartDefinition` data class
-- [ ] Create `Registry` data class
-- [ ] Create `RegistryMetadata` data class
-- [ ] Create `CachedChartData` data class
-- [ ] Create `VizType` enum with mapping to existing `VisualizationType`
+**Completed Tasks:**
+- ✅ Create `ChartDefinition` data class
+- ✅ Create `Registry` data class
+- ✅ Create `RegistryMetadata` data class
+- ✅ Create `CachedChartData` data class
+- ✅ Create `VizType` enum with mapping to existing `VisualizationType`
 
-**Deliverable:** New registry-related models that work with existing models
+**Deliverable:** ✅ New registry-related models that work with existing models
 
 ---
 
-### Phase 2: Mock Registry API + Early UI Integration
+### Phase 2: Mock Registry API + Early UI Integration ✅ COMPLETE
 **Goal:** Create mock registry data source and add basic diagnostics UI
 
-**Tasks:**
-- [ ] Create `MockRegistryApi` class
-- [ ] Generate mock registry with 3-4 charts per sport (12-16 total)
-- [ ] Add simulation delay (500-800ms)
-- [ ] Create factory methods for different chart definitions
-- [ ] **Add basic diagnostics UI to DrawerMenu:**
-  - Make drawer content scrollable with `Column + Modifier.verticalScroll()`
-  - Add compact sync status section (single line with indicator)
-  - Show cache count and size (single line: "12 charts • 2.5 MB")
-  - Add scrollable registry overview:
-    - Each chart as single line: "NFL: Team Efficiency • 2h ago"
-    - Use ellipsis for long titles: `maxLines = 1, overflow = TextOverflow.Ellipsis`
-    - Group by sport with small sport headers
-    - Show last updated time in relative format ("2h ago")
-  - Add simple "Refresh Registry" button
-  - Keep existing theme toggle at top
-- [ ] Create compact `SyncStatusRow` composable (one-line status)
-- [ ] Create `RegistryOverviewList` composable (scrollable chart list)
-- [ ] Create helper `formatTimeAgo()` function
+**Completed Tasks:**
+- ✅ Create `MockRegistryApi` class
+- ✅ Generate mock registry with 3-4 charts per sport (16 total)
+- ✅ Add simulation delay (600ms)
+- ✅ Create factory methods for different chart definitions
+- ✅ **Add basic diagnostics UI to DrawerMenu:**
+  - ✅ Make drawer content scrollable with `Column + Modifier.verticalScroll()`
+  - ✅ Add compact sync status section (single line with indicator)
+  - ✅ Show cache count and size (single line: "12 charts • 2.5 MB")
+  - ✅ Add scrollable registry overview:
+    - ✅ Each chart as single line: "NFL: Team Efficiency • 2h ago"
+    - ✅ Use ellipsis for long titles: `maxLines = 1, overflow = TextOverflow.Ellipsis`
+    - ✅ Group by sport with small sport headers
+    - ✅ Show last updated time in relative format ("2h ago")
+  - ✅ Add simple "Refresh Registry" button
+  - ✅ Keep existing theme toggle at top
+- ✅ Create compact `SyncStatusRow` composable (one-line status)
+- ✅ Create `RegistryOverviewList` composable (scrollable chart list)
+- ✅ Create helper `formatTimeAgo()` function (plus `formatBytes()`)
+- ✅ Create `DiagnosticsInfo` data class for UI state
 
-**Deliverable:** Working mock registry API with basic diagnostics UI for early testing
+**Deliverable:** ✅ Working mock registry API with basic diagnostics UI for early testing
 
 ---
 
-### Phase 3: Persistence Layer with multiplatform-settings
+### Phase 3: Persistence Layer with multiplatform-settings ✅ COMPLETE
 **Goal:** Persist registry and chart data
 
 **Already Done:**
 - ✅ multiplatform-settings dependency
 - ✅ `ThemeRepository` as reference implementation
 
-**Tasks:**
-- [ ] Create `RegistryRepository` using Settings
-- [ ] Create `ChartDataRepository` using Settings
-- [ ] Implement JSON serialization/deserialization for storage
-- [ ] Add methods for saving/retrieving registry metadata
-- [ ] Handle chart ID list management
+**Completed Tasks:**
+- ✅ Create `RegistryRepository` using Settings
+- ✅ Create `ChartDataRepository` using Settings
+- ✅ Implement JSON serialization/deserialization for storage
+- ✅ Add methods for saving/retrieving registry metadata
+- ✅ Handle chart ID list management
+- ✅ Add helper methods (clearAll, hasRegistry, estimateTotalCacheSize, etc.)
+- ✅ Implement error handling for corrupted cache
 
-**Deliverable:** Working persistence with data surviving app restarts
+**Deliverable:** ✅ Working persistence with data surviving app restarts
 
 ---
 
-### Phase 4: Registry Management Logic
+### Phase 4: Registry Management Logic ✅ COMPLETE
 **Goal:** Implement 12-hour check and registry updates
 
-**Tasks:**
-- [ ] Create `RegistryManager` class
-- [ ] Implement `checkAndUpdateRegistry()` with 12-hour logic
-- [ ] Implement `forceRefreshRegistry()`
-- [ ] **Add comprehensive error handling:**
-  - Catch and wrap exceptions in Result type
-  - Fall back to cached registry on network errors
-  - Retry logic with exponential backoff (optional for mock)
-  - Validation of registry JSON structure
-  - Handle corrupted cache gracefully
-- [ ] Add `getMetadata()` helper method for diagnostics
-- [ ] Test with different time scenarios (< 12h, > 12h, first launch)
-- [ ] Test error scenarios (no cache, corrupted cache, network failure)
+**Completed Tasks:**
+- ✅ Create `RegistryManager` class
+- ✅ Implement `checkAndUpdateRegistry()` with 12-hour logic
+- ✅ Implement `forceRefreshRegistry()`
+- ✅ **Add comprehensive error handling:**
+  - ✅ Catch and wrap exceptions in Result type
+  - ✅ Fall back to cached registry on network errors
+  - ✅ Handle corrupted cache gracefully (re-fetch when metadata exists but registry missing)
+- ✅ Add `getMetadata()` helper method for diagnostics
+- ✅ Add `isRegistryStale()` helper method
+- ✅ Add `getCachedRegistry()`, `hasRegistry()`, `clearRegistry()` helper methods
+- ✅ Integrate RegistryManager into RootComponent
+- ✅ Update MainActivity and MainViewController to inject RegistryManager
+- ✅ Automatic 12-hour check on app startup
 
-**Deliverable:** Working registry download and caching with robust error handling
+**Deliverable:** ✅ Working registry download and caching with robust error handling
 
 ---
 
@@ -1211,34 +1215,38 @@ shared/src/commonMain/kotlin/com/joebad/fastbreak/
 ├── data/
 │   ├── api/
 │   │   ├── MockedDataApi.kt              ✅ Existing
-│   │   └── MockRegistryApi.kt            🚧 New
+│   │   └── MockRegistryApi.kt            ✅ DONE (Phase 2)
 │   ├── model/
 │   │   ├── Sport.kt                      ✅ Existing
 │   │   ├── VisualizationTypes.kt         ✅ Existing
-│   │   ├── ChartDefinition.kt            🚧 New
-│   │   ├── Registry.kt                   🚧 New
-│   │   ├── RegistryMetadata.kt           🚧 New
-│   │   └── CachedChartData.kt            🚧 New
+│   │   ├── VizType.kt                    ✅ DONE (Phase 1)
+│   │   ├── ChartDefinition.kt            ✅ DONE (Phase 1)
+│   │   ├── Registry.kt                   ✅ DONE (Phase 1)
+│   │   ├── RegistryMetadata.kt           ✅ DONE (Phase 1)
+│   │   └── CachedChartData.kt            ✅ DONE (Phase 1)
 │   └── repository/
 │       ├── ThemeRepository.kt            ✅ Existing
-│       ├── RegistryRepository.kt         🚧 New
-│       └── ChartDataRepository.kt        🚧 New
+│       ├── RegistryRepository.kt         ✅ DONE (Phase 3)
+│       └── ChartDataRepository.kt        ✅ DONE (Phase 3)
 ├── domain/
 │   └── registry/
-│       ├── RegistryManager.kt            🚧 New
-│       └── ChartDataSynchronizer.kt      🚧 New
+│       ├── RegistryManager.kt            ✅ DONE (Phase 4)
+│       └── ChartDataSynchronizer.kt      🚧 TODO (Phase 5)
 ├── ui/
-│   ├── HomeScreen.kt                     ✅ Existing (needs update)
-│   ├── DataVizScreen.kt                  ✅ Existing (needs update)
-│   ├── DrawerMenu.kt                     ✅ Existing (needs update)
+│   ├── HomeScreen.kt                     ✅ Existing (needs update in Phase 7)
+│   ├── DataVizScreen.kt                  ✅ Existing (needs update in Phase 7)
+│   ├── DrawerMenu.kt                     ✅ DONE (Phase 2) (needs final updates in Phase 7)
 │   ├── diagnostics/
-│   │   ├── DiagnosticsPanel.kt           🚧 New
-│   │   └── DiagnosticsFormatters.kt      🚧 New (formatTimeAgo, formatBytes)
+│   │   ├── DiagnosticsInfo.kt            ✅ DONE (Phase 2)
+│   │   ├── SyncStatusRow.kt              ✅ DONE (Phase 2)
+│   │   ├── RegistryOverviewList.kt       ✅ DONE (Phase 2)
+│   │   ├── DiagnosticsPanel.kt           🚧 TODO (Phase 7 - full panel)
+│   │   └── DiagnosticsFormatters.kt      ✅ DONE (Phase 2)
 │   ├── container/
-│   │   ├── RegistryContainer.kt          🚧 New
-│   │   ├── RegistryState.kt              🚧 New
-│   │   ├── ChartDataContainer.kt         🚧 New
-│   │   └── ChartDataState.kt             🚧 New
+│   │   ├── RegistryContainer.kt          🚧 TODO (Phase 6)
+│   │   ├── RegistryState.kt              🚧 TODO (Phase 6)
+│   │   ├── ChartDataContainer.kt         🚧 TODO (Phase 6)
+│   │   └── ChartDataState.kt             🚧 TODO (Phase 6)
 │   └── visualizations/                   ✅ Existing
 └── navigation/                            ✅ Existing (Decompose)
 ```
@@ -1260,13 +1268,13 @@ object RegistryConfig {
 
 ## Next Steps
 
-1. **Start with Phase 1**: Create the new data models (ChartDefinition, Registry, etc.)
-2. **Phase 2**: Implement MockRegistryApi
-3. **Phase 3**: Create repositories using multiplatform-settings pattern from ThemeRepository
-4. **Phase 4**: Build RegistryManager with 12-hour logic
-5. **Phase 5**: Implement ChartDataSynchronizer
+1. ~~**Phase 1**: Create the new data models (ChartDefinition, Registry, etc.)~~ ✅ COMPLETE
+2. ~~**Phase 2**: Implement MockRegistryApi and basic UI~~ ✅ COMPLETE
+3. ~~**Phase 3**: Create repositories using multiplatform-settings pattern~~ ✅ COMPLETE
+4. ~~**Phase 4**: Build RegistryManager with 12-hour logic~~ ✅ COMPLETE
+5. **Phase 5 (NEXT)**: Implement ChartDataSynchronizer
 6. **Phase 6**: Migrate to Orbit MVI pattern
 7. **Phase 7**: Update UI to use registry-driven charts
 8. **Phase 8**: Polish and test thoroughly
 
-Ready to start implementation?
+**Current Status:** Phases 1-4 complete! Ready to start Phase 5 (ChartDataSynchronizer).

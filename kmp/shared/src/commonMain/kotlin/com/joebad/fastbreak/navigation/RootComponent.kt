@@ -8,13 +8,11 @@ import com.arkivanov.decompose.router.stack.pop
 import com.arkivanov.decompose.router.stack.push
 import com.arkivanov.decompose.value.MutableValue
 import com.arkivanov.decompose.value.Value
-import com.joebad.fastbreak.data.api.MockRegistryApi
 import com.joebad.fastbreak.data.api.MockedDataApi
 import com.joebad.fastbreak.data.model.Registry
-import com.joebad.fastbreak.data.model.RegistryMetadata
 import com.joebad.fastbreak.data.model.Sport
 import com.joebad.fastbreak.data.repository.ChartDataRepository
-import com.joebad.fastbreak.data.repository.RegistryRepository
+import com.joebad.fastbreak.domain.registry.RegistryManager
 import com.joebad.fastbreak.ui.diagnostics.DiagnosticsInfo
 import com.joebad.fastbreak.ui.theme.ThemeMode
 import com.joebad.fastbreak.ui.theme.ThemeRepository
@@ -29,12 +27,11 @@ import kotlin.time.Duration.Companion.hours
 class RootComponent(
     componentContext: ComponentContext,
     private val themeRepository: ThemeRepository,
-    private val registryRepository: RegistryRepository,
+    private val registryManager: RegistryManager,
     private val chartDataRepository: ChartDataRepository
 ) : ComponentContext by componentContext {
 
     private val navigation = StackNavigation<Config>()
-    private val mockRegistryApi = MockRegistryApi()
 
     // Coroutine scope for async operations (temporary until Orbit MVI in Phase 6)
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
@@ -51,8 +48,8 @@ class RootComponent(
     val diagnostics: Value<DiagnosticsInfo> = _diagnostics
 
     init {
-        // Load cached registry on startup
-        loadCachedRegistry()
+        // Check and load registry on startup (with 12-hour check)
+        checkAndLoadRegistry()
     }
 
     fun toggleTheme(mode: ThemeMode) {
@@ -61,36 +58,40 @@ class RootComponent(
     }
 
     /**
-     * Loads the cached registry and updates diagnostics.
+     * Checks if registry needs updating (12-hour policy) and loads it.
      * Called on app startup.
+     * Uses RegistryManager to handle automatic updates and fallback to cache.
      */
-    private fun loadCachedRegistry() {
-        val cachedRegistry = registryRepository.getRegistry()
-        _registry.value = cachedRegistry ?: Registry.empty()
-        updateDiagnostics()
+    private fun checkAndLoadRegistry() {
+        scope.launch {
+            registryManager.checkAndUpdateRegistry()
+                .onSuccess { registry ->
+                    _registry.value = registry
+                    updateDiagnostics()
+                }
+                .onFailure { error ->
+                    // Failed to load - show empty registry and update diagnostics with error
+                    _registry.value = Registry.empty()
+                    _diagnostics.value = _diagnostics.value.copy(
+                        lastError = error.message,
+                        failedSyncs = _diagnostics.value.failedSyncs + 1
+                    )
+                }
+        }
     }
 
     /**
-     * Refreshes the registry from the mock API.
-     * Saves to repository and updates diagnostics.
-     * (Temporary implementation for Phase 2 testing - will be replaced in Phase 6 with Orbit MVI)
+     * Forces a registry refresh regardless of staleness.
+     * Uses RegistryManager to handle the refresh and persistence.
+     * (Temporary implementation for Phase 4 testing - will be replaced in Phase 6 with Orbit MVI)
      */
     fun refreshRegistry() {
         // Set syncing state
         _diagnostics.value = _diagnostics.value.copy(isSyncing = true)
 
         scope.launch {
-            mockRegistryApi.fetchRegistry()
+            registryManager.forceRefreshRegistry()
                 .onSuccess { registry ->
-                    // Save to repository
-                    registryRepository.saveRegistry(registry)
-                    registryRepository.saveMetadata(
-                        RegistryMetadata(
-                            lastDownloadTime = Clock.System.now(),
-                            registryVersion = registry.version
-                        )
-                    )
-
                     // Update state
                     _registry.value = registry
                     updateDiagnostics()
@@ -108,10 +109,10 @@ class RootComponent(
 
     /**
      * Updates the diagnostics info based on current repository state.
+     * Uses RegistryManager to check staleness.
      */
     private fun updateDiagnostics() {
-        val metadata = registryRepository.getMetadata()
-        val now = Clock.System.now()
+        val metadata = registryManager.getMetadata()
         val chartCount = chartDataRepository.getCachedChartCount()
         val cacheSize = chartDataRepository.estimateTotalCacheSize()
 
@@ -123,7 +124,7 @@ class RootComponent(
             totalCacheSize = cacheSize,
             failedSyncs = _diagnostics.value.failedSyncs,
             lastError = null,
-            isStale = metadata?.let { now - it.lastDownloadTime > 12.hours } ?: false,
+            isStale = registryManager.isRegistryStale(),
             isSyncing = false
         )
     }

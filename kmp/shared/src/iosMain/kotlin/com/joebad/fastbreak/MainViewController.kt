@@ -3,6 +3,10 @@ package com.joebad.fastbreak
 import androidx.compose.ui.window.ComposeUIViewController
 import com.arkivanov.decompose.DefaultComponentContext
 import com.arkivanov.essenty.lifecycle.LifecycleRegistry
+import com.joebad.fastbreak.data.api.MockRegistryApi
+import com.joebad.fastbreak.data.repository.ChartDataRepository
+import com.joebad.fastbreak.data.repository.RegistryRepository
+import com.joebad.fastbreak.domain.registry.RegistryManager
 import com.joebad.fastbreak.navigation.RootComponent
 import com.joebad.fastbreak.ui.theme.SystemThemeDetector
 import com.joebad.fastbreak.ui.theme.ThemeRepository
@@ -15,13 +19,22 @@ fun MainViewController(): UIViewController {
         settings = settings,
         systemThemeDetector = SystemThemeDetector()
     )
-    val registryRepository = com.joebad.fastbreak.data.repository.RegistryRepository(settings)
-    val chartDataRepository = com.joebad.fastbreak.data.repository.ChartDataRepository(settings)
+
+    // Create repositories
+    val registryRepository = RegistryRepository(settings)
+    val chartDataRepository = ChartDataRepository(settings)
+
+    // Create RegistryManager (Phase 4)
+    val mockRegistryApi = MockRegistryApi()
+    val registryManager = RegistryManager(
+        mockRegistryApi = mockRegistryApi,
+        registryRepository = registryRepository
+    )
 
     val rootComponent = RootComponent(
         componentContext = DefaultComponentContext(lifecycle = LifecycleRegistry()),
         themeRepository = themeRepository,
-        registryRepository = registryRepository,
+        registryManager = registryManager,
         chartDataRepository = chartDataRepository
     )
 

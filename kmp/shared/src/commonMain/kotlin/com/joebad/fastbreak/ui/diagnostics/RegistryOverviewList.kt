@@ -24,10 +24,10 @@ import com.joebad.fastbreak.data.model.Sport
  */
 @Composable
 fun RegistryOverviewList(
-    registry: Registry?,
+    registry: Registry = Registry.empty(),
     modifier: Modifier = Modifier
 ) {
-    if (registry == null) {
+    if (registry.charts.isEmpty()) {
         Text(
             text = "No registry loaded",
             style = MaterialTheme.typography.bodySmall,

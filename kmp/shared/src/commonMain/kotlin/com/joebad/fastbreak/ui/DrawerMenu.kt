@@ -22,7 +22,7 @@ import io.github.alexzhirkevich.cupertino.CupertinoSegmentedControlTab
 fun DrawerMenu(
     currentTheme: ThemeMode,
     onThemeChange: (ThemeMode) -> Unit,
-    registry: Registry? = null,
+    registry: Registry = Registry.empty(),
     diagnostics: DiagnosticsInfo = DiagnosticsInfo(),
     onRefreshRegistry: () -> Unit = {},
     modifier: Modifier = Modifier

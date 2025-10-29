@@ -15,10 +15,14 @@ fun MainViewController(): UIViewController {
         settings = settings,
         systemThemeDetector = SystemThemeDetector()
     )
+    val registryRepository = com.joebad.fastbreak.data.repository.RegistryRepository(settings)
+    val chartDataRepository = com.joebad.fastbreak.data.repository.ChartDataRepository(settings)
 
     val rootComponent = RootComponent(
         componentContext = DefaultComponentContext(lifecycle = LifecycleRegistry()),
-        themeRepository = themeRepository
+        themeRepository = themeRepository,
+        registryRepository = registryRepository,
+        chartDataRepository = chartDataRepository
     )
 
     return ComposeUIViewController {

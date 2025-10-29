@@ -20,6 +20,8 @@ import kotlinx.coroutines.launch
 @Composable
 fun App(rootComponent: RootComponent) {
     val themeMode by rootComponent.themeMode.subscribeAsState()
+    val registry by rootComponent.registry.subscribeAsState()
+    val diagnostics by rootComponent.diagnostics.subscribeAsState()
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
 
@@ -31,7 +33,10 @@ fun App(rootComponent: RootComponent) {
                     currentTheme = themeMode,
                     onThemeChange = { newTheme ->
                         rootComponent.toggleTheme(newTheme)
-                    }
+                    },
+                    registry = registry,
+                    diagnostics = diagnostics,
+                    onRefreshRegistry = { rootComponent.refreshRegistry() }
                 )
             }
         ) {

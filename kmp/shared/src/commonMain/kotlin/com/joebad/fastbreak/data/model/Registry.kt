@@ -1,5 +1,6 @@
 package com.joebad.fastbreak.data.model
 
+import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 import kotlinx.serialization.Serializable
 
@@ -26,6 +27,18 @@ data class Registry(
      */
     val charts: List<ChartDefinition>
 ) {
+    companion object {
+        /**
+         * Creates an empty registry for initial state
+         */
+        fun empty(): Registry {
+            return Registry(
+                version = "0.0",
+                lastUpdated = Clock.System.now(),
+                charts = emptyList()
+            )
+        }
+    }
     /**
      * Get all charts for a specific sport
      */

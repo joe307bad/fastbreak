@@ -12,6 +12,7 @@ import com.joebad.fastbreak.data.api.MockedDataApi
 import com.joebad.fastbreak.data.model.Registry
 import com.joebad.fastbreak.data.model.Sport
 import com.joebad.fastbreak.data.repository.ChartDataRepository
+import com.joebad.fastbreak.domain.registry.ChartDataSynchronizer
 import com.joebad.fastbreak.domain.registry.RegistryManager
 import com.joebad.fastbreak.ui.diagnostics.DiagnosticsInfo
 import com.joebad.fastbreak.ui.theme.ThemeMode
@@ -28,6 +29,7 @@ class RootComponent(
     componentContext: ComponentContext,
     private val themeRepository: ThemeRepository,
     private val registryManager: RegistryManager,
+    private val chartDataSynchronizer: ChartDataSynchronizer,
     private val chartDataRepository: ChartDataRepository
 ) : ComponentContext by componentContext {
 
@@ -61,6 +63,7 @@ class RootComponent(
      * Checks if registry needs updating (12-hour policy) and loads it.
      * Called on app startup.
      * Uses RegistryManager to handle automatic updates and fallback to cache.
+     * After loading registry, syncs chart data based on timestamps.
      */
     private fun checkAndLoadRegistry() {
         scope.launch {
@@ -68,6 +71,9 @@ class RootComponent(
                 .onSuccess { registry ->
                     _registry.value = registry
                     updateDiagnostics()
+
+                    // Sync chart data (Phase 5)
+                    syncChartData(registry)
                 }
                 .onFailure { error ->
                     // Failed to load - show empty registry and update diagnostics with error
@@ -83,9 +89,17 @@ class RootComponent(
     /**
      * Forces a registry refresh regardless of staleness.
      * Uses RegistryManager to handle the refresh and persistence.
-     * (Temporary implementation for Phase 4 testing - will be replaced in Phase 6 with Orbit MVI)
+     * After refreshing registry, syncs chart data based on timestamps.
+     * Prevents concurrent refresh operations with a guard.
+     * (Temporary implementation for Phase 5 testing - will be replaced in Phase 6 with Orbit MVI)
      */
     fun refreshRegistry() {
+        // Guard: prevent concurrent refresh operations
+        if (_diagnostics.value.isSyncing) {
+            println("Refresh already in progress, ignoring duplicate request")
+            return
+        }
+
         // Set syncing state
         _diagnostics.value = _diagnostics.value.copy(isSyncing = true)
 
@@ -95,6 +109,9 @@ class RootComponent(
                     // Update state
                     _registry.value = registry
                     updateDiagnostics()
+
+                    // Sync chart data (Phase 5)
+                    syncChartData(registry)
                 }
                 .onFailure { error ->
                     // Update diagnostics with error
@@ -108,6 +125,32 @@ class RootComponent(
     }
 
     /**
+     * Synchronizes chart data based on registry definitions.
+     * Compares timestamps and downloads charts that need updating.
+     * Collects progress updates and handles failures gracefully.
+     * (Phase 5 implementation)
+     */
+    private suspend fun syncChartData(registry: Registry) {
+        chartDataSynchronizer.synchronizeCharts(registry).collect { progress ->
+            // Update diagnostics with sync progress
+            _diagnostics.value = _diagnostics.value.copy(
+                isSyncing = !progress.isComplete,
+                lastError = if (progress.hasFailures) {
+                    "Failed to sync ${progress.failedCharts.size} charts"
+                } else null,
+                failedSyncs = if (progress.hasFailures) {
+                    _diagnostics.value.failedSyncs + progress.failedCharts.size
+                } else _diagnostics.value.failedSyncs
+            )
+
+            // When complete, update diagnostics with final cache info
+            if (progress.isComplete) {
+                updateDiagnostics()
+            }
+        }
+    }
+
+    /**
      * Updates the diagnostics info based on current repository state.
      * Uses RegistryManager to check staleness.
      */
@@ -116,9 +159,14 @@ class RootComponent(
         val chartCount = chartDataRepository.getCachedChartCount()
         val cacheSize = chartDataRepository.estimateTotalCacheSize()
 
+        // Get the most recent cache update time from all cached charts
+        val lastCacheUpdate = chartDataSynchronizer.getCachedChartIds()
+            .mapNotNull { chartDataSynchronizer.getChartCacheTime(it) }
+            .maxOrNull()
+
         _diagnostics.value = DiagnosticsInfo(
             lastRegistryFetch = metadata?.lastDownloadTime,
-            lastCacheUpdate = null, // Will be implemented in Phase 5
+            lastCacheUpdate = lastCacheUpdate,
             cachedChartsCount = chartCount,
             registryVersion = metadata?.registryVersion,
             totalCacheSize = cacheSize,

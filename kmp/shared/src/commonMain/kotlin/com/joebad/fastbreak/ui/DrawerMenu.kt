@@ -101,12 +101,16 @@ fun DrawerMenu(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Refresh button
+            // Refresh button - disabled while syncing
             OutlinedButton(
                 onClick = onRefreshRegistry,
+                enabled = !diagnostics.isSyncing,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text("refresh registry", fontFamily = FontFamily.Monospace)
+                Text(
+                    text = "refresh registry",
+                    fontFamily = FontFamily.Monospace
+                )
             }
 
             Spacer(modifier = Modifier.height(24.dp))

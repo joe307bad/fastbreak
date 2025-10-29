@@ -4,8 +4,10 @@ import androidx.compose.ui.window.ComposeUIViewController
 import com.arkivanov.decompose.DefaultComponentContext
 import com.arkivanov.essenty.lifecycle.LifecycleRegistry
 import com.joebad.fastbreak.data.api.MockRegistryApi
+import com.joebad.fastbreak.data.api.MockedDataApi
 import com.joebad.fastbreak.data.repository.ChartDataRepository
 import com.joebad.fastbreak.data.repository.RegistryRepository
+import com.joebad.fastbreak.domain.registry.ChartDataSynchronizer
 import com.joebad.fastbreak.domain.registry.RegistryManager
 import com.joebad.fastbreak.navigation.RootComponent
 import com.joebad.fastbreak.ui.theme.SystemThemeDetector
@@ -24,17 +26,27 @@ fun MainViewController(): UIViewController {
     val registryRepository = RegistryRepository(settings)
     val chartDataRepository = ChartDataRepository(settings)
 
-    // Create RegistryManager (Phase 4)
+    // Create API services
     val mockRegistryApi = MockRegistryApi()
+    val mockedDataApi = MockedDataApi() // API generates data based on parameters, not constructor
+
+    // Create RegistryManager (Phase 4)
     val registryManager = RegistryManager(
         mockRegistryApi = mockRegistryApi,
         registryRepository = registryRepository
+    )
+
+    // Create ChartDataSynchronizer (Phase 5)
+    val chartDataSynchronizer = ChartDataSynchronizer(
+        chartDataRepository = chartDataRepository,
+        mockedDataApi = mockedDataApi
     )
 
     val rootComponent = RootComponent(
         componentContext = DefaultComponentContext(lifecycle = LifecycleRegistry()),
         themeRepository = themeRepository,
         registryManager = registryManager,
+        chartDataSynchronizer = chartDataSynchronizer,
         chartDataRepository = chartDataRepository
     )
 

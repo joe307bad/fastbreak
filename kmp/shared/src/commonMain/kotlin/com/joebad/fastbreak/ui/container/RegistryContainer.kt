@@ -147,13 +147,21 @@ class RegistryContainer(
     private fun loadDiagnostics(): DiagnosticsInfo {
         val currentState = container.stateFlow.value
         val metadata = registryManager.getMetadata()
-        val chartCount = chartDataRepository.getCachedChartCount()
-        val cacheSize = chartDataRepository.estimateTotalCacheSize()
+
+        // Use registry chart count instead of cached chart count
+        val chartCount = currentState.registry?.charts?.size ?: 0
+
+        // If registry has no charts, show 0 bytes (cached data is orphaned/stale)
+        val cacheSize = if (chartCount == 0) 0L else chartDataRepository.estimateTotalCacheSize()
 
         // Get the most recent cache update time from all cached charts
-        val lastCacheUpdate = chartDataSynchronizer.getCachedChartIds()
-            .mapNotNull { chartDataSynchronizer.getChartCacheTime(it) }
-            .maxOrNull()
+        val lastCacheUpdate = if (chartCount == 0) {
+            null  // No valid cache if registry is empty
+        } else {
+            chartDataSynchronizer.getCachedChartIds()
+                .mapNotNull { chartDataSynchronizer.getChartCacheTime(it) }
+                .maxOrNull()
+        }
 
         return DiagnosticsInfo(
             lastRegistryFetch = metadata?.lastDownloadTime,

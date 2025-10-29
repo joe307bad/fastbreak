@@ -41,8 +41,16 @@ data class ChartDefinition(
     val visualizationType: VizType,
 
     /**
+     * The URL to fetch the chart data from
+     * In production, this will be a real API endpoint
+     * For now, contains a fake URL while using mock data
+     */
+    val url: String,
+
+    /**
      * The type string passed to MockedDataApi ("scatter", "bar", "line")
      * Tells the mock API which type of data to generate
+     * TODO: Remove this when switching to real data fetching via URL
      */
     val mockDataType: String
 )

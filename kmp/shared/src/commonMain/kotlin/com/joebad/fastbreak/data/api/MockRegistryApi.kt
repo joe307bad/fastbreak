@@ -33,6 +33,8 @@ class MockRegistryApi {
     }
 
     private fun buildChartList(now: kotlinx.datetime.Instant): List<ChartDefinition> {
+//        return listOf()
+
         return listOf(
             // NFL Charts (4 charts)
             ChartDefinition(
@@ -42,6 +44,7 @@ class MockRegistryApi {
                 subtitle = "Offensive vs Defensive Performance",
                 lastUpdated = now.minus(2.hours),
                 visualizationType = VizType.SCATTER_PLOT,
+                url = "https://api.fastbreak.com/v1/charts/nfl/nfl-efficiency-scatter",
                 mockDataType = "scatter"
             ),
             ChartDefinition(
@@ -51,6 +54,7 @@ class MockRegistryApi {
                 subtitle = "Season performance margins",
                 lastUpdated = now.minus(3.hours),
                 visualizationType = VizType.BAR_GRAPH,
+                url = "https://api.fastbreak.com/v1/charts/nfl/nfl-point-differential",
                 mockDataType = "bar"
             ),
             ChartDefinition(
@@ -60,6 +64,7 @@ class MockRegistryApi {
                 subtitle = "Cumulative wins over season",
                 lastUpdated = now.minus(1.hours),
                 visualizationType = VizType.LINE_CHART,
+                url = "https://api.fastbreak.com/v1/charts/nfl/nfl-season-progression",
                 mockDataType = "line"
             ),
             ChartDefinition(
@@ -69,6 +74,7 @@ class MockRegistryApi {
                 subtitle = "Top quarterbacks by yards",
                 lastUpdated = now.minus(45.minutes),
                 visualizationType = VizType.BAR_GRAPH,
+                url = "https://api.fastbreak.com/v1/charts/nfl/nfl-passing-leaders",
                 mockDataType = "bar"
             ),
 
@@ -80,6 +86,7 @@ class MockRegistryApi {
                 subtitle = "PER vs Usage Rate",
                 lastUpdated = now.minus(1.hours),
                 visualizationType = VizType.SCATTER_PLOT,
+                url = "https://api.fastbreak.com/v1/charts/nba/nba-efficiency-rating",
                 mockDataType = "scatter"
             ),
             ChartDefinition(
@@ -89,6 +96,7 @@ class MockRegistryApi {
                 subtitle = "Points per 100 possessions",
                 lastUpdated = now.minus(2.hours),
                 visualizationType = VizType.BAR_GRAPH,
+                url = "https://api.fastbreak.com/v1/charts/nba/nba-scoring-differential",
                 mockDataType = "bar"
             ),
             ChartDefinition(
@@ -98,6 +106,7 @@ class MockRegistryApi {
                 subtitle = "Wins accumulated over time",
                 lastUpdated = now.minus(30.minutes),
                 visualizationType = VizType.LINE_CHART,
+                url = "https://api.fastbreak.com/v1/charts/nba/nba-season-standings",
                 mockDataType = "line"
             ),
             ChartDefinition(
@@ -107,6 +116,7 @@ class MockRegistryApi {
                 subtitle = "Made 3-pointers by player",
                 lastUpdated = now.minus(90.minutes),
                 visualizationType = VizType.BAR_GRAPH,
+                url = "https://api.fastbreak.com/v1/charts/nba/nba-three-point-leaders",
                 mockDataType = "bar"
             ),
 
@@ -118,6 +128,7 @@ class MockRegistryApi {
                 subtitle = "Average vs Home Runs",
                 lastUpdated = now.minus(4.hours),
                 visualizationType = VizType.SCATTER_PLOT,
+                url = "https://api.fastbreak.com/v1/charts/mlb/mlb-batting-analysis",
                 mockDataType = "scatter"
             ),
             ChartDefinition(
@@ -127,6 +138,7 @@ class MockRegistryApi {
                 subtitle = "Runs scored vs allowed",
                 lastUpdated = now.minus(5.hours),
                 visualizationType = VizType.BAR_GRAPH,
+                url = "https://api.fastbreak.com/v1/charts/mlb/mlb-run-differential",
                 mockDataType = "bar"
             ),
             ChartDefinition(
@@ -136,6 +148,7 @@ class MockRegistryApi {
                 subtitle = "Cumulative wins by team",
                 lastUpdated = now.minus(2.hours),
                 visualizationType = VizType.LINE_CHART,
+                url = "https://api.fastbreak.com/v1/charts/mlb/mlb-season-wins",
                 mockDataType = "line"
             ),
             ChartDefinition(
@@ -145,6 +158,7 @@ class MockRegistryApi {
                 subtitle = "Top pitchers by ERA",
                 lastUpdated = now.minus(3.hours),
                 visualizationType = VizType.BAR_GRAPH,
+                url = "https://api.fastbreak.com/v1/charts/mlb/mlb-era-leaders",
                 mockDataType = "bar"
             ),
 
@@ -156,6 +170,7 @@ class MockRegistryApi {
                 subtitle = "Goals vs Assists",
                 lastUpdated = now.minus(1.hours),
                 visualizationType = VizType.SCATTER_PLOT,
+                url = "https://api.fastbreak.com/v1/charts/nhl/nhl-player-production",
                 mockDataType = "scatter"
             ),
             ChartDefinition(
@@ -165,6 +180,7 @@ class MockRegistryApi {
                 subtitle = "Goals for vs against",
                 lastUpdated = now.minus(2.hours),
                 visualizationType = VizType.BAR_GRAPH,
+                url = "https://api.fastbreak.com/v1/charts/nhl/nhl-goal-differential",
                 mockDataType = "bar"
             ),
             ChartDefinition(
@@ -174,6 +190,7 @@ class MockRegistryApi {
                 subtitle = "Points accumulated over season",
                 lastUpdated = now.minus(90.minutes),
                 visualizationType = VizType.LINE_CHART,
+                url = "https://api.fastbreak.com/v1/charts/nhl/nhl-season-points",
                 mockDataType = "line"
             ),
             ChartDefinition(
@@ -183,6 +200,7 @@ class MockRegistryApi {
                 subtitle = "Top goalies by save %",
                 lastUpdated = now.minus(4.hours),
                 visualizationType = VizType.BAR_GRAPH,
+                url = "https://api.fastbreak.com/v1/charts/nhl/nhl-save-percentage",
                 mockDataType = "bar"
             )
         )

@@ -3,26 +3,49 @@ package com.joebad.fastbreak.ui
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import com.arkivanov.decompose.extensions.compose.subscribeAsState
 import com.joebad.fastbreak.data.api.MockedDataApi
 import com.joebad.fastbreak.data.model.Sport
 import com.joebad.fastbreak.navigation.HomeComponent
+import com.joebad.fastbreak.ui.container.RegistryState
 
 @Composable
 fun HomeScreen(
     component: HomeComponent,
+    registryState: RegistryState,
+    onRefresh: () -> Unit,
     onMenuClick: () -> Unit = {}
 ) {
     val selectedSport by component.selectedSport.subscribeAsState()
 
+    // Refresh state
+    val isRefreshing = registryState.isLoading || registryState.isSyncing
+
+    // Snackbar for errors
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    // Show error snackbar when there's an error
+    LaunchedEffect(registryState.error) {
+        registryState.error?.let { error ->
+            snackbarHostState.showSnackbar(
+                message = error,
+                duration = SnackbarDuration.Short
+            )
+        }
+    }
+
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text("fastbreak") },
@@ -31,6 +54,17 @@ fun HomeScreen(
                         Icon(
                             imageVector = Icons.Default.Menu,
                             contentDescription = "Menu"
+                        )
+                    }
+                },
+                actions = {
+                    IconButton(
+                        onClick = onRefresh,
+                        enabled = !isRefreshing
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Refresh,
+                            contentDescription = "Refresh"
                         )
                     }
                 },
@@ -93,37 +127,120 @@ fun HomeScreen(
                 thickness = 1.dp
             )
 
-            // Visualization list
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(0.dp)
-            ) {
-                // Scatter Plot
-                item {
-                    VisualizationItem(
-                        title = "Scatter Plot Analysis",
-                        description = "Compare two metrics across teams or players",
-                        onClick = { component.onNavigateToDataViz(selectedSport, MockedDataApi.VizType.SCATTER) }
-                    )
-                }
+            // Filter charts for selected sport
+            val chartsForSport = registryState.registry?.charts?.filter { chart ->
+                chart.sport == selectedSport
+            } ?: emptyList()
 
-                // Bar Chart
-                item {
-                    VisualizationItem(
-                        title = "Bar Chart Comparison",
-                        description = "View and compare individual performance metrics",
-                        onClick = { component.onNavigateToDataViz(selectedSport, MockedDataApi.VizType.BAR) }
-                    )
-                }
+            // Check if entire registry is empty
+            val registryIsEmpty = registryState.registry?.charts?.isEmpty() == true
 
-                // Line Chart
-                item {
-                    VisualizationItem(
-                        title = "Line Chart Trends",
-                        description = "Track performance trends over time",
-                        onClick = { component.onNavigateToDataViz(selectedSport, MockedDataApi.VizType.LINE) }
-                    )
+            // Show different states
+            when {
+                registryState.isLoading && registryState.registry == null -> {
+                    // Initial loading
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            CircularProgressIndicator()
+                            Text(
+                                text = "loading registry...",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontFamily = FontFamily.Monospace
+                            )
+                        }
+                    }
+                }
+                registryIsEmpty -> {
+                    // Entire registry is empty
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.padding(32.dp)
+                        ) {
+                            Text(
+                                text = "no charts available",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontFamily = FontFamily.Monospace
+                            )
+                            Text(
+                                text = "tap refresh to load charts",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                                fontFamily = FontFamily.Monospace
+                            )
+                        }
+                    }
+                }
+                chartsForSport.isEmpty() && registryState.registry != null -> {
+                    // No charts for this specific sport (but registry has charts)
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "no ${selectedSport.displayName} charts available",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontFamily = FontFamily.Monospace
+                        )
+                    }
+                }
+                else -> {
+                    // Display charts
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(0.dp)
+                    ) {
+                        // Sync progress indicator at the top
+                        if (registryState.isSyncing && registryState.syncProgress != null) {
+                            item {
+                                SyncProgressIndicator(
+                                    progress = registryState.syncProgress
+                                )
+                            }
+                        }
+
+                        items(chartsForSport) { chart ->
+                            // Determine chart sync state
+                            val isSyncing = registryState.syncProgress?.isChartSyncing(chart.id) == true
+                            val isReady = registryState.syncProgress?.isChartReady(chart.id) ?: false
+
+                            VisualizationItem(
+                                title = chart.title,
+                                description = chart.subtitle,
+                                isSyncing = isSyncing,
+                                isReady = isReady,
+                                onClick = {
+                                    // Only navigate if chart is ready
+                                    if (isReady) {
+                                        // Map VizType to MockedDataApi.VizType
+                                        val apiVizType = when (chart.visualizationType) {
+                                            com.joebad.fastbreak.data.model.VizType.SCATTER_PLOT ->
+                                                MockedDataApi.VizType.SCATTER
+                                            com.joebad.fastbreak.data.model.VizType.BAR_GRAPH ->
+                                                MockedDataApi.VizType.BAR
+                                            com.joebad.fastbreak.data.model.VizType.LINE_CHART ->
+                                                MockedDataApi.VizType.LINE
+                                        }
+                                        component.onNavigateToDataViz(selectedSport, apiVizType)
+                                    }
+                                }
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -134,29 +251,109 @@ fun HomeScreen(
 private fun VisualizationItem(
     title: String,
     description: String,
+    isSyncing: Boolean,
+    isReady: Boolean,
     onClick: () -> Unit
 ) {
+    val alpha = if (isReady) 1f else 0.5f
+    val clickableModifier = if (isReady) {
+        Modifier.clickable(onClick = onClick)
+    } else {
+        Modifier
+    }
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
+            .then(clickableModifier)
             .padding(vertical = 12.dp)
     ) {
-        Text(
-            text = title,
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onBackground
-        )
-        Spacer(modifier = Modifier.height(4.dp))
-        Text(
-            text = description,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = alpha)
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = description,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = alpha)
+                )
+            }
+
+            // Show loading indicator if syncing
+            if (isSyncing) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(20.dp),
+                    strokeWidth = 2.dp
+                )
+            }
+        }
         Spacer(modifier = Modifier.height(12.dp))
         HorizontalDivider(
             color = MaterialTheme.colorScheme.outline,
             thickness = 1.dp
         )
+    }
+}
+
+@Composable
+private fun SyncProgressIndicator(
+    progress: com.joebad.fastbreak.ui.diagnostics.SyncProgress
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.primaryContainer
+        )
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Syncing charts...",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    fontFamily = FontFamily.Monospace
+                )
+                Text(
+                    text = "${progress.current}/${progress.total}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    fontFamily = FontFamily.Monospace
+                )
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            LinearProgressIndicator(
+                progress = { progress.percentage / 100f },
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            if (progress.currentChart.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = progress.currentChart,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
+                    fontFamily = FontFamily.Monospace,
+                    maxLines = 1
+                )
+            }
+        }
     }
 }

@@ -37,57 +37,6 @@ fun DrawerMenu(
                 .verticalScroll(rememberScrollState())
                 .padding(16.dp)
         ) {
-            Text(
-                text = "settings",
-                style = MaterialTheme.typography.titleLarge,
-                fontFamily = FontFamily.Monospace,
-                modifier = Modifier.padding(bottom = 16.dp)
-            )
-
-            HorizontalDivider(
-                modifier = Modifier.padding(bottom = 16.dp),
-                color = MaterialTheme.colorScheme.outline
-            )
-
-            // Theme selector
-            Text(
-                text = "theme",
-                style = MaterialTheme.typography.bodyMedium,
-                fontFamily = FontFamily.Monospace,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(bottom = 8.dp)
-            )
-
-            CupertinoSegmentedControl(
-                selectedTabIndex = if (currentTheme == ThemeMode.LIGHT) 0 else 1,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 8.dp)
-            ) {
-                CupertinoSegmentedControlTab(
-                    isSelected = currentTheme == ThemeMode.LIGHT,
-                    onClick = { onThemeChange(ThemeMode.LIGHT) }
-                ) {
-                    Text(
-                        text = "light",
-                        color = if (currentTheme == ThemeMode.LIGHT) Color.Black else MaterialTheme.colorScheme.onSurface
-                    )
-                }
-                CupertinoSegmentedControlTab(
-                    isSelected = currentTheme == ThemeMode.DARK,
-                    onClick = { onThemeChange(ThemeMode.DARK) }
-                ) {
-                    Text(
-                        text = "dark",
-                        color = if (currentTheme == ThemeMode.DARK) Color.Black else MaterialTheme.colorScheme.onSurface
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(24.dp))
-            HorizontalDivider(color = MaterialTheme.colorScheme.outline)
-            Spacer(modifier = Modifier.height(16.dp))
-
             // Sync status section
             Text(
                 text = "sync status",
@@ -127,6 +76,44 @@ fun DrawerMenu(
             Spacer(modifier = Modifier.height(8.dp))
 
             RegistryOverviewList(registry = registry)
+
+            Spacer(modifier = Modifier.height(24.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Theme selector at bottom
+            Text(
+                text = "theme",
+                style = MaterialTheme.typography.titleSmall,
+                fontFamily = FontFamily.Monospace,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+
+            CupertinoSegmentedControl(
+                selectedTabIndex = if (currentTheme == ThemeMode.LIGHT) 0 else 1,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 8.dp)
+            ) {
+                CupertinoSegmentedControlTab(
+                    isSelected = currentTheme == ThemeMode.LIGHT,
+                    onClick = { onThemeChange(ThemeMode.LIGHT) }
+                ) {
+                    Text(
+                        text = "light",
+                        color = if (currentTheme == ThemeMode.LIGHT) Color.Black else MaterialTheme.colorScheme.onSurface
+                    )
+                }
+                CupertinoSegmentedControlTab(
+                    isSelected = currentTheme == ThemeMode.DARK,
+                    onClick = { onThemeChange(ThemeMode.DARK) }
+                ) {
+                    Text(
+                        text = "dark",
+                        color = if (currentTheme == ThemeMode.DARK) Color.Black else MaterialTheme.colorScheme.onSurface
+                    )
+                }
+            }
 
             // Bottom padding for scroll
             Spacer(modifier = Modifier.height(16.dp))

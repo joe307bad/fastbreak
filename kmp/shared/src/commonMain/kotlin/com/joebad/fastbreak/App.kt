@@ -32,17 +32,15 @@ fun App(rootComponent: RootComponent) {
         ModalNavigationDrawer(
             drawerState = drawerState,
             drawerContent = {
-                registryState.registry?.let { registry ->
-                    DrawerMenu(
-                        currentTheme = themeMode,
-                        onThemeChange = { newTheme ->
-                            rootComponent.toggleTheme(newTheme)
-                        },
-                        registry = registry,
-                        diagnostics = registryState.diagnostics,
-                        onRefreshRegistry = { rootComponent.refreshRegistry() }
-                    )
-                }
+                DrawerMenu(
+                    currentTheme = themeMode,
+                    onThemeChange = { newTheme ->
+                        rootComponent.toggleTheme(newTheme)
+                    },
+                    registry = registryState.registry ?: com.joebad.fastbreak.data.model.Registry.empty(),
+                    diagnostics = registryState.diagnostics,
+                    onRefreshRegistry = { rootComponent.refreshRegistry() }
+                )
             }
         ) {
             val stack by rootComponent.stack.subscribeAsState()
@@ -54,6 +52,8 @@ fun App(rootComponent: RootComponent) {
                 when (val child = it.instance) {
                     is RootComponent.Child.Home -> HomeScreen(
                         component = child.component,
+                        registryState = registryState,
+                        onRefresh = { rootComponent.refreshRegistry() },
                         onMenuClick = { scope.launch { drawerState.open() } }
                     )
                     is RootComponent.Child.DataViz -> DataVizScreen(

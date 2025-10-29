@@ -22,6 +22,16 @@ data class SyncProgress(
     val currentChart: String,
 
     /**
+     * Set of chart IDs that have been successfully synced
+     */
+    val syncedChartIds: Set<String> = emptySet(),
+
+    /**
+     * Set of chart IDs currently being synced
+     */
+    val syncingChartIds: Set<String> = emptySet(),
+
+    /**
      * List of charts that failed to sync (chartId to error message)
      */
     val failedCharts: List<Pair<String, String>> = emptyList()
@@ -61,4 +71,26 @@ data class SyncProgress(
             isComplete && hasFailures -> "Sync complete: $successfulCount/$total successful"
             else -> "Syncing $currentChart ($current/$total)"
         }
+
+    /**
+     * Checks if a specific chart has been synced
+     */
+    fun isChartSynced(chartId: String): Boolean {
+        return syncedChartIds.contains(chartId)
+    }
+
+    /**
+     * Checks if a specific chart is currently being synced
+     */
+    fun isChartSyncing(chartId: String): Boolean {
+        return syncingChartIds.contains(chartId)
+    }
+
+    /**
+     * Checks if a specific chart is ready (synced and not failed)
+     */
+    fun isChartReady(chartId: String): Boolean {
+        val isFailed = failedCharts.any { it.first == chartId }
+        return syncedChartIds.contains(chartId) && !isFailed
+    }
 }

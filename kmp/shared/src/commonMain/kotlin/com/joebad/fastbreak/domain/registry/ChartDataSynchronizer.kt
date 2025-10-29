@@ -51,12 +51,15 @@ class ChartDataSynchronizer(
         }
 
         if (chartsNeedingUpdate.isEmpty()) {
-            // Nothing to update
+            // Nothing to update - all charts already synced
+            val allChartIds = registry.charts.map { it.id }.toSet()
             emit(
                 SyncProgress(
                     current = 0,
                     total = 0,
                     currentChart = "",
+                    syncedChartIds = allChartIds,
+                    syncingChartIds = emptySet(),
                     failedCharts = emptyList()
                 )
             )
@@ -64,19 +67,31 @@ class ChartDataSynchronizer(
         }
 
         val failedCharts = mutableListOf<Pair<String, String>>() // chartId to error message
+        val syncedCharts = mutableSetOf<String>() // Successfully synced chart IDs
+
+        // Add already-cached charts to synced set
+        registry.charts.forEach { chart ->
+            if (!chartsNeedingUpdate.contains(chart)) {
+                syncedCharts.add(chart.id)
+            }
+        }
 
         chartsNeedingUpdate.forEachIndexed { index, chartDef ->
+            // Emit progress showing this chart is currently syncing
             emit(
                 SyncProgress(
                     current = index + 1,
                     total = chartsNeedingUpdate.size,
                     currentChart = chartDef.title,
+                    syncedChartIds = syncedCharts.toSet(),
+                    syncingChartIds = setOf(chartDef.id),
                     failedCharts = failedCharts.toList()
                 )
             )
 
             try {
                 downloadAndCacheChart(chartDef)
+                syncedCharts.add(chartDef.id)
             } catch (e: Exception) {
                 // Log error but continue with other charts
                 println("Failed to sync chart '${chartDef.title}': ${e.message}")
@@ -90,6 +105,8 @@ class ChartDataSynchronizer(
                 current = chartsNeedingUpdate.size,
                 total = chartsNeedingUpdate.size,
                 currentChart = "",
+                syncedChartIds = syncedCharts.toSet(),
+                syncingChartIds = emptySet(),
                 failedCharts = failedCharts.toList()
             )
         )
@@ -114,9 +131,16 @@ class ChartDataSynchronizer(
      *
      * @param chartDef The chart definition to download
      * @throws Exception if download or caching fails
+     *
+     * TODO: In production, use chartDef.url to fetch data from real API endpoint
+     *       For now, using MockedDataApi with chartDef.mockDataType
      */
     private suspend fun downloadAndCacheChart(chartDef: ChartDefinition) {
-        // Map data model types to MockedDataApi types
+        // TODO: Replace with real HTTP call to chartDef.url when switching to production data
+        // val response = httpClient.get(chartDef.url)
+        // val jsonData = response.bodyAsText()
+
+        // For now, map data model types to MockedDataApi types
         val apiSport = when (chartDef.sport) {
             com.joebad.fastbreak.data.model.Sport.NFL -> MockedDataApi.Sport.NFL
             com.joebad.fastbreak.data.model.Sport.NBA -> MockedDataApi.Sport.NBA

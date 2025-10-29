@@ -4,6 +4,7 @@ import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
 import com.arkivanov.decompose.extensions.compose.stack.Children
@@ -20,8 +21,10 @@ import kotlinx.coroutines.launch
 @Composable
 fun App(rootComponent: RootComponent) {
     val themeMode by rootComponent.themeMode.subscribeAsState()
-    val registry by rootComponent.registry.subscribeAsState()
-    val diagnostics by rootComponent.diagnostics.subscribeAsState()
+
+    // Collect Orbit MVI state (Phase 6)
+    val registryState by rootComponent.registryContainer.container.stateFlow.collectAsState()
+
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
 
@@ -29,15 +32,17 @@ fun App(rootComponent: RootComponent) {
         ModalNavigationDrawer(
             drawerState = drawerState,
             drawerContent = {
-                DrawerMenu(
-                    currentTheme = themeMode,
-                    onThemeChange = { newTheme ->
-                        rootComponent.toggleTheme(newTheme)
-                    },
-                    registry = registry,
-                    diagnostics = diagnostics,
-                    onRefreshRegistry = { rootComponent.refreshRegistry() }
-                )
+                registryState.registry?.let { registry ->
+                    DrawerMenu(
+                        currentTheme = themeMode,
+                        onThemeChange = { newTheme ->
+                            rootComponent.toggleTheme(newTheme)
+                        },
+                        registry = registry,
+                        diagnostics = registryState.diagnostics,
+                        onRefreshRegistry = { rootComponent.refreshRegistry() }
+                    )
+                }
             }
         ) {
             val stack by rootComponent.stack.subscribeAsState()

@@ -13,9 +13,13 @@ import com.joebad.fastbreak.data.repository.RegistryRepository
 import com.joebad.fastbreak.domain.registry.ChartDataSynchronizer
 import com.joebad.fastbreak.domain.registry.RegistryManager
 import com.joebad.fastbreak.navigation.RootComponent
+import com.joebad.fastbreak.ui.container.RegistryContainer
 import com.joebad.fastbreak.ui.theme.SystemThemeDetector
 import com.joebad.fastbreak.ui.theme.ThemeRepository
 import com.russhwolf.settings.Settings
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -27,13 +31,16 @@ class MainActivity : ComponentActivity() {
             systemThemeDetector = SystemThemeDetector()
         )
 
+        // Create coroutine scope
+        val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
+
         // Create repositories
         val registryRepository = RegistryRepository(settings)
         val chartDataRepository = ChartDataRepository(settings)
 
         // Create API services
         val mockRegistryApi = MockRegistryApi()
-        val mockedDataApi = MockedDataApi() // API generates data based on parameters, not constructor
+        val mockedDataApi = MockedDataApi()
 
         // Create RegistryManager (Phase 4)
         val registryManager = RegistryManager(
@@ -47,12 +54,18 @@ class MainActivity : ComponentActivity() {
             mockedDataApi = mockedDataApi
         )
 
+        // Create RegistryContainer (Phase 6 - Orbit MVI)
+        val registryContainer = RegistryContainer(
+            registryManager = registryManager,
+            chartDataSynchronizer = chartDataSynchronizer,
+            chartDataRepository = chartDataRepository,
+            scope = scope
+        )
+
         val rootComponent = RootComponent(
             componentContext = DefaultComponentContext(lifecycle = LifecycleRegistry()),
             themeRepository = themeRepository,
-            registryManager = registryManager,
-            chartDataSynchronizer = chartDataSynchronizer,
-            chartDataRepository = chartDataRepository
+            registryContainer = registryContainer
         )
 
         setContent {

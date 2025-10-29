@@ -9,50 +9,28 @@ import com.arkivanov.decompose.router.stack.push
 import com.arkivanov.decompose.value.MutableValue
 import com.arkivanov.decompose.value.Value
 import com.joebad.fastbreak.data.api.MockedDataApi
-import com.joebad.fastbreak.data.model.Registry
 import com.joebad.fastbreak.data.model.Sport
-import com.joebad.fastbreak.data.repository.ChartDataRepository
-import com.joebad.fastbreak.domain.registry.ChartDataSynchronizer
-import com.joebad.fastbreak.domain.registry.RegistryManager
-import com.joebad.fastbreak.ui.diagnostics.DiagnosticsInfo
+import com.joebad.fastbreak.ui.container.RegistryContainer
 import com.joebad.fastbreak.ui.theme.ThemeMode
 import com.joebad.fastbreak.ui.theme.ThemeRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.launch
-import kotlinx.datetime.Clock
 import kotlinx.serialization.Serializable
-import kotlin.time.Duration.Companion.hours
 
 class RootComponent(
     componentContext: ComponentContext,
     private val themeRepository: ThemeRepository,
-    private val registryManager: RegistryManager,
-    private val chartDataSynchronizer: ChartDataSynchronizer,
-    private val chartDataRepository: ChartDataRepository
+    val registryContainer: RegistryContainer
 ) : ComponentContext by componentContext {
 
     private val navigation = StackNavigation<Config>()
 
-    // Coroutine scope for async operations (temporary until Orbit MVI in Phase 6)
+    // Coroutine scope for async operations
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
 
     private val _themeMode = MutableValue(themeRepository.getInitialTheme())
     val themeMode: Value<ThemeMode> = _themeMode
-
-    // Registry state (temporary until Orbit MVI in Phase 6)
-    private val _registry = MutableValue(Registry.empty())
-    val registry: Value<Registry> = _registry
-
-    // Diagnostics state (temporary until Orbit MVI in Phase 6)
-    private val _diagnostics = MutableValue(DiagnosticsInfo())
-    val diagnostics: Value<DiagnosticsInfo> = _diagnostics
-
-    init {
-        // Check and load registry on startup (with 12-hour check)
-        checkAndLoadRegistry()
-    }
 
     fun toggleTheme(mode: ThemeMode) {
         _themeMode.value = mode
@@ -60,121 +38,11 @@ class RootComponent(
     }
 
     /**
-     * Checks if registry needs updating (12-hour policy) and loads it.
-     * Called on app startup.
-     * Uses RegistryManager to handle automatic updates and fallback to cache.
-     * After loading registry, syncs chart data based on timestamps.
-     */
-    private fun checkAndLoadRegistry() {
-        scope.launch {
-            registryManager.checkAndUpdateRegistry()
-                .onSuccess { registry ->
-                    _registry.value = registry
-                    updateDiagnostics()
-
-                    // Sync chart data (Phase 5)
-                    syncChartData(registry)
-                }
-                .onFailure { error ->
-                    // Failed to load - show empty registry and update diagnostics with error
-                    _registry.value = Registry.empty()
-                    _diagnostics.value = _diagnostics.value.copy(
-                        lastError = error.message,
-                        failedSyncs = _diagnostics.value.failedSyncs + 1
-                    )
-                }
-        }
-    }
-
-    /**
-     * Forces a registry refresh regardless of staleness.
-     * Uses RegistryManager to handle the refresh and persistence.
-     * After refreshing registry, syncs chart data based on timestamps.
-     * Prevents concurrent refresh operations with a guard.
-     * (Temporary implementation for Phase 5 testing - will be replaced in Phase 6 with Orbit MVI)
+     * Triggers a registry refresh.
+     * Delegates to RegistryContainer (Orbit MVI).
      */
     fun refreshRegistry() {
-        // Guard: prevent concurrent refresh operations
-        if (_diagnostics.value.isSyncing) {
-            println("Refresh already in progress, ignoring duplicate request")
-            return
-        }
-
-        // Set syncing state
-        _diagnostics.value = _diagnostics.value.copy(isSyncing = true)
-
-        scope.launch {
-            registryManager.forceRefreshRegistry()
-                .onSuccess { registry ->
-                    // Update state
-                    _registry.value = registry
-                    updateDiagnostics()
-
-                    // Sync chart data (Phase 5)
-                    syncChartData(registry)
-                }
-                .onFailure { error ->
-                    // Update diagnostics with error
-                    _diagnostics.value = _diagnostics.value.copy(
-                        isSyncing = false,
-                        lastError = error.message,
-                        failedSyncs = _diagnostics.value.failedSyncs + 1
-                    )
-                }
-        }
-    }
-
-    /**
-     * Synchronizes chart data based on registry definitions.
-     * Compares timestamps and downloads charts that need updating.
-     * Collects progress updates and handles failures gracefully.
-     * (Phase 5 implementation)
-     */
-    private suspend fun syncChartData(registry: Registry) {
-        chartDataSynchronizer.synchronizeCharts(registry).collect { progress ->
-            // Update diagnostics with sync progress
-            _diagnostics.value = _diagnostics.value.copy(
-                isSyncing = !progress.isComplete,
-                lastError = if (progress.hasFailures) {
-                    "Failed to sync ${progress.failedCharts.size} charts"
-                } else null,
-                failedSyncs = if (progress.hasFailures) {
-                    _diagnostics.value.failedSyncs + progress.failedCharts.size
-                } else _diagnostics.value.failedSyncs
-            )
-
-            // When complete, update diagnostics with final cache info
-            if (progress.isComplete) {
-                updateDiagnostics()
-            }
-        }
-    }
-
-    /**
-     * Updates the diagnostics info based on current repository state.
-     * Uses RegistryManager to check staleness.
-     */
-    private fun updateDiagnostics() {
-        val metadata = registryManager.getMetadata()
-        val chartCount = chartDataRepository.getCachedChartCount()
-        val cacheSize = chartDataRepository.estimateTotalCacheSize()
-
-        // Get the most recent cache update time from all cached charts
-        val lastCacheUpdate = chartDataSynchronizer.getCachedChartIds()
-            .mapNotNull { chartDataSynchronizer.getChartCacheTime(it) }
-            .maxOrNull()
-
-        _diagnostics.value = DiagnosticsInfo(
-            lastRegistryFetch = metadata?.lastDownloadTime,
-            lastCacheUpdate = lastCacheUpdate,
-            cachedChartsCount = chartCount,
-            registryVersion = metadata?.registryVersion,
-            totalCacheSize = cacheSize,
-            failedSyncs = _diagnostics.value.failedSyncs,
-            lastError = null,
-            isStale = registryManager.isRegistryStale(),
-            isSyncing = false
-        )
+        registryContainer.refreshRegistry()
     }
 
     val stack: Value<ChildStack<*, Child>> = childStack(

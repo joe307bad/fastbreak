@@ -39,11 +39,44 @@ class RootComponent(
     }
 
     /**
+     * Checks network permission status.
+     * Delegates to RegistryContainer (Orbit MVI).
+     */
+    fun checkNetworkPermission() {
+        registryContainer.checkNetworkPermission()
+    }
+
+    /**
+     * Requests network permission.
+     * Delegates to RegistryContainer (Orbit MVI).
+     */
+    fun requestNetworkPermission() {
+        registryContainer.requestNetworkPermission()
+    }
+
+    /**
+     * Loads the registry (initial load with 12-hour check).
+     * Delegates to RegistryContainer (Orbit MVI).
+     */
+    fun loadRegistry() {
+        registryContainer.loadRegistry()
+    }
+
+    /**
      * Triggers a registry refresh.
      * Delegates to RegistryContainer (Orbit MVI).
      */
     fun refreshRegistry() {
+        println("🔵 RootComponent.refreshRegistry() called from UI")
         registryContainer.refreshRegistry()
+    }
+
+    /**
+     * Clears the sync progress state.
+     * Delegates to RegistryContainer (Orbit MVI).
+     */
+    fun clearSyncProgress() {
+        registryContainer.clearSyncProgress()
     }
 
     val stack: Value<ChildStack<*, Child>> = childStack(

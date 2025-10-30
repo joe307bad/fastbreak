@@ -81,10 +81,17 @@ class RegistryManager(
      * @return Result containing the fresh registry or an error
      */
     suspend fun forceRefreshRegistry(): Result<Registry> = runCatching {
+        println("🔧 RegistryManager.forceRefreshRegistry() - Starting")
+
         try {
+            println("🌐 Calling mockRegistryApi.fetchRegistry()...")
             val registry = mockRegistryApi.fetchRegistry().getOrThrow()
+            println("✅ API call successful - Received registry version: ${registry.version}")
+            println("   Registry contains ${registry.charts.size} charts")
+            println("   Last updated: ${registry.lastUpdated}")
 
             // Save registry and metadata
+            println("💾 Saving registry to repository...")
             registryRepository.saveRegistry(registry)
             registryRepository.saveMetadata(
                 RegistryMetadata(
@@ -92,15 +99,22 @@ class RegistryManager(
                     registryVersion = registry.version
                 )
             )
+            println("✅ Registry saved successfully")
 
             registry
         } catch (e: Exception) {
             // Network or API error - fall back to cached registry if available
+            println("❌ API call FAILED with exception: ${e.message}")
+            println("   Exception type: ${e::class.simpleName}")
+            println("   Stack trace: ${e.stackTraceToString()}")
+
             val cachedRegistry = registryRepository.getRegistry()
             if (cachedRegistry != null) {
-                println("Force refresh failed, using cached version: ${e.message}")
-                throw Exception("Failed to refresh registry: ${e.message}", e)
+                println("📦 Found cached registry with ${cachedRegistry.charts.size} charts")
+                println("✓ Returning cached registry as fallback")
+                cachedRegistry  // Return cached registry instead of throwing
             } else {
+                println("❌ No cached registry available - throwing exception")
                 throw Exception("Failed to refresh registry and no cached data available", e)
             }
         }

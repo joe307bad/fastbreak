@@ -1,6 +1,6 @@
 package com.joebad.fastbreak.domain.registry
 
-import com.joebad.fastbreak.data.api.MockedDataApi
+import com.joebad.fastbreak.data.api.HttpClientFactory
 import com.joebad.fastbreak.data.model.BarGraphVisualization
 import com.joebad.fastbreak.data.model.CachedChartData
 import com.joebad.fastbreak.data.model.ChartDefinition
@@ -10,8 +10,10 @@ import com.joebad.fastbreak.data.model.ScatterPlotVisualization
 import com.joebad.fastbreak.data.model.VizType
 import com.joebad.fastbreak.data.repository.ChartDataRepository
 import com.joebad.fastbreak.ui.diagnostics.SyncProgress
+import io.ktor.client.*
+import io.ktor.client.call.*
+import io.ktor.client.request.*
 import kotlinx.coroutines.async
-import kotlinx.coroutines.channels.ProducerScope
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.channelFlow
@@ -29,7 +31,7 @@ import kotlinx.serialization.json.Json
  */
 class ChartDataSynchronizer(
     private val chartDataRepository: ChartDataRepository,
-    private val mockedDataApi: MockedDataApi
+    private val httpClient: HttpClient = HttpClientFactory.create()
 ) {
     private val json = Json {
         ignoreUnknownKeys = true
@@ -53,11 +55,20 @@ class ChartDataSynchronizer(
      * @return Flow of SyncProgress updates, including any errors
      */
     suspend fun synchronizeCharts(registry: Registry): Flow<SyncProgress> = channelFlow {
+        println("📊 ChartDataSynchronizer.synchronizeCharts() - Starting")
+        println("   Total charts in registry: ${registry.charts.size}")
+
         val chartsNeedingUpdate = registry.charts.filter { chart ->
             needsUpdate(chart)
         }
 
+        println("   Charts needing update: ${chartsNeedingUpdate.size}")
+        chartsNeedingUpdate.forEach { chart ->
+            println("     - ${chart.id} (${chart.title})")
+        }
+
         if (chartsNeedingUpdate.isEmpty()) {
+            println("✓ All charts already synced, nothing to update")
             // Nothing to update - all charts already synced
             val allChartIds = registry.charts.map { it.id }.toSet()
             send(
@@ -72,6 +83,8 @@ class ChartDataSynchronizer(
             )
             return@channelFlow
         }
+
+        println("🔄 Starting parallel download of ${chartsNeedingUpdate.size} charts...")
 
         // Thread-safe tracking for parallel downloads
         val failedCharts = mutableListOf<Pair<String, String>>() // chartId to error message
@@ -124,8 +137,10 @@ class ChartDataSynchronizer(
                         }
                         emitProgress()
 
+                        println("⬇️  Downloading chart: ${chartDef.id} (${chartDef.title})")
                         // Download chart data
                         downloadAndCacheChart(chartDef)
+                        println("✅ Successfully downloaded: ${chartDef.id}")
 
                         // Mark as synced
                         stateMutex.withLock {
@@ -133,7 +148,8 @@ class ChartDataSynchronizer(
                         }
                     } catch (e: Exception) {
                         // Log error but continue with other charts
-                        println("Failed to sync chart '${chartDef.title}': ${e.message}")
+                        println("❌ Failed to sync chart '${chartDef.title}': ${e.message}")
+                        println("   Exception: ${e::class.simpleName}")
                         stateMutex.withLock {
                             failedCharts.add(chartDef.id to (e.message ?: "Unknown error"))
                         }
@@ -157,6 +173,10 @@ class ChartDataSynchronizer(
             jobs.forEach { it.await() }
         }
 
+        println("✅ All chart downloads complete")
+        println("   Successfully synced: ${syncedCharts.size}")
+        println("   Failed: ${failedCharts.size}")
+
         // Emit final progress with all results
         val finalSnapshot = stateMutex.withLock {
             SyncProgress(
@@ -169,6 +189,7 @@ class ChartDataSynchronizer(
             )
         }
         send(finalSnapshot)
+        println("📊 ChartDataSynchronizer.synchronizeCharts() - Complete")
     }
 
     /**
@@ -178,46 +199,43 @@ class ChartDataSynchronizer(
      * @return true if the chart needs to be downloaded/updated
      */
     private fun needsUpdate(chartDef: ChartDefinition): Boolean {
-        val cached = chartDataRepository.getChartData(chartDef.id) ?: return true
+        val cached = chartDataRepository.getChartData(chartDef.id)
+
+        if (cached == null) {
+            println("🔍 Chart ${chartDef.id}: No cached data, needs update")
+            return true
+        }
 
         // Update if the chart definition's lastUpdated is newer than cached version
-        return chartDef.lastUpdated > cached.lastUpdated
+        val needsUpdate = chartDef.lastUpdated > cached.lastUpdated
+        println("🔍 Chart ${chartDef.id}:")
+        println("   Registry timestamp: ${chartDef.lastUpdated}")
+        println("   Cached timestamp:   ${cached.lastUpdated}")
+        println("   Needs update: $needsUpdate")
+
+        return needsUpdate
     }
 
     /**
-     * Downloads chart data from the mock API and caches it.
+     * Downloads chart data from the mock server and caches it.
      * Handles serialization of different visualization types.
      *
      * @param chartDef The chart definition to download
      * @throws Exception if download or caching fails
-     *
-     * TODO: In production, use chartDef.url to fetch data from real API endpoint
-     *       For now, using MockedDataApi with chartDef.mockDataType
      */
     private suspend fun downloadAndCacheChart(chartDef: ChartDefinition) {
-        // TODO: Replace with real HTTP call to chartDef.url when switching to production data
-        // val response = httpClient.get(chartDef.url)
-        // val jsonData = response.bodyAsText()
-
-        // For now, map data model types to MockedDataApi types
-        val apiSport = when (chartDef.sport) {
-            com.joebad.fastbreak.data.model.Sport.NFL -> MockedDataApi.Sport.NFL
-            com.joebad.fastbreak.data.model.Sport.NBA -> MockedDataApi.Sport.NBA
-            com.joebad.fastbreak.data.model.Sport.MLB -> MockedDataApi.Sport.MLB
-            com.joebad.fastbreak.data.model.Sport.NHL -> MockedDataApi.Sport.NHL
-        }
-
-        val apiVizType = when (chartDef.visualizationType) {
-            VizType.SCATTER_PLOT -> MockedDataApi.VizType.SCATTER
-            VizType.BAR_GRAPH -> MockedDataApi.VizType.BAR
-            VizType.LINE_CHART -> MockedDataApi.VizType.LINE
-        }
-
-        // Use MockedDataApi to generate data based on chart definition
-        val vizData = mockedDataApi.fetchVisualizationData(
-            sport = apiSport,
-            vizType = apiVizType
+        // Convert the URL to use 192.168.50.128:1080 for the mock server
+        val mockServerUrl = chartDef.url.replace(
+            "https://api.fastbreak.com",
+            "http://192.168.50.128:1080/api"
         )
+
+        // Fetch chart data from mock server based on visualization type
+        val vizData = when (chartDef.visualizationType) {
+            VizType.SCATTER_PLOT -> httpClient.get(mockServerUrl).body<ScatterPlotVisualization>()
+            VizType.BAR_GRAPH -> httpClient.get(mockServerUrl).body<BarGraphVisualization>()
+            VizType.LINE_CHART -> httpClient.get(mockServerUrl).body<LineChartVisualization>()
+        }
 
         // Serialize visualization data based on type
         val dataJson = when (vizData) {
@@ -236,8 +254,11 @@ class ChartDataSynchronizer(
             dataJson = dataJson
         )
 
+        println("💾 Caching chart ${chartDef.id} with timestamp: ${chartDef.lastUpdated}")
+
         // Save to repository
         chartDataRepository.saveChartData(chartDef.id, cachedData)
+        println("✅ Chart ${chartDef.id} saved to cache")
     }
 
     /**

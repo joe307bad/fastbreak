@@ -4,7 +4,6 @@ import androidx.compose.ui.window.ComposeUIViewController
 import com.arkivanov.decompose.DefaultComponentContext
 import com.arkivanov.essenty.lifecycle.LifecycleRegistry
 import com.joebad.fastbreak.data.api.MockRegistryApi
-import com.joebad.fastbreak.data.api.MockedDataApi
 import com.joebad.fastbreak.data.repository.ChartDataRepository
 import com.joebad.fastbreak.data.repository.RegistryRepository
 import com.joebad.fastbreak.domain.registry.ChartDataSynchronizer
@@ -35,7 +34,6 @@ fun MainViewController(): UIViewController {
 
     // Create API services
     val mockRegistryApi = MockRegistryApi()
-    val mockedDataApi = MockedDataApi()
 
     // Create RegistryManager (Phase 4)
     val registryManager = RegistryManager(
@@ -45,8 +43,7 @@ fun MainViewController(): UIViewController {
 
     // Create ChartDataSynchronizer (Phase 5)
     val chartDataSynchronizer = ChartDataSynchronizer(
-        chartDataRepository = chartDataRepository,
-        mockedDataApi = mockedDataApi
+        chartDataRepository = chartDataRepository
     )
 
     // Create RegistryContainer (Phase 6 - Orbit MVI)

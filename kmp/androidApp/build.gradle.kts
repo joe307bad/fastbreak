@@ -7,12 +7,12 @@ plugins {
 
 android {
     namespace = "com.joebad.fastbreak"
-    compileSdk = 34
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "com.joebad.fastbreak"
         minSdk = 24
-        targetSdk = 34
+        targetSdk = 35
         versionCode = 1
         versionName = "1.0"
     }
@@ -37,4 +37,5 @@ dependencies {
     implementation(libs.decompose)
     implementation(libs.essenty.lifecycle)
     implementation(libs.multiplatform.settings.no.arg)
+    implementation(libs.ktor.client.core)
 }

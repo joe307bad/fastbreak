@@ -54,7 +54,11 @@ fun App(rootComponent: RootComponent) {
                         component = child.component,
                         registryState = registryState,
                         onRefresh = { rootComponent.refreshRegistry() },
-                        onMenuClick = { scope.launch { drawerState.open() } }
+                        onMenuClick = { scope.launch { drawerState.open() } },
+                        onInitialLoad = { rootComponent.loadRegistry() },
+                        onRequestPermission = { rootComponent.requestNetworkPermission() },
+                        onCheckPermission = { rootComponent.checkNetworkPermission() },
+                        onClearSyncProgress = { rootComponent.clearSyncProgress() }
                     )
                     is RootComponent.Child.DataViz -> DataVizScreen(
                         component = child.component,

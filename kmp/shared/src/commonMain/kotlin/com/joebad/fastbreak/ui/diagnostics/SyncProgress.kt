@@ -38,9 +38,14 @@ data class SyncProgress(
 ) {
     /**
      * Calculates the progress percentage (0-100)
+     * Returns 100 when complete, even if total is 0
      */
     val percentage: Int
-        get() = if (total > 0) ((current.toFloat() / total) * 100).toInt() else 0
+        get() = when {
+            isComplete -> 100
+            total > 0 -> ((current.toFloat() / total) * 100).toInt()
+            else -> 0
+        }
 
     /**
      * Returns true if the sync is complete

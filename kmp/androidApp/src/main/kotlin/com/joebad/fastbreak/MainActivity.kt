@@ -7,7 +7,6 @@ import com.arkivanov.decompose.DefaultComponentContext
 import com.arkivanov.essenty.lifecycle.LifecycleRegistry
 import com.joebad.fastbreak.App
 import com.joebad.fastbreak.data.api.MockRegistryApi
-import com.joebad.fastbreak.data.api.MockedDataApi
 import com.joebad.fastbreak.data.repository.ChartDataRepository
 import com.joebad.fastbreak.data.repository.RegistryRepository
 import com.joebad.fastbreak.domain.registry.ChartDataSynchronizer
@@ -40,7 +39,6 @@ class MainActivity : ComponentActivity() {
 
         // Create API services
         val mockRegistryApi = MockRegistryApi()
-        val mockedDataApi = MockedDataApi()
 
         // Create RegistryManager (Phase 4)
         val registryManager = RegistryManager(
@@ -50,8 +48,7 @@ class MainActivity : ComponentActivity() {
 
         // Create ChartDataSynchronizer (Phase 5)
         val chartDataSynchronizer = ChartDataSynchronizer(
-            chartDataRepository = chartDataRepository,
-            mockedDataApi = mockedDataApi
+            chartDataRepository = chartDataRepository
         )
 
         // Create RegistryContainer (Phase 6 - Orbit MVI)

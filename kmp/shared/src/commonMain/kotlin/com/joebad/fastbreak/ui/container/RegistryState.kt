@@ -2,6 +2,7 @@ package com.joebad.fastbreak.ui.container
 
 import com.joebad.fastbreak.data.model.Registry
 import com.joebad.fastbreak.ui.diagnostics.DiagnosticsInfo
+import com.mohamedrejeb.calf.permissions.PermissionStatus
 import kotlinx.datetime.Instant
 
 /**
@@ -38,6 +39,12 @@ data class RegistryState(
      * Current error message (null if no error)
      */
     val error: String? = null,
+
+    /**
+     * Network permission status - always Granted.
+     * iOS will prompt for local network access automatically when needed.
+     */
+    val networkPermissionStatus: PermissionStatus = PermissionStatus.Granted,
 
     /**
      * Diagnostics information for the UI

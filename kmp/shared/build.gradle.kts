@@ -18,6 +18,7 @@ kotlin {
 
     sourceSets.all {
         languageSettings.optIn("androidx.compose.material3.ExperimentalMaterial3Api")
+        languageSettings.optIn("com.mohamedrejeb.calf.permissions.ExperimentalPermissionsApi")
     }
 
     listOf(
@@ -63,17 +64,30 @@ kotlin {
 
             // Kotlinx Serialization
             implementation(libs.kotlinx.serialization.json)
+
+            // Ktor Client
+            implementation(libs.ktor.client.core)
+            implementation(libs.ktor.client.content.negotiation)
+            implementation(libs.ktor.serialization.kotlinx.json)
+
+            // Calf Permissions
+            implementation(libs.calf.permissions)
         }
 
         androidMain.dependencies {
             implementation(libs.androidx.activity.compose)
+            implementation(libs.ktor.client.okhttp)
+        }
+
+        iosMain.dependencies {
+            implementation(libs.ktor.client.darwin)
         }
     }
 }
 
 android {
     namespace = "com.example.kmpapp"
-    compileSdk = 34
+    compileSdk = 35
 
     defaultConfig {
         minSdk = 24

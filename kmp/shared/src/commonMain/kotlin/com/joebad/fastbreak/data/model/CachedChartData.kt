@@ -2,6 +2,7 @@ package com.joebad.fastbreak.data.model
 
 import kotlinx.datetime.Instant
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
 
 /**
  * Represents cached chart data stored locally.
@@ -44,4 +45,19 @@ data class CachedChartData(
      */
     val estimatedSizeBytes: Long
         get() = dataJson.length.toLong()
+
+    /**
+     * Deserializes the cached JSON data back into the appropriate VisualizationType.
+     *
+     * @return The deserialized visualization data
+     * @throws Exception if deserialization fails
+     */
+    fun deserialize(): VisualizationType {
+        val json = Json { ignoreUnknownKeys = true }
+        return when (visualizationType) {
+            VizType.SCATTER_PLOT -> json.decodeFromString<ScatterPlotVisualization>(dataJson)
+            VizType.BAR_GRAPH -> json.decodeFromString<BarGraphVisualization>(dataJson)
+            VizType.LINE_CHART -> json.decodeFromString<LineChartVisualization>(dataJson)
+        }
+    }
 }

@@ -26,18 +26,26 @@ fun DataVizScreen(
     var state by remember { mutableStateOf<DataVizState>(DataVizState.Loading) }
     val scope = rememberCoroutineScope()
 
-    // Load data when component is first displayed
-    LaunchedEffect(component.sport, component.vizType) {
-        state = DataVizState.Loading
+    // Load cached data when component is first displayed
+    LaunchedEffect(component.chartId) {
         try {
-            val apiSport = when (component.sport) {
-                Sport.NFL -> MockedDataApi.Sport.NFL
-                Sport.NBA -> MockedDataApi.Sport.NBA
-                Sport.MLB -> MockedDataApi.Sport.MLB
-                Sport.NHL -> MockedDataApi.Sport.NHL
+            // Load from cache using chartId
+            val cachedData = component.chartDataRepository.getChartData(component.chartId)
+            if (cachedData != null) {
+                // Data is cached, deserialize and show immediately
+                val visualization = cachedData.deserialize()
+                state = DataVizState.Success(visualization)
+            } else {
+                // Fallback: data not cached yet, fetch from API
+                val apiSport = when (component.sport) {
+                    Sport.NFL -> MockedDataApi.Sport.NFL
+                    Sport.NBA -> MockedDataApi.Sport.NBA
+                    Sport.MLB -> MockedDataApi.Sport.MLB
+                    Sport.NHL -> MockedDataApi.Sport.NHL
+                }
+                val data = component.api.fetchVisualizationData(apiSport, component.vizType)
+                state = DataVizState.Success(data)
             }
-            val data = component.api.fetchVisualizationData(apiSport, component.vizType)
-            state = DataVizState.Success(data)
         } catch (e: Exception) {
             state = DataVizState.Error(e.message ?: "Unknown error")
         }

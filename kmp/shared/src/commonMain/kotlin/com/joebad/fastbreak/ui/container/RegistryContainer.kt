@@ -76,7 +76,7 @@ class RegistryContainer(
             return@intent
         }
 
-        reduce { state.copy(isSyncing = true, error = null) }
+        reduce { state.copy(isSyncing = true, error = null, syncProgress = null) }
 
         registryManager.forceRefreshRegistry()
             .onSuccess { registry ->

@@ -8,7 +8,7 @@ import com.joebad.fastbreak.data.model.Sport
 
 class HomeComponent(
     componentContext: ComponentContext,
-    val onNavigateToDataViz: (Sport, MockedDataApi.VizType) -> Unit
+    val onNavigateToDataViz: (String, Sport, MockedDataApi.VizType) -> Unit
 ) : ComponentContext by componentContext {
 
     private val _selectedSport = MutableValue(Sport.NFL)

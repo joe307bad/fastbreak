@@ -235,7 +235,7 @@ fun HomeScreen(
                                             com.joebad.fastbreak.data.model.VizType.LINE_CHART ->
                                                 MockedDataApi.VizType.LINE
                                         }
-                                        component.onNavigateToDataViz(selectedSport, apiVizType)
+                                        component.onNavigateToDataViz(chart.id, selectedSport, apiVizType)
                                     }
                                 }
                             )
@@ -341,7 +341,8 @@ private fun SyncProgressIndicator(
 
             LinearProgressIndicator(
                 progress = { progress.percentage / 100f },
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                drawStopIndicator = {}
             )
 
             if (progress.currentChart.isNotEmpty()) {

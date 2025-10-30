@@ -10,8 +10,14 @@ import com.joebad.fastbreak.data.model.ScatterPlotVisualization
 import com.joebad.fastbreak.data.model.VizType
 import com.joebad.fastbreak.data.repository.ChartDataRepository
 import com.joebad.fastbreak.ui.diagnostics.SyncProgress
+import kotlinx.coroutines.async
+import kotlinx.coroutines.channels.ProducerScope
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.channelFlow
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withLock
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 import kotlinx.serialization.encodeToString
@@ -41,11 +47,12 @@ class ChartDataSynchronizer(
      * Synchronizes all charts in the registry that need updating.
      * Emits progress updates via Flow.
      * Continues syncing even if individual charts fail.
+     * Uses channelFlow to support concurrent emissions from parallel downloads.
      *
      * @param registry The registry containing chart definitions
      * @return Flow of SyncProgress updates, including any errors
      */
-    suspend fun synchronizeCharts(registry: Registry): Flow<SyncProgress> = flow {
+    suspend fun synchronizeCharts(registry: Registry): Flow<SyncProgress> = channelFlow {
         val chartsNeedingUpdate = registry.charts.filter { chart ->
             needsUpdate(chart)
         }
@@ -53,7 +60,7 @@ class ChartDataSynchronizer(
         if (chartsNeedingUpdate.isEmpty()) {
             // Nothing to update - all charts already synced
             val allChartIds = registry.charts.map { it.id }.toSet()
-            emit(
+            send(
                 SyncProgress(
                     current = 0,
                     total = 0,
@@ -63,11 +70,16 @@ class ChartDataSynchronizer(
                     failedCharts = emptyList()
                 )
             )
-            return@flow
+            return@channelFlow
         }
 
+        // Thread-safe tracking for parallel downloads
         val failedCharts = mutableListOf<Pair<String, String>>() // chartId to error message
         val syncedCharts = mutableSetOf<String>() // Successfully synced chart IDs
+        val syncingCharts = mutableSetOf<String>() // Currently syncing chart IDs
+
+        // Mutex for thread-safe access to shared state
+        val stateMutex = Mutex()
 
         // Add already-cached charts to synced set
         registry.charts.forEach { chart ->
@@ -76,31 +88,77 @@ class ChartDataSynchronizer(
             }
         }
 
-        chartsNeedingUpdate.forEachIndexed { index, chartDef ->
-            // Emit progress showing this chart is currently syncing
-            emit(
+        // Use semaphore to limit concurrent downloads
+        val semaphore = Semaphore(MAX_CONCURRENT_DOWNLOADS)
+        var completedCount = 0
+
+        // Helper to emit current progress with thread-safe state snapshot
+        suspend fun emitProgress() {
+            val snapshot = stateMutex.withLock {
                 SyncProgress(
-                    current = index + 1,
+                    current = completedCount,
                     total = chartsNeedingUpdate.size,
-                    currentChart = chartDef.title,
+                    currentChart = syncingCharts.firstOrNull()?.let { id ->
+                        chartsNeedingUpdate.find { it.id == id }?.title ?: ""
+                    } ?: "",
                     syncedChartIds = syncedCharts.toSet(),
-                    syncingChartIds = setOf(chartDef.id),
+                    syncingChartIds = syncingCharts.toSet(),
                     failedCharts = failedCharts.toList()
                 )
-            )
-
-            try {
-                downloadAndCacheChart(chartDef)
-                syncedCharts.add(chartDef.id)
-            } catch (e: Exception) {
-                // Log error but continue with other charts
-                println("Failed to sync chart '${chartDef.title}': ${e.message}")
-                failedCharts.add(chartDef.id to (e.message ?: "Unknown error"))
             }
+            // Emit outside the mutex lock using channelFlow's thread-safe send
+            send(snapshot)
+        }
+
+        // Launch all downloads in parallel with concurrency limit
+        coroutineScope {
+            val jobs = chartsNeedingUpdate.map { chartDef ->
+                async {
+                    // Acquire semaphore permit to limit concurrency
+                    semaphore.acquire()
+
+                    try {
+                        // Mark as syncing
+                        stateMutex.withLock {
+                            syncingCharts.add(chartDef.id)
+                        }
+                        emitProgress()
+
+                        // Download chart data
+                        downloadAndCacheChart(chartDef)
+
+                        // Mark as synced
+                        stateMutex.withLock {
+                            syncedCharts.add(chartDef.id)
+                        }
+                    } catch (e: Exception) {
+                        // Log error but continue with other charts
+                        println("Failed to sync chart '${chartDef.title}': ${e.message}")
+                        stateMutex.withLock {
+                            failedCharts.add(chartDef.id to (e.message ?: "Unknown error"))
+                        }
+                    } finally {
+                        // Remove from syncing and update progress
+                        stateMutex.withLock {
+                            syncingCharts.remove(chartDef.id)
+                            completedCount++
+                        }
+
+                        // Release semaphore permit
+                        semaphore.release()
+
+                        // Emit progress update
+                        emitProgress()
+                    }
+                }
+            }
+
+            // Wait for all downloads to complete
+            jobs.forEach { it.await() }
         }
 
         // Emit final progress with all results
-        emit(
+        val finalSnapshot = stateMutex.withLock {
             SyncProgress(
                 current = chartsNeedingUpdate.size,
                 total = chartsNeedingUpdate.size,
@@ -109,7 +167,8 @@ class ChartDataSynchronizer(
                 syncingChartIds = emptySet(),
                 failedCharts = failedCharts.toList()
             )
-        )
+        }
+        send(finalSnapshot)
     }
 
     /**

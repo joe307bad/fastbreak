@@ -21,7 +21,8 @@ import kotlinx.serialization.Serializable
 class RootComponent(
     componentContext: ComponentContext,
     private val themeRepository: ThemeRepository,
-    val registryContainer: RegistryContainer
+    val registryContainer: RegistryContainer,
+    private val chartDataRepository: com.joebad.fastbreak.data.repository.ChartDataRepository
 ) : ComponentContext by componentContext {
 
     private val navigation = StackNavigation<Config>()
@@ -58,16 +59,18 @@ class RootComponent(
             is Config.Home -> Child.Home(
                 HomeComponent(
                     componentContext = componentContext,
-                    onNavigateToDataViz = { sport, vizType ->
-                        navigation.push(Config.DataViz(sport, vizType))
+                    onNavigateToDataViz = { chartId, sport, vizType ->
+                        navigation.push(Config.DataViz(chartId, sport, vizType))
                     }
                 )
             )
             is Config.DataViz -> Child.DataViz(
                 DataVizComponent(
                     componentContext = componentContext,
+                    chartId = config.chartId,
                     sport = config.sport,
                     vizType = config.vizType,
+                    chartDataRepository = chartDataRepository,
                     onNavigateBack = { navigation.pop() }
                 )
             )
@@ -84,6 +87,6 @@ class RootComponent(
         data object Home : Config
 
         @Serializable
-        data class DataViz(val sport: Sport, val vizType: MockedDataApi.VizType) : Config
+        data class DataViz(val chartId: String, val sport: Sport, val vizType: MockedDataApi.VizType) : Config
     }
 }

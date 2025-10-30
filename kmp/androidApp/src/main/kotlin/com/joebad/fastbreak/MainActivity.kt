@@ -65,7 +65,8 @@ class MainActivity : ComponentActivity() {
         val rootComponent = RootComponent(
             componentContext = DefaultComponentContext(lifecycle = LifecycleRegistry()),
             themeRepository = themeRepository,
-            registryContainer = registryContainer
+            registryContainer = registryContainer,
+            chartDataRepository = chartDataRepository
         )
 
         setContent {

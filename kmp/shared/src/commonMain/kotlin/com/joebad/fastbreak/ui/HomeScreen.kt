@@ -14,6 +14,7 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import com.arkivanov.decompose.extensions.compose.subscribeAsState
@@ -395,13 +396,13 @@ private fun SyncProgressIndicator(
 
     // Determine card colors based on state
     val containerColor = when {
-        isComplete && !hasFailures -> MaterialTheme.colorScheme.tertiaryContainer // Green
+        isComplete && !hasFailures -> Color(0xFF1B5E20).copy(alpha = 0.2f) // Light green
         isComplete && hasFailures -> MaterialTheme.colorScheme.errorContainer // Red
         else -> MaterialTheme.colorScheme.primaryContainer // Blue
     }
 
     val contentColor = when {
-        isComplete && !hasFailures -> MaterialTheme.colorScheme.onTertiaryContainer
+        isComplete && !hasFailures -> Color(0xFF81C784) // Light green for visibility in dark mode
         isComplete && hasFailures -> MaterialTheme.colorScheme.onErrorContainer
         else -> MaterialTheme.colorScheme.onPrimaryContainer
     }

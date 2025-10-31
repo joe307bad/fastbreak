@@ -38,7 +38,7 @@
             "sport": "NFL",
             "title": "Team Efficiency Analysis",
             "subtitle": "Offensive vs Defensive Performance",
-            "lastUpdated": "2025-06-01T16:00:00Z",
+            "lastUpdated": "2025-12-02T16:00:00Z",
             "visualizationType": "SCATTER_PLOT",
             "url": "https://api.fastbreak.com/v1/charts/nfl/nfl-efficiency-scatter",
             "mockDataType": "scatter"

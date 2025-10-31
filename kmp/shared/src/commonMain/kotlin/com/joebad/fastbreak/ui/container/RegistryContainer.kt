@@ -101,7 +101,9 @@ class RegistryContainer(
                     state.copy(
                         registry = registry,
                         isLoading = false,
-                        diagnostics = loadDiagnostics()
+                        diagnostics = loadDiagnostics().copy(
+                            isSyncing = true  // Keep syncing state active for chart data sync
+                        )
                     )
                 }
 
@@ -123,6 +125,7 @@ class RegistryContainer(
                             registry = cachedRegistry,
                             isLoading = false,
                             diagnostics = loadDiagnostics().copy(
+                                isSyncing = true,  // Keep syncing state active for chart data sync
                                 failedSyncs = container.stateFlow.value.diagnostics.failedSyncs + 1,
                                 lastError = errorMsg
                             )
@@ -205,7 +208,9 @@ class RegistryContainer(
                 reduce {
                     state.copy(
                         registry = registry,
-                        diagnostics = loadDiagnostics()
+                        diagnostics = loadDiagnostics().copy(
+                            isSyncing = true  // Keep syncing state active for chart data sync
+                        )
                     )
                 }
 
@@ -230,6 +235,7 @@ class RegistryContainer(
                         state.copy(
                             registry = cachedRegistry,
                             diagnostics = loadDiagnostics().copy(
+                                isSyncing = true,  // Keep syncing state active for chart data sync
                                 failedSyncs = container.stateFlow.value.diagnostics.failedSyncs + 1,
                                 lastError = errorMsg
                             )
@@ -318,14 +324,14 @@ class RegistryContainer(
                 // Keep loading indicator visible for minimum 0.5 seconds after completion
                 delay(500)
 
-                // Now clear the loading state but keep syncProgress visible
+                // Update diagnostics but keep syncing state active
                 intent {
                     reduce {
                         state.copy(
-                            isSyncing = false,
+                            isSyncing = true,  // Keep true until we clear syncProgress
                             lastSyncTime = Clock.System.now(),
                             diagnostics = loadDiagnostics().copy(
-                                isSyncing = false,  // Explicitly set to false since loadDiagnostics() reads old state
+                                isSyncing = true,  // Keep true until we clear syncProgress
                                 lastError = if (progress.hasFailures) {
                                     "Failed to sync ${progress.failedCharts.size} charts"
                                 } else null,
@@ -338,11 +344,17 @@ class RegistryContainer(
                     postSideEffect(RegistrySideEffect.SyncCompleted)
                 }.join()
 
-                // Keep the completion message visible for 0.5 seconds, then clear syncProgress
+                // Keep the completion message visible for 0.5 seconds
                 delay(500)
+
+                // Now clear syncProgress and unlock buttons
                 intent {
                     reduce {
-                        state.copy(syncProgress = null)
+                        state.copy(
+                            syncProgress = null,
+                            isSyncing = false,
+                            diagnostics = state.diagnostics.copy(isSyncing = false)
+                        )
                     }
                 }.join()
             } else {

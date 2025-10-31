@@ -50,10 +50,10 @@ fun DrawerMenu(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Refresh button - disabled while syncing
+            // Refresh button - disabled while syncing, but enabled if there's an error
             OutlinedButton(
                 onClick = onRefreshRegistry,
-                enabled = !diagnostics.isSyncing,
+                enabled = !diagnostics.isSyncing || diagnostics.lastError != null,
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text(

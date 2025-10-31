@@ -24,7 +24,7 @@ class RegistryManager(
 
     /**
      * Checks if the registry needs updating (>12 hours old or missing) and updates if needed.
-     * Falls back to cached registry on network errors.
+     * Throws an exception on network errors (Container handles fallback to cache).
      *
      * @return Result containing the registry (either fresh or cached) or an error
      */
@@ -50,16 +50,9 @@ class RegistryManager(
 
                 registry
             } catch (e: Exception) {
-                // Network or API error - fall back to cached registry
-                val cachedRegistry = registryRepository.getRegistry()
-                if (cachedRegistry != null) {
-                    // Return cached data but log the error
-                    println("Failed to fetch registry, using cached version: ${e.message}")
-                    cachedRegistry
-                } else {
-                    // No cached data available - throw error
-                    throw Exception("Failed to fetch registry and no cached data available", e)
-                }
+                // Network or API error - rethrow so Container can show error and handle fallback
+                println("Failed to fetch registry: ${e.message}")
+                throw e
             }
         } else {
             // Return cached registry (not stale yet)
@@ -76,7 +69,7 @@ class RegistryManager(
 
     /**
      * Forces a registry refresh regardless of when it was last updated.
-     * Falls back to cached registry on network errors.
+     * Throws an exception on network errors (Container handles fallback to cache).
      *
      * @return Result containing the fresh registry or an error
      */
@@ -103,20 +96,11 @@ class RegistryManager(
 
             registry
         } catch (e: Exception) {
-            // Network or API error - fall back to cached registry if available
+            // Network or API error - rethrow so Container can show error and handle fallback
             println("❌ API call FAILED with exception: ${e.message}")
             println("   Exception type: ${e::class.simpleName}")
             println("   Stack trace: ${e.stackTraceToString()}")
-
-            val cachedRegistry = registryRepository.getRegistry()
-            if (cachedRegistry != null) {
-                println("📦 Found cached registry with ${cachedRegistry.charts.size} charts")
-                println("✓ Returning cached registry as fallback")
-                cachedRegistry  // Return cached registry instead of throwing
-            } else {
-                println("❌ No cached registry available - throwing exception")
-                throw Exception("Failed to refresh registry and no cached data available", e)
-            }
+            throw e
         }
     }
 

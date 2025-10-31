@@ -28,6 +28,20 @@ class RegistryContainer(
     override val container: Container<RegistryState, RegistrySideEffect> =
         scope.container(RegistryState())
 
+    init {
+        // Load initial diagnostics from cache without making network requests
+        intent {
+            val cachedRegistry = registryManager.getCachedRegistry()
+            reduce {
+                state.copy(registry = cachedRegistry)
+            }
+            // Now that registry is in state, load diagnostics
+            reduce {
+                state.copy(diagnostics = loadDiagnostics())
+            }
+        }
+    }
+
     // Note: We don't auto-load in init to avoid triggering network requests
     // before iOS local network permission is granted. Call loadRegistry()
     // explicitly when ready (e.g., when HomeScreen first displays).
@@ -69,7 +83,17 @@ class RegistryContainer(
      * Also triggers chart data synchronization after loading.
      */
     fun loadRegistry() = intent {
-        reduce { state.copy(isLoading = true, error = null, syncProgress = null) }
+        reduce {
+            state.copy(
+                isLoading = true,
+                error = null,
+                syncProgress = null,
+                diagnostics = state.diagnostics.copy(
+                    lastError = null,
+                    isSyncing = true
+                )
+            )
+        }
 
         registryManager.checkAndUpdateRegistry()
             .onSuccess { registry ->
@@ -88,19 +112,45 @@ class RegistryContainer(
                 val errorMsg = error.message ?: "Unknown error"
                 println("LoadRegistry failed with error: $errorMsg")
 
-                val diagnostics = container.stateFlow.value.diagnostics.copy(
-                    failedSyncs = container.stateFlow.value.diagnostics.failedSyncs + 1,
-                    lastError = errorMsg
-                )
+                // Try to fall back to cached registry
+                val cachedRegistry = registryManager.getCachedRegistry()
 
-                reduce {
-                    state.copy(
-                        isLoading = false,
-                        error = errorMsg,
-                        diagnostics = diagnostics
+                if (cachedRegistry != null) {
+                    println("📦 Falling back to cached registry with ${cachedRegistry.charts.size} charts")
+
+                    reduce {
+                        state.copy(
+                            registry = cachedRegistry,
+                            isLoading = false,
+                            diagnostics = loadDiagnostics().copy(
+                                failedSyncs = container.stateFlow.value.diagnostics.failedSyncs + 1,
+                                lastError = errorMsg
+                            )
+                        )
+                    }
+
+                    // Show error toast even though we have cached data
+                    postSideEffect(RegistrySideEffect.ShowError(errorMsg))
+
+                    // Continue with chart data sync using cached registry
+                    syncChartData()
+                } else {
+                    println("❌ No cached registry available")
+
+                    val diagnostics = container.stateFlow.value.diagnostics.copy(
+                        failedSyncs = container.stateFlow.value.diagnostics.failedSyncs + 1,
+                        lastError = errorMsg
                     )
+
+                    reduce {
+                        state.copy(
+                            isLoading = false,
+                            error = errorMsg,
+                            diagnostics = diagnostics
+                        )
+                    }
+                    postSideEffect(RegistrySideEffect.ShowError(errorMsg))
                 }
-                postSideEffect(RegistrySideEffect.ShowError(errorMsg))
             }
     }
 
@@ -120,8 +170,25 @@ class RegistryContainer(
             return@intent
         }
 
-        println("✓ Setting isSyncing = true")
-        reduce { state.copy(isSyncing = true, error = null, syncProgress = null) }
+        println("✓ Setting isSyncing = true and showing initial sync progress")
+        reduce {
+            state.copy(
+                isSyncing = true,
+                error = null,
+                syncProgress = com.joebad.fastbreak.ui.diagnostics.SyncProgress(
+                    current = 0,
+                    total = 1,
+                    currentChart = "Preparing to sync...",
+                    syncedChartIds = emptySet(),
+                    syncingChartIds = emptySet(),
+                    failedCharts = emptyList()
+                ),
+                diagnostics = state.diagnostics.copy(
+                    lastError = null,
+                    isSyncing = true
+                )
+            )
+        }
 
         // Show loading indicator for minimum 0.5 seconds before starting
         println("⏳ Waiting 500ms before starting refresh...")
@@ -153,27 +220,55 @@ class RegistryContainer(
                 println("❌ forceRefreshRegistry() FAILED with error: $errorMsg")
                 println("Stack trace: ${error?.stackTraceToString()}")
 
-                val diagnostics = container.stateFlow.value.diagnostics.copy(
-                    failedSyncs = container.stateFlow.value.diagnostics.failedSyncs + 1,
-                    lastError = errorMsg
-                )
+                // Try to fall back to cached registry
+                val cachedRegistry = registryManager.getCachedRegistry()
 
-                // Keep loading indicator visible for 0.5s even on error
-                println("⏳ Waiting 500ms before hiding loading indicator...")
-                delay(500)
+                if (cachedRegistry != null) {
+                    println("📦 Falling back to cached registry with ${cachedRegistry.charts.size} charts")
 
-                println("✓ Setting error state and isSyncing = false")
-                reduce {
-                    state.copy(
-                        isSyncing = false,
-                        error = errorMsg,
-                        diagnostics = diagnostics
+                    reduce {
+                        state.copy(
+                            registry = cachedRegistry,
+                            diagnostics = loadDiagnostics().copy(
+                                failedSyncs = container.stateFlow.value.diagnostics.failedSyncs + 1,
+                                lastError = errorMsg
+                            )
+                        )
+                    }
+
+                    // Show error toast even though we have cached data
+                    postSideEffect(RegistrySideEffect.ShowError(errorMsg))
+
+                    // Continue with chart data sync using cached registry
+                    println("📊 Starting chart data synchronization with cached registry...")
+                    syncChartData()
+                    println("✅ Chart synchronization complete")
+                } else {
+                    println("❌ No cached registry available")
+
+                    val diagnostics = container.stateFlow.value.diagnostics.copy(
+                        failedSyncs = container.stateFlow.value.diagnostics.failedSyncs + 1,
+                        lastError = errorMsg
                     )
+
+                    // Keep loading indicator visible for 0.5s even on error
+                    println("⏳ Waiting 500ms before hiding loading indicator...")
+                    delay(500)
+
+                    println("✓ Setting error state and isSyncing = false")
+                    reduce {
+                        state.copy(
+                            isSyncing = false,
+                            syncProgress = null,
+                            error = errorMsg,
+                            diagnostics = diagnostics
+                        )
+                    }
+                    postSideEffect(RegistrySideEffect.ShowError(errorMsg))
+                    println("═══════════════════════════════════════════════════════")
+                    println("❌ REFRESH FLOW COMPLETE (WITH ERROR)")
+                    println("═══════════════════════════════════════════════════════")
                 }
-                postSideEffect(RegistrySideEffect.ShowError(errorMsg))
-                println("═══════════════════════════════════════════════════════")
-                println("❌ REFRESH FLOW COMPLETE (WITH ERROR)")
-                println("═══════════════════════════════════════════════════════")
             }
         }
     }
@@ -190,6 +285,24 @@ class RegistryContainer(
         val registry = container.stateFlow.value.registry ?: return
 
         chartDataSynchronizer.synchronizeCharts(registry).collect { progress ->
+            // Skip showing progress if nothing needs syncing (everything cached)
+            if (progress.total == 0) {
+                // Everything is already cached, no need to show sync progress
+                intent {
+                    reduce {
+                        state.copy(
+                            isSyncing = false,
+                            lastSyncTime = Clock.System.now(),
+                            syncProgress = null,
+                            diagnostics = loadDiagnostics().copy(
+                                isSyncing = false  // Explicitly set to false
+                            )
+                        )
+                    }
+                }.join()
+                return@collect
+            }
+
             // When complete, keep loading visible for 0.5s before hiding
             if (progress.isComplete) {
                 // Update progress but keep syncing state

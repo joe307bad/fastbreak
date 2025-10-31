@@ -38,7 +38,7 @@
             "sport": "NFL",
             "title": "Team Efficiency Analysis",
             "subtitle": "Offensive vs Defensive Performance",
-            "lastUpdated": "2025-04-01T16:00:00Z",
+            "lastUpdated": "2025-06-01T16:00:00Z",
             "visualizationType": "SCATTER_PLOT",
             "url": "https://api.fastbreak.com/v1/charts/nfl/nfl-efficiency-scatter",
             "mockDataType": "scatter"
@@ -224,7 +224,7 @@
           { "label": "Cowboys", "x": 27.5, "y": 22.1, "sum": 49.6 },
           { "label": "Lions", "x": 28.1, "y": 23.5, "sum": 51.6 },
           { "label": "Dolphins", "x": 29.5, "y": 24.2, "sum": 53.7 },
-          { "label": "another!!!!", "x": 25.8, "y": 23.9, "sum": 49.7 },
+          { "label": "update over herewefepo!!!!", "x": 25.8, "y": 23.9, "sum": 49.7 },
           { "label": "Jaguars", "x": 24.2, "y": 25.1, "sum": 49.3 },
           { "label": "Browns", "x": 22.5, "y": 20.8, "sum": 43.3 },
           { "label": "Steelers", "x": 23.1, "y": 19.5, "sum": 42.6 },

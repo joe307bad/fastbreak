@@ -53,6 +53,7 @@ fun App(rootComponent: RootComponent) {
                     is RootComponent.Child.Home -> HomeScreen(
                         component = child.component,
                         registryState = registryState,
+                        registryContainer = rootComponent.registryContainer,
                         onRefresh = { rootComponent.refreshRegistry() },
                         onMenuClick = { scope.launch { drawerState.open() } },
                         onInitialLoad = { rootComponent.loadRegistry() },

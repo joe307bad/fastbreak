@@ -41,7 +41,17 @@ class MockRegistryApi(
             println("❌ HTTP request FAILED")
             println("   Error: ${e.message}")
             println("   Exception type: ${e::class.simpleName}")
-            throw e
+
+            // Create a detailed error message including the endpoint
+            val errorMessage = buildString {
+                append("Network request failed\n")
+                append("Endpoint: $REGISTRY_ENDPOINT\n")
+                if (e.message != null) {
+                    append("Error: ${e.message}")
+                }
+            }
+
+            throw Exception(errorMessage, e)
         }
     }
 }

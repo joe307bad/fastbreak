@@ -26,6 +26,7 @@ import com.joebad.fastbreak.ui.container.RegistryState
 fun HomeScreen(
     component: HomeComponent,
     registryState: RegistryState,
+    registryContainer: com.joebad.fastbreak.ui.container.RegistryContainer,
     onRefresh: () -> Unit,
     onMenuClick: () -> Unit = {},
     onInitialLoad: () -> Unit,
@@ -66,18 +67,45 @@ fun HomeScreen(
     // Snackbar for errors
     val snackbarHostState = remember { SnackbarHostState() }
 
-    // Show error snackbar when there's an error
-    LaunchedEffect(registryState.error) {
-        registryState.error?.let { error ->
-            snackbarHostState.showSnackbar(
-                message = error,
-                duration = SnackbarDuration.Short
-            )
+    // Observe side effects from the container
+    LaunchedEffect(Unit) {
+        registryContainer.container.sideEffectFlow.collect { sideEffect ->
+            when (sideEffect) {
+                is com.joebad.fastbreak.ui.container.RegistrySideEffect.ShowError -> {
+                    // Truncate error message to 100 characters
+                    val truncatedMessage = if (sideEffect.message.length > 100) {
+                        sideEffect.message.take(100) + "..."
+                    } else {
+                        sideEffect.message
+                    }
+
+                    snackbarHostState.showSnackbar(
+                        message = truncatedMessage,
+                        actionLabel = "Dismiss",
+                        duration = SnackbarDuration.Indefinite
+                    )
+                }
+                is com.joebad.fastbreak.ui.container.RegistrySideEffect.SyncCompleted -> {
+                    // Optional: Show success message
+                }
+                is com.joebad.fastbreak.ui.container.RegistrySideEffect.NavigateToChart -> {
+                    // Handle navigation if needed
+                }
+            }
         }
     }
 
     Scaffold(
-        snackbarHost = { SnackbarHost(snackbarHostState) },
+        snackbarHost = {
+            SnackbarHost(snackbarHostState) { data ->
+                Snackbar(
+                    snackbarData = data,
+                    containerColor = MaterialTheme.colorScheme.errorContainer,
+                    contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                    actionColor = MaterialTheme.colorScheme.error
+                )
+            }
+        },
         topBar = {
             TopAppBar(
                 title = { Text("fastbreak") },
@@ -257,7 +285,8 @@ fun HomeScreen(
                     ) {
                         // Sync progress indicator at the top
                         // Show during sync OR when complete (until cleared after 3 seconds)
-                        if (registryState.syncProgress != null) {
+                        // Don't show if total = 0 (nothing to sync, everything is cached)
+                        if (registryState.syncProgress != null && registryState.syncProgress.total > 0) {
                             item {
                                 SyncProgressIndicator(
                                     progress = registryState.syncProgress
@@ -428,7 +457,8 @@ private fun SyncProgressIndicator(
                 }
 
                 // Only show counter if there are charts to sync (total > 0)
-                if (progress.total > 0) {
+                // Don't show counter in initial "preparing" state
+                if (progress.total > 0 && !(progress.current == 0 && progress.total == 1)) {
                     Text(
                         text = "${progress.current}/${progress.total}",
                         style = MaterialTheme.typography.labelSmall,

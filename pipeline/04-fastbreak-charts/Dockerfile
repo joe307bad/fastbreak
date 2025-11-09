@@ -1,4 +1,4 @@
-FROM --platform=linux/arm64 rocker/r-base:latest
+FROM rocker/r-base:latest
 
 # Install cron and system dependencies for R packages
 RUN apt-get update && \
@@ -9,6 +9,11 @@ RUN apt-get update && \
     libxml2-dev \
     && apt-get clean && \
     rm -rf /var/lib/apt/lists/*
+
+# Install R packages using Posit PPM for faster binary installs
+RUN R -e "options(repos = c(CRAN = 'https://packagemanager.posit.co/cran/latest')); \
+    install.packages(c('jsonlite', 'dplyr', 'nflfastR')); \
+    if (!require('nflfastR')) stop('nflfastR installation failed')"
 
 # Create app directory and output directory
 WORKDIR /app

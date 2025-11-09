@@ -5,7 +5,7 @@ docker stop fastbreak-charts 2>/dev/null
 docker rm fastbreak-charts 2>/dev/null
 
 echo "Building new image..."
-docker build --platform=linux/arm64 -t fastbreak-charts .
+docker build -t fastbreak-charts .
 
 echo "Running new container..."
 docker run -d \

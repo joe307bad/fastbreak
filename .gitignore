@@ -16,3 +16,5 @@ sentry.properties
 pipeline/**/*.csv
 pipeline/**/*.png
 pipeline/**/*.json
+
+server/nginx/static/*.json

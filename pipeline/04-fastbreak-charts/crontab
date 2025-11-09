@@ -1,0 +1,7 @@
+# Run daily scripts every day at midnight
+0 0 * * * /usr/bin/find /app/daily -name "*.R" -exec /usr/bin/Rscript {} \; >> /var/log/cron.log 2>&1
+
+# Run weekly scripts every Sunday at midnight
+0 0 * * 0 /usr/bin/find /app/weekly -name "*.R" -exec /usr/bin/Rscript {} \; >> /var/log/cron.log 2>&1
+
+# Empty line required at end of file

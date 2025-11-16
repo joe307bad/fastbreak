@@ -108,7 +108,22 @@ class RegistryContainer(
                 }
 
                 // Sync chart data after loading registry (await completion)
-                syncChartData()
+                try {
+                    syncChartData()
+                } catch (e: Exception) {
+                    println("❌ Chart synchronization failed: ${e.message}")
+                    // Ensure isSyncing is cleared even on exception
+                    reduce {
+                        state.copy(
+                            isSyncing = false,
+                            syncProgress = null,
+                            diagnostics = state.diagnostics.copy(
+                                isSyncing = false,
+                                lastError = "Chart sync failed: ${e.message}"
+                            )
+                        )
+                    }
+                }
             }
             .onFailure { error ->
                 val errorMsg = error.message ?: "Unknown error"
@@ -136,11 +151,27 @@ class RegistryContainer(
                     postSideEffect(RegistrySideEffect.ShowError(errorMsg))
 
                     // Continue with chart data sync using cached registry
-                    syncChartData()
+                    try {
+                        syncChartData()
+                    } catch (e: Exception) {
+                        println("❌ Chart synchronization failed: ${e.message}")
+                        // Ensure isSyncing is cleared even on exception
+                        reduce {
+                            state.copy(
+                                isSyncing = false,
+                                syncProgress = null,
+                                diagnostics = state.diagnostics.copy(
+                                    isSyncing = false,
+                                    lastError = "Chart sync failed: ${e.message}"
+                                )
+                            )
+                        }
+                    }
                 } else {
                     println("❌ No cached registry available")
 
                     val diagnostics = container.stateFlow.value.diagnostics.copy(
+                        isSyncing = false,
                         failedSyncs = container.stateFlow.value.diagnostics.failedSyncs + 1,
                         lastError = errorMsg
                     )
@@ -216,8 +247,23 @@ class RegistryContainer(
 
                 println("📊 Starting chart data synchronization...")
                 // Sync chart data after refresh (await completion)
-                syncChartData()
-                println("✅ Chart synchronization complete")
+                try {
+                    syncChartData()
+                    println("✅ Chart synchronization complete")
+                } catch (e: Exception) {
+                    println("❌ Chart synchronization failed: ${e.message}")
+                    // Ensure isSyncing is cleared even on exception
+                    reduce {
+                        state.copy(
+                            isSyncing = false,
+                            syncProgress = null,
+                            diagnostics = state.diagnostics.copy(
+                                isSyncing = false,
+                                lastError = "Chart sync failed: ${e.message}"
+                            )
+                        )
+                    }
+                }
             }
             refreshResult.isFailure -> {
                 val error = refreshResult.exceptionOrNull()
@@ -247,12 +293,28 @@ class RegistryContainer(
 
                     // Continue with chart data sync using cached registry
                     println("📊 Starting chart data synchronization with cached registry...")
-                    syncChartData()
-                    println("✅ Chart synchronization complete")
+                    try {
+                        syncChartData()
+                        println("✅ Chart synchronization complete")
+                    } catch (e: Exception) {
+                        println("❌ Chart synchronization failed: ${e.message}")
+                        // Ensure isSyncing is cleared even on exception
+                        reduce {
+                            state.copy(
+                                isSyncing = false,
+                                syncProgress = null,
+                                diagnostics = state.diagnostics.copy(
+                                    isSyncing = false,
+                                    lastError = "Chart sync failed: ${e.message}"
+                                )
+                            )
+                        }
+                    }
                 } else {
                     println("❌ No cached registry available")
 
                     val diagnostics = container.stateFlow.value.diagnostics.copy(
+                        isSyncing = false,
                         failedSyncs = container.stateFlow.value.diagnostics.failedSyncs + 1,
                         lastError = errorMsg
                     )
@@ -290,7 +352,8 @@ class RegistryContainer(
     private suspend fun syncChartData() {
         val registry = container.stateFlow.value.registry ?: return
 
-        chartDataSynchronizer.synchronizeCharts(registry).collect { progress ->
+        try {
+            chartDataSynchronizer.synchronizeCharts(registry).collect { progress ->
             // Skip showing progress if nothing needs syncing (everything cached)
             if (progress.total == 0) {
                 // Everything is already cached, no need to show sync progress
@@ -368,6 +431,23 @@ class RegistryContainer(
                     }
                 }.join()
             }
+        }
+        } catch (e: Exception) {
+            println("❌ syncChartData() - Exception during flow collection: ${e.message}")
+            e.printStackTrace()
+            // Ensure isSyncing is cleared even on exception
+            intent {
+                reduce {
+                    state.copy(
+                        isSyncing = false,
+                        syncProgress = null,
+                        diagnostics = state.diagnostics.copy(
+                            isSyncing = false,
+                            lastError = "Sync error: ${e.message}"
+                        )
+                    )
+                }
+            }.join()
         }
     }
 

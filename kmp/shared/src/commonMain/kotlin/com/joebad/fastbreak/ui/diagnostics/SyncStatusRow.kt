@@ -37,9 +37,10 @@ fun SyncStatusRow(
                 .size(8.dp)
                 .background(
                     color = when {
-                        diagnostics.lastError != null -> Color.Red
-                        diagnostics.isStale -> Color(0xFFFFAA00) // Amber
-                        else -> Color.Green
+                        diagnostics.isSyncing -> Color(0xFF2196F3) // Blue
+                        diagnostics.lastError != null -> Color(0xFFF44336) // Red
+                        diagnostics.isStale -> Color(0xFFFFAA00) // Amber/Yellow
+                        else -> Color(0xFF4CAF50) // Green
                     },
                     shape = CircleShape
                 )
@@ -50,9 +51,9 @@ fun SyncStatusRow(
         // Status text
         Text(
             text = when {
+                diagnostics.isSyncing -> "Syncing..."
                 diagnostics.lastError != null -> "Error"
                 diagnostics.isStale -> "Stale"
-                diagnostics.isSyncing -> "Syncing..."
                 else -> "Up to date"
             },
             style = MaterialTheme.typography.bodySmall,

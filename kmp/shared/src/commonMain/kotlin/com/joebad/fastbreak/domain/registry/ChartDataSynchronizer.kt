@@ -224,17 +224,14 @@ class ChartDataSynchronizer(
      * @throws Exception if download or caching fails
      */
     private suspend fun downloadAndCacheChart(chartDef: ChartDefinition) {
-        // Convert the URL to use 192.168.50.128:1080 for the mock server
-        val mockServerUrl = chartDef.url.replace(
-            "https://api.fastbreak.com",
-            "http://192.168.50.128:1080/api"
-        )
+        // Use localhost:8080 base URL with the relative path from the chart definition
+        val chartDataUrl = "http://localhost:8080${chartDef.url}"
 
-        // Fetch chart data from mock server based on visualization type
+        // Fetch chart data from server based on visualization type
         val vizData = when (chartDef.visualizationType) {
-            VizType.SCATTER_PLOT -> httpClient.get(mockServerUrl).body<ScatterPlotVisualization>()
-            VizType.BAR_GRAPH -> httpClient.get(mockServerUrl).body<BarGraphVisualization>()
-            VizType.LINE_CHART -> httpClient.get(mockServerUrl).body<LineChartVisualization>()
+            VizType.SCATTER_PLOT -> httpClient.get(chartDataUrl).body<ScatterPlotVisualization>()
+            VizType.BAR_GRAPH -> httpClient.get(chartDataUrl).body<BarGraphVisualization>()
+            VizType.LINE_CHART -> httpClient.get(chartDataUrl).body<LineChartVisualization>()
         }
 
         // Serialize visualization data based on type

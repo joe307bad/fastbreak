@@ -17,11 +17,12 @@ RUN R -e "options(repos = c(CRAN = 'https://packagemanager.posit.co/cran/latest'
 
 # Create app directory and output directory
 WORKDIR /app
-RUN mkdir -p /app/output
+RUN mkdir -p /app/output /app/weekly /app/daily /app/data
 
-# Copy R scripts
-COPY weekly /app/weekly
-COPY daily /app/daily
+# Scripts will be mounted as volumes at runtime
+
+# Copy registry and static files to data directory
+COPY registry.json /app/data/registry.json
 
 # Copy cron configuration and startup script
 COPY crontab /etc/cron.d/r-cron

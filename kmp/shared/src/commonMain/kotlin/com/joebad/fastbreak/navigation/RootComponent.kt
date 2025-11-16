@@ -104,6 +104,7 @@ class RootComponent(
                     sport = config.sport,
                     vizType = config.vizType,
                     chartDataRepository = chartDataRepository,
+                    registryContainer = registryContainer,
                     onNavigateBack = { navigation.pop() }
                 )
             )

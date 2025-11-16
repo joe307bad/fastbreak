@@ -55,6 +55,22 @@ class ChartDataContainer(
             return@intent
         }
 
+        // Check if this chart failed during synchronization
+        val syncProgress = registryContainer.container.stateFlow.value.syncProgress
+        val failedChart = syncProgress?.failedCharts?.find { it.first == chartId }
+        if (failedChart != null) {
+            val (_, errorMessage) = failedChart
+            reduce {
+                state.copy(
+                    chartDefinition = chartDef,
+                    isLoading = false,
+                    error = "Failed to sync chart data: $errorMessage"
+                )
+            }
+            postSideEffect(ChartDataSideEffect.ShowError("Sync failed: $errorMessage"))
+            return@intent
+        }
+
         // Try to load from cache
         val cached = chartDataSynchronizer.getCachedChartData(chartId)
         if (cached != null) {
@@ -82,6 +98,7 @@ class ChartDataContainer(
             } catch (e: Exception) {
                 reduce {
                     state.copy(
+                        chartDefinition = chartDef,
                         isLoading = false,
                         error = "Failed to load chart data: ${e.message}"
                     )

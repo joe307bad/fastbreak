@@ -40,10 +40,31 @@ team_list <- team_epa %>%
   ))) %>%
   pull(team_data)
 
+# Create output object with metadata
+output_data <- list(
+  title = paste("NFL Team Tier List - Week", most_recent_week),
+  description = "Expected Points Added (EPA) measures the value of each play by comparing the expected points before and after the play. Offensive EPA per play shows how many points a team adds per offensive play on average, while defensive EPA per play (where lower is better) shows how many points a team allows per defensive play. Teams in the top-right quadrant have strong offenses and defenses, making them the most dominant teams.",
+  xAxisLabel = "Offensive EPA per Play",
+  yAxisLabel = "Defensive EPA per Play",
+  data = team_list
+)
+
 # Write JSON output
-output_dir <- if (dir.exists("/app/output")) "/app/output" else "output"
-output_file <- file.path(output_dir, paste0("nfl__team_tier_list__", most_recent_week, ".json"))
-write_json(team_list, output_file, pretty = TRUE, auto_unbox = TRUE)
+output_dir <- if (dir.exists("/app/output")) {
+  "/app/output"
+} else if (dir.exists("../../../server/nginx/static")) {
+  "../../../server/nginx/static"
+} else {
+  "output"
+}
+
+# Create output directory if it doesn't exist
+if (!dir.exists(output_dir)) {
+  dir.create(output_dir, recursive = TRUE)
+}
+
+output_file <- file.path(output_dir, paste0("nfl__team_tier_list.json"))
+write_json(output_data, output_file, pretty = TRUE, auto_unbox = TRUE)
 
 cat("NFL team EPA data generated:", output_file, "\n")
 cat("Total teams:", length(team_list), "\n")

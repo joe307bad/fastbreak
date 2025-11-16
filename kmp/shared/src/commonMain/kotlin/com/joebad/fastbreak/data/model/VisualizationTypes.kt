@@ -42,6 +42,8 @@ data class ScatterPlotVisualization(
     override val subtitle: String,
     override val description: String,
     override val lastUpdated: Instant,
+    val xAxisLabel: String,
+    val yAxisLabel: String,
     val dataPoints: List<ScatterPlotDataPoint>
 ) : VisualizationType
 

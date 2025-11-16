@@ -15,6 +15,10 @@ sentry.properties
 .fake
 pipeline/**/*.csv
 pipeline/**/*.png
-pipeline/**/*.json
+pipeline/**/d3-charts/*.json
+pipeline/**/data/*.json
+pipeline/**/output/*.json
+pipeline/**/weekly/*.json
+pipeline/**/daily/*.json
 
 server/nginx/static/*.json

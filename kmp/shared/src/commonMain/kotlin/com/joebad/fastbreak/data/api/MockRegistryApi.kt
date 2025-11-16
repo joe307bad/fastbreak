@@ -6,15 +6,15 @@ import io.ktor.client.call.*
 import io.ktor.client.request.*
 
 /**
- * API for fetching registry data from the mock server.
- * Fetches data from http://192.168.50.128:1080/api/v1/registry
+ * API for fetching registry data from the server.
+ * Fetches data from http://localhost:8080/registry.json (debug)
  */
 class MockRegistryApi(
     private val httpClient: HttpClient = HttpClientFactory.create()
 ) {
     companion object {
-        private const val BASE_URL = "http://192.168.50.128:1080"
-        private const val REGISTRY_ENDPOINT = "/api/v1/registry"
+        private const val BASE_URL = "http://localhost:8080"
+        private const val REGISTRY_ENDPOINT = "/registry.json"
     }
 
     /**

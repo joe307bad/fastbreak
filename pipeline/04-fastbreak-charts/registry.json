@@ -1,0 +1,15 @@
+{
+  "version": "1.0",
+  "lastUpdated": "2025-01-30T18:00:00Z",
+  "charts": [
+    {
+      "id": "nfl-team-tier-list",
+      "sport": "NFL",
+      "title": "NFL Team Tier List",
+      "subtitle": "Offensive vs Defensive EPA Analysis",
+      "lastUpdated": "2025-01-30T18:00:00Z",
+      "visualizationType": "SCATTER_PLOT",
+      "url": "/nfl__team_tier_list.json"
+    }
+  ]
+}

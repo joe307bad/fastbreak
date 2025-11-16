@@ -51,6 +51,8 @@ class MockedDataApi {
             subtitle = "${sport.name} 2024 Season",
             description = "Performance comparison: $xLabel vs $yLabel",
             lastUpdated = Clock.System.now(),
+            xAxisLabel = xLabel,
+            yAxisLabel = yLabel,
             dataPoints = dataPoints
         )
     }

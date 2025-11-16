@@ -26,9 +26,21 @@ fun DataVizScreen(
     var state by remember { mutableStateOf<DataVizState>(DataVizState.Loading) }
     val scope = rememberCoroutineScope()
 
+    // Observe registry state for sync failures
+    val registryState by component.registryContainer.container.stateFlow.collectAsState()
+
     // Load cached data when component is first displayed
     LaunchedEffect(component.chartId) {
         try {
+            // First check if this chart failed during synchronization
+            val syncProgress = registryState.syncProgress
+            val failedChart = syncProgress?.failedCharts?.find { it.first == component.chartId }
+            if (failedChart != null) {
+                val (_, errorMessage) = failedChart
+                state = DataVizState.Error("Failed to sync chart data: $errorMessage")
+                return@LaunchedEffect
+            }
+
             // Load from cache using chartId
             val cachedData = component.chartDataRepository.getChartData(component.chartId)
             if (cachedData != null) {
@@ -36,15 +48,8 @@ fun DataVizScreen(
                 val visualization = cachedData.deserialize()
                 state = DataVizState.Success(visualization)
             } else {
-                // Fallback: data not cached yet, fetch from API
-                val apiSport = when (component.sport) {
-                    Sport.NFL -> MockedDataApi.Sport.NFL
-                    Sport.NBA -> MockedDataApi.Sport.NBA
-                    Sport.MLB -> MockedDataApi.Sport.MLB
-                    Sport.NHL -> MockedDataApi.Sport.NHL
-                }
-                val data = component.api.fetchVisualizationData(apiSport, component.vizType)
-                state = DataVizState.Success(data)
+                // No cached data available
+                state = DataVizState.Error("Chart data not available. Please refresh from the home screen.")
             }
         } catch (e: Exception) {
             state = DataVizState.Error(e.message ?: "Unknown error")

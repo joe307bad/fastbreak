@@ -19,6 +19,8 @@ docker build -t fastbreak-charts .
 ```bash
 docker run -d \
   -v /Users/joebad/Source/fastbreak/server/nginx/static:/app/output \
+  -v /Users/joebad/Source/fastbreak/pipeline/04-fastbreak-charts/weekly:/app/weekly \
+  -v /Users/joebad/Source/fastbreak/pipeline/04-fastbreak-charts/daily:/app/daily \
   --name fastbreak-charts \
   fastbreak-charts
 ```

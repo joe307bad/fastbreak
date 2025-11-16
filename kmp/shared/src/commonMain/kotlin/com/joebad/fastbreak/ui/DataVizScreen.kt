@@ -16,6 +16,7 @@ import com.joebad.fastbreak.data.api.MockedDataApi
 import com.joebad.fastbreak.data.model.*
 import com.joebad.fastbreak.navigation.DataVizComponent
 import com.joebad.fastbreak.ui.visualizations.*
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 @Composable
@@ -24,13 +25,16 @@ fun DataVizScreen(
     onMenuClick: () -> Unit = {}
 ) {
     var state by remember { mutableStateOf<DataVizState>(DataVizState.Loading) }
+    var refreshTrigger by remember { mutableStateOf(0) }
     val scope = rememberCoroutineScope()
 
     // Observe registry state for sync failures
     val registryState by component.registryContainer.container.stateFlow.collectAsState()
 
-    // Load cached data when component is first displayed
-    LaunchedEffect(component.chartId) {
+    // Load cached data when component is first displayed or when refresh is triggered
+    LaunchedEffect(component.chartId, refreshTrigger) {
+        state = DataVizState.Loading
+
         try {
             // First check if this chart failed during synchronization
             val syncProgress = registryState.syncProgress
@@ -49,7 +53,7 @@ fun DataVizScreen(
                 state = DataVizState.Success(visualization)
             } else {
                 // No cached data available
-                state = DataVizState.Error("Chart data not available. Please refresh from the home screen.")
+                state = DataVizState.Error("Chart data not available. Please refresh.")
             }
         } catch (e: Exception) {
             state = DataVizState.Error(e.message ?: "Unknown error")
@@ -107,16 +111,38 @@ fun DataVizScreen(
                     message = currentState.message,
                     onRetry = {
                         scope.launch {
+                            // Show loading state immediately
                             state = DataVizState.Loading
+
+                            // Trigger a registry refresh which will re-sync the chart data
+                            component.registryContainer.refreshRegistry()
+
+                            // Wait for the sync to actually start (isSyncing becomes true)
+                            component.registryContainer.container.stateFlow
+                                .first { it.isSyncing }
+
+                            // Now wait for sync to complete (isSyncing becomes false again)
+                            component.registryContainer.container.stateFlow
+                                .first { !it.isSyncing }
+
+                            // Reload the chart data manually (same logic as LaunchedEffect)
                             try {
-                                val apiSport = when (component.sport) {
-                                    Sport.NFL -> MockedDataApi.Sport.NFL
-                                    Sport.NBA -> MockedDataApi.Sport.NBA
-                                    Sport.MLB -> MockedDataApi.Sport.MLB
-                                    Sport.NHL -> MockedDataApi.Sport.NHL
+                                val currentRegistryState = component.registryContainer.container.stateFlow.value
+                                val syncProgress = currentRegistryState.syncProgress
+                                val failedChart = syncProgress?.failedCharts?.find { it.first == component.chartId }
+                                if (failedChart != null) {
+                                    val (_, errorMessage) = failedChart
+                                    state = DataVizState.Error("Failed to sync chart data: $errorMessage")
+                                    return@launch
                                 }
-                                val data = component.api.fetchVisualizationData(apiSport, component.vizType)
-                                state = DataVizState.Success(data)
+
+                                val cachedData = component.chartDataRepository.getChartData(component.chartId)
+                                if (cachedData != null) {
+                                    val visualization = cachedData.deserialize()
+                                    state = DataVizState.Success(visualization)
+                                } else {
+                                    state = DataVizState.Error("Chart data not available. Please refresh.")
+                                }
                             } catch (e: Exception) {
                                 state = DataVizState.Error(e.message ?: "Unknown error")
                             }

@@ -14,7 +14,4 @@ class DataVizComponent(
     val chartDataRepository: ChartDataRepository,
     val registryContainer: RegistryContainer,
     val onNavigateBack: () -> Unit
-) : ComponentContext by componentContext {
-
-    val api = MockedDataApi()
-}
+) : ComponentContext by componentContext

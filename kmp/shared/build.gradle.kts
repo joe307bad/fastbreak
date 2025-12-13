@@ -38,7 +38,7 @@ kotlin {
             implementation(compose.foundation)
             implementation(compose.material3)
             implementation(compose.ui)
-            implementation(compose.components.resources)
+            // implementation(compose.components.resources) // Disabled - causes archive issues when not using Compose Resources
 
             // Decompose
             implementation(libs.decompose)

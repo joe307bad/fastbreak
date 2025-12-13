@@ -1,0 +1,11 @@
+app = 'fastbreak-chart-generator'
+primary_region = 'iad'
+
+[build]
+
+[processes]
+  app = '/app/start.sh'
+
+[[vm]]
+  memory = '1gb'
+  cpus = 1

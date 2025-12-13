@@ -1,0 +1,991 @@
+[
+  {
+    "httpRequest": {
+      "method": "GET",
+      "path": "/api/v1/health"
+    },
+    "httpResponse": {
+      "statusCode": 200,
+      "headers": {
+        "Content-Type": ["application/json"]
+      },
+      "body": {
+        "status": "healthy",
+        "timestamp": "2025-01-30T18:00:00Z",
+        "version": "1.0.0"
+      }
+    },
+    "times": {
+      "unlimited": true
+    }
+  },
+  {
+    "httpRequest": {
+      "method": "GET",
+      "path": "/api/v1/registry"
+    },
+    "httpResponse": {
+      "statusCode": 200,
+      "headers": {
+        "Content-Type": ["application/json"]
+      },
+      "body": {
+        "version": "1.0",
+        "lastUpdated": "2025-01-30T18:00:00Z",
+        "charts": [
+          {
+            "id": "nfl-efficiency-scatter",
+            "sport": "NFL",
+            "title": "Team Efficiency Analysis",
+            "subtitle": "Offensive vs Defensive Performance",
+            "lastUpdated": "2025-12-02T16:00:00Z",
+            "visualizationType": "SCATTER_PLOT",
+            "url": "https://api.fastbreak.com/v1/charts/nfl/nfl-efficiency-scatter",
+            "mockDataType": "scatter"
+          },
+          {
+            "id": "nfl-point-differential",
+            "sport": "NFL",
+            "title": "Point Differential by Team",
+            "subtitle": "Season performance margins",
+            "lastUpdated": "2025-01-30T15:00:00Z",
+            "visualizationType": "BAR_GRAPH",
+            "url": "https://api.fastbreak.com/v1/charts/nfl/nfl-point-differential",
+            "mockDataType": "bar"
+          },
+          {
+            "id": "nfl-season-progression",
+            "sport": "NFL",
+            "title": "Win-Loss Progression",
+            "subtitle": "Cumulative wins over season",
+            "lastUpdated": "2025-01-30T17:00:00Z",
+            "visualizationType": "LINE_CHART",
+            "url": "https://api.fastbreak.com/v1/charts/nfl/nfl-season-progression",
+            "mockDataType": "line"
+          },
+          {
+            "id": "nfl-passing-leaders",
+            "sport": "NFL",
+            "title": "Passing Yards Leaders",
+            "subtitle": "Top quarterbacks by yards",
+            "lastUpdated": "2025-01-30T17:15:00Z",
+            "visualizationType": "BAR_GRAPH",
+            "url": "https://api.fastbreak.com/v1/charts/nfl/nfl-passing-leaders",
+            "mockDataType": "bar"
+          },
+          {
+            "id": "nba-efficiency-rating",
+            "sport": "NBA",
+            "title": "Player Efficiency Rating",
+            "subtitle": "PER vs Usage Rate",
+            "lastUpdated": "2025-01-30T17:00:00Z",
+            "visualizationType": "SCATTER_PLOT",
+            "url": "https://api.fastbreak.com/v1/charts/nba/nba-efficiency-rating",
+            "mockDataType": "scatter"
+          },
+          {
+            "id": "nba-scoring-differential",
+            "sport": "NBA",
+            "title": "Team Net Rating",
+            "subtitle": "Points per 100 possessions",
+            "lastUpdated": "2025-01-30T16:00:00Z",
+            "visualizationType": "BAR_GRAPH",
+            "url": "https://api.fastbreak.com/v1/charts/nba/nba-scoring-differential",
+            "mockDataType": "bar"
+          },
+          {
+            "id": "nba-season-standings",
+            "sport": "NBA",
+            "title": "Season Win Progression",
+            "subtitle": "Wins accumulated over time",
+            "lastUpdated": "2025-01-30T17:30:00Z",
+            "visualizationType": "LINE_CHART",
+            "url": "https://api.fastbreak.com/v1/charts/nba/nba-season-standings",
+            "mockDataType": "line"
+          },
+          {
+            "id": "nba-three-point-leaders",
+            "sport": "NBA",
+            "title": "Three-Point Shooting Leaders",
+            "subtitle": "Made 3-pointers by player",
+            "lastUpdated": "2025-01-30T16:30:00Z",
+            "visualizationType": "BAR_GRAPH",
+            "url": "https://api.fastbreak.com/v1/charts/nba/nba-three-point-leaders",
+            "mockDataType": "bar"
+          },
+          {
+            "id": "mlb-batting-analysis",
+            "sport": "MLB",
+            "title": "Batting Performance",
+            "subtitle": "Average vs Home Runs",
+            "lastUpdated": "2025-01-30T14:00:00Z",
+            "visualizationType": "SCATTER_PLOT",
+            "url": "https://api.fastbreak.com/v1/charts/mlb/mlb-batting-analysis",
+            "mockDataType": "scatter"
+          },
+          {
+            "id": "mlb-run-differential",
+            "sport": "MLB",
+            "title": "Team Run Differential",
+            "subtitle": "Runs scored vs allowed",
+            "lastUpdated": "2025-01-30T13:00:00Z",
+            "visualizationType": "BAR_GRAPH",
+            "url": "https://api.fastbreak.com/v1/charts/mlb/mlb-run-differential",
+            "mockDataType": "bar"
+          },
+          {
+            "id": "mlb-season-wins",
+            "sport": "MLB",
+            "title": "Season Win Progression",
+            "subtitle": "Cumulative wins by team",
+            "lastUpdated": "2025-01-30T16:00:00Z",
+            "visualizationType": "LINE_CHART",
+            "url": "https://api.fastbreak.com/v1/charts/mlb/mlb-season-wins",
+            "mockDataType": "line"
+          },
+          {
+            "id": "mlb-era-leaders",
+            "sport": "MLB",
+            "title": "ERA Leaders",
+            "subtitle": "Top pitchers by ERA",
+            "lastUpdated": "2025-01-30T15:00:00Z",
+            "visualizationType": "BAR_GRAPH",
+            "url": "https://api.fastbreak.com/v1/charts/mlb/mlb-era-leaders",
+            "mockDataType": "bar"
+          },
+          {
+            "id": "nhl-player-production",
+            "sport": "NHL",
+            "title": "Player Production",
+            "subtitle": "Goals vs Assists",
+            "lastUpdated": "2025-01-30T17:00:00Z",
+            "visualizationType": "SCATTER_PLOT",
+            "url": "https://api.fastbreak.com/v1/charts/nhl/nhl-player-production",
+            "mockDataType": "scatter"
+          },
+          {
+            "id": "nhl-goal-differential",
+            "sport": "NHL",
+            "title": "Team Goal Differential",
+            "subtitle": "Goals for vs against",
+            "lastUpdated": "2025-01-30T16:00:00Z",
+            "visualizationType": "BAR_GRAPH",
+            "url": "https://api.fastbreak.com/v1/charts/nhl/nhl-goal-differential",
+            "mockDataType": "bar"
+          },
+          {
+            "id": "nhl-season-performance",
+            "sport": "NHL",
+            "title": "Season Points Progression",
+            "subtitle": "Points accumulated over time",
+            "lastUpdated": "2025-01-30T17:00:00Z",
+            "visualizationType": "LINE_CHART",
+            "url": "https://api.fastbreak.com/v1/charts/nhl/nhl-season-performance",
+            "mockDataType": "line"
+          },
+          {
+            "id": "nhl-save-percentage",
+            "sport": "NHL",
+            "title": "Goalie Save Percentage",
+            "subtitle": "Top goalies by save %",
+            "lastUpdated": "2025-01-30T15:30:00Z",
+            "visualizationType": "BAR_GRAPH",
+            "url": "https://api.fastbreak.com/v1/charts/nhl/nhl-save-percentage",
+            "mockDataType": "bar"
+          }
+        ]
+      }
+    },
+    "times": {
+      "unlimited": true
+    }
+  },
+  {
+    "httpRequest": {
+      "method": "GET",
+      "path": "/api/v1/charts/nfl/nfl-efficiency-scatter"
+    },
+    "httpResponse": {
+      "statusCode": 200,
+      "headers": {
+        "Content-Type": ["application/json"]
+      },
+      "body": {
+        "title": "Team Efficiency Analysis",
+        "subtitle": "Offensive vs Defensive Performance",
+        "description": "Comparison of offensive and defensive efficiency ratings for NFL teams. Teams in the upper-right quadrant excel in both categories.",
+        "lastUpdated": "2025-01-30T16:00:00Z",
+        "dataPoints": [
+          { "label": "Chiefs", "x": 28.5, "y": 19.2, "sum": 47.7 },
+          { "label": "Bills", "x": 27.8, "y": 20.1, "sum": 47.9 },
+          { "label": "49ers", "x": 29.2, "y": 18.5, "sum": 47.7 },
+          { "label": "Ravens", "x": 28.9, "y": 19.8, "sum": 48.7 },
+          { "label": "Eagles", "x": 26.7, "y": 21.3, "sum": 48.0 },
+          { "label": "Cowboys", "x": 27.5, "y": 22.1, "sum": 49.6 },
+          { "label": "Lions", "x": 28.1, "y": 23.5, "sum": 51.6 },
+          { "label": "Dolphins", "x": 29.5, "y": 24.2, "sum": 53.7 },
+          { "label": "update over herewefepo!!!!", "x": 25.8, "y": 23.9, "sum": 49.7 },
+          { "label": "Jaguars", "x": 24.2, "y": 25.1, "sum": 49.3 },
+          { "label": "Browns", "x": 22.5, "y": 20.8, "sum": 43.3 },
+          { "label": "Steelers", "x": 23.1, "y": 19.5, "sum": 42.6 },
+          { "label": "Seahawks", "x": 24.9, "y": 24.7, "sum": 49.6 },
+          { "label": "Rams", "x": 25.3, "y": 22.8, "sum": 48.1 },
+          { "label": "Vikings", "x": 23.7, "y": 23.4, "sum": 47.1 },
+          { "label": "Packers", "x": 24.8, "y": 21.9, "sum": 46.7 }
+        ]
+      }
+    },
+    "times": {
+      "unlimited": true
+    }
+  },
+  {
+    "httpRequest": {
+      "method": "GET",
+      "path": "/api/v1/charts/nfl/nfl-point-differential"
+    },
+    "httpResponse": {
+      "statusCode": 200,
+      "headers": {
+        "Content-Type": ["application/json"]
+      },
+      "body": {
+        "title": "Point Differential by Team",
+        "subtitle": "Season performance margins",
+        "description": "Total point differential for each NFL team this season. Positive values indicate more points scored than allowed.",
+        "lastUpdated": "2025-01-30T15:00:00Z",
+        "dataPoints": [
+          { "label": "Ravens", "value": 142.0 },
+          { "label": "49ers", "value": 138.0 },
+          { "label": "Chiefs", "value": 121.0 },
+          { "label": "Bills", "value": 115.0 },
+          { "label": "Lions", "value": 98.0 },
+          { "label": "Dolphins", "value": 92.0 },
+          { "label": "Eagles", "value": 85.0 },
+          { "label": "Cowboys", "value": 78.0 },
+          { "label": "Packers", "value": 45.0 },
+          { "label": "Rams", "value": 38.0 },
+          { "label": "Seahawks", "value": 12.0 },
+          { "label": "Vikings", "value": -8.0 },
+          { "label": "Bengals", "value": -15.0 },
+          { "label": "Browns", "value": -42.0 },
+          { "label": "Steelers", "value": -58.0 },
+          { "label": "Patriots", "value": -95.0 }
+        ]
+      }
+    },
+    "times": {
+      "unlimited": true
+    }
+  },
+  {
+    "httpRequest": {
+      "method": "GET",
+      "path": "/api/v1/charts/nfl/nfl-season-progression"
+    },
+    "httpResponse": {
+      "statusCode": 200,
+      "headers": {
+        "Content-Type": ["application/json"]
+      },
+      "body": {
+        "title": "Win-Loss Progression",
+        "subtitle": "Cumulative wins over season",
+        "description": "Tracking cumulative wins throughout the 2024 NFL season for top teams.",
+        "lastUpdated": "2025-01-30T17:00:00Z",
+        "series": [
+          {
+            "label": "Chiefs",
+            "dataPoints": [
+              { "x": 1.0, "y": 1.0 },
+              { "x": 2.0, "y": 2.0 },
+              { "x": 3.0, "y": 3.0 },
+              { "x": 4.0, "y": 4.0 },
+              { "x": 5.0, "y": 5.0 },
+              { "x": 6.0, "y": 6.0 },
+              { "x": 7.0, "y": 7.0 },
+              { "x": 8.0, "y": 8.0 },
+              { "x": 9.0, "y": 9.0 },
+              { "x": 10.0, "y": 10.0 },
+              { "x": 11.0, "y": 11.0 },
+              { "x": 12.0, "y": 11.0 },
+              { "x": 13.0, "y": 12.0 },
+              { "x": 14.0, "y": 13.0 },
+              { "x": 15.0, "y": 13.0 },
+              { "x": 16.0, "y": 14.0 },
+              { "x": 17.0, "y": 15.0 }
+            ]
+          },
+          {
+            "label": "49ers",
+            "dataPoints": [
+              { "x": 1.0, "y": 1.0 },
+              { "x": 2.0, "y": 1.0 },
+              { "x": 3.0, "y": 2.0 },
+              { "x": 4.0, "y": 3.0 },
+              { "x": 5.0, "y": 4.0 },
+              { "x": 6.0, "y": 5.0 },
+              { "x": 7.0, "y": 6.0 },
+              { "x": 8.0, "y": 7.0 },
+              { "x": 9.0, "y": 7.0 },
+              { "x": 10.0, "y": 8.0 },
+              { "x": 11.0, "y": 9.0 },
+              { "x": 12.0, "y": 10.0 },
+              { "x": 13.0, "y": 11.0 },
+              { "x": 14.0, "y": 12.0 },
+              { "x": 15.0, "y": 12.0 },
+              { "x": 16.0, "y": 13.0 },
+              { "x": 17.0, "y": 14.0 }
+            ]
+          },
+          {
+            "label": "Ravens",
+            "dataPoints": [
+              { "x": 1.0, "y": 0.0 },
+              { "x": 2.0, "y": 1.0 },
+              { "x": 3.0, "y": 2.0 },
+              { "x": 4.0, "y": 3.0 },
+              { "x": 5.0, "y": 3.0 },
+              { "x": 6.0, "y": 4.0 },
+              { "x": 7.0, "y": 5.0 },
+              { "x": 8.0, "y": 6.0 },
+              { "x": 9.0, "y": 7.0 },
+              { "x": 10.0, "y": 8.0 },
+              { "x": 11.0, "y": 9.0 },
+              { "x": 12.0, "y": 10.0 },
+              { "x": 13.0, "y": 10.0 },
+              { "x": 14.0, "y": 11.0 },
+              { "x": 15.0, "y": 12.0 },
+              { "x": 16.0, "y": 13.0 },
+              { "x": 17.0, "y": 13.0 }
+            ]
+          },
+          {
+            "label": "Bills",
+            "dataPoints": [
+              { "x": 1.0, "y": 1.0 },
+              { "x": 2.0, "y": 2.0 },
+              { "x": 3.0, "y": 2.0 },
+              { "x": 4.0, "y": 3.0 },
+              { "x": 5.0, "y": 4.0 },
+              { "x": 6.0, "y": 5.0 },
+              { "x": 7.0, "y": 5.0 },
+              { "x": 8.0, "y": 6.0 },
+              { "x": 9.0, "y": 7.0 },
+              { "x": 10.0, "y": 8.0 },
+              { "x": 11.0, "y": 9.0 },
+              { "x": 12.0, "y": 10.0 },
+              { "x": 13.0, "y": 10.0 },
+              { "x": 14.0, "y": 11.0 },
+              { "x": 15.0, "y": 11.0 },
+              { "x": 16.0, "y": 12.0 },
+              { "x": 17.0, "y": 13.0 }
+            ]
+          }
+        ]
+      }
+    },
+    "times": {
+      "unlimited": true
+    }
+  },
+  {
+    "httpRequest": {
+      "method": "GET",
+      "path": "/api/v1/charts/nba/nba-efficiency-rating"
+    },
+    "httpResponse": {
+      "statusCode": 200,
+      "headers": {
+        "Content-Type": ["application/json"]
+      },
+      "body": {
+        "title": "Player Efficiency Rating",
+        "subtitle": "PER vs Usage Rate",
+        "description": "Player Efficiency Rating plotted against usage rate for NBA's top players. Higher PER indicates better overall efficiency.",
+        "lastUpdated": "2025-01-30T17:00:00Z",
+        "dataPoints": [
+          { "label": "Jokic", "x": 31.8, "y": 28.5, "sum": 60.3 },
+          { "label": "Embiid", "x": 30.2, "y": 33.1, "sum": 63.3 },
+          { "label": "Giannis", "x": 29.5, "y": 31.7, "sum": 61.2 },
+          { "label": "Doncic", "x": 28.9, "y": 36.2, "sum": 65.1 },
+          { "label": "Curry", "x": 27.8, "y": 32.8, "sum": 60.6 },
+          { "label": "Durant", "x": 27.2, "y": 31.5, "sum": 58.7 },
+          { "label": "Tatum", "x": 26.5, "y": 30.9, "sum": 57.4 },
+          { "label": "Booker", "x": 25.8, "y": 29.7, "sum": 55.5 },
+          { "label": "Mitchell", "x": 24.9, "y": 31.2, "sum": 56.1 },
+          { "label": "Brown", "x": 24.2, "y": 28.4, "sum": 52.6 },
+          { "label": "George", "x": 23.8, "y": 27.9, "sum": 51.7 },
+          { "label": "Leonard", "x": 23.5, "y": 29.1, "sum": 52.6 },
+          { "label": "Davis", "x": 25.1, "y": 26.8, "sum": 51.9 },
+          { "label": "Young", "x": 22.7, "y": 32.5, "sum": 55.2 },
+          { "label": "Harden", "x": 22.3, "y": 28.9, "sum": 51.2 },
+          { "label": "Butler", "x": 21.9, "y": 27.3, "sum": 49.2 }
+        ]
+      }
+    },
+    "times": {
+      "unlimited": true
+    }
+  },
+  {
+    "httpRequest": {
+      "method": "GET",
+      "path": "/api/v1/charts/mlb/mlb-run-differential"
+    },
+    "httpResponse": {
+      "statusCode": 200,
+      "headers": {
+        "Content-Type": ["application/json"]
+      },
+      "body": {
+        "title": "Team Run Differential",
+        "subtitle": "Runs scored vs allowed",
+        "description": "Net run differential for MLB teams through the season. Teams with positive differentials typically make the playoffs.",
+        "lastUpdated": "2025-01-30T13:00:00Z",
+        "dataPoints": [
+          { "label": "Dodgers", "value": 256.0 },
+          { "label": "Braves", "value": 218.0 },
+          { "label": "Rays", "value": 189.0 },
+          { "label": "Orioles", "value": 172.0 },
+          { "label": "Astros", "value": 158.0 },
+          { "label": "Rangers", "value": 142.0 },
+          { "label": "Phillies", "value": 125.0 },
+          { "label": "Blue Jays", "value": 98.0 },
+          { "label": "Mariners", "value": 76.0 },
+          { "label": "Twins", "value": 54.0 },
+          { "label": "Cubs", "value": 12.0 },
+          { "label": "Reds", "value": -18.0 },
+          { "label": "Giants", "value": -42.0 },
+          { "label": "Cardinals", "value": -65.0 },
+          { "label": "Tigers", "value": -128.0 },
+          { "label": "Royals", "value": -182.0 }
+        ]
+      }
+    },
+    "times": {
+      "unlimited": true
+    }
+  },
+  {
+    "httpRequest": {
+      "method": "GET",
+      "path": "/api/v1/charts/nhl/nhl-season-performance"
+    },
+    "httpResponse": {
+      "statusCode": 200,
+      "headers": {
+        "Content-Type": ["application/json"]
+      },
+      "body": {
+        "title": "Season Points Progression",
+        "subtitle": "Points accumulated over time",
+        "description": "Cumulative points earned throughout the 2024-25 NHL season by top teams in the league.",
+        "lastUpdated": "2025-01-30T17:00:00Z",
+        "series": [
+          {
+            "label": "Bruins",
+            "dataPoints": [
+              { "x": 1.0, "y": 2.0 },
+              { "x": 2.0, "y": 4.0 },
+              { "x": 3.0, "y": 6.0 },
+              { "x": 4.0, "y": 7.0 },
+              { "x": 5.0, "y": 9.0 },
+              { "x": 6.0, "y": 11.0 },
+              { "x": 7.0, "y": 13.0 },
+              { "x": 8.0, "y": 15.0 },
+              { "x": 9.0, "y": 16.0 },
+              { "x": 10.0, "y": 18.0 },
+              { "x": 11.0, "y": 20.0 },
+              { "x": 12.0, "y": 22.0 }
+            ]
+          },
+          {
+            "label": "Avalanche",
+            "dataPoints": [
+              { "x": 1.0, "y": 2.0 },
+              { "x": 2.0, "y": 3.0 },
+              { "x": 3.0, "y": 5.0 },
+              { "x": 4.0, "y": 7.0 },
+              { "x": 5.0, "y": 8.0 },
+              { "x": 6.0, "y": 10.0 },
+              { "x": 7.0, "y": 12.0 },
+              { "x": 8.0, "y": 13.0 },
+              { "x": 9.0, "y": 15.0 },
+              { "x": 10.0, "y": 17.0 },
+              { "x": 11.0, "y": 18.0 },
+              { "x": 12.0, "y": 20.0 }
+            ]
+          },
+          {
+            "label": "Panthers",
+            "dataPoints": [
+              { "x": 1.0, "y": 1.0 },
+              { "x": 2.0, "y": 3.0 },
+              { "x": 3.0, "y": 4.0 },
+              { "x": 4.0, "y": 6.0 },
+              { "x": 5.0, "y": 8.0 },
+              { "x": 6.0, "y": 9.0 },
+              { "x": 7.0, "y": 11.0 },
+              { "x": 8.0, "y": 12.0 },
+              { "x": 9.0, "y": 14.0 },
+              { "x": 10.0, "y": 16.0 },
+              { "x": 11.0, "y": 17.0 },
+              { "x": 12.0, "y": 19.0 }
+            ]
+          },
+          {
+            "label": "Oilers",
+            "dataPoints": [
+              { "x": 1.0, "y": 0.0 },
+              { "x": 2.0, "y": 2.0 },
+              { "x": 3.0, "y": 3.0 },
+              { "x": 4.0, "y": 5.0 },
+              { "x": 5.0, "y": 7.0 },
+              { "x": 6.0, "y": 9.0 },
+              { "x": 7.0, "y": 10.0 },
+              { "x": 8.0, "y": 12.0 },
+              { "x": 9.0, "y": 13.0 },
+              { "x": 10.0, "y": 15.0 },
+              { "x": 11.0, "y": 16.0 },
+              { "x": 12.0, "y": 18.0 }
+            ]
+          }
+        ]
+      }
+    },
+    "times": {
+      "unlimited": true
+    }
+  },
+  {
+    "httpRequest": {
+      "method": "GET",
+      "path": "/api/v1/charts/nfl/nfl-passing-leaders"
+    },
+    "httpResponse": {
+      "statusCode": 200,
+      "headers": {
+        "Content-Type": ["application/json"]
+      },
+      "body": {
+        "title": "Passing Yards Leaders",
+        "subtitle": "Top quarterbacks by yards",
+        "description": "Top NFL quarterbacks ranked by total passing yards this season.",
+        "lastUpdated": "2025-01-30T17:15:00Z",
+        "dataPoints": [
+          { "label": "Mahomes", "value": 4839.0 },
+          { "label": "Allen", "value": 4306.0 },
+          { "label": "Prescott", "value": 4516.0 },
+          { "label": "Purdy", "value": 4280.0 },
+          { "label": "Tagovailoa", "value": 4624.0 },
+          { "label": "Stroud", "value": 4108.0 },
+          { "label": "Goff", "value": 4575.0 },
+          { "label": "Jackson", "value": 3678.0 },
+          { "label": "Hurts", "value": 3858.0 },
+          { "label": "Lawrence", "value": 4016.0 },
+          { "label": "Stafford", "value": 3965.0 },
+          { "label": "Cousins", "value": 3321.0 },
+          { "label": "Love", "value": 4159.0 },
+          { "label": "Burrow", "value": 4056.0 },
+          { "label": "Herbert", "value": 3134.0 },
+          { "label": "Wilson", "value": 3070.0 }
+        ]
+      }
+    },
+    "times": {
+      "unlimited": true
+    }
+  },
+  {
+    "httpRequest": {
+      "method": "GET",
+      "path": "/api/v1/charts/nba/nba-scoring-differential"
+    },
+    "httpResponse": {
+      "statusCode": 200,
+      "headers": {
+        "Content-Type": ["application/json"]
+      },
+      "body": {
+        "title": "Team Net Rating",
+        "subtitle": "Points per 100 possessions",
+        "description": "Team net rating showing point differential per 100 possessions. Higher values indicate more dominant teams.",
+        "lastUpdated": "2025-01-30T16:00:00Z",
+        "dataPoints": [
+          { "label": "Celtics", "value": 11.8 },
+          { "label": "Nuggets", "value": 9.2 },
+          { "label": "Bucks", "value": 8.7 },
+          { "label": "Suns", "value": 7.4 },
+          { "label": "76ers", "value": 6.9 },
+          { "label": "Cavaliers", "value": 5.8 },
+          { "label": "Lakers", "value": 4.2 },
+          { "label": "Knicks", "value": 3.5 },
+          { "label": "Heat", "value": 2.1 },
+          { "label": "Pelicans", "value": 1.2 },
+          { "label": "Kings", "value": -0.8 },
+          { "label": "Mavericks", "value": -1.5 },
+          { "label": "Warriors", "value": -2.3 },
+          { "label": "Bulls", "value": -4.7 },
+          { "label": "Wizards", "value": -8.9 },
+          { "label": "Pistons", "value": -11.2 }
+        ]
+      }
+    },
+    "times": {
+      "unlimited": true
+    }
+  },
+  {
+    "httpRequest": {
+      "method": "GET",
+      "path": "/api/v1/charts/nba/nba-season-standings"
+    },
+    "httpResponse": {
+      "statusCode": 200,
+      "headers": {
+        "Content-Type": ["application/json"]
+      },
+      "body": {
+        "title": "Season Win Progression",
+        "subtitle": "Wins accumulated over time",
+        "description": "Tracking cumulative wins throughout the 2024-25 NBA season for top Eastern and Western Conference teams.",
+        "lastUpdated": "2025-01-30T17:30:00Z",
+        "series": [
+          {
+            "label": "Celtics",
+            "dataPoints": [
+              { "x": 1.0, "y": 1.0 }, { "x": 2.0, "y": 2.0 }, { "x": 3.0, "y": 3.0 },
+              { "x": 4.0, "y": 4.0 }, { "x": 5.0, "y": 5.0 }, { "x": 6.0, "y": 6.0 },
+              { "x": 7.0, "y": 7.0 }, { "x": 8.0, "y": 8.0 }, { "x": 9.0, "y": 9.0 },
+              { "x": 10.0, "y": 10.0 }, { "x": 11.0, "y": 11.0 }, { "x": 12.0, "y": 11.0 },
+              { "x": 13.0, "y": 12.0 }, { "x": 14.0, "y": 13.0 }, { "x": 15.0, "y": 14.0 }
+            ]
+          },
+          {
+            "label": "Nuggets",
+            "dataPoints": [
+              { "x": 1.0, "y": 1.0 }, { "x": 2.0, "y": 1.0 }, { "x": 3.0, "y": 2.0 },
+              { "x": 4.0, "y": 3.0 }, { "x": 5.0, "y": 4.0 }, { "x": 6.0, "y": 5.0 },
+              { "x": 7.0, "y": 6.0 }, { "x": 8.0, "y": 7.0 }, { "x": 9.0, "y": 8.0 },
+              { "x": 10.0, "y": 9.0 }, { "x": 11.0, "y": 10.0 }, { "x": 12.0, "y": 11.0 },
+              { "x": 13.0, "y": 11.0 }, { "x": 14.0, "y": 12.0 }, { "x": 15.0, "y": 13.0 }
+            ]
+          },
+          {
+            "label": "Bucks",
+            "dataPoints": [
+              { "x": 1.0, "y": 0.0 }, { "x": 2.0, "y": 1.0 }, { "x": 3.0, "y": 2.0 },
+              { "x": 4.0, "y": 3.0 }, { "x": 5.0, "y": 4.0 }, { "x": 6.0, "y": 5.0 },
+              { "x": 7.0, "y": 6.0 }, { "x": 8.0, "y": 6.0 }, { "x": 9.0, "y": 7.0 },
+              { "x": 10.0, "y": 8.0 }, { "x": 11.0, "y": 9.0 }, { "x": 12.0, "y": 10.0 },
+              { "x": 13.0, "y": 10.0 }, { "x": 14.0, "y": 11.0 }, { "x": 15.0, "y": 12.0 }
+            ]
+          },
+          {
+            "label": "Suns",
+            "dataPoints": [
+              { "x": 1.0, "y": 1.0 }, { "x": 2.0, "y": 2.0 }, { "x": 3.0, "y": 2.0 },
+              { "x": 4.0, "y": 3.0 }, { "x": 5.0, "y": 4.0 }, { "x": 6.0, "y": 5.0 },
+              { "x": 7.0, "y": 5.0 }, { "x": 8.0, "y": 6.0 }, { "x": 9.0, "y": 7.0 },
+              { "x": 10.0, "y": 8.0 }, { "x": 11.0, "y": 9.0 }, { "x": 12.0, "y": 9.0 },
+              { "x": 13.0, "y": 10.0 }, { "x": 14.0, "y": 10.0 }, { "x": 15.0, "y": 11.0 }
+            ]
+          }
+        ]
+      }
+    },
+    "times": {
+      "unlimited": true
+    }
+  },
+  {
+    "httpRequest": {
+      "method": "GET",
+      "path": "/api/v1/charts/nba/nba-three-point-leaders"
+    },
+    "httpResponse": {
+      "statusCode": 200,
+      "headers": {
+        "Content-Type": ["application/json"]
+      },
+      "body": {
+        "title": "Three-Point Shooting Leaders",
+        "subtitle": "Made 3-pointers by player",
+        "description": "Top NBA players by total three-pointers made this season.",
+        "lastUpdated": "2025-01-30T16:30:00Z",
+        "dataPoints": [
+          { "label": "Curry", "value": 357.0 },
+          { "label": "Harden", "value": 262.0 },
+          { "label": "Lillard", "value": 301.0 },
+          { "label": "Young", "value": 245.0 },
+          { "label": "Towns", "value": 223.0 },
+          { "label": "Durant", "value": 209.0 },
+          { "label": "George", "value": 238.0 },
+          { "label": "Mitchell", "value": 256.0 },
+          { "label": "LaVine", "value": 233.0 },
+          { "label": "Beal", "value": 198.0 },
+          { "label": "Murray", "value": 211.0 },
+          { "label": "Booker", "value": 205.0 },
+          { "label": "Randle", "value": 187.0 },
+          { "label": "Bridges", "value": 176.0 },
+          { "label": "Siakam", "value": 164.0 },
+          { "label": "Barrett", "value": 152.0 }
+        ]
+      }
+    },
+    "times": {
+      "unlimited": true
+    }
+  },
+  {
+    "httpRequest": {
+      "method": "GET",
+      "path": "/api/v1/charts/mlb/mlb-batting-analysis"
+    },
+    "httpResponse": {
+      "statusCode": 200,
+      "headers": {
+        "Content-Type": ["application/json"]
+      },
+      "body": {
+        "title": "Batting Performance",
+        "subtitle": "Average vs Home Runs",
+        "description": "Analysis of batting average versus home run totals for MLB's top hitters. Players in the upper-right quadrant excel in both power and contact.",
+        "lastUpdated": "2025-01-30T14:00:00Z",
+        "dataPoints": [
+          { "label": "Ohtani", "x": 0.304, "y": 44.0, "sum": 44.304 },
+          { "label": "Acuña Jr.", "x": 0.337, "y": 41.0, "sum": 41.337 },
+          { "label": "Freeman", "x": 0.331, "y": 29.0, "sum": 29.331 },
+          { "label": "Betts", "x": 0.307, "y": 39.0, "sum": 39.307 },
+          { "label": "Soto", "x": 0.275, "y": 35.0, "sum": 35.275 },
+          { "label": "Judge", "x": 0.267, "y": 37.0, "sum": 37.267 },
+          { "label": "Altuve", "x": 0.311, "y": 17.0, "sum": 17.311 },
+          { "label": "Seager", "x": 0.327, "y": 33.0, "sum": 33.327 },
+          { "label": "Devers", "x": 0.272, "y": 28.0, "sum": 28.272 },
+          { "label": "Alvarez", "x": 0.293, "y": 31.0, "sum": 31.293 },
+          { "label": "Turner", "x": 0.298, "y": 26.0, "sum": 26.298 },
+          { "label": "Goldschmidt", "x": 0.283, "y": 25.0, "sum": 25.283 },
+          { "label": "Riley", "x": 0.276, "y": 37.0, "sum": 37.276 },
+          { "label": "Olson", "x": 0.283, "y": 54.0, "sum": 54.283 },
+          { "label": "Harper", "x": 0.293, "y": 21.0, "sum": 21.293 },
+          { "label": "Machado", "x": 0.263, "y": 30.0, "sum": 30.263 }
+        ]
+      }
+    },
+    "times": {
+      "unlimited": true
+    }
+  },
+  {
+    "httpRequest": {
+      "method": "GET",
+      "path": "/api/v1/charts/mlb/mlb-season-wins"
+    },
+    "httpResponse": {
+      "statusCode": 200,
+      "headers": {
+        "Content-Type": ["application/json"]
+      },
+      "body": {
+        "title": "Season Win Progression",
+        "subtitle": "Cumulative wins by team",
+        "description": "Tracking cumulative wins throughout the 2024 MLB season for top playoff contenders.",
+        "lastUpdated": "2025-01-30T16:00:00Z",
+        "series": [
+          {
+            "label": "Dodgers",
+            "dataPoints": [
+              { "x": 20.0, "y": 15.0 }, { "x": 40.0, "y": 28.0 }, { "x": 60.0, "y": 42.0 },
+              { "x": 80.0, "y": 56.0 }, { "x": 100.0, "y": 69.0 }, { "x": 120.0, "y": 81.0 },
+              { "x": 140.0, "y": 93.0 }, { "x": 162.0, "y": 100.0 }
+            ]
+          },
+          {
+            "label": "Braves",
+            "dataPoints": [
+              { "x": 20.0, "y": 14.0 }, { "x": 40.0, "y": 27.0 }, { "x": 60.0, "y": 40.0 },
+              { "x": 80.0, "y": 53.0 }, { "x": 100.0, "y": 66.0 }, { "x": 120.0, "y": 78.0 },
+              { "x": 140.0, "y": 90.0 }, { "x": 162.0, "y": 104.0 }
+            ]
+          },
+          {
+            "label": "Rays",
+            "dataPoints": [
+              { "x": 20.0, "y": 13.0 }, { "x": 40.0, "y": 26.0 }, { "x": 60.0, "y": 39.0 },
+              { "x": 80.0, "y": 52.0 }, { "x": 100.0, "y": 64.0 }, { "x": 120.0, "y": 76.0 },
+              { "x": 140.0, "y": 87.0 }, { "x": 162.0, "y": 99.0 }
+            ]
+          },
+          {
+            "label": "Orioles",
+            "dataPoints": [
+              { "x": 20.0, "y": 12.0 }, { "x": 40.0, "y": 24.0 }, { "x": 60.0, "y": 37.0 },
+              { "x": 80.0, "y": 50.0 }, { "x": 100.0, "y": 62.0 }, { "x": 120.0, "y": 74.0 },
+              { "x": 140.0, "y": 86.0 }, { "x": 162.0, "y": 101.0 }
+            ]
+          }
+        ]
+      }
+    },
+    "times": {
+      "unlimited": true
+    }
+  },
+  {
+    "httpRequest": {
+      "method": "GET",
+      "path": "/api/v1/charts/mlb/mlb-era-leaders"
+    },
+    "httpResponse": {
+      "statusCode": 200,
+      "headers": {
+        "Content-Type": ["application/json"]
+      },
+      "body": {
+        "title": "ERA Leaders",
+        "subtitle": "Top pitchers by ERA",
+        "description": "Top MLB pitchers ranked by Earned Run Average (ERA). Lower values indicate better pitching performance.",
+        "lastUpdated": "2025-01-30T15:00:00Z",
+        "dataPoints": [
+          { "label": "Webb", "value": 2.45 },
+          { "label": "Strider", "value": 2.85 },
+          { "label": "Cease", "value": 2.20 },
+          { "label": "Fried", "value": 2.55 },
+          { "label": "Rodón", "value": 2.88 },
+          { "label": "McClanahan", "value": 2.54 },
+          { "label": "Burnes", "value": 2.94 },
+          { "label": "Cole", "value": 2.63 },
+          { "label": "Alcantara", "value": 2.28 },
+          { "label": "Manoah", "value": 2.24 },
+          { "label": "Verlander", "value": 1.75 },
+          { "label": "Nola", "value": 3.25 },
+          { "label": "Bieber", "value": 2.88 },
+          { "label": "Castillo", "value": 2.99 },
+          { "label": "Gallen", "value": 2.54 },
+          { "label": "Gausman", "value": 3.16 }
+        ]
+      }
+    },
+    "times": {
+      "unlimited": true
+    }
+  },
+  {
+    "httpRequest": {
+      "method": "GET",
+      "path": "/api/v1/charts/nhl/nhl-player-production"
+    },
+    "httpResponse": {
+      "statusCode": 200,
+      "headers": {
+        "Content-Type": ["application/json"]
+      },
+      "body": {
+        "title": "Player Production",
+        "subtitle": "Goals vs Assists",
+        "description": "NHL player production analysis showing goals versus assists. Elite playmakers appear in the upper-right quadrant.",
+        "lastUpdated": "2025-01-30T17:00:00Z",
+        "dataPoints": [
+          { "label": "McDavid", "x": 64.0, "y": 89.0, "sum": 153.0 },
+          { "label": "Draisaitl", "x": 55.0, "y": 73.0, "sum": 128.0 },
+          { "label": "Matthews", "x": 69.0, "y": 38.0, "sum": 107.0 },
+          { "label": "MacKinnon", "x": 42.0, "y": 69.0, "sum": 111.0 },
+          { "label": "Pastrnak", "x": 61.0, "y": 52.0, "sum": 113.0 },
+          { "label": "Kucherov", "x": 44.0, "y": 69.0, "sum": 113.0 },
+          { "label": "Panarin", "x": 29.0, "y": 63.0, "sum": 92.0 },
+          { "label": "Rantanen", "x": 55.0, "y": 50.0, "sum": 105.0 },
+          { "label": "Marner", "x": 27.0, "y": 72.0, "sum": 99.0 },
+          { "label": "Kane", "x": 26.0, "y": 66.0, "sum": 92.0 },
+          { "label": "Kaprizov", "x": 47.0, "y": 61.0, "sum": 108.0 },
+          { "label": "Tkachuk", "x": 42.0, "y": 67.0, "sum": 109.0 },
+          { "label": "Point", "x": 51.0, "y": 44.0, "sum": 95.0 },
+          { "label": "Huberdeau", "x": 30.0, "y": 85.0, "sum": 115.0 },
+          { "label": "Crosby", "x": 31.0, "y": 53.0, "sum": 84.0 },
+          { "label": "Ovechkin", "x": 50.0, "y": 40.0, "sum": 90.0 }
+        ]
+      }
+    },
+    "times": {
+      "unlimited": true
+    }
+  },
+  {
+    "httpRequest": {
+      "method": "GET",
+      "path": "/api/v1/charts/nhl/nhl-goal-differential"
+    },
+    "httpResponse": {
+      "statusCode": 200,
+      "headers": {
+        "Content-Type": ["application/json"]
+      },
+      "body": {
+        "title": "Team Goal Differential",
+        "subtitle": "Goals for vs against",
+        "description": "Net goal differential for NHL teams. Teams with positive differentials typically make the playoffs.",
+        "lastUpdated": "2025-01-30T16:00:00Z",
+        "dataPoints": [
+          { "label": "Bruins", "value": 128.0 },
+          { "label": "Avalanche", "value": 112.0 },
+          { "label": "Panthers", "value": 98.0 },
+          { "label": "Hurricanes", "value": 87.0 },
+          { "label": "Oilers", "value": 95.0 },
+          { "label": "Rangers", "value": 76.0 },
+          { "label": "Devils", "value": 68.0 },
+          { "label": "Stars", "value": 72.0 },
+          { "label": "Maple Leafs", "value": 54.0 },
+          { "label": "Knights", "value": 48.0 },
+          { "label": "Kraken", "value": 12.0 },
+          { "label": "Flames", "value": -5.0 },
+          { "label": "Penguins", "value": -18.0 },
+          { "label": "Sabres", "value": -32.0 },
+          { "label": "Coyotes", "value": -78.0 },
+          { "label": "Sharks", "value": -112.0 }
+        ]
+      }
+    },
+    "times": {
+      "unlimited": true
+    }
+  },
+  {
+    "httpRequest": {
+      "method": "GET",
+      "path": "/api/v1/charts/nhl/nhl-save-percentage"
+    },
+    "httpResponse": {
+      "statusCode": 200,
+      "headers": {
+        "Content-Type": ["application/json"]
+      },
+      "body": {
+        "title": "Goalie Save Percentage",
+        "subtitle": "Top goalies by save %",
+        "description": "Top NHL goalies ranked by save percentage. Higher percentages indicate better goaltending performance.",
+        "lastUpdated": "2025-01-30T15:30:00Z",
+        "dataPoints": [
+          { "label": "Hellebuyck", "value": 0.925 },
+          { "label": "Shesterkin", "value": 0.916 },
+          { "label": "Saros", "value": 0.919 },
+          { "label": "Oettinger", "value": 0.914 },
+          { "label": "Sorokin", "value": 0.924 },
+          { "label": "Ullmark", "value": 0.938 },
+          { "label": "Vasilevskiy", "value": 0.916 },
+          { "label": "Demko", "value": 0.915 },
+          { "label": "Bobrovsky", "value": 0.913 },
+          { "label": "Markstrom", "value": 0.922 },
+          { "label": "Quick", "value": 0.910 },
+          { "label": "Talbot", "value": 0.911 },
+          { "label": "Georgiev", "value": 0.919 },
+          { "label": "Jarry", "value": 0.909 },
+          { "label": "Lehner", "value": 0.907 },
+          { "label": "Andersen", "value": 0.922 }
+        ]
+      }
+    },
+    "times": {
+      "unlimited": true
+    }
+  }
+]

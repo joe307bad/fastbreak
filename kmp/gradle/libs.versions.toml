@@ -1,62 +1,46 @@
 [versions]
-agp = "8.8.2"
-kotlin = "2.1.10"
+kotlin = "2.1.21"
 compose = "1.7.1"
-compose-compiler = "1.7.1"
-compose-material3 = "1.1.2"
-androidx-activityCompose = "1.8.0"
-foundationLayoutAndroid = "1.7.7"
-compose-jb = "1.7.1"
-appcompat = "1.7.0"
-material = "1.12.0"
+agp = "8.7.2"
+androidx-activityCompose = "1.9.3"
+decompose = "3.2.0"
+essenty = "2.2.0"
+orbit = "9.0.0"
+koalaplot = "0.6.3"
 cupertino = "0.1.0-alpha04"
-coreKtx = "1.15.0"
-junit = "4.13.2"
-junitVersion = "1.2.1"
-espressoCore = "3.6.1"
-couchbase-lite-c = "3.1.9"
-kmp-native-coroutines = "1.0.0-ALPHA-25"
-kotbase = "3.1.9-1.1.1"
-jetbrainsKotlinJvm = "2.0.21"
-uiTextGoogleFonts = "1.7.8"
-uiTextAndroid = "1.7.8"
-coreI18n = "1.0.0-alpha01"
-uiAndroid = "1.7.8"
-compiler = "3.2.0-alpha11"
-uiGraphicsAndroid = "1.7.8"
+multiplatformSettings = "1.2.0"
+kotlinxDatetime = "0.6.1"
+kotlinxSerializationJson = "1.7.3"
+ktor = "3.0.3"
+calf = "0.8.0"
 
 [libraries]
-kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
 androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "androidx-activityCompose" }
-compose-ui = { module = "androidx.compose.ui:ui", version.ref = "compose" }
-compose-ui-tooling = { module = "androidx.compose.ui:ui-tooling", version.ref = "compose" }
-compose-ui-tooling-preview = { module = "androidx.compose.ui:ui-tooling-preview", version.ref = "compose" }
-compose-foundation = { module = "androidx.compose.foundation:foundation", version.ref = "compose" }
-compose-material3 = { module = "androidx.compose.material3:material3", version.ref = "compose-material3" }
-androidx-foundation-layout-android = { group = "androidx.compose.foundation", name = "foundation-layout-android", version.ref = "foundationLayoutAndroid" }
-androidx-appcompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "appcompat" }
-material = { group = "com.google.android.material", name = "material", version.ref = "material" }
+decompose = { module = "com.arkivanov.decompose:decompose", version.ref = "decompose" }
+decompose-compose = { module = "com.arkivanov.decompose:extensions-compose", version.ref = "decompose" }
+decompose-android = { module = "com.arkivanov.decompose:extensions-android", version.ref = "decompose" }
+essenty-lifecycle = { module = "com.arkivanov.essenty:lifecycle", version.ref = "essenty" }
+orbit-core = { module = "org.orbit-mvi:orbit-core", version.ref = "orbit" }
+orbit-compose = { module = "org.orbit-mvi:orbit-compose", version.ref = "orbit" }
+koalaplot-core = { module = "io.github.koalaplot:koalaplot-core", version.ref = "koalaplot" }
+cupertino = { module = "io.github.alexzhirkevich:cupertino", version.ref = "cupertino" }
 cupertino-adaptive = { module = "io.github.alexzhirkevich:cupertino-adaptive", version.ref = "cupertino" }
-cupertino-iconsExtended = { module = "io.github.alexzhirkevich:cupertino-icons-extended", version.ref = "cupertino" }
-androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
-junit = { group = "junit", name = "junit", version.ref = "junit" }
-androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "junitVersion" }
-androidx-espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espressoCore" }
-kotbase = { module = "dev.kotbase:couchbase-lite", version.ref = "kotbase" }
-androidx-ui-text-google-fonts = { group = "androidx.compose.ui", name = "ui-text-google-fonts", version.ref = "uiTextGoogleFonts" }
-androidx-ui-text-android = { group = "androidx.compose.ui", name = "ui-text-android", version.ref = "uiTextAndroid" }
-androidx-core-i18n = { group = "androidx.core", name = "core-i18n", version.ref = "coreI18n" }
-androidx-ui-android = { group = "androidx.compose.ui", name = "ui-android", version.ref = "uiAndroid" }
-androidx-compiler = { group = "androidx.databinding", name = "compiler", version.ref = "compiler" }
-androidx-ui-graphics-android = { group = "androidx.compose.ui", name = "ui-graphics-android", version.ref = "uiGraphicsAndroid" }
+multiplatform-settings = { module = "com.russhwolf:multiplatform-settings", version.ref = "multiplatformSettings" }
+multiplatform-settings-no-arg = { module = "com.russhwolf:multiplatform-settings-no-arg", version.ref = "multiplatformSettings" }
+kotlinx-datetime = { module = "org.jetbrains.kotlinx:kotlinx-datetime", version.ref = "kotlinxDatetime" }
+kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinxSerializationJson" }
+ktor-client-core = { module = "io.ktor:ktor-client-core", version.ref = "ktor" }
+ktor-client-content-negotiation = { module = "io.ktor:ktor-client-content-negotiation", version.ref = "ktor" }
+ktor-serialization-kotlinx-json = { module = "io.ktor:ktor-serialization-kotlinx-json", version.ref = "ktor" }
+ktor-client-darwin = { module = "io.ktor:ktor-client-darwin", version.ref = "ktor" }
+ktor-client-okhttp = { module = "io.ktor:ktor-client-okhttp", version.ref = "ktor" }
+calf-permissions = { module = "com.mohamedrejeb.calf:calf-permissions", version.ref = "calf" }
 
 [plugins]
 androidApplication = { id = "com.android.application", version.ref = "agp" }
 androidLibrary = { id = "com.android.library", version.ref = "agp" }
 kotlinAndroid = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 kotlinMultiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
-kotlinCocoapods = { id = "org.jetbrains.kotlin.native.cocoapods", version.ref = "kotlin" }
-jetbrainsCompose = { id = "org.jetbrains.compose", version.ref = "compose-jb" }
-composeResources = { id = "org.jetbrains.compose.resources", version.ref = "compose-jb" }
-compose-compiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
-jetbrainsKotlinJvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "jetbrainsKotlinJvm" }
+kotlinSerialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
+composeMultiplatform = { id = "org.jetbrains.compose", version.ref = "compose" }
+composeCompiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }

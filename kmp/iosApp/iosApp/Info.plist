@@ -2,28 +2,10 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-
-    <key>GIDServerClientID</key>
-        <string>617022169854-jlql6h358vf62i3pbe19l4gacrmrkehn.apps.googleusercontent.com</string>
-
-        <key>GIDClientID</key>
-        <string>617022169854-0dviplk2deg1c1j3lhj5udm5ej3kp74m.apps.googleusercontent.com</string>
-        <key>CFBundleURLTypes</key>
-        <array>
-          <dict>
-            <key>CFBundleURLSchemes</key>
-            <array>
-              <string>com.googleusercontent.apps.617022169854-0dviplk2deg1c1j3lhj5udm5ej3kp74m</string>
-            </array>
-          </dict>
-        </array>
-
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
-	<key>CFBundleDisplayName</key>
-    <string>Fastbreak</string>
 	<key>CFBundleIdentifier</key>
 	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
 	<key>CFBundleInfoDictionaryVersion</key>
@@ -33,18 +15,7 @@
 	<key>CFBundlePackageType</key>
 	<string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
 	<key>CFBundleShortVersionString</key>
-	<string>1.0.0</string>
-	<key>CFBundleURLTypes</key>
-	<array>
-		<dict>
-			<key>CFBundleTypeRole</key>
-			<string>Editor</string>
-			<key>CFBundleURLSchemes</key>
-			<array>
-              <string>com.googleusercontent.apps.617022169854-0dviplk2deg1c1j3lhj5udm5ej3kp74m</string>
-			</array>
-		</dict>
-	</array>
+	<string>1.0</string>
 	<key>CFBundleVersion</key>
 	<string>1</string>
 	<key>LSRequiresIPhoneOS</key>
@@ -56,9 +27,11 @@
 	</dict>
 	<key>UILaunchScreen</key>
 	<dict/>
+	<key>CADisableMinimumFrameDurationOnPhone</key>
+	<true/>
 	<key>UIRequiredDeviceCapabilities</key>
 	<array>
-		<string>armv7</string>
+		<string>arm64</string>
 	</array>
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
@@ -73,7 +46,11 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
-	<key>CADisableMinimumFrameDurationOnPhone</key>
-    <true/>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>This app needs to access devices on your local network to connect to the mock server for testing and development.</string>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_http._tcp</string>
+	</array>
 </dict>
 </plist>

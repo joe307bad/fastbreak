@@ -1,0 +1,38 @@
+FROM rocker/tidyverse:latest
+
+# Install cron and AWS CLI
+RUN apt-get update && \
+    apt-get install -y cron python3-pip && \
+    pip3 install awscli --break-system-packages && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+# Install remaining R packages (tidyverse deps already installed)
+RUN R -e "options(repos = c(CRAN = 'https://packagemanager.posit.co/cran/__linux__/jammy/latest')); \
+    install.packages('nflreadr'); \
+    if (!require('nflreadr')) stop('nflreadr installation failed')"
+
+# Create app directory
+WORKDIR /app
+
+# Copy R scripts and data
+COPY weekly /app/weekly
+COPY daily /app/daily
+RUN mkdir -p /app/data
+COPY registry.json /app/data/registry.json
+
+# Copy cron configuration and startup script
+COPY crontab /etc/cron.d/r-cron
+COPY start.sh /app/start.sh
+
+# Give execution rights
+RUN chmod 0644 /etc/cron.d/r-cron && \
+    chmod +x /app/start.sh
+
+# Apply cron job
+RUN crontab /etc/cron.d/r-cron
+
+# Create cron log file
+RUN touch /var/log/cron.log
+
+CMD ["/app/start.sh"]

@@ -9,6 +9,6 @@ services:
     ports:
       - "0.0.0.0:1080:1080"
     environment:
-      - MOCKSERVER_INITIALIZATION_JSON_PATH=/config/expectations.json
+      - MOCKSERVER_INITIALIZATION_JSON_PATH=/config/chart-expectations.json
     volumes:
       - ./config:/config

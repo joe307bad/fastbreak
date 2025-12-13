@@ -1,10 +1,10 @@
-library(nflfastR)
+library(nflreadr)
 library(dplyr)
 library(jsonlite)
 
 # Get current season and most recent week
 current_season <- as.numeric(format(Sys.Date(), "%Y"))
-pbp <- nflfastR::load_pbp(current_season)
+pbp <- nflreadr::load_pbp(current_season)
 
 # Get the most recent week with data
 most_recent_week <- max(pbp$week, na.rm = TRUE)
@@ -49,22 +49,32 @@ output_data <- list(
   data = team_list
 )
 
-# Write JSON output
-output_dir <- if (dir.exists("/app/output")) {
-  "/app/output"
-} else if (dir.exists("../../../server/nginx/static")) {
-  "../../../server/nginx/static"
+# Upload to S3
+s3_bucket <- Sys.getenv("AWS_S3_BUCKET")
+
+if (!nzchar(s3_bucket)) {
+  stop("AWS_S3_BUCKET environment variable is not set")
+}
+
+is_prod <- tolower(Sys.getenv("PROD")) == "true"
+
+s3_key <- if (is_prod) {
+  "nfl__team_tier_list.json"
 } else {
-  "output"
+  "dev/nfl__team_tier_list.json"
 }
 
-# Create output directory if it doesn't exist
-if (!dir.exists(output_dir)) {
-  dir.create(output_dir, recursive = TRUE)
+# Write JSON to temp file and upload via AWS CLI
+tmp_file <- tempfile(fileext = ".json")
+write_json(output_data, tmp_file, pretty = TRUE, auto_unbox = TRUE)
+
+s3_path <- paste0("s3://", s3_bucket, "/", s3_key)
+cmd <- paste("aws s3 cp", shQuote(tmp_file), shQuote(s3_path), "--content-type application/json")
+result <- system(cmd)
+
+if (result != 0) {
+  stop("Failed to upload to S3")
 }
 
-output_file <- file.path(output_dir, paste0("nfl__team_tier_list.json"))
-write_json(output_data, output_file, pretty = TRUE, auto_unbox = TRUE)
-
-cat("NFL team EPA data generated:", output_file, "\n")
+cat("Uploaded to S3:", s3_path, "\n")
 cat("Total teams:", length(team_list), "\n")

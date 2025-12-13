@@ -9,8 +9,8 @@ docker build -t fastbreak-charts .
 
 echo "Running new container..."
 docker run -d \
-  -v /Users/joebad/Source/fastbreak/server/nginx/static:/app/output \
   --name fastbreak-charts \
+  --env-file .env \
   fastbreak-charts
 
 echo "Done! View logs with: docker logs -f fastbreak-charts"

@@ -30,23 +30,27 @@ team_epa <- offense_epa %>%
   left_join(defense_epa, by = "team") %>%
   arrange(team)
 
-# Convert to list format for JSON
-team_list <- team_epa %>%
+# Convert to list format for JSON matching ScatterPlotVisualization model
+# ScatterPlotDataPoint: label, x, y, sum
+data_points <- team_epa %>%
   rowwise() %>%
-  mutate(team_data = list(list(
-    team = team,
-    offense_epa_per_play = round(offense_epa_per_play, 4),
-    defense_epa_per_play = round(defense_epa_per_play, 4)
+  mutate(data_point = list(list(
+    label = team,
+    x = round(offense_epa_per_play, 4),
+    y = round(defense_epa_per_play, 4),
+    sum = round(offense_epa_per_play + defense_epa_per_play, 4)
   ))) %>%
-  pull(team_data)
+  pull(data_point)
 
-# Create output object with metadata
+# Create output object with metadata matching ScatterPlotVisualization model
 output_data <- list(
   title = paste("NFL Team Tier List - Week", most_recent_week),
+  subtitle = "Offensive vs Defensive EPA Analysis",
   description = "Expected Points Added (EPA) measures the value of each play by comparing the expected points before and after the play. Offensive EPA per play shows how many points a team adds per offensive play on average, while defensive EPA per play (where lower is better) shows how many points a team allows per defensive play. Teams in the top-right quadrant have strong offenses and defenses, making them the most dominant teams.",
+  lastUpdated = format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC"),
   xAxisLabel = "Offensive EPA per Play",
   yAxisLabel = "Defensive EPA per Play",
-  data = team_list
+  dataPoints = data_points
 )
 
 # Upload to S3
@@ -77,4 +81,4 @@ if (result != 0) {
 }
 
 cat("Uploaded to S3:", s3_path, "\n")
-cat("Total teams:", length(team_list), "\n")
+cat("Total teams:", length(data_points), "\n")

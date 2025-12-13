@@ -7,13 +7,13 @@ import io.ktor.client.request.*
 
 /**
  * API for fetching registry data from the server.
- * Fetches data from http://localhost:8080/registry.json (debug)
+ * Fetches data from CloudFront CDN.
  */
 class MockRegistryApi(
     private val httpClient: HttpClient = HttpClientFactory.create()
 ) {
     companion object {
-        private const val BASE_URL = "http://localhost:8080"
+        private const val BASE_URL = "https://d2jyizt5xogu23.cloudfront.net/dev"
         private const val REGISTRY_ENDPOINT = "/registry.json"
     }
 

@@ -16,6 +16,7 @@ import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.TextStyle
@@ -51,7 +52,9 @@ private fun Double.formatTo(decimals: Int): String {
 fun FourQuadrantScatterPlot(
     data: List<ScatterPlotDataPoint>,
     modifier: Modifier = Modifier,
-    title: String = "4-Quadrant Scatter Plot"
+    title: String = "4-Quadrant Scatter Plot",
+    xAxisLabel: String = "X Axis",
+    yAxisLabel: String = "Y Axis"
 ) {
     // Zoom and pan state
     var scale by remember { mutableStateOf(1f) }
@@ -376,23 +379,28 @@ fun FourQuadrantScatterPlot(
             }
 
             // Draw axis labels
-            val xAxisLabelText = "PFF Offense Grade"
-            val xAxisLabel = textMeasurer.measure(xAxisLabelText, labelTextStyle.copy(fontWeight = FontWeight.Bold))
+            val xAxisLabelMeasured = textMeasurer.measure(xAxisLabel, labelTextStyle.copy(fontWeight = FontWeight.Bold))
             drawText(
                 textMeasurer,
-                xAxisLabelText,
-                topLeft = Offset((width - xAxisLabel.size.width) / 2, height - bottomPadding + 30),
+                xAxisLabel,
+                topLeft = Offset((width - xAxisLabelMeasured.size.width) / 2, height - bottomPadding + 30),
                 style = labelTextStyle.copy(fontWeight = FontWeight.Bold)
             )
 
-            val yAxisLabelText = "EPA per Play"
-            val yAxisLabel = textMeasurer.measure(yAxisLabelText, labelTextStyle.copy(fontWeight = FontWeight.Bold))
-            drawText(
-                textMeasurer,
-                yAxisLabelText,
-                topLeft = Offset(5f, (height - yAxisLabel.size.width) / 2),
-                style = labelTextStyle.copy(fontWeight = FontWeight.Bold)
-            )
+            val yAxisLabelMeasured = textMeasurer.measure(yAxisLabel, labelTextStyle.copy(fontWeight = FontWeight.Bold))
+            withTransform({
+                rotate(-90f, pivot = Offset(yAxisLabelMeasured.size.height / 2f, height / 2f))
+            }) {
+                drawText(
+                    textMeasurer,
+                    yAxisLabel,
+                    topLeft = Offset(
+                        -yAxisLabelMeasured.size.width / 2f + yAxisLabelMeasured.size.height / 2f,
+                        height / 2f - yAxisLabelMeasured.size.height / 2f
+                    ),
+                    style = labelTextStyle.copy(fontWeight = FontWeight.Bold)
+                )
+            }
 
             // Plot data points with labels (with clipping)
             clipRect(

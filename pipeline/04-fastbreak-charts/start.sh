@@ -62,6 +62,46 @@ run_scripts() {
   echo ""
 }
 
+# Upload registry.json to S3
+upload_registry() {
+  echo -e "${BOLD}${CYAN}▶ Uploading registry.json...${NC}"
+  echo -e "${CYAN}────────────────────────────────────────${NC}"
+
+  if [ ! -f "/app/data/registry.json" ]; then
+    echo -e "${RED}  ✗ registry.json not found${NC}"
+    echo ""
+    return
+  fi
+
+  if [ -z "$AWS_S3_BUCKET" ]; then
+    echo -e "${RED}  ✗ AWS_S3_BUCKET not set, skipping upload${NC}"
+    echo ""
+    return
+  fi
+
+  echo -e "${YELLOW}  ⏳ Uploading to S3...${NC}"
+
+  if [ "$PROD" = "true" ]; then
+    s3_key="registry.json"
+  else
+    s3_key="dev/registry.json"
+  fi
+
+  s3_path="s3://$AWS_S3_BUCKET/$s3_key"
+  output=$(aws s3 cp /app/data/registry.json "$s3_path" --content-type application/json 2>&1)
+
+  if [ $? -eq 0 ]; then
+    echo -e "${GREEN}  ✓ registry.json uploaded successfully${NC}"
+    echo -e "${GREEN}    └─ $s3_path${NC}"
+  else
+    echo -e "${RED}  ✗ Failed to upload registry.json${NC}"
+    echo -e "${RED}    └─ $output${NC}"
+  fi
+  echo ""
+}
+
+upload_registry
+
 # Run scripts on startup
 run_scripts "/app/daily" "daily"
 run_scripts "/app/weekly" "weekly"

@@ -12,7 +12,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.joebad.fastbreak.data.api.MockedDataApi
 import com.joebad.fastbreak.data.model.*
 import com.joebad.fastbreak.navigation.DataVizComponent
 import com.joebad.fastbreak.ui.visualizations.*
@@ -64,13 +63,12 @@ fun DataVizScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    val vizTypeName = when (component.vizType) {
-                        MockedDataApi.VizType.SCATTER -> "Scatter Plot"
-                        MockedDataApi.VizType.BAR -> "Bar Chart"
-                        MockedDataApi.VizType.LINE -> "Line Chart"
+                    val titleText = when (val currentState = state) {
+                        is DataVizState.Success -> currentState.data.title
+                        else -> "Loading..."
                     }
                     Text(
-                        text = "${component.sport.displayName} - $vizTypeName",
+                        text = titleText,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -191,7 +189,9 @@ private fun SuccessContent(visualization: VisualizationType) {
                         is ScatterPlotVisualization -> {
                             FourQuadrantScatterPlot(
                                 data = visualization.dataPoints,
-                                title = "",
+                                title = visualization.title,
+                                xAxisLabel = visualization.xAxisLabel,
+                                yAxisLabel = visualization.yAxisLabel,
                                 modifier = Modifier.fillMaxWidth()
                             )
                         }

@@ -217,15 +217,16 @@ class ChartDataSynchronizer(
     }
 
     /**
-     * Downloads chart data from the mock server and caches it.
+     * Downloads chart data from the CDN and caches it.
      * Handles serialization of different visualization types.
      *
      * @param chartDef The chart definition to download
      * @throws Exception if download or caching fails
      */
     private suspend fun downloadAndCacheChart(chartDef: ChartDefinition) {
-        // Use localhost:8080 base URL with the relative path from the chart definition
-        val chartDataUrl = "http://localhost:8080${chartDef.url}"
+        // Use CloudFront CDN base URL with the relative path from the chart definition
+        val chartDataUrl = "https://d2jyizt5xogu23.cloudfront.net/dev${chartDef.url}"
+        println("🌐 Fetching chart data from: $chartDataUrl")
 
         // Fetch chart data from server based on visualization type
         val vizData = when (chartDef.visualizationType) {

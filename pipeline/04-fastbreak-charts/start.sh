@@ -16,6 +16,11 @@ echo -e "${BOLD}${BLUE}                  R Cron Scheduler Starting              
 echo -e "${BOLD}${BLUE}════════════════════════════════════════════════════════════${NC}"
 echo ""
 
+# Export environment variables for cron jobs (restricted permissions)
+printenv | grep -E "^(AWS_|PROD)" > /app/env.sh
+sed -i 's/^/export /' /app/env.sh
+chmod 600 /app/env.sh
+
 run_scripts() {
   local dir=$1
   local label=$2

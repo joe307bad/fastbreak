@@ -4,7 +4,7 @@ import com.joebad.fastbreak.data.api.MockRegistryApi
 import com.joebad.fastbreak.data.model.Registry
 import com.joebad.fastbreak.data.model.RegistryMetadata
 import com.joebad.fastbreak.data.repository.RegistryRepository
-import kotlinx.datetime.Clock
+import kotlin.time.Clock
 import kotlin.time.Duration.Companion.hours
 
 /**

@@ -1,6 +1,6 @@
 package com.joebad.fastbreak.ui.diagnostics
 
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 
 /**
  * Diagnostics information for the app health UI.

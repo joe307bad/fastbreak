@@ -109,7 +109,7 @@ fun HomeScreen(
         },
         topBar = {
             TopAppBar(
-                title = { Text("fastbreak //") },
+                title = { Text("fastbreak") },
                 navigationIcon = {
                     IconButton(onClick = onMenuClick) {
                         Icon(

@@ -1,7 +1,11 @@
+@file:UseSerializers(InstantSerializer::class)
+
 package com.joebad.fastbreak.data.model
 
-import kotlinx.datetime.Instant
+import com.joebad.fastbreak.data.serializers.InstantSerializer
+import kotlin.time.Instant
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.UseSerializers
 import kotlinx.serialization.json.Json
 
 /**

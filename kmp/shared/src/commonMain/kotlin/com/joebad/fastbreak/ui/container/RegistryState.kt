@@ -3,7 +3,7 @@ package com.joebad.fastbreak.ui.container
 import com.joebad.fastbreak.data.model.Registry
 import com.joebad.fastbreak.ui.diagnostics.DiagnosticsInfo
 import com.mohamedrejeb.calf.permissions.PermissionStatus
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 
 /**
  * State for the registry management system.

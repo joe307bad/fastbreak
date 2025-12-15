@@ -7,7 +7,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import com.joebad.fastbreak.data.model.Registry
@@ -15,8 +14,9 @@ import com.joebad.fastbreak.ui.diagnostics.DiagnosticsInfo
 import com.joebad.fastbreak.ui.diagnostics.RegistryOverviewList
 import com.joebad.fastbreak.ui.diagnostics.SyncStatusRow
 import com.joebad.fastbreak.ui.theme.ThemeMode
-import io.github.alexzhirkevich.cupertino.CupertinoSegmentedControl
-import io.github.alexzhirkevich.cupertino.CupertinoSegmentedControlTab
+// Cupertino library removed due to Compose version incompatibility
+// import io.github.alexzhirkevich.cupertino.CupertinoSegmentedControl
+// import io.github.alexzhirkevich.cupertino.CupertinoSegmentedControlTab
 
 @Composable
 fun DrawerMenu(
@@ -89,29 +89,25 @@ fun DrawerMenu(
                 modifier = Modifier.padding(bottom = 8.dp)
             )
 
-            CupertinoSegmentedControl(
-                selectedTabIndex = if (currentTheme == ThemeMode.LIGHT) 0 else 1,
+            // Material3 SegmentedButton replacement for Cupertino
+            SingleChoiceSegmentedButtonRow(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(vertical = 8.dp)
             ) {
-                CupertinoSegmentedControlTab(
-                    isSelected = currentTheme == ThemeMode.LIGHT,
-                    onClick = { onThemeChange(ThemeMode.LIGHT) }
+                SegmentedButton(
+                    selected = currentTheme == ThemeMode.LIGHT,
+                    onClick = { onThemeChange(ThemeMode.LIGHT) },
+                    shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
                 ) {
-                    Text(
-                        text = "light",
-                        color = if (currentTheme == ThemeMode.LIGHT) Color.Black else MaterialTheme.colorScheme.onSurface
-                    )
+                    Text(text = "light")
                 }
-                CupertinoSegmentedControlTab(
-                    isSelected = currentTheme == ThemeMode.DARK,
-                    onClick = { onThemeChange(ThemeMode.DARK) }
+                SegmentedButton(
+                    selected = currentTheme == ThemeMode.DARK,
+                    onClick = { onThemeChange(ThemeMode.DARK) },
+                    shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
                 ) {
-                    Text(
-                        text = "dark",
-                        color = if (currentTheme == ThemeMode.DARK) Color.Black else MaterialTheme.colorScheme.onSurface
-                    )
+                    Text(text = "dark")
                 }
             }
 

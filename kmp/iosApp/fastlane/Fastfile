@@ -33,7 +33,14 @@ platform :ios do
 
     build_app(
       scheme: "Fastbreak",
-      export_method: "app-store"
+      export_method: "app-store",
+      xcargs: "-allowProvisioningUpdates CODE_SIGN_STYLE=Manual",
+      export_options: {
+        signingStyle: "manual",
+        provisioningProfiles: {
+          "com.joebad.fastbreak" => "match AppStore com.joebad.fastbreak"
+        }
+      }
     )
 
     upload_to_testflight(api_key: api_key)

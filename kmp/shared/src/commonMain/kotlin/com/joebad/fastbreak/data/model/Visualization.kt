@@ -1,6 +1,6 @@
 package com.joebad.fastbreak.data.model
 
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 
 data class Visualization(
     val id: String,

@@ -1,8 +1,12 @@
+@file:UseSerializers(InstantSerializer::class)
+
 package com.joebad.fastbreak.data.model
 
-import kotlinx.datetime.Clock
-import kotlinx.datetime.Instant
+import com.joebad.fastbreak.data.serializers.InstantSerializer
+import kotlin.time.Clock
+import kotlin.time.Instant
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.UseSerializers
 
 /**
  * Represents the complete registry of available charts.

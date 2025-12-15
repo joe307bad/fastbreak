@@ -2,7 +2,7 @@ package com.joebad.fastbreak.data.api
 
 import com.joebad.fastbreak.data.model.*
 import kotlinx.coroutines.delay
-import kotlinx.datetime.Clock
+import kotlin.time.Clock
 import kotlin.random.Random
 
 /**

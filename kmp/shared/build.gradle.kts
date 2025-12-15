@@ -19,6 +19,7 @@ kotlin {
     sourceSets.all {
         languageSettings.optIn("androidx.compose.material3.ExperimentalMaterial3Api")
         languageSettings.optIn("com.mohamedrejeb.calf.permissions.ExperimentalPermissionsApi")
+        languageSettings.optIn("kotlin.time.ExperimentalTime")
     }
 
     listOf(
@@ -36,7 +37,9 @@ kotlin {
         commonMain.dependencies {
             implementation(compose.runtime)
             implementation(compose.foundation)
+            implementation(compose.animation)
             implementation(compose.material3)
+            implementation(compose.materialIconsExtended)
             implementation(compose.ui)
             // implementation(compose.components.resources) // Disabled - causes archive issues when not using Compose Resources
 
@@ -51,9 +54,9 @@ kotlin {
             // Koala Plot
             implementation(libs.koalaplot.core)
 
-            // Cupertino
-            implementation(libs.cupertino)
-            implementation(libs.cupertino.adaptive)
+            // Cupertino - disabled due to Compose version incompatibility
+            // implementation(libs.cupertino)
+            // implementation(libs.cupertino.adaptive)
 
             // Multiplatform Settings
             implementation(libs.multiplatform.settings)

@@ -8,7 +8,7 @@ import com.joebad.fastbreak.ui.diagnostics.DiagnosticsInfo
 import com.mohamedrejeb.calf.permissions.PermissionStatus
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
-import kotlinx.datetime.Clock
+import kotlin.time.Clock
 import org.orbitmvi.orbit.Container
 import org.orbitmvi.orbit.ContainerHost
 import org.orbitmvi.orbit.container

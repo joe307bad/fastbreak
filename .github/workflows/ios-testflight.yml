@@ -16,7 +16,10 @@ jobs:
     
     steps:
       - uses: actions/checkout@v4
-      
+
+      - name: Select Xcode 16
+        run: sudo xcode-select -s /Applications/Xcode_16.1.app/Contents/Developer
+
       - name: Set up JDK
         uses: actions/setup-java@v4
         with:

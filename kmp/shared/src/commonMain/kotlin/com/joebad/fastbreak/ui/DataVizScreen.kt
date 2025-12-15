@@ -192,6 +192,11 @@ private fun SuccessContent(visualization: VisualizationType) {
                                 title = visualization.title,
                                 xAxisLabel = visualization.xAxisLabel,
                                 yAxisLabel = visualization.yAxisLabel,
+                                invertYAxis = visualization.invertYAxis,
+                                quadrantTopRight = visualization.quadrantTopRight,
+                                quadrantTopLeft = visualization.quadrantTopLeft,
+                                quadrantBottomLeft = visualization.quadrantBottomLeft,
+                                quadrantBottomRight = visualization.quadrantBottomRight,
                                 modifier = Modifier.fillMaxWidth()
                             )
                         }

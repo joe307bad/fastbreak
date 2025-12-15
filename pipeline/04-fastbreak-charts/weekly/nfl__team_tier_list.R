@@ -52,6 +52,11 @@ output_data <- list(
   lastUpdated = format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC"),
   xAxisLabel = "Offensive EPA per Play",
   yAxisLabel = "Defensive EPA per Play",
+  invertYAxis = TRUE,
+  quadrantTopRight = list(color = "#4CAF50", label = "Good D/Good O"),
+  quadrantTopLeft = list(color = "#2196F3", label = "Good D/Bad O"),
+  quadrantBottomLeft = list(color = "#F44336", label = "Bad D/Bad O"),
+  quadrantBottomRight = list(color = "#FFEB3B", label = "Good O/Bad D"),
   dataPoints = data_points
 )
 

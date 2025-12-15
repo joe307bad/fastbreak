@@ -45,6 +45,12 @@ data class ScatterPlotDataPoint(
 )
 
 @Serializable
+data class QuadrantConfig(
+    val color: String,
+    val label: String
+)
+
+@Serializable
 data class ScatterPlotVisualization(
     override val sport: String,
     override val visualizationType: String,
@@ -54,6 +60,11 @@ data class ScatterPlotVisualization(
     override val lastUpdated: Instant,
     val xAxisLabel: String,
     val yAxisLabel: String,
+    val invertYAxis: Boolean = false,
+    val quadrantTopRight: QuadrantConfig? = null,
+    val quadrantTopLeft: QuadrantConfig? = null,
+    val quadrantBottomLeft: QuadrantConfig? = null,
+    val quadrantBottomRight: QuadrantConfig? = null,
     val dataPoints: List<ScatterPlotDataPoint>
 ) : VisualizationType
 

@@ -25,6 +25,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.joebad.fastbreak.data.model.QuadrantConfig
 import com.joebad.fastbreak.data.model.ScatterPlotDataPoint
 import kotlin.math.abs
 import kotlin.math.ceil
@@ -48,40 +49,70 @@ private fun Double.formatTo(decimals: Int): String {
     return this.toFloat().formatTo(decimals)
 }
 
+// Helper to parse hex color string to Compose Color
+private fun parseHexColor(hex: String): Color {
+    val cleanHex = hex.removePrefix("#")
+    return Color(("FF$cleanHex").toLong(16))
+}
+
 @Composable
 fun FourQuadrantScatterPlot(
     data: List<ScatterPlotDataPoint>,
     modifier: Modifier = Modifier,
     title: String = "4-Quadrant Scatter Plot",
     xAxisLabel: String = "X Axis",
-    yAxisLabel: String = "Y Axis"
+    yAxisLabel: String = "Y Axis",
+    invertYAxis: Boolean = false,
+    quadrantTopRight: QuadrantConfig? = null,
+    quadrantTopLeft: QuadrantConfig? = null,
+    quadrantBottomLeft: QuadrantConfig? = null,
+    quadrantBottomRight: QuadrantConfig? = null
 ) {
-    // Zoom and pan state
-    var scale by remember { mutableStateOf(1f) }
+    // Resolve quadrant colors (use config or defaults)
+    val topRightColor = quadrantTopRight?.let { parseHexColor(it.color) } ?: Color(0xFF4CAF50)
+    val topLeftColor = quadrantTopLeft?.let { parseHexColor(it.color) } ?: Color(0xFF2196F3)
+    val bottomLeftColor = quadrantBottomLeft?.let { parseHexColor(it.color) } ?: Color(0xFFFF9800)
+    val bottomRightColor = quadrantBottomRight?.let { parseHexColor(it.color) } ?: Color(0xFFF44336)
+
+    // Resolve quadrant labels (use config or defaults)
+    val topRightLabel = quadrantTopRight?.label ?: "Elite"
+    val topLeftLabel = quadrantTopLeft?.label ?: "Efficient"
+    val bottomLeftLabel = quadrantBottomLeft?.label ?: "Struggling"
+    val bottomRightLabel = quadrantBottomRight?.label ?: "Inefficient"
+
+    // Zoom and pan state - start zoomed out for better overview
+    var scale by remember { mutableStateOf(0.75f) }
     var offsetX by remember { mutableStateOf(0f) }
     var offsetY by remember { mutableStateOf(0f) }
 
-    val (minX, maxX, minY, maxY) = remember(data) {
+    // When invertYAxis is true, we multiply Y values by -1 for positioning
+    // This keeps panning natural while visually inverting the axis
+    val yMultiplier = if (invertYAxis) -1.0 else 1.0
+
+    val (minX, maxX, minY, maxY) = remember(data, invertYAxis) {
         val minX = data.minOfOrNull { it.x } ?: 50.0
         val maxX = data.maxOfOrNull { it.x } ?: 100.0
-        val minY = data.minOfOrNull { it.y } ?: -0.2
-        val maxY = data.maxOfOrNull { it.y } ?: 0.4
+        // Transform Y values for positioning
+        val transformedYValues = data.map { it.y * yMultiplier }
+        val minY = transformedYValues.minOrNull() ?: -0.2
+        val maxY = transformedYValues.maxOrNull() ?: 0.4
         listOf(minX, maxX, minY, maxY)
     }
 
     // Calculate actual data averages (fixed, not based on visible range)
-    val (avgPFF, avgEPA) = remember(data) {
+    // Use transformed Y values for positioning
+    val (avgPFF, avgEPA) = remember(data, invertYAxis) {
         val avgX = data.map { it.x }.average()
-        val avgY = data.map { it.y }.average()
+        val avgY = data.map { it.y * yMultiplier }.average()
         Pair(avgX, avgY)
     }
 
-    // Calculate linear regression (line of best fit)
-    val (slope, intercept) = remember(data) {
+    // Calculate linear regression (line of best fit) using transformed Y values
+    val (slope, intercept) = remember(data, invertYAxis) {
         val n = data.size.toDouble()
         val sumX = data.sumOf { it.x }
-        val sumY = data.sumOf { it.y }
-        val sumXY = data.sumOf { it.x * it.y }
+        val sumY = data.sumOf { it.y * yMultiplier }
+        val sumXY = data.sumOf { it.x * it.y * yMultiplier }
         val sumX2 = data.sumOf { it.x * it.x }
 
         // y = mx + b
@@ -274,6 +305,7 @@ fun FourQuadrantScatterPlot(
             // Draw Y-axis ticks and labels
             val yTicks = calculateNiceTicksY(adjustedYRange)
             yTicks.forEach { tickValue ->
+                // Normal Y coordinate calculation (higher values at top)
                 val y = height - bottomPadding - (height - topPadding - bottomPadding) * (tickValue - visibleMinY) / adjustedYRange
 
                 // Draw tick mark
@@ -292,8 +324,9 @@ fun FourQuadrantScatterPlot(
                     strokeWidth = 1f
                 )
 
-                // Draw tick label
-                val tickLabel = tickValue.formatTo(2)
+                // Draw tick label - show original value (multiply by -1 when inverted)
+                val displayValue = if (invertYAxis) -tickValue else tickValue
+                val tickLabel = displayValue.formatTo(2)
                 val measured = textMeasurer.measure(tickLabel, labelTextStyle)
                 drawText(
                     textMeasurer,
@@ -339,8 +372,9 @@ fun FourQuadrantScatterPlot(
                     pathEffect = PathEffect.dashPathEffect(floatArrayOf(12f, 6f))
                 )
 
-                // Label for the average EPA line
-                val avgLabel = "Avg: ${avgEPA.formatTo(2)}"
+                // Label for the average EPA line - show original value
+                val displayAvgEPA = if (invertYAxis) -avgEPA else avgEPA
+                val avgLabel = "Avg: ${displayAvgEPA.formatTo(2)}"
                 val measured = textMeasurer.measure(avgLabel, labelTextStyle.copy(fontSize = 10.sp))
                 drawText(
                     textMeasurer,
@@ -362,7 +396,7 @@ fun FourQuadrantScatterPlot(
                 val trendYStart = slope * visibleMinX + intercept
                 val trendYEnd = slope * visibleMaxX + intercept
 
-                // Convert to screen coordinates
+                // Convert to screen coordinates (normal positioning)
                 val trendX1 = leftPadding
                 val trendY1 = height - bottomPadding - (height - topPadding - bottomPadding) * (trendYStart.toFloat() - visibleMinY) / adjustedYRange
                 val trendX2 = width - rightPadding
@@ -411,16 +445,20 @@ fun FourQuadrantScatterPlot(
             ) {
                 data.forEach { point ->
                     val x = leftPadding + (width - leftPadding - rightPadding) * (point.x.toFloat() - visibleMinX) / adjustedXRange
-                    val y = height - bottomPadding - (height - topPadding - bottomPadding) * (point.y.toFloat() - visibleMinY) / adjustedYRange
+                    // Use transformed Y value for positioning (multiplied by yMultiplier)
+                    val transformedY = (point.y * yMultiplier).toFloat()
+                    val y = height - bottomPadding - (height - topPadding - bottomPadding) * (transformedY - visibleMinY) / adjustedYRange
 
                     // Only draw if point is in visible range
                     if (x >= leftPadding && x <= width - rightPadding && y >= topPadding && y <= height - bottomPadding) {
-                        // Determine quadrant based on comparison to data averages (not visible averages)
+                        // Determine quadrant based on comparison to data averages
+                        // Since avgEPA is already computed with transformed Y values, this comparison works naturally
+                        // Higher transformed Y = better (visually at top of chart)
                         val pointColor = when {
-                            point.x >= avgPFF && point.y >= avgEPA -> Color(0xFF4CAF50) // Q1 - High PFF, High EPA (Green)
-                            point.x < avgPFF && point.y >= avgEPA -> Color(0xFF2196F3)  // Q2 - Low PFF, High EPA (Blue)
-                            point.x < avgPFF && point.y < avgEPA -> Color(0xFFFF9800)   // Q3 - Low PFF, Low EPA (Orange)
-                            else -> Color(0xFFF44336)                                   // Q4 - High PFF, Low EPA (Red)
+                            point.x >= avgPFF && transformedY >= avgEPA -> topRightColor    // Top-right quadrant
+                            point.x < avgPFF && transformedY >= avgEPA -> topLeftColor      // Top-left quadrant
+                            point.x < avgPFF && transformedY < avgEPA -> bottomLeftColor    // Bottom-left quadrant
+                            else -> bottomRightColor                                         // Bottom-right quadrant
                         }
 
                         // Draw point
@@ -457,26 +495,29 @@ fun FourQuadrantScatterPlot(
             modifier = Modifier.padding(top = 4.dp, bottom = 2.dp)
         )
 
-        // Quadrant legend
-        Row(
+        // Quadrant legend - uses FlowRow to wrap to multiple lines if needed
+        FlowRow(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(vertical = 4.dp, horizontal = 8.dp),
-            horizontalArrangement = Arrangement.SpaceEvenly
+            horizontalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterHorizontally),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
-            QuadrantLabel("Elite", Color(0xFF4CAF50))
-            QuadrantLabel("Efficient", Color(0xFF2196F3))
-            QuadrantLabel("Struggling", Color(0xFFFF9800))
-            QuadrantLabel("Inefficient", Color(0xFFF44336))
+            QuadrantLabel(topRightLabel, topRightColor)
+            QuadrantLabel(topLeftLabel, topLeftColor)
+            QuadrantLabel(bottomLeftLabel, bottomLeftColor)
+            QuadrantLabel(bottomRightLabel, bottomRightColor)
         }
     }
 }
 
 @Composable
 private fun QuadrantLabel(text: String, color: Color) {
+    // Dot and label grouped together so they stay on the same line
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp)
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        modifier = Modifier.padding(vertical = 2.dp)
     ) {
         Box(
             modifier = Modifier
@@ -485,7 +526,8 @@ private fun QuadrantLabel(text: String, color: Color) {
         )
         Text(
             text = text,
-            style = MaterialTheme.typography.bodySmall
+            style = MaterialTheme.typography.bodySmall,
+            maxLines = 1
         )
     }
 }

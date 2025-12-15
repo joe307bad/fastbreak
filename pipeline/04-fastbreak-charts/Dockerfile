@@ -9,8 +9,9 @@ RUN apt-get update && \
 
 # Install remaining R packages (tidyverse deps already installed)
 RUN R -e "options(repos = c(CRAN = 'https://packagemanager.posit.co/cran/__linux__/jammy/latest')); \
-    install.packages('nflreadr'); \
-    if (!require('nflreadr')) stop('nflreadr installation failed')"
+    install.packages(c('nflreadr', 'hoopR')); \
+    if (!require('nflreadr')) stop('nflreadr installation failed'); \
+    if (!require('hoopR')) stop('hoopR installation failed')"
 
 # Create app directory
 WORKDIR /app

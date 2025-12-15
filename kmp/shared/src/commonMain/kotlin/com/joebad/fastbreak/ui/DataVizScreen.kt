@@ -170,69 +170,104 @@ private fun LoadingContent() {
 
 @Composable
 private fun SuccessContent(visualization: VisualizationType) {
-    val scrollState = rememberScrollState()
-
-    BoxWithConstraints(
-        modifier = Modifier.fillMaxSize()
-    ) {
-        val isLandscape = maxWidth > maxHeight
-
+    // TableVisualization has its own scrolling, so don't wrap it in verticalScroll
+    if (visualization is TableVisualization) {
+        // For tables: use Column with table taking most space, source at bottom
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .verticalScroll(scrollState)
+                .padding(horizontal = 8.dp, vertical = 4.dp)
         ) {
-            // Visualization - with right padding in landscape so users can scroll without triggering pan gestures
-            Row(modifier = Modifier.fillMaxWidth()) {
-                Box(modifier = Modifier.weight(1f)) {
-                    when (visualization) {
-                        is ScatterPlotVisualization -> {
-                            FourQuadrantScatterPlot(
-                                data = visualization.dataPoints,
-                                title = visualization.title,
-                                xAxisLabel = visualization.xAxisLabel,
-                                yAxisLabel = visualization.yAxisLabel,
-                                invertYAxis = visualization.invertYAxis,
-                                quadrantTopRight = visualization.quadrantTopRight,
-                                quadrantTopLeft = visualization.quadrantTopLeft,
-                                quadrantBottomLeft = visualization.quadrantBottomLeft,
-                                quadrantBottomRight = visualization.quadrantBottomRight,
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                        }
-                        is BarGraphVisualization -> {
-                            BarChartComponent(
-                                data = visualization.dataPoints,
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                        }
-                        is LineChartVisualization -> {
-                            LineChartComponent(
-                                series = visualization.series,
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                        }
-                        else -> {
-                            Text(
-                                text = "This visualization type is not yet supported",
-                                style = MaterialTheme.typography.bodyLarge,
-                                modifier = Modifier.padding(16.dp)
-                            )
-                        }
-                    }
-                }
-                // Right padding area for scrolling (only in landscape)
-                if (isLandscape) {
-                    Spacer(modifier = Modifier.width(40.dp))
-                }
-            }
-
-            // Data table - full width, minimal padding
+            // Table takes remaining space
             DataTableComponent(
                 visualization = visualization,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
             )
+
+            // Source attribution at bottom
+            SourceAttribution(source = visualization.source)
         }
+    } else {
+        // For charts: use vertical scroll to show chart + data table
+        val scrollState = rememberScrollState()
+
+        BoxWithConstraints(
+            modifier = Modifier.fillMaxSize()
+        ) {
+            val isLandscape = maxWidth > maxHeight
+
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(scrollState)
+            ) {
+                // Visualization - with right padding in landscape so users can scroll without triggering pan gestures
+                Row(modifier = Modifier.fillMaxWidth()) {
+                    Box(modifier = Modifier.weight(1f)) {
+                        when (visualization) {
+                            is ScatterPlotVisualization -> {
+                                FourQuadrantScatterPlot(
+                                    data = visualization.dataPoints,
+                                    title = visualization.title,
+                                    xAxisLabel = visualization.xAxisLabel,
+                                    yAxisLabel = visualization.yAxisLabel,
+                                    invertYAxis = visualization.invertYAxis,
+                                    quadrantTopRight = visualization.quadrantTopRight,
+                                    quadrantTopLeft = visualization.quadrantTopLeft,
+                                    quadrantBottomLeft = visualization.quadrantBottomLeft,
+                                    quadrantBottomRight = visualization.quadrantBottomRight,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                            }
+                            is BarGraphVisualization -> {
+                                BarChartComponent(
+                                    data = visualization.dataPoints,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                            }
+                            is LineChartVisualization -> {
+                                LineChartComponent(
+                                    series = visualization.series,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                            }
+                            is TableVisualization -> {
+                                // Handled above
+                            }
+                        }
+                    }
+                    // Right padding area for scrolling (only in landscape)
+                    if (isLandscape) {
+                        Spacer(modifier = Modifier.width(40.dp))
+                    }
+                }
+
+                // Data table - full width, minimal padding
+                DataTableComponent(
+                    visualization = visualization,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                // Source attribution at bottom
+                SourceAttribution(source = visualization.source)
+            }
+        }
+    }
+}
+
+@Composable
+private fun SourceAttribution(source: String?) {
+    if (source != null) {
+        Text(
+            text = "Data source: $source",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 12.dp)
+        )
     }
 }
 

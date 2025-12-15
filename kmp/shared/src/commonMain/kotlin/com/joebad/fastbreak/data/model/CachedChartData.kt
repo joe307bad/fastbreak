@@ -73,6 +73,7 @@ data class CachedChartData(
             VizType.SCATTER_PLOT -> json.decodeFromString<ScatterPlotVisualization>(dataJson)
             VizType.BAR_GRAPH -> json.decodeFromString<BarGraphVisualization>(dataJson)
             VizType.LINE_CHART -> json.decodeFromString<LineChartVisualization>(dataJson)
+            VizType.TABLE -> json.decodeFromString<TableVisualization>(dataJson)
         }
     }
 }

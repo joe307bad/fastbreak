@@ -59,6 +59,7 @@ output_data <- list(
   quadrantTopLeft = list(color = "#2196F3", label = "Good D/Bad O"),
   quadrantBottomLeft = list(color = "#F44336", label = "Bad D/Bad O"),
   quadrantBottomRight = list(color = "#FFEB3B", label = "Good O/Bad D"),
+  source = "nflfastR / nflreadr",
   dataPoints = data_points
 )
 

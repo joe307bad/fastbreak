@@ -10,5 +10,6 @@ import kotlinx.serialization.Serializable
 enum class VizType {
     SCATTER_PLOT,
     BAR_GRAPH,
-    LINE_CHART
+    LINE_CHART,
+    TABLE
 }

@@ -27,6 +27,25 @@ import androidx.compose.ui.unit.sp
 import com.joebad.fastbreak.data.model.LineChartSeries
 import kotlin.math.*
 
+/**
+ * Parses a hex color string (e.g., "#FF5722") to a Compose Color.
+ * Returns null if the string is invalid.
+ */
+private fun parseHexColor(hex: String?): Color? {
+    if (hex == null) return null
+    return try {
+        val colorString = hex.removePrefix("#")
+        val colorLong = when (colorString.length) {
+            6 -> "FF$colorString".toLong(16) // Add alpha if not present
+            8 -> colorString.toLong(16)
+            else -> return null
+        }
+        Color(colorLong)
+    } catch (e: Exception) {
+        null
+    }
+}
+
 private fun Float.formatTo(decimals: Int): String {
     val multiplier = when (decimals) {
         1 -> 10.0
@@ -48,12 +67,22 @@ fun LineChartComponent(
 ) {
     if (series.isEmpty() || series.all { it.dataPoints.isEmpty() }) return
 
-    val colors = listOf(
+    // Default color palette as fallback when series don't specify colors
+    val defaultColors = listOf(
         MaterialTheme.colorScheme.primary,
         MaterialTheme.colorScheme.secondary,
         MaterialTheme.colorScheme.tertiary,
-        MaterialTheme.colorScheme.error
+        MaterialTheme.colorScheme.error,
+        Color(0xFF9C27B0), // Purple
+        Color(0xFF009688), // Teal
+        Color(0xFFFF9800), // Orange
+        Color(0xFF795548)  // Brown
     )
+
+    // Parse custom colors from series data, falling back to default palette
+    val seriesColors = series.mapIndexed { index, lineSeries ->
+        parseHexColor(lineSeries.color) ?: defaultColors[index % defaultColors.size]
+    }
 
     val axisColor = MaterialTheme.colorScheme.onSurface
     val gridColor = MaterialTheme.colorScheme.outlineVariant
@@ -293,7 +322,7 @@ fun LineChartComponent(
                 series.forEachIndexed { seriesIndex, lineSeries ->
                     if (lineSeries.dataPoints.size < 2) return@forEachIndexed
 
-                    val color = colors[seriesIndex % colors.size]
+                    val color = seriesColors[seriesIndex]
                     val path = Path()
                     var pathStarted = false
 
@@ -391,7 +420,7 @@ fun LineChartComponent(
                     Box(
                         modifier = Modifier
                             .size(12.dp)
-                            .background(colors[index % colors.size], CircleShape)
+                            .background(seriesColors[index], CircleShape)
                     )
                     Text(
                         text = lineSeries.label,

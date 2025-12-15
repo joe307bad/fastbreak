@@ -5,14 +5,20 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.joebad.fastbreak.data.model.*
 import kotlin.math.roundToInt
@@ -56,7 +62,7 @@ fun DataTableComponent(
             )
             is BarGraphVisualization -> BarDataTable(visualization.dataPoints)
             is LineChartVisualization -> LineDataTable(visualization.series)
-            else -> Text("No data available", modifier = Modifier.padding(8.dp))
+            is TableVisualization -> GenericDataTable(visualization.dataPoints)
         }
     }
 }
@@ -296,4 +302,210 @@ private fun TableCell(text: String, width: androidx.compose.ui.unit.Dp) {
         overflow = TextOverflow.Ellipsis,
         modifier = Modifier.width(width)
     )
+}
+
+/**
+ * Generic data table with pinned header row and pinned left column.
+ * Uses synchronized scroll states for smooth scrolling experience.
+ */
+@Composable
+private fun GenericDataTable(data: List<TableDataPoint>) {
+    if (data.isEmpty()) {
+        Text("No data available", modifier = Modifier.padding(8.dp))
+        return
+    }
+
+    // Get column headers from first data point
+    val columns = data.firstOrNull()?.columns ?: emptyList()
+
+    // Scroll states for synchronized scrolling
+    val horizontalScrollState = rememberScrollState()
+    val verticalScrollState = rememberScrollState()
+    val headerHorizontalScrollState = rememberScrollState()
+    val leftColumnVerticalScrollState = rememberScrollState()
+
+    // Sync horizontal scroll between header and data area
+    LaunchedEffect(horizontalScrollState) {
+        snapshotFlow { horizontalScrollState.value }
+            .collect { value ->
+                if (headerHorizontalScrollState.value != value) {
+                    headerHorizontalScrollState.scrollTo(value)
+                }
+            }
+    }
+
+    LaunchedEffect(headerHorizontalScrollState) {
+        snapshotFlow { headerHorizontalScrollState.value }
+            .collect { value ->
+                if (horizontalScrollState.value != value) {
+                    horizontalScrollState.scrollTo(value)
+                }
+            }
+    }
+
+    // Sync vertical scroll between left column and data area
+    LaunchedEffect(verticalScrollState) {
+        snapshotFlow { verticalScrollState.value }
+            .collect { value ->
+                if (leftColumnVerticalScrollState.value != value) {
+                    leftColumnVerticalScrollState.scrollTo(value)
+                }
+            }
+    }
+
+    LaunchedEffect(leftColumnVerticalScrollState) {
+        snapshotFlow { leftColumnVerticalScrollState.value }
+            .collect { value ->
+                if (verticalScrollState.value != value) {
+                    verticalScrollState.scrollTo(value)
+                }
+            }
+    }
+
+    val labelColumnWidth = 100.dp
+    val dataColumnWidth = 90.dp
+    val rowHeight = 36.dp
+    val headerHeight = 40.dp
+    val backgroundColor = MaterialTheme.colorScheme.background
+    val dividerColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
+
+    Column(modifier = Modifier.fillMaxSize()) {
+        // Top row: pinned corner + scrollable header (fixed height)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(headerHeight)
+        ) {
+            // Top-left corner: pinned "Team" header
+            Box(
+                modifier = Modifier
+                    .width(labelColumnWidth)
+                    .fillMaxHeight()
+                    .background(backgroundColor),
+                contentAlignment = Alignment.CenterStart
+            ) {
+                Text(
+                    text = "Team",
+                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.onBackground,
+                    modifier = Modifier.padding(horizontal = 8.dp)
+                )
+            }
+
+            // Vertical divider between pinned column and scrollable area
+            VerticalDivider(
+                modifier = Modifier.fillMaxHeight(),
+                color = dividerColor,
+                thickness = 1.dp
+            )
+
+            // Top-right: scrollable column headers
+            Row(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+                    .horizontalScroll(headerHorizontalScrollState)
+                    .background(backgroundColor),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                columns.forEach { column ->
+                    Box(
+                        modifier = Modifier
+                            .width(dataColumnWidth)
+                            .fillMaxHeight(),
+                        contentAlignment = Alignment.CenterStart
+                    ) {
+                        Text(
+                            text = column.label,
+                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.onBackground,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.padding(horizontal = 4.dp)
+                        )
+                    }
+                }
+            }
+        }
+
+        // Header divider
+        HorizontalDivider(color = dividerColor, thickness = 1.dp)
+
+        // Bottom row: pinned left column + scrollable data (takes remaining space)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f)  // Take remaining vertical space
+        ) {
+            // Bottom-left: pinned team names column (vertically scrollable)
+            Column(
+                modifier = Modifier
+                    .width(labelColumnWidth)
+                    .fillMaxHeight()
+                    .verticalScroll(leftColumnVerticalScrollState)
+                    .background(backgroundColor)
+            ) {
+                data.forEach { point ->
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(rowHeight),
+                        contentAlignment = Alignment.CenterStart
+                    ) {
+                        Text(
+                            text = point.label,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.padding(horizontal = 8.dp)
+                        )
+                    }
+                    HorizontalDivider(color = dividerColor, thickness = 0.5.dp)
+                }
+            }
+
+            // Vertical divider between pinned column and scrollable area
+            VerticalDivider(
+                modifier = Modifier.fillMaxHeight(),
+                color = dividerColor,
+                thickness = 1.dp
+            )
+
+            // Bottom-right: scrollable data area (both directions)
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+                    .horizontalScroll(horizontalScrollState)
+                    .verticalScroll(verticalScrollState)
+            ) {
+                data.forEach { point ->
+                    Row(
+                        modifier = Modifier.height(rowHeight),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        point.columns.forEach { column ->
+                            Box(
+                                modifier = Modifier
+                                    .width(dataColumnWidth)
+                                    .fillMaxHeight(),
+                                contentAlignment = Alignment.CenterStart
+                            ) {
+                                Text(
+                                    text = column.value,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.padding(horizontal = 4.dp)
+                                )
+                            }
+                        }
+                    }
+                    HorizontalDivider(color = dividerColor, thickness = 0.5.dp)
+                }
+            }
+        }
+    }
 }

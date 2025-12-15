@@ -3,6 +3,7 @@ package com.joebad.fastbreak.ui.container
 import com.joebad.fastbreak.data.model.BarGraphVisualization
 import com.joebad.fastbreak.data.model.LineChartVisualization
 import com.joebad.fastbreak.data.model.ScatterPlotVisualization
+import com.joebad.fastbreak.data.model.TableVisualization
 import com.joebad.fastbreak.domain.registry.ChartDataSynchronizer
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.serialization.json.Json
@@ -85,6 +86,9 @@ class ChartDataContainer(
                     }
                     com.joebad.fastbreak.data.model.VizType.LINE_CHART -> {
                         json.decodeFromString<LineChartVisualization>(cached.dataJson)
+                    }
+                    com.joebad.fastbreak.data.model.VizType.TABLE -> {
+                        json.decodeFromString<TableVisualization>(cached.dataJson)
                     }
                 }
 

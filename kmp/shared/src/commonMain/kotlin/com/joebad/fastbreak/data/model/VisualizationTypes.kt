@@ -15,6 +15,7 @@ sealed interface VisualizationType {
     val subtitle: String
     val description: String
     val lastUpdated: Instant
+    val source: String?
 }
 
 // Bar Graph data structures
@@ -32,6 +33,7 @@ data class BarGraphVisualization(
     override val subtitle: String,
     override val description: String,
     override val lastUpdated: Instant,
+    override val source: String? = null,
     val dataPoints: List<BarGraphDataPoint>
 ) : VisualizationType
 
@@ -58,6 +60,7 @@ data class ScatterPlotVisualization(
     override val subtitle: String,
     override val description: String,
     override val lastUpdated: Instant,
+    override val source: String? = null,
     val xAxisLabel: String,
     val yAxisLabel: String,
     val xColumnLabel: String? = null,
@@ -80,7 +83,12 @@ data class LineChartDataPoint(
 @Serializable
 data class LineChartSeries(
     val label: String,
-    val dataPoints: List<LineChartDataPoint>
+    val dataPoints: List<LineChartDataPoint>,
+    /**
+     * Optional hex color for this series (e.g., "#FF5722")
+     * If not provided, a default color from the palette will be used
+     */
+    val color: String? = null
 )
 
 @Serializable
@@ -91,6 +99,7 @@ data class LineChartVisualization(
     override val subtitle: String,
     override val description: String,
     override val lastUpdated: Instant,
+    override val source: String? = null,
     val series: List<LineChartSeries>
 ) : VisualizationType
 
@@ -115,5 +124,6 @@ data class TableVisualization(
     override val subtitle: String,
     override val description: String,
     override val lastUpdated: Instant,
+    override val source: String? = null,
     val dataPoints: List<TableDataPoint>
 ) : VisualizationType

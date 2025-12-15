@@ -1,0 +1,44 @@
+name: Deploy to TestFlight
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'kmp/**'
+
+jobs:
+  deploy:
+    runs-on: macos-14
+    defaults:
+      run:
+        working-directory: kmp
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.2'
+          bundler-cache: true
+          working-directory: iosApp
+      
+      - name: Build KMP Framework
+        run: ./gradlew :shared:linkReleaseFrameworkIosArm64
+
+      - name: Deploy to TestFlight
+        working-directory: iosApp
+        env:
+          MATCH_GIT_BASIC_AUTHORIZATION: ${{ secrets.MATCH_GIT_BASIC_AUTHORIZATION }}
+          MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
+          APP_STORE_CONNECT_API_KEY_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          APP_STORE_CONNECT_API_KEY_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          APP_STORE_CONNECT_API_KEY_KEY: ${{ secrets.ASC_PRIVATE_KEY }}
+        run: bundle exec fastlane beta

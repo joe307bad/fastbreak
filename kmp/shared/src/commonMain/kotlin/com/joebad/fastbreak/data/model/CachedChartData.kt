@@ -42,7 +42,18 @@ data class CachedChartData(
      * Will be one of: BarGraphVisualization, ScatterPlotVisualization, or LineChartVisualization
      * This allows flexible storage without complex type handling in multiplatform-settings
      */
-    val dataJson: String
+    val dataJson: String,
+
+    /**
+     * Update interval for the chart (e.g., "weekly", "daily")
+     */
+    val interval: String? = null,
+
+    /**
+     * Whether the user has viewed this chart
+     * Used to show "new" indicator on unviewed charts
+     */
+    val viewed: Boolean = false
 ) {
     /**
      * Estimate the size of this cached data in bytes (approximate)

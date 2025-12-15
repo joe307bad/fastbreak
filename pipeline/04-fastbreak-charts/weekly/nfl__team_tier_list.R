@@ -52,6 +52,8 @@ output_data <- list(
   lastUpdated = format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC"),
   xAxisLabel = "Offensive EPA per Play",
   yAxisLabel = "Defensive EPA per Play",
+  xColumnLabel = "OEPA",
+  yColumnLabel = "DEPA",
   invertYAxis = TRUE,
   quadrantTopRight = list(color = "#4CAF50", label = "Good D/Good O"),
   quadrantTopLeft = list(color = "#2196F3", label = "Good D/Bad O"),
@@ -89,12 +91,13 @@ if (result != 0) {
 
 cat("Uploaded to S3:", s3_path, "\n")
 
-# Update DynamoDB with updatedAt and title
+# Update DynamoDB with updatedAt, title, and interval
 dynamodb_table <- Sys.getenv("AWS_DYNAMODB_TABLE", "fastbreak-file-timestamps")
 utc_timestamp <- format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC")
 chart_title <- output_data$title
+chart_interval <- "weekly"
 
-dynamodb_item <- sprintf('{"file_key": {"S": "%s"}, "updatedAt": {"S": "%s"}, "title": {"S": "%s"}}', s3_key, utc_timestamp, chart_title)
+dynamodb_item <- sprintf('{"file_key": {"S": "%s"}, "updatedAt": {"S": "%s"}, "title": {"S": "%s"}, "interval": {"S": "%s"}}', s3_key, utc_timestamp, chart_title, chart_interval)
 dynamodb_cmd <- sprintf(
   'aws dynamodb put-item --table-name %s --item %s',
   shQuote(dynamodb_table),
@@ -106,7 +109,7 @@ dynamodb_result <- system(dynamodb_cmd)
 if (dynamodb_result != 0) {
   warning("Failed to update DynamoDB timestamp (non-fatal)")
 } else {
-  cat("Updated DynamoDB:", dynamodb_table, "key:", s3_key, "updatedAt:", utc_timestamp, "title:", chart_title, "\n")
+  cat("Updated DynamoDB:", dynamodb_table, "key:", s3_key, "updatedAt:", utc_timestamp, "title:", chart_title, "interval:", chart_interval, "\n")
 }
 
 cat("Total teams:", length(data_points), "\n")

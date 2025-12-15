@@ -155,4 +155,24 @@ class ChartDataRepository(
     fun hasChartData(chartId: String): Boolean {
         return settings.hasKey("$PREFIX_CHART$chartId")
     }
+
+    /**
+     * Marks a chart as viewed by the user.
+     * Updates the cached data with viewed = true.
+     *
+     * @param chartId The ID of the chart to mark as viewed
+     * @return true if the chart was successfully marked as viewed
+     */
+    fun markChartAsViewed(chartId: String): Boolean {
+        val cachedData = getChartData(chartId) ?: return false
+
+        // Only update if not already viewed
+        if (cachedData.viewed) {
+            return true
+        }
+
+        val updatedData = cachedData.copy(viewed = true)
+        saveChartData(chartId, updatedData)
+        return true
+    }
 }

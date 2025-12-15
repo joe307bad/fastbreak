@@ -270,7 +270,8 @@ class ChartDataSynchronizer(
             lastUpdated = entry.updatedAt,
             visualizationType = vizType,
             cachedAt = Clock.System.now(),
-            dataJson = rawJson
+            dataJson = rawJson,
+            interval = entry.interval
         )
 
         println("💾 Caching chart $chartId with timestamp: ${entry.updatedAt}")
@@ -294,7 +295,10 @@ class ChartDataSynchronizer(
             subtitle = vizData.subtitle,
             lastUpdated = cached.lastUpdated,
             visualizationType = cached.visualizationType,
-            url = "" // URL not needed once cached
+            url = "", // URL not needed once cached
+            interval = cached.interval,
+            cachedAt = cached.cachedAt,
+            viewed = cached.viewed
         )
     }
 
@@ -355,5 +359,15 @@ class ChartDataSynchronizer(
      */
     fun hasChartData(chartId: String): Boolean {
         return chartDataRepository.hasChartData(chartId)
+    }
+
+    /**
+     * Marks a chart as viewed by the user.
+     *
+     * @param chartId The chart ID to mark as viewed
+     * @return true if the chart was successfully marked as viewed
+     */
+    fun markChartAsViewed(chartId: String): Boolean {
+        return chartDataRepository.markChartAsViewed(chartId)
     }
 }

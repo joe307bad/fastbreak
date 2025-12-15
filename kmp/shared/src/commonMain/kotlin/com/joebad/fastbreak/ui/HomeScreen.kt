@@ -1,9 +1,11 @@
 package com.joebad.fastbreak.ui
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
@@ -21,6 +23,8 @@ import com.arkivanov.decompose.extensions.compose.subscribeAsState
 import com.joebad.fastbreak.data.model.Sport
 import com.joebad.fastbreak.navigation.HomeComponent
 import com.joebad.fastbreak.ui.container.RegistryState
+import kotlin.time.Clock
+import kotlin.time.Instant
 
 @Composable
 fun HomeScreen(
@@ -32,7 +36,8 @@ fun HomeScreen(
     onInitialLoad: () -> Unit,
     onRequestPermission: () -> Unit,
     onCheckPermission: () -> Unit,
-    onClearSyncProgress: () -> Unit
+    onClearSyncProgress: () -> Unit,
+    onMarkChartAsViewed: (String) -> Unit = {}
 ) {
     val selectedSport by component.selectedSport.subscribeAsState()
 
@@ -166,15 +171,42 @@ fun HomeScreen(
                     }
                 }
             ) {
+                // Calculate which sports have unviewed charts
+                val sportsWithUnviewedCharts = remember(registryState.registry?.charts) {
+                    registryState.registry?.charts
+                        ?.filter { !it.viewed }
+                        ?.map { it.sport }
+                        ?.toSet()
+                        ?: emptySet()
+                }
+
                 Sport.entries.forEach { sport ->
+                    val hasUnviewedCharts = sport in sportsWithUnviewedCharts
+
                     Tab(
                         selected = selectedSport == sport,
                         onClick = { component.selectSport(sport) },
                         text = {
-                            Text(
-                                text = sport.displayName,
-                                style = MaterialTheme.typography.titleMedium
-                            )
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Text(
+                                    text = sport.displayName,
+                                    style = MaterialTheme.typography.titleMedium
+                                )
+                                // Show blue dot if this sport has unviewed charts
+                                if (hasUnviewedCharts) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(6.dp)
+                                            .background(
+                                                color = Color(0xFF2196F3), // Material Blue
+                                                shape = CircleShape
+                                            )
+                                    )
+                                }
+                            }
                         },
                         selectedContentColor = MaterialTheme.colorScheme.onBackground,
                         unselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant
@@ -304,11 +336,16 @@ fun HomeScreen(
                             VisualizationItem(
                                 title = chart.title,
                                 description = chart.subtitle,
+                                interval = chart.interval,
+                                lastUpdated = chart.lastUpdated,
+                                viewed = chart.viewed,
                                 isSyncing = isSyncing,
                                 isReady = isReady,
                                 onClick = {
                                     // Only navigate if chart is ready
                                     if (isReady) {
+                                        // Mark chart as viewed before navigating
+                                        onMarkChartAsViewed(chart.id)
                                         component.onNavigateToDataViz(chart.id, selectedSport, chart.visualizationType)
                                     }
                                 }
@@ -325,6 +362,9 @@ fun HomeScreen(
 private fun VisualizationItem(
     title: String,
     description: String,
+    interval: String?,
+    lastUpdated: Instant,
+    viewed: Boolean,
     isSyncing: Boolean,
     isReady: Boolean,
     onClick: () -> Unit
@@ -335,6 +375,9 @@ private fun VisualizationItem(
     } else {
         Modifier
     }
+
+    // Build the metadata line (interval + relative time)
+    val metadataText = buildMetadataText(interval, lastUpdated)
 
     Column(
         modifier = Modifier
@@ -348,17 +391,43 @@ private fun VisualizationItem(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = alpha)
-                )
+                // Title row with unviewed indicator
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = alpha)
+                    )
+                    // Show blue dot indicator for unviewed charts
+                    if (!viewed && isReady) {
+                        Box(
+                            modifier = Modifier
+                                .size(8.dp)
+                                .background(
+                                    color = Color(0xFF2196F3), // Material Blue
+                                    shape = CircleShape
+                                )
+                        )
+                    }
+                }
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = description,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = alpha)
                 )
+                // Show metadata (interval + relative time) if available
+                if (metadataText.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = metadataText,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary.copy(alpha = alpha)
+                    )
+                }
             }
 
             // Show loading indicator if syncing
@@ -374,6 +443,46 @@ private fun VisualizationItem(
             color = MaterialTheme.colorScheme.outline,
             thickness = 1.dp
         )
+    }
+}
+
+/**
+ * Builds the metadata text combining interval and relative time.
+ * Example outputs: "Weekly - updated 2h ago", "Daily - updated 5m ago", "updated just now"
+ */
+private fun buildMetadataText(interval: String?, lastUpdated: Instant): String {
+    val parts = mutableListOf<String>()
+
+    // Add interval if available
+    if (interval != null) {
+        parts.add(interval.replaceFirstChar { it.uppercase() })
+    }
+
+    // Add relative time
+    parts.add("updated ${formatRelativeTime(lastUpdated)}")
+
+    return parts.joinToString(" - ")
+}
+
+/**
+ * Formats an instant as a relative time string.
+ * Examples: "just now", "5m ago", "2h ago", "3d ago"
+ */
+private fun formatRelativeTime(instant: Instant): String {
+    val now = Clock.System.now()
+    val duration = now - instant
+
+    val totalSeconds = duration.inWholeSeconds
+    val totalMinutes = duration.inWholeMinutes
+    val totalHours = duration.inWholeHours
+    val totalDays = duration.inWholeDays
+
+    return when {
+        totalSeconds < 60 -> "just now"
+        totalMinutes < 60 -> "${totalMinutes}m ago"
+        totalHours < 24 -> "${totalHours}h ago"
+        totalDays < 7 -> "${totalDays}d ago"
+        else -> "${totalDays / 7}w ago"
     }
 }
 

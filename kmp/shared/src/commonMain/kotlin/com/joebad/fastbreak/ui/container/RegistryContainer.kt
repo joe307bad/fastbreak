@@ -139,6 +139,32 @@ class RegistryContainer(
     }
 
     /**
+     * Marks a chart as viewed by the user.
+     * Updates both the cache and the UI state.
+     *
+     * @param chartId The ID of the chart to mark as viewed
+     */
+    fun markChartAsViewed(chartId: String) = intent {
+        // Mark as viewed in the cache
+        chartDataSynchronizer.markChartAsViewed(chartId)
+
+        // Update the state to reflect the change immediately
+        val currentRegistry = state.registry ?: return@intent
+        val updatedCharts = currentRegistry.charts.map { chart ->
+            if (chart.id == chartId) {
+                chart.copy(viewed = true)
+            } else {
+                chart
+            }
+        }
+        val updatedRegistry = currentRegistry.copy(charts = updatedCharts)
+
+        reduce {
+            state.copy(registry = updatedRegistry)
+        }
+    }
+
+    /**
      * Loads the registry with 12-hour automatic update check.
      * Also triggers chart data synchronization after loading.
      */

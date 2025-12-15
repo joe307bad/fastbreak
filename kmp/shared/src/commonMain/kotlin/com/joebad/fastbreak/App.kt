@@ -59,7 +59,8 @@ fun App(rootComponent: RootComponent) {
                         onInitialLoad = { rootComponent.loadRegistry() },
                         onRequestPermission = { rootComponent.requestNetworkPermission() },
                         onCheckPermission = { rootComponent.checkNetworkPermission() },
-                        onClearSyncProgress = { rootComponent.clearSyncProgress() }
+                        onClearSyncProgress = { rootComponent.clearSyncProgress() },
+                        onMarkChartAsViewed = { chartId -> rootComponent.markChartAsViewed(chartId) }
                     )
                     is RootComponent.Child.DataViz -> DataVizScreen(
                         component = child.component,

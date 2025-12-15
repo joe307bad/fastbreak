@@ -79,6 +79,14 @@ class RootComponent(
         registryContainer.clearSyncProgress()
     }
 
+    /**
+     * Marks a chart as viewed by the user.
+     * Delegates to RegistryContainer (Orbit MVI).
+     */
+    fun markChartAsViewed(chartId: String) {
+        registryContainer.markChartAsViewed(chartId)
+    }
+
     val stack: Value<ChildStack<*, Child>> = childStack(
         source = navigation,
         serializer = Config.serializer(),

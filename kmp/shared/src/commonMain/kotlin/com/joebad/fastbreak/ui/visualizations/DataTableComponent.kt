@@ -1,13 +1,17 @@
 package com.joebad.fastbreak.ui.visualizations
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.joebad.fastbreak.data.model.*
@@ -40,7 +44,16 @@ fun DataTableComponent(
             .padding(horizontal = 8.dp, vertical = 4.dp)
     ) {
         when (visualization) {
-            is ScatterPlotVisualization -> ScatterDataTable(visualization.dataPoints)
+            is ScatterPlotVisualization -> ScatterDataTable(
+                data = visualization.dataPoints,
+                invertYAxis = visualization.invertYAxis,
+                xColumnLabel = visualization.xColumnLabel,
+                yColumnLabel = visualization.yColumnLabel,
+                quadrantTopRight = visualization.quadrantTopRight,
+                quadrantTopLeft = visualization.quadrantTopLeft,
+                quadrantBottomLeft = visualization.quadrantBottomLeft,
+                quadrantBottomRight = visualization.quadrantBottomRight
+            )
             is BarGraphVisualization -> BarDataTable(visualization.dataPoints)
             is LineChartVisualization -> LineDataTable(visualization.series)
             else -> Text("No data available", modifier = Modifier.padding(8.dp))
@@ -48,9 +61,54 @@ fun DataTableComponent(
     }
 }
 
+// Helper to parse hex color string to Compose Color
+private fun parseHexColor(hex: String): Color {
+    val cleanHex = hex.removePrefix("#")
+    return Color(("FF$cleanHex").toLong(16))
+}
+
 @Composable
-private fun ScatterDataTable(data: List<ScatterPlotDataPoint>) {
+private fun ScatterDataTable(
+    data: List<ScatterPlotDataPoint>,
+    invertYAxis: Boolean = false,
+    xColumnLabel: String? = null,
+    yColumnLabel: String? = null,
+    quadrantTopRight: QuadrantConfig? = null,
+    quadrantTopLeft: QuadrantConfig? = null,
+    quadrantBottomLeft: QuadrantConfig? = null,
+    quadrantBottomRight: QuadrantConfig? = null
+) {
     val horizontalScrollState = rememberScrollState()
+
+    // Calculate averages for quadrant determination
+    val avgX = data.map { it.x }.average()
+    val avgY = data.map { it.y }.average()
+
+    // Resolve quadrant colors (use config or defaults)
+    val topRightColor = quadrantTopRight?.let { parseHexColor(it.color) } ?: Color(0xFF4CAF50)
+    val topLeftColor = quadrantTopLeft?.let { parseHexColor(it.color) } ?: Color(0xFF2196F3)
+    val bottomLeftColor = quadrantBottomLeft?.let { parseHexColor(it.color) } ?: Color(0xFFFF9800)
+    val bottomRightColor = quadrantBottomRight?.let { parseHexColor(it.color) } ?: Color(0xFFF44336)
+
+    // When invertYAxis is true, lower Y values are better (e.g., defensive EPA)
+    // So we sort by x - y (higher x, lower y = better) instead of x + y
+    val sortedData = if (invertYAxis) {
+        data.sortedByDescending { it.x - it.y }
+    } else {
+        data.sortedByDescending { it.sum }
+    }
+
+    // Helper to get quadrant color for a point
+    fun getQuadrantColor(point: ScatterPlotDataPoint): Color {
+        // When invertYAxis is true, "good Y" means LOWER values
+        val isGoodY = if (invertYAxis) point.y < avgY else point.y >= avgY
+        return when {
+            point.x >= avgX && isGoodY -> topRightColor
+            point.x < avgX && isGoodY -> topLeftColor
+            point.x < avgX && !isGoodY -> bottomLeftColor
+            else -> bottomRightColor
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -63,10 +121,10 @@ private fun ScatterDataTable(data: List<ScatterPlotDataPoint>) {
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             TableHeader("Rank", 40.dp)
-            TableHeader("Player/Team", 120.dp)
-            TableHeader("X Value", 80.dp)
-            TableHeader("Y Value", 80.dp)
-            TableHeader("Sum", 80.dp)
+            TableHeader("Player/Team", 130.dp)
+            TableHeader(xColumnLabel ?: "X Value", 80.dp)
+            TableHeader(yColumnLabel ?: "Y Value", 80.dp)
+            TableHeader("Score", 80.dp)
         }
 
         HorizontalDivider(
@@ -74,17 +132,40 @@ private fun ScatterDataTable(data: List<ScatterPlotDataPoint>) {
             thickness = 1.dp
         )
 
-        // Data rows sorted by sum
-        data.sortedByDescending { it.sum }.forEachIndexed { index, point ->
+        // Data rows sorted by score (accounting for Y-axis inversion)
+        sortedData.forEachIndexed { index, point ->
+            // Calculate display score based on inversion
+            val score = if (invertYAxis) point.x - point.y else point.sum
+            val quadrantColor = getQuadrantColor(point)
+
             Row(
                 modifier = Modifier.padding(vertical = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 TableCell((index + 1).toString(), 40.dp)
-                TableCell(point.label, 120.dp)
+                // Team name with colored dot
+                Row(
+                    modifier = Modifier.width(130.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(10.dp)
+                            .background(quadrantColor, CircleShape)
+                    )
+                    Text(
+                        text = point.label,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
                 TableCell(point.x.formatTo(2), 80.dp)
                 TableCell(point.y.formatTo(2), 80.dp)
-                TableCell(point.sum.formatTo(2), 80.dp)
+                TableCell(score.formatTo(2), 80.dp)
             }
             HorizontalDivider(
                 color = MaterialTheme.colorScheme.outline,

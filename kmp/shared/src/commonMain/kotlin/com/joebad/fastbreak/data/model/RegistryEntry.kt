@@ -10,7 +10,7 @@ import kotlinx.serialization.UseSerializers
 /**
  * Represents a single entry in the registry response from the server.
  * The registry is returned as Map<String, RegistryEntry> where the key is the file path.
- * Only contains updatedAt and title - other metadata (sport, subtitle, visualizationType)
+ * Only contains updatedAt, title, and interval - other metadata (sport, subtitle, visualizationType)
  * is contained in the chart JSON itself.
  */
 @Serializable
@@ -23,5 +23,10 @@ data class RegistryEntry(
     /**
      * Display title for the chart
      */
-    val title: String
+    val title: String,
+
+    /**
+     * Update interval for the chart (e.g., "weekly", "daily")
+     */
+    val interval: String? = null
 )

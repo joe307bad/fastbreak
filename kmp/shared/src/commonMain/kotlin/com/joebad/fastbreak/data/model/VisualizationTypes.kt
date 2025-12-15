@@ -60,6 +60,8 @@ data class ScatterPlotVisualization(
     override val lastUpdated: Instant,
     val xAxisLabel: String,
     val yAxisLabel: String,
+    val xColumnLabel: String? = null,
+    val yColumnLabel: String? = null,
     val invertYAxis: Boolean = false,
     val quadrantTopRight: QuadrantConfig? = null,
     val quadrantTopLeft: QuadrantConfig? = null,

@@ -48,5 +48,22 @@ data class ChartDefinition(
      * The URL to fetch the chart data from (relative path like "/nfl__team_tier_list.json")
      * Will be combined with base URL to fetch actual chart data
      */
-    val url: String
+    val url: String,
+
+    /**
+     * Update interval for the chart (e.g., "weekly", "daily")
+     */
+    val interval: String? = null,
+
+    /**
+     * When this chart was cached locally
+     * Used to show relative time since last fetch
+     */
+    val cachedAt: Instant? = null,
+
+    /**
+     * Whether the user has viewed this chart
+     * Used to show "new" indicator on unviewed charts
+     */
+    val viewed: Boolean = false
 )

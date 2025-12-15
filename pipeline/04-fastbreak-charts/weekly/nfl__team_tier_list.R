@@ -81,4 +81,24 @@ if (result != 0) {
 }
 
 cat("Uploaded to S3:", s3_path, "\n")
+
+# Update DynamoDB with file timestamp
+dynamodb_table <- Sys.getenv("AWS_DYNAMODB_TABLE", "fastbreak-file-timestamps")
+utc_timestamp <- format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC")
+
+dynamodb_item <- sprintf('{"file_key": {"S": "%s"}, "updated_at": {"S": "%s"}}', s3_key, utc_timestamp)
+dynamodb_cmd <- sprintf(
+  'aws dynamodb put-item --table-name %s --item %s',
+  shQuote(dynamodb_table),
+  shQuote(dynamodb_item)
+)
+
+dynamodb_result <- system(dynamodb_cmd)
+
+if (dynamodb_result != 0) {
+  warning("Failed to update DynamoDB timestamp (non-fatal)")
+} else {
+  cat("Updated DynamoDB:", dynamodb_table, "key:", s3_key, "timestamp:", utc_timestamp, "\n")
+}
+
 cat("Total teams:", length(data_points), "\n")

@@ -47,6 +47,17 @@ resource "aws_iam_user_policy" "s3_access" {
           aws_s3_bucket.fastbreak.arn,
           "${aws_s3_bucket.fastbreak.arn}/*"
         ]
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "dynamodb:PutItem",
+          "dynamodb:GetItem",
+          "dynamodb:UpdateItem",
+          "dynamodb:Query",
+          "dynamodb:Scan"
+        ]
+        Resource = aws_dynamodb_table.file_timestamps.arn
       }
     ]
   })
@@ -106,6 +117,22 @@ resource "aws_cloudfront_distribution" "fastbreak" {
 
   viewer_certificate {
     cloudfront_default_certificate = true
+  }
+}
+
+# DynamoDB table for tracking file update timestamps
+resource "aws_dynamodb_table" "file_timestamps" {
+  name         = "fastbreak-file-timestamps"
+  billing_mode = "PAY_PER_REQUEST"
+  hash_key     = "file_key"
+
+  attribute {
+    name = "file_key"
+    type = "S"
+  }
+
+  tags = {
+    Name = "fastbreak-file-timestamps"
   }
 }
 

@@ -33,3 +33,8 @@ output "cloudfront_distribution_id" {
   description = "CloudFront distribution ID (for cache invalidation)"
   value       = aws_cloudfront_distribution.fastbreak.id
 }
+
+output "dynamodb_table_name" {
+  description = "Name of the DynamoDB table for file timestamps"
+  value       = aws_dynamodb_table.file_timestamps.name
+}

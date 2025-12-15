@@ -34,7 +34,7 @@ platform :ios do
     build_app(
       scheme: "Fastbreak",
       export_method: "app-store",
-      xcargs: "-allowProvisioningUpdates CODE_SIGN_STYLE=Manual",
+      xcargs: "CODE_SIGN_STYLE=Manual PROVISIONING_PROFILE_SPECIFIER='match AppStore com.joebad.fastbreak' CODE_SIGN_IDENTITY='iPhone Distribution'",
       export_options: {
         signingStyle: "manual",
         provisioningProfiles: {

@@ -28,13 +28,13 @@ jobs:
         with:
           ruby-version: '3.2'
           bundler-cache: true
-          working-directory: iosApp
+          working-directory: kmp/iosApp
       
       - name: Build KMP Framework
         run: ./gradlew :shared:linkReleaseFrameworkIosArm64
 
       - name: Deploy to TestFlight
-        working-directory: iosApp
+        working-directory: kmp/iosApp
         env:
           MATCH_GIT_BASIC_AUTHORIZATION: ${{ secrets.MATCH_GIT_BASIC_AUTHORIZATION }}
           MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}

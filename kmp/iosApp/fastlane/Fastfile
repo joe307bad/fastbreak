@@ -1,20 +1,3 @@
-# This file contains the fastlane.tools configuration
-# You can find the documentation at https://docs.fastlane.tools
-#
-# For a list of all available actions, check out
-#
-#     https://docs.fastlane.tools/actions
-#
-# For a list of all available plugins, check out
-#
-#     https://docs.fastlane.tools/plugins/available-plugins
-#
-
-# Uncomment the line if you want fastlane to automatically update itself
-# update_fastlane
-
-default_platform(:ios)
-
 platform :ios do
   desc "Push a new beta build to TestFlight"
   lane :beta do
@@ -25,10 +8,25 @@ platform :ios do
       is_key_content_base64: true
     )
 
+    # Create a temporary keychain for CI
+    keychain_name = "fastlane_tmp_keychain"
+    keychain_password = SecureRandom.base64
+
+    create_keychain(
+      name: keychain_name,
+      password: keychain_password,
+      default_keychain: true,
+      unlock: true,
+      timeout: 3600,
+      lock_when_sleeps: false
+    )
+
     match(
       type: "appstore",
       readonly: true,
-      api_key: api_key
+      api_key: api_key,
+      keychain_name: keychain_name,
+      keychain_password: keychain_password
     )
 
     build_app(
@@ -44,5 +42,7 @@ platform :ios do
     )
 
     upload_to_testflight(api_key: api_key)
+
+    delete_keychain(name: keychain_name)
   end
 end

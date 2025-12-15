@@ -31,7 +31,7 @@ jobs:
           working-directory: kmp/iosApp
       
       - name: Build KMP Framework
-        run: ./gradlew :shared:linkReleaseFrameworkIosArm64
+        run: ./gradlew :shared:linkReleaseFrameworkIosArm64 --info
 
       - name: Deploy to TestFlight
         working-directory: kmp/iosApp

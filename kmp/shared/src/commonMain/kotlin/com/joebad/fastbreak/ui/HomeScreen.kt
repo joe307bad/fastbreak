@@ -18,7 +18,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import com.arkivanov.decompose.extensions.compose.subscribeAsState
-import com.joebad.fastbreak.data.api.MockedDataApi
 import com.joebad.fastbreak.data.model.Sport
 import com.joebad.fastbreak.navigation.HomeComponent
 import com.joebad.fastbreak.ui.container.RegistryState
@@ -310,16 +309,7 @@ fun HomeScreen(
                                 onClick = {
                                     // Only navigate if chart is ready
                                     if (isReady) {
-                                        // Map VizType to MockedDataApi.VizType
-                                        val apiVizType = when (chart.visualizationType) {
-                                            com.joebad.fastbreak.data.model.VizType.SCATTER_PLOT ->
-                                                MockedDataApi.VizType.SCATTER
-                                            com.joebad.fastbreak.data.model.VizType.BAR_GRAPH ->
-                                                MockedDataApi.VizType.BAR
-                                            com.joebad.fastbreak.data.model.VizType.LINE_CHART ->
-                                                MockedDataApi.VizType.LINE
-                                        }
-                                        component.onNavigateToDataViz(chart.id, selectedSport, apiVizType)
+                                        component.onNavigateToDataViz(chart.id, selectedSport, chart.visualizationType)
                                     }
                                 }
                             )

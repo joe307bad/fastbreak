@@ -1,6 +1,6 @@
 package com.joebad.fastbreak.data.repository
 
-import com.joebad.fastbreak.data.model.Registry
+import com.joebad.fastbreak.data.model.RegistryEntry
 import com.joebad.fastbreak.data.model.RegistryMetadata
 import com.russhwolf.settings.Settings
 import kotlinx.serialization.SerializationException
@@ -20,38 +20,54 @@ class RegistryRepository(
     }
 
     companion object {
-        private const val KEY_REGISTRY = "registry_data"
+        private const val KEY_REGISTRY_ENTRIES = "registry_entries"
         private const val KEY_METADATA = "registry_metadata"
     }
 
     /**
-     * Saves the registry to local storage.
-     * The registry is serialized to JSON and stored as a string.
+     * Saves the registry entries to local storage.
+     * The entries are serialized to JSON and stored as a string.
      *
-     * @param registry The registry to save
+     * @param entries Map of file_key to RegistryEntry
      */
-    fun saveRegistry(registry: Registry) {
+    fun saveRegistryEntries(entries: Map<String, RegistryEntry>) {
+        println("💾 RegistryRepository.saveRegistryEntries()")
+        println("   Entries count: ${entries.size}")
+        entries.forEach { (key, entry) ->
+            println("   - $key: ${entry.title} (updatedAt: ${entry.updatedAt})")
+        }
         try {
-            val jsonString = json.encodeToString(registry)
-            settings.putString(KEY_REGISTRY, jsonString)
+            val jsonString = json.encodeToString(entries)
+            println("   JSON size: ${jsonString.length} chars")
+            settings.putString(KEY_REGISTRY_ENTRIES, jsonString)
+            println("   ✅ Saved successfully")
         } catch (e: SerializationException) {
-            // Log error but don't crash - this is a storage issue
-            println("Error saving registry: ${e.message}")
+            println("   ❌ Error saving registry entries: ${e.message}")
         }
     }
 
     /**
-     * Retrieves the cached registry from local storage.
+     * Retrieves the cached registry entries from local storage.
      *
-     * @return The cached Registry, or null if not found or corrupted
+     * @return The cached registry entries, or null if not found or corrupted
      */
-    fun getRegistry(): Registry? {
+    fun getRegistryEntries(): Map<String, RegistryEntry>? {
+        println("📖 RegistryRepository.getRegistryEntries()")
         return try {
-            val jsonString = settings.getStringOrNull(KEY_REGISTRY) ?: return null
-            json.decodeFromString<Registry>(jsonString)
+            val jsonString = settings.getStringOrNull(KEY_REGISTRY_ENTRIES)
+            if (jsonString == null) {
+                println("   No cached entries found (key not present)")
+                return null
+            }
+            println("   Found cached JSON: ${jsonString.length} chars")
+            val entries = json.decodeFromString<Map<String, RegistryEntry>>(jsonString)
+            println("   ✅ Decoded ${entries.size} entries:")
+            entries.forEach { (key, entry) ->
+                println("   - $key: ${entry.title} (updatedAt: ${entry.updatedAt})")
+            }
+            entries
         } catch (e: SerializationException) {
-            // Corrupted data - return null and let the caller handle it
-            println("Error reading registry: ${e.message}")
+            println("   ❌ Error reading registry entries: ${e.message}")
             null
         }
     }
@@ -62,11 +78,15 @@ class RegistryRepository(
      * @param metadata The metadata to save
      */
     fun saveMetadata(metadata: RegistryMetadata) {
+        println("💾 RegistryRepository.saveMetadata()")
+        println("   lastDownloadTime: ${metadata.lastDownloadTime}")
+        println("   registryVersion: ${metadata.registryVersion}")
         try {
             val jsonString = json.encodeToString(metadata)
             settings.putString(KEY_METADATA, jsonString)
+            println("   ✅ Metadata saved successfully")
         } catch (e: SerializationException) {
-            println("Error saving registry metadata: ${e.message}")
+            println("   ❌ Error saving registry metadata: ${e.message}")
         }
     }
 
@@ -76,11 +96,20 @@ class RegistryRepository(
      * @return The cached RegistryMetadata, or null if not found or corrupted
      */
     fun getMetadata(): RegistryMetadata? {
+        println("📖 RegistryRepository.getMetadata()")
         return try {
-            val jsonString = settings.getStringOrNull(KEY_METADATA) ?: return null
-            json.decodeFromString<RegistryMetadata>(jsonString)
+            val jsonString = settings.getStringOrNull(KEY_METADATA)
+            if (jsonString == null) {
+                println("   No cached metadata found (key not present)")
+                return null
+            }
+            val metadata = json.decodeFromString<RegistryMetadata>(jsonString)
+            println("   ✅ Found cached metadata:")
+            println("   lastDownloadTime: ${metadata.lastDownloadTime}")
+            println("   registryVersion: ${metadata.registryVersion}")
+            metadata
         } catch (e: SerializationException) {
-            println("Error reading registry metadata: ${e.message}")
+            println("   ❌ Error reading registry metadata: ${e.message}")
             null
         }
     }
@@ -90,16 +119,20 @@ class RegistryRepository(
      * Useful for troubleshooting or resetting the app.
      */
     fun clearAll() {
-        settings.remove(KEY_REGISTRY)
+        println("🗑️ RegistryRepository.clearAll()")
+        settings.remove(KEY_REGISTRY_ENTRIES)
         settings.remove(KEY_METADATA)
+        println("   ✅ Cleared registry entries and metadata")
     }
 
     /**
-     * Checks if a registry is currently cached.
+     * Checks if registry entries are currently cached.
      *
-     * @return true if a registry exists in storage
+     * @return true if registry entries exist in storage
      */
-    fun hasRegistry(): Boolean {
-        return settings.hasKey(KEY_REGISTRY)
+    fun hasRegistryEntries(): Boolean {
+        val hasEntries = settings.hasKey(KEY_REGISTRY_ENTRIES)
+        println("📖 RegistryRepository.hasRegistryEntries() = $hasEntries")
+        return hasEntries
     }
 }

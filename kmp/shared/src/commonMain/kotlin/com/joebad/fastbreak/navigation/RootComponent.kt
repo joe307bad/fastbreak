@@ -8,8 +8,8 @@ import com.arkivanov.decompose.router.stack.pop
 import com.arkivanov.decompose.router.stack.push
 import com.arkivanov.decompose.value.MutableValue
 import com.arkivanov.decompose.value.Value
-import com.joebad.fastbreak.data.api.MockedDataApi
 import com.joebad.fastbreak.data.model.Sport
+import com.joebad.fastbreak.data.model.VizType
 import com.joebad.fastbreak.ui.container.RegistryContainer
 import com.joebad.fastbreak.ui.theme.ThemeMode
 import com.joebad.fastbreak.ui.theme.ThemeRepository
@@ -121,6 +121,6 @@ class RootComponent(
         data object Home : Config
 
         @Serializable
-        data class DataViz(val chartId: String, val sport: Sport, val vizType: MockedDataApi.VizType) : Config
+        data class DataViz(val chartId: String, val sport: Sport, val vizType: VizType) : Config
     }
 }

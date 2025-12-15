@@ -9,6 +9,8 @@ import kotlinx.serialization.UseSerializers
 
 // Base interface for all visualization types
 sealed interface VisualizationType {
+    val sport: String
+    val visualizationType: String
     val title: String
     val subtitle: String
     val description: String
@@ -24,6 +26,8 @@ data class BarGraphDataPoint(
 
 @Serializable
 data class BarGraphVisualization(
+    override val sport: String,
+    override val visualizationType: String,
     override val title: String,
     override val subtitle: String,
     override val description: String,
@@ -42,6 +46,8 @@ data class ScatterPlotDataPoint(
 
 @Serializable
 data class ScatterPlotVisualization(
+    override val sport: String,
+    override val visualizationType: String,
     override val title: String,
     override val subtitle: String,
     override val description: String,
@@ -66,6 +72,8 @@ data class LineChartSeries(
 
 @Serializable
 data class LineChartVisualization(
+    override val sport: String,
+    override val visualizationType: String,
     override val title: String,
     override val subtitle: String,
     override val description: String,
@@ -88,6 +96,8 @@ data class TableDataPoint(
 
 @Serializable
 data class TableVisualization(
+    override val sport: String,
+    override val visualizationType: String,
     override val title: String,
     override val subtitle: String,
     override val description: String,

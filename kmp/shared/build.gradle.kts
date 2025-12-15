@@ -1,9 +1,30 @@
+import java.io.File
+
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
     alias(libs.plugins.androidLibrary)
     alias(libs.plugins.composeMultiplatform)
     alias(libs.plugins.composeCompiler)
     alias(libs.plugins.kotlinSerialization)
+}
+
+// Generate AppConfig from gradle.properties
+val devMode = project.findProperty("dev_mode")?.toString()?.toBoolean() ?: true
+
+val generateAppConfig = tasks.register("generateAppConfig") {
+    val outputDir = layout.buildDirectory.dir("generated/appconfig")
+    outputs.dir(outputDir)
+    doLast {
+        val dir = outputDir.get().asFile.resolve("com/joebad/fastbreak/config")
+        dir.mkdirs()
+        dir.resolve("AppConfig.kt").writeText("""
+            package com.joebad.fastbreak.config
+
+            object AppConfig {
+                const val DEV_MODE: Boolean = $devMode
+            }
+        """.trimIndent())
+    }
 }
 
 kotlin {
@@ -34,6 +55,9 @@ kotlin {
     }
 
     sourceSets {
+        commonMain {
+            kotlin.srcDir(generateAppConfig.map { it.outputs.files.singleFile })
+        }
         commonMain.dependencies {
             implementation(compose.runtime)
             implementation(compose.foundation)

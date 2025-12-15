@@ -6,7 +6,7 @@ import androidx.activity.compose.setContent
 import com.arkivanov.decompose.DefaultComponentContext
 import com.arkivanov.essenty.lifecycle.LifecycleRegistry
 import com.joebad.fastbreak.App
-import com.joebad.fastbreak.data.api.MockRegistryApi
+import com.joebad.fastbreak.data.api.RegistryApi
 import com.joebad.fastbreak.data.repository.ChartDataRepository
 import com.joebad.fastbreak.data.repository.RegistryRepository
 import com.joebad.fastbreak.domain.registry.ChartDataSynchronizer
@@ -38,11 +38,11 @@ class MainActivity : ComponentActivity() {
         val chartDataRepository = ChartDataRepository(settings)
 
         // Create API services
-        val mockRegistryApi = MockRegistryApi()
+        val registryApi = RegistryApi()
 
         // Create RegistryManager (Phase 4)
         val registryManager = RegistryManager(
-            mockRegistryApi = mockRegistryApi,
+            registryApi = registryApi,
             registryRepository = registryRepository
         )
 

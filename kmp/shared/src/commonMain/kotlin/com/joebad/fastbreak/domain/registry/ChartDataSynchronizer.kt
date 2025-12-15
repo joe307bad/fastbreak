@@ -1,18 +1,21 @@
 package com.joebad.fastbreak.domain.registry
 
 import com.joebad.fastbreak.data.api.HttpClientFactory
+import com.joebad.fastbreak.data.api.RegistryApi
 import com.joebad.fastbreak.data.model.BarGraphVisualization
 import com.joebad.fastbreak.data.model.CachedChartData
 import com.joebad.fastbreak.data.model.ChartDefinition
 import com.joebad.fastbreak.data.model.LineChartVisualization
-import com.joebad.fastbreak.data.model.Registry
+import com.joebad.fastbreak.data.model.RegistryEntry
 import com.joebad.fastbreak.data.model.ScatterPlotVisualization
+import com.joebad.fastbreak.data.model.Sport
 import com.joebad.fastbreak.data.model.VizType
 import com.joebad.fastbreak.data.repository.ChartDataRepository
 import com.joebad.fastbreak.ui.diagnostics.SyncProgress
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
+import io.ktor.client.statement.*
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
@@ -24,9 +27,11 @@ import kotlin.time.Clock
 import kotlin.time.Instant
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 
 /**
- * Synchronizes chart data based on registry definitions.
+ * Synchronizes chart data based on registry entries.
  * Compares timestamps to determine which charts need updates and downloads them.
  */
 class ChartDataSynchronizer(
@@ -51,26 +56,26 @@ class ChartDataSynchronizer(
      * Continues syncing even if individual charts fail.
      * Uses channelFlow to support concurrent emissions from parallel downloads.
      *
-     * @param registry The registry containing chart definitions
+     * @param registryEntries Map of file_key to RegistryEntry
      * @return Flow of SyncProgress updates, including any errors
      */
-    suspend fun synchronizeCharts(registry: Registry): Flow<SyncProgress> = channelFlow {
+    suspend fun synchronizeCharts(registryEntries: Map<String, RegistryEntry>): Flow<SyncProgress> = channelFlow {
         println("📊 ChartDataSynchronizer.synchronizeCharts() - Starting")
-        println("   Total charts in registry: ${registry.charts.size}")
+        println("   Total charts in registry: ${registryEntries.size}")
 
-        val chartsNeedingUpdate = registry.charts.filter { chart ->
-            needsUpdate(chart)
+        val chartsNeedingUpdate = registryEntries.filter { (fileKey, entry) ->
+            needsUpdate(fileKey, entry)
         }
 
         println("   Charts needing update: ${chartsNeedingUpdate.size}")
-        chartsNeedingUpdate.forEach { chart ->
-            println("     - ${chart.id} (${chart.title})")
+        chartsNeedingUpdate.forEach { (fileKey, entry) ->
+            println("     - $fileKey (${entry.title})")
         }
 
         if (chartsNeedingUpdate.isEmpty()) {
             println("✓ All charts already synced, nothing to update")
             // Nothing to update - all charts already synced
-            val allChartIds = registry.charts.map { it.id }.toSet()
+            val allChartIds = registryEntries.keys.map { fileKeyToChartId(it) }.toSet()
             send(
                 SyncProgress(
                     current = 0,
@@ -95,9 +100,10 @@ class ChartDataSynchronizer(
         val stateMutex = Mutex()
 
         // Add already-cached charts to synced set
-        registry.charts.forEach { chart ->
-            if (!chartsNeedingUpdate.contains(chart)) {
-                syncedCharts.add(chart.id)
+        registryEntries.forEach { (fileKey, _) ->
+            val chartId = fileKeyToChartId(fileKey)
+            if (!chartsNeedingUpdate.containsKey(fileKey)) {
+                syncedCharts.add(chartId)
             }
         }
 
@@ -111,8 +117,8 @@ class ChartDataSynchronizer(
                 SyncProgress(
                     current = completedCount,
                     total = chartsNeedingUpdate.size,
-                    currentChart = syncingCharts.firstOrNull()?.let { id ->
-                        chartsNeedingUpdate.find { it.id == id }?.title ?: ""
+                    currentChart = syncingCharts.firstOrNull()?.let { chartId ->
+                        chartsNeedingUpdate.entries.find { fileKeyToChartId(it.key) == chartId }?.value?.title ?: ""
                     } ?: "",
                     syncedChartIds = syncedCharts.toSet(),
                     syncingChartIds = syncingCharts.toSet(),
@@ -125,38 +131,39 @@ class ChartDataSynchronizer(
 
         // Launch all downloads in parallel with concurrency limit
         coroutineScope {
-            val jobs = chartsNeedingUpdate.map { chartDef ->
+            val jobs = chartsNeedingUpdate.map { (fileKey, entry) ->
                 async {
+                    val chartId = fileKeyToChartId(fileKey)
                     // Acquire semaphore permit to limit concurrency
                     semaphore.acquire()
 
                     try {
                         // Mark as syncing
                         stateMutex.withLock {
-                            syncingCharts.add(chartDef.id)
+                            syncingCharts.add(chartId)
                         }
                         emitProgress()
 
-                        println("⬇️  Downloading chart: ${chartDef.id} (${chartDef.title})")
+                        println("⬇️  Downloading chart: $fileKey (${entry.title})")
                         // Download chart data
-                        downloadAndCacheChart(chartDef)
-                        println("✅ Successfully downloaded: ${chartDef.id}")
+                        downloadAndCacheChart(fileKey, entry)
+                        println("✅ Successfully downloaded: $fileKey")
 
                         // Mark as synced
                         stateMutex.withLock {
-                            syncedCharts.add(chartDef.id)
+                            syncedCharts.add(chartId)
                         }
                     } catch (e: Exception) {
                         // Log error but continue with other charts
-                        println("❌ Failed to sync chart '${chartDef.title}': ${e.message}")
+                        println("❌ Failed to sync chart '${entry.title}': ${e.message}")
                         println("   Exception: ${e::class.simpleName}")
                         stateMutex.withLock {
-                            failedCharts.add(chartDef.id to (e.message ?: "Unknown error"))
+                            failedCharts.add(chartId to (e.message ?: "Unknown error"))
                         }
                     } finally {
                         // Remove from syncing and update progress
                         stateMutex.withLock {
-                            syncingCharts.remove(chartDef.id)
+                            syncingCharts.remove(chartId)
                             completedCount++
                         }
 
@@ -193,23 +200,33 @@ class ChartDataSynchronizer(
     }
 
     /**
+     * Converts a file key to a chart ID.
+     * e.g., "dev/nfl__team_tier_list.json" -> "dev_nfl__team_tier_list"
+     */
+    private fun fileKeyToChartId(fileKey: String): String {
+        return fileKey.removeSuffix(".json").replace("/", "_")
+    }
+
+    /**
      * Checks if a chart needs updating by comparing timestamps.
      *
-     * @param chartDef The chart definition from the registry
+     * @param fileKey The file key from the registry
+     * @param entry The registry entry with updatedAt timestamp
      * @return true if the chart needs to be downloaded/updated
      */
-    private fun needsUpdate(chartDef: ChartDefinition): Boolean {
-        val cached = chartDataRepository.getChartData(chartDef.id)
+    private fun needsUpdate(fileKey: String, entry: RegistryEntry): Boolean {
+        val chartId = fileKeyToChartId(fileKey)
+        val cached = chartDataRepository.getChartData(chartId)
 
         if (cached == null) {
-            println("🔍 Chart ${chartDef.id}: No cached data, needs update")
+            println("🔍 Chart $chartId: No cached data, needs update")
             return true
         }
 
-        // Update if the chart definition's lastUpdated is newer than cached version
-        val needsUpdate = chartDef.lastUpdated > cached.lastUpdated
-        println("🔍 Chart ${chartDef.id}:")
-        println("   Registry timestamp: ${chartDef.lastUpdated}")
+        // Update if the registry entry's updatedAt is newer than cached version
+        val needsUpdate = entry.updatedAt > cached.lastUpdated
+        println("🔍 Chart $chartId:")
+        println("   Registry timestamp: ${entry.updatedAt}")
         println("   Cached timestamp:   ${cached.lastUpdated}")
         println("   Needs update: $needsUpdate")
 
@@ -218,45 +235,67 @@ class ChartDataSynchronizer(
 
     /**
      * Downloads chart data from the CDN and caches it.
-     * Handles serialization of different visualization types.
+     * Parses visualizationType from the JSON to determine how to deserialize.
      *
-     * @param chartDef The chart definition to download
+     * @param fileKey The file key (path) of the chart
+     * @param entry The registry entry with metadata
      * @throws Exception if download or caching fails
      */
-    private suspend fun downloadAndCacheChart(chartDef: ChartDefinition) {
-        // Use CloudFront CDN base URL with the relative path from the chart definition
-        val chartDataUrl = "https://d2jyizt5xogu23.cloudfront.net/dev${chartDef.url}"
+    private suspend fun downloadAndCacheChart(fileKey: String, entry: RegistryEntry) {
+        // Build URL: base URL + file key (file key already includes dev/ if needed)
+        val chartDataUrl = "${RegistryApi.BASE_URL}/$fileKey"
         println("🌐 Fetching chart data from: $chartDataUrl")
 
-        // Fetch chart data from server based on visualization type
-        val vizData = when (chartDef.visualizationType) {
-            VizType.SCATTER_PLOT -> httpClient.get(chartDataUrl).body<ScatterPlotVisualization>()
-            VizType.BAR_GRAPH -> httpClient.get(chartDataUrl).body<BarGraphVisualization>()
-            VizType.LINE_CHART -> httpClient.get(chartDataUrl).body<LineChartVisualization>()
+        // First, fetch raw JSON to determine visualization type
+        val rawJson = httpClient.get(chartDataUrl).bodyAsText()
+        val jsonElement = json.parseToJsonElement(rawJson)
+        val vizTypeString = jsonElement.jsonObject["visualizationType"]?.jsonPrimitive?.content
+            ?: throw IllegalArgumentException("Chart JSON missing visualizationType field")
+
+        val vizType = VizType.valueOf(vizTypeString)
+        println("   Visualization type: $vizType")
+
+        // Deserialize based on visualization type
+        val vizData = when (vizType) {
+            VizType.SCATTER_PLOT -> json.decodeFromString<ScatterPlotVisualization>(rawJson)
+            VizType.BAR_GRAPH -> json.decodeFromString<BarGraphVisualization>(rawJson)
+            VizType.LINE_CHART -> json.decodeFromString<LineChartVisualization>(rawJson)
         }
 
-        // Serialize visualization data based on type
-        val dataJson = when (vizData) {
-            is ScatterPlotVisualization -> json.encodeToString(vizData)
-            is BarGraphVisualization -> json.encodeToString(vizData)
-            is LineChartVisualization -> json.encodeToString(vizData)
-            else -> throw IllegalArgumentException("Unsupported visualization type: ${vizData::class.simpleName}")
-        }
+        val chartId = fileKeyToChartId(fileKey)
 
         // Create cached data entry
         val cachedData = CachedChartData(
-            chartId = chartDef.id,
-            lastUpdated = chartDef.lastUpdated,
-            visualizationType = chartDef.visualizationType,
+            chartId = chartId,
+            lastUpdated = entry.updatedAt,
+            visualizationType = vizType,
             cachedAt = Clock.System.now(),
-            dataJson = dataJson
+            dataJson = rawJson
         )
 
-        println("💾 Caching chart ${chartDef.id} with timestamp: ${chartDef.lastUpdated}")
+        println("💾 Caching chart $chartId with timestamp: ${entry.updatedAt}")
 
         // Save to repository
-        chartDataRepository.saveChartData(chartDef.id, cachedData)
-        println("✅ Chart ${chartDef.id} saved to cache")
+        chartDataRepository.saveChartData(chartId, cachedData)
+        println("✅ Chart $chartId saved to cache")
+    }
+
+    /**
+     * Builds ChartDefinition from cached chart data.
+     * Used to reconstruct the chart definition from stored data.
+     */
+    fun buildChartDefinition(chartId: String, cached: CachedChartData): ChartDefinition? {
+        val vizData = cached.deserialize() ?: return null
+
+        return ChartDefinition(
+            id = chartId,
+            sport = Sport.valueOf(vizData.sport),
+            title = vizData.title,
+            subtitle = vizData.subtitle,
+            lastUpdated = cached.lastUpdated,
+            visualizationType = cached.visualizationType,
+            url = "" // URL not needed once cached
+        )
     }
 
     /**

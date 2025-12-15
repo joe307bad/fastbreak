@@ -1,6 +1,7 @@
 package com.joebad.fastbreak.ui.container
 
 import com.joebad.fastbreak.data.model.Registry
+import com.joebad.fastbreak.data.model.RegistryEntry
 import com.joebad.fastbreak.ui.diagnostics.DiagnosticsInfo
 import com.mohamedrejeb.calf.permissions.PermissionStatus
 import kotlin.time.Instant
@@ -11,7 +12,14 @@ import kotlin.time.Instant
  */
 data class RegistryState(
     /**
-     * The current registry containing all chart definitions
+     * Raw registry entries from the server (file_key -> RegistryEntry)
+     * Used for determining which charts to sync
+     */
+    val registryEntries: Map<String, RegistryEntry>? = null,
+
+    /**
+     * The current registry containing all chart definitions (built from cached chart data)
+     * Used by UI components to display charts
      */
     val registry: Registry? = null,
 

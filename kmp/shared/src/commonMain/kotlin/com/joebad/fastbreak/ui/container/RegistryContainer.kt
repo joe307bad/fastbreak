@@ -1,5 +1,7 @@
 package com.joebad.fastbreak.ui.container
 
+import com.joebad.fastbreak.data.model.Registry
+import com.joebad.fastbreak.data.model.RegistryEntry
 import com.joebad.fastbreak.data.repository.ChartDataRepository
 import com.joebad.fastbreak.domain.registry.ChartDataSynchronizer
 import com.joebad.fastbreak.domain.registry.RegistryManager
@@ -29,17 +31,75 @@ class RegistryContainer(
         scope.container(RegistryState())
 
     init {
-        // Load initial diagnostics from cache without making network requests
+        // Load initial state from cache without making network requests
+        println("═══════════════════════════════════════════════════════")
+        println("🚀 RegistryContainer.init - Loading from cache")
+        println("═══════════════════════════════════════════════════════")
         intent {
-            val cachedRegistry = registryManager.getCachedRegistry()
+            println("   📖 Getting cached registry entries...")
+            val cachedEntries = registryManager.getCachedRegistryEntries()
+            println("   📖 Building registry from cache...")
+            val registry = buildRegistryFromCache()
+            println("   📝 Updating state with cached data")
+            println("   - registryEntries: ${cachedEntries?.size ?: 0} entries")
+            println("   - registry: ${registry?.charts?.size ?: 0} charts")
             reduce {
-                state.copy(registry = cachedRegistry)
+                state.copy(
+                    registryEntries = cachedEntries,
+                    registry = registry
+                )
             }
             // Now that registry is in state, load diagnostics
+            println("   📊 Loading diagnostics...")
             reduce {
                 state.copy(diagnostics = loadDiagnostics())
             }
+            println("   ✅ RegistryContainer.init complete")
         }
+    }
+
+    /**
+     * Builds a Registry object from cached chart data.
+     * Used to reconstruct the registry for UI display after sync.
+     */
+    private fun buildRegistryFromCache(): Registry? {
+        println("🔨 RegistryContainer.buildRegistryFromCache()")
+        val chartIds = chartDataSynchronizer.getCachedChartIds()
+        println("   Cached chart IDs: ${chartIds.size}")
+        chartIds.forEach { println("   - $it") }
+
+        if (chartIds.isEmpty()) {
+            println("   ⚠️ No cached charts found, returning null")
+            return null
+        }
+
+        val charts = chartIds.mapNotNull { chartId ->
+            val cached = chartDataSynchronizer.getCachedChartData(chartId)
+            if (cached == null) {
+                println("   ⚠️ No cached data for chart: $chartId")
+                return@mapNotNull null
+            }
+            val chartDef = chartDataSynchronizer.buildChartDefinition(chartId, cached)
+            if (chartDef != null) {
+                println("   ✅ Built ChartDefinition: ${chartDef.id} (${chartDef.sport}, ${chartDef.visualizationType})")
+            } else {
+                println("   ⚠️ Failed to build ChartDefinition for: $chartId")
+            }
+            chartDef
+        }
+
+        if (charts.isEmpty()) {
+            println("   ⚠️ No valid charts built, returning null")
+            return null
+        }
+
+        val registry = Registry(
+            version = "2.0",
+            lastUpdated = Clock.System.now(),
+            charts = charts
+        )
+        println("   ✅ Built Registry with ${registry.charts.size} charts")
+        return registry
     }
 
     // Note: We don't auto-load in init to avoid triggering network requests
@@ -96,10 +156,10 @@ class RegistryContainer(
         }
 
         registryManager.checkAndUpdateRegistry()
-            .onSuccess { registry ->
+            .onSuccess { entries ->
                 reduce {
                     state.copy(
-                        registry = registry,
+                        registryEntries = entries,
                         isLoading = false,
                         diagnostics = loadDiagnostics().copy(
                             isSyncing = true  // Keep syncing state active for chart data sync
@@ -107,9 +167,9 @@ class RegistryContainer(
                     )
                 }
 
-                // Sync chart data after loading registry (await completion)
+                // Sync chart data after loading registry entries (await completion)
                 try {
-                    syncChartData()
+                    syncChartData(entries)
                 } catch (e: Exception) {
                     println("❌ Chart synchronization failed: ${e.message}")
                     // Ensure isSyncing is cleared even on exception
@@ -129,15 +189,15 @@ class RegistryContainer(
                 val errorMsg = error.message ?: "Unknown error"
                 println("LoadRegistry failed with error: $errorMsg")
 
-                // Try to fall back to cached registry
-                val cachedRegistry = registryManager.getCachedRegistry()
+                // Try to fall back to cached registry entries
+                val cachedEntries = registryManager.getCachedRegistryEntries()
 
-                if (cachedRegistry != null) {
-                    println("📦 Falling back to cached registry with ${cachedRegistry.charts.size} charts")
+                if (cachedEntries != null) {
+                    println("📦 Falling back to cached registry with ${cachedEntries.size} entries")
 
                     reduce {
                         state.copy(
-                            registry = cachedRegistry,
+                            registryEntries = cachedEntries,
                             isLoading = false,
                             diagnostics = loadDiagnostics().copy(
                                 isSyncing = true,  // Keep syncing state active for chart data sync
@@ -150,9 +210,9 @@ class RegistryContainer(
                     // Show error toast even though we have cached data
                     postSideEffect(RegistrySideEffect.ShowError(errorMsg))
 
-                    // Continue with chart data sync using cached registry
+                    // Continue with chart data sync using cached entries
                     try {
-                        syncChartData()
+                        syncChartData(cachedEntries)
                     } catch (e: Exception) {
                         println("❌ Chart synchronization failed: ${e.message}")
                         // Ensure isSyncing is cleared even on exception
@@ -233,12 +293,12 @@ class RegistryContainer(
 
         when {
             refreshResult.isSuccess -> {
-                val registry = refreshResult.getOrThrow()
-                println("✅ forceRefreshRegistry() SUCCESS - Registry loaded with ${registry.charts.size} charts")
+                val entries = refreshResult.getOrThrow()
+                println("✅ forceRefreshRegistry() SUCCESS - Received ${entries.size} entries")
 
                 reduce {
                     state.copy(
-                        registry = registry,
+                        registryEntries = entries,
                         diagnostics = loadDiagnostics().copy(
                             isSyncing = true  // Keep syncing state active for chart data sync
                         )
@@ -248,7 +308,7 @@ class RegistryContainer(
                 println("📊 Starting chart data synchronization...")
                 // Sync chart data after refresh (await completion)
                 try {
-                    syncChartData()
+                    syncChartData(entries)
                     println("✅ Chart synchronization complete")
                 } catch (e: Exception) {
                     println("❌ Chart synchronization failed: ${e.message}")
@@ -271,15 +331,15 @@ class RegistryContainer(
                 println("❌ forceRefreshRegistry() FAILED with error: $errorMsg")
                 println("Stack trace: ${error?.stackTraceToString()}")
 
-                // Try to fall back to cached registry
-                val cachedRegistry = registryManager.getCachedRegistry()
+                // Try to fall back to cached registry entries
+                val cachedEntries = registryManager.getCachedRegistryEntries()
 
-                if (cachedRegistry != null) {
-                    println("📦 Falling back to cached registry with ${cachedRegistry.charts.size} charts")
+                if (cachedEntries != null) {
+                    println("📦 Falling back to cached registry with ${cachedEntries.size} entries")
 
                     reduce {
                         state.copy(
-                            registry = cachedRegistry,
+                            registryEntries = cachedEntries,
                             diagnostics = loadDiagnostics().copy(
                                 isSyncing = true,  // Keep syncing state active for chart data sync
                                 failedSyncs = container.stateFlow.value.diagnostics.failedSyncs + 1,
@@ -291,10 +351,10 @@ class RegistryContainer(
                     // Show error toast even though we have cached data
                     postSideEffect(RegistrySideEffect.ShowError(errorMsg))
 
-                    // Continue with chart data sync using cached registry
-                    println("📊 Starting chart data synchronization with cached registry...")
+                    // Continue with chart data sync using cached entries
+                    println("📊 Starting chart data synchronization with cached entries...")
                     try {
-                        syncChartData()
+                        syncChartData(cachedEntries)
                         println("✅ Chart synchronization complete")
                     } catch (e: Exception) {
                         println("❌ Chart synchronization failed: ${e.message}")
@@ -342,24 +402,25 @@ class RegistryContainer(
     }
 
     /**
-     * Synchronizes chart data based on registry definitions.
+     * Synchronizes chart data based on registry entries.
      * Compares timestamps and downloads charts that need updating.
+     * Builds Registry from cached data after sync completes.
      * Adds 0.5s delay after completion before hiding loading indicator.
      *
      * Note: This is a regular suspend function, not wrapped in intent{},
      * so it can be properly awaited when called from other intent blocks.
      */
-    private suspend fun syncChartData() {
-        val registry = container.stateFlow.value.registry ?: return
-
+    private suspend fun syncChartData(entries: Map<String, RegistryEntry>) {
         try {
-            chartDataSynchronizer.synchronizeCharts(registry).collect { progress ->
+            chartDataSynchronizer.synchronizeCharts(entries).collect { progress ->
             // Skip showing progress if nothing needs syncing (everything cached)
             if (progress.total == 0) {
-                // Everything is already cached, no need to show sync progress
+                // Everything is already cached, build registry from cache and finish
+                val registry = buildRegistryFromCache()
                 intent {
                     reduce {
                         state.copy(
+                            registry = registry,
                             isSyncing = false,
                             lastSyncTime = Clock.System.now(),
                             syncProgress = null,
@@ -387,10 +448,14 @@ class RegistryContainer(
                 // Keep loading indicator visible for minimum 0.5 seconds after completion
                 delay(500)
 
-                // Update diagnostics but keep syncing state active
+                // Build registry from cached chart data
+                val registry = buildRegistryFromCache()
+
+                // Update state with registry and diagnostics
                 intent {
                     reduce {
                         state.copy(
+                            registry = registry,
                             isSyncing = true,  // Keep true until we clear syncProgress
                             lastSyncTime = Clock.System.now(),
                             diagnostics = loadDiagnostics().copy(
@@ -458,10 +523,12 @@ class RegistryContainer(
         val currentState = container.stateFlow.value
         val metadata = registryManager.getMetadata()
 
-        // Use registry chart count instead of cached chart count
-        val chartCount = currentState.registry?.charts?.size ?: 0
+        // Use registry entries count or cached chart count
+        val chartCount = currentState.registryEntries?.size
+            ?: currentState.registry?.charts?.size
+            ?: 0
 
-        // If registry has no charts, show 0 bytes (cached data is orphaned/stale)
+        // If no charts, show 0 bytes (cached data is orphaned/stale)
         val cacheSize = if (chartCount == 0) 0L else chartDataRepository.estimateTotalCacheSize()
 
         // Get the most recent cache update time from all cached charts

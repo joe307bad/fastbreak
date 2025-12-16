@@ -12,6 +12,8 @@ import com.joebad.fastbreak.data.model.Sport
 import com.joebad.fastbreak.data.model.TableVisualization
 import com.joebad.fastbreak.data.model.VizType
 import com.joebad.fastbreak.data.repository.ChartDataRepository
+import com.joebad.fastbreak.logging.SentryLogger
+import com.joebad.fastbreak.logging.SpanStatus
 import com.joebad.fastbreak.ui.diagnostics.SyncProgress
 import io.ktor.client.*
 import io.ktor.client.call.*
@@ -25,6 +27,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withLock
 import kotlin.time.Clock
+import kotlin.time.DurationUnit
 import kotlin.time.Instant
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -247,40 +250,85 @@ class ChartDataSynchronizer(
         val chartDataUrl = "${RegistryApi.BASE_URL}/$fileKey"
         println("🌐 Fetching chart data from: $chartDataUrl")
 
-        // First, fetch raw JSON to determine visualization type
-        val rawJson = httpClient.get(chartDataUrl).bodyAsText()
-        val jsonElement = json.parseToJsonElement(rawJson)
-        val vizTypeString = jsonElement.jsonObject["visualizationType"]?.jsonPrimitive?.content
-            ?: throw IllegalArgumentException("Chart JSON missing visualizationType field")
+        val startTime = Clock.System.now()
+        val spanId = SentryLogger.startSpan("http.client", "GET /$fileKey")
 
-        val vizType = VizType.valueOf(vizTypeString)
-        println("   Visualization type: $vizType")
-
-        // Deserialize based on visualization type
-        val vizData = when (vizType) {
-            VizType.SCATTER_PLOT -> json.decodeFromString<ScatterPlotVisualization>(rawJson)
-            VizType.BAR_GRAPH -> json.decodeFromString<BarGraphVisualization>(rawJson)
-            VizType.LINE_CHART -> json.decodeFromString<LineChartVisualization>(rawJson)
-            VizType.TABLE -> json.decodeFromString<TableVisualization>(rawJson)
-        }
-
-        val chartId = fileKeyToChartId(fileKey)
-
-        // Create cached data entry
-        val cachedData = CachedChartData(
-            chartId = chartId,
-            lastUpdated = entry.updatedAt,
-            visualizationType = vizType,
-            cachedAt = Clock.System.now(),
-            dataJson = rawJson,
-            interval = entry.interval
+        SentryLogger.addBreadcrumb(
+            category = "network",
+            message = "Fetching chart: ${entry.title}",
+            data = mapOf("fileKey" to fileKey, "url" to chartDataUrl)
         )
 
-        println("💾 Caching chart $chartId with timestamp: ${entry.updatedAt}")
+        try {
+            // First, fetch raw JSON to determine visualization type
+            val rawJson = httpClient.get(chartDataUrl).bodyAsText()
+            val requestDurationMs = (Clock.System.now() - startTime).toDouble(DurationUnit.MILLISECONDS)
 
-        // Save to repository
-        chartDataRepository.saveChartData(chartId, cachedData)
-        println("✅ Chart $chartId saved to cache")
+            println("   Request duration: ${requestDurationMs.toLong()}ms")
+
+            val jsonElement = json.parseToJsonElement(rawJson)
+            val vizTypeString = jsonElement.jsonObject["visualizationType"]?.jsonPrimitive?.content
+                ?: throw IllegalArgumentException("Chart JSON missing visualizationType field")
+
+            val vizType = VizType.valueOf(vizTypeString)
+            println("   Visualization type: $vizType")
+
+            // Deserialize based on visualization type
+            val vizData = when (vizType) {
+                VizType.SCATTER_PLOT -> json.decodeFromString<ScatterPlotVisualization>(rawJson)
+                VizType.BAR_GRAPH -> json.decodeFromString<BarGraphVisualization>(rawJson)
+                VizType.LINE_CHART -> json.decodeFromString<LineChartVisualization>(rawJson)
+                VizType.TABLE -> json.decodeFromString<TableVisualization>(rawJson)
+            }
+
+            val chartId = fileKeyToChartId(fileKey)
+
+            // Create cached data entry
+            val cachedData = CachedChartData(
+                chartId = chartId,
+                lastUpdated = entry.updatedAt,
+                visualizationType = vizType,
+                cachedAt = Clock.System.now(),
+                dataJson = rawJson,
+                interval = entry.interval
+            )
+
+            println("💾 Caching chart $chartId with timestamp: ${entry.updatedAt}")
+
+            // Save to repository
+            chartDataRepository.saveChartData(chartId, cachedData)
+            println("✅ Chart $chartId saved to cache")
+
+            SentryLogger.finishSpan(spanId, SpanStatus.OK)
+
+            SentryLogger.addBreadcrumb(
+                category = "network",
+                message = "Chart downloaded: ${entry.title}",
+                data = mapOf(
+                    "chartId" to chartId,
+                    "fileKey" to fileKey,
+                    "durationMs" to requestDurationMs.toLong(),
+                    "sizeBytes" to rawJson.length,
+                    "vizType" to vizType.name
+                )
+            )
+        } catch (e: Exception) {
+            val requestDurationMs = (Clock.System.now() - startTime).toDouble(DurationUnit.MILLISECONDS)
+
+            SentryLogger.finishSpan(spanId, SpanStatus.ERROR)
+
+            SentryLogger.captureException(
+                throwable = e,
+                extras = mapOf(
+                    "fileKey" to fileKey,
+                    "chartTitle" to entry.title,
+                    "url" to chartDataUrl,
+                    "durationMs" to requestDurationMs.toLong()
+                )
+            )
+
+            throw e
+        }
     }
 
     /**

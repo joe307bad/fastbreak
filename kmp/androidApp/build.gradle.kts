@@ -49,6 +49,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 
     compileOptions {
@@ -73,4 +74,5 @@ dependencies {
     implementation(libs.essenty.lifecycle)
     implementation(libs.multiplatform.settings.no.arg)
     implementation(libs.ktor.client.core)
+    implementation(libs.sentry.android)
 }

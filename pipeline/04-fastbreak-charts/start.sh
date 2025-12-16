@@ -17,8 +17,10 @@ echo -e "${BOLD}${BLUE}═══════════════════
 echo ""
 
 # Export environment variables for cron jobs (restricted permissions)
-printenv | grep -E "^(AWS_|PROD)" > /app/env.sh
-sed -i 's/^/export /' /app/env.sh
+# Include PATH so cron can find aws cli and other tools
+echo "export PATH=\"$PATH\"" > /app/env.sh
+printenv | grep -E "^(AWS_|PROD)" >> /app/env.sh
+sed -i '/^AWS_\|^PROD/s/^/export /' /app/env.sh
 chmod 600 /app/env.sh
 
 run_scripts() {

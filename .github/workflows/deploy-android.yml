@@ -1,11 +1,12 @@
 name: Deploy to Google Play Beta
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - 'kmp/**'
+  workflow_dispatch:  # Manual trigger only for now
+  # push:
+  #   branches:
+  #     - main
+  #   paths:
+  #     - 'kmp/**'
 
 jobs:
   deploy:

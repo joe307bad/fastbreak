@@ -1,0 +1,147 @@
+library(hockeyR)
+library(dplyr)
+library(jsonlite)
+
+# Get current NHL season (NHL season spans two years, e.g., 2024-25)
+current_year <- as.numeric(format(Sys.Date(), "%Y"))
+current_month <- as.numeric(format(Sys.Date(), "%m"))
+
+# NHL season starts in October, so if we're in Jan-Sep, use previous year as season start
+nhl_season <- if (current_month >= 10) current_year else current_year - 1
+
+cat("Processing NHL Team Efficiency for", nhl_season, "-", nhl_season + 1, "season\n")
+
+# Load team standings using hockeyR
+standings <- tryCatch({
+  hockeyR::get_standings(nhl_season)
+}, error = function(e) {
+  cat("Error loading standings:", e$message, "\n")
+  stop(e)
+})
+
+cat("Loaded standings for", nrow(standings), "teams\n")
+cat("Available columns:", paste(names(standings), collapse = ", "), "\n")
+
+# NHL team abbreviation mapping
+team_abbrevs <- c(
+  "Anaheim Ducks" = "ANA", "Arizona Coyotes" = "ARI", "Boston Bruins" = "BOS",
+  "Buffalo Sabres" = "BUF", "Calgary Flames" = "CGY", "Carolina Hurricanes" = "CAR",
+  "Chicago Blackhawks" = "CHI", "Colorado Avalanche" = "COL", "Columbus Blue Jackets" = "CBJ",
+  "Dallas Stars" = "DAL", "Detroit Red Wings" = "DET", "Edmonton Oilers" = "EDM",
+  "Florida Panthers" = "FLA", "Los Angeles Kings" = "LAK", "Minnesota Wild" = "MIN",
+  "Montreal Canadiens" = "MTL", "Montréal Canadiens" = "MTL", "Nashville Predators" = "NSH",
+  "New Jersey Devils" = "NJD", "New York Islanders" = "NYI", "New York Rangers" = "NYR",
+  "Ottawa Senators" = "OTT", "Philadelphia Flyers" = "PHI", "Pittsburgh Penguins" = "PIT",
+  "San Jose Sharks" = "SJS", "Seattle Kraken" = "SEA", "St. Louis Blues" = "STL",
+  "Tampa Bay Lightning" = "TBL", "Toronto Maple Leafs" = "TOR", "Utah Hockey Club" = "UTA",
+  "Vancouver Canucks" = "VAN", "Vegas Golden Knights" = "VGK", "Washington Capitals" = "WSH",
+  "Winnipeg Jets" = "WPG"
+)
+
+# Calculate goals for and against per game
+team_ratings <- standings %>%
+  mutate(
+    GP = as.numeric(games),
+    GF = as.numeric(goals_for),
+    GA = as.numeric(goals_against),
+    GF_PG = round(GF / GP, 2),
+    GA_PG = round(GA / GP, 2),
+    DIFF_PG = round((GF - GA) / GP, 2),
+    TEAM_ABBREV = team_abbrevs[team_name]
+  ) %>%
+  filter(!is.na(GF_PG) & !is.na(GA_PG) & GP > 0)
+
+cat("\nTeam Ratings Preview:\n")
+print(head(team_ratings %>% arrange(desc(DIFF_PG)) %>% select(team_name, TEAM_ABBREV, GF_PG, GA_PG, DIFF_PG), 10))
+
+# Convert to list format for JSON matching ScatterPlotVisualization model
+# For NHL: x = Goals For per Game, y = Goals Against per Game
+# invertYAxis = TRUE because lower goals against is better
+data_points <- team_ratings %>%
+  rowwise() %>%
+  mutate(data_point = list(list(
+    label = TEAM_ABBREV,
+    x = GF_PG,
+    y = GA_PG,
+    sum = DIFF_PG
+  ))) %>%
+  pull(data_point)
+
+# Create output object with metadata matching ScatterPlotVisualization model
+output_data <- list(
+  sport = "NHL",
+  visualizationType = "SCATTER_PLOT",
+  title = paste0("NHL Team Efficiency - ", nhl_season, "-", substr(nhl_season + 1, 3, 4)),
+  subtitle = "Goals For vs Goals Against per Game",
+  description = "Goals For per Game measures offensive output while Goals Against per Game measures defensive performance (lower is better). Teams in the top-right quadrant have elite offenses and defenses, making them Stanley Cup contenders. Goal differential per game is the best single measure of team quality.",
+  lastUpdated = format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC"),
+  source = "hockeyR / Hockey Reference",
+  xAxisLabel = "Goals For / Game",
+  yAxisLabel = "Goals Against / Game",
+  xColumnLabel = "GF/G",
+  yColumnLabel = "GA/G",
+  invertYAxis = TRUE,
+  quadrantTopRight = list(color = "#4CAF50", label = "Elite"),
+  quadrantTopLeft = list(color = "#2196F3", label = "Defense First"),
+  quadrantBottomLeft = list(color = "#F44336", label = "Struggling"),
+  quadrantBottomRight = list(color = "#FFEB3B", label = "Offense First"),
+  dataPoints = data_points
+)
+
+# Upload to S3
+s3_bucket <- Sys.getenv("AWS_S3_BUCKET")
+
+if (!nzchar(s3_bucket)) {
+  stop("AWS_S3_BUCKET environment variable is not set")
+}
+
+is_prod <- tolower(Sys.getenv("PROD")) == "true"
+
+s3_key <- if (is_prod) {
+  "nhl__team_efficiency.json"
+} else {
+  "dev/nhl__team_efficiency.json"
+}
+
+# Write JSON to temp file and upload via AWS CLI
+tmp_file <- tempfile(fileext = ".json")
+write_json(output_data, tmp_file, pretty = TRUE, auto_unbox = TRUE)
+
+s3_path <- paste0("s3://", s3_bucket, "/", s3_key)
+cmd <- paste("aws s3 cp", shQuote(tmp_file), shQuote(s3_path), "--content-type application/json")
+result <- system(cmd)
+
+if (result != 0) {
+  stop("Failed to upload to S3")
+}
+
+cat("\nUploaded to S3:", s3_path, "\n")
+
+# Update DynamoDB with updatedAt, title, and interval
+dynamodb_table <- Sys.getenv("AWS_DYNAMODB_TABLE", "fastbreak-file-timestamps")
+utc_timestamp <- format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC")
+chart_title <- output_data$title
+chart_interval <- "daily"
+
+dynamodb_item <- sprintf('{"file_key": {"S": "%s"}, "updatedAt": {"S": "%s"}, "title": {"S": "%s"}, "interval": {"S": "%s"}}', s3_key, utc_timestamp, chart_title, chart_interval)
+dynamodb_cmd <- sprintf(
+  'aws dynamodb put-item --table-name %s --item %s',
+  shQuote(dynamodb_table),
+  shQuote(dynamodb_item)
+)
+
+dynamodb_result <- system(dynamodb_cmd)
+
+if (dynamodb_result != 0) {
+  warning("Failed to update DynamoDB timestamp (non-fatal)")
+} else {
+  cat("Updated DynamoDB:", dynamodb_table, "key:", s3_key, "updatedAt:", utc_timestamp, "title:", chart_title, "interval:", chart_interval, "\n")
+}
+
+# Print summary
+cat("\nTeam Efficiency Summary:\n")
+cat("Total teams:", length(data_points), "\n")
+cat("\nTop 5 by Goal Differential/Game:\n")
+print(head(team_ratings %>% arrange(desc(DIFF_PG)) %>% select(TEAM_ABBREV, GF_PG, GA_PG, DIFF_PG), 5))
+cat("\nBottom 5 by Goal Differential/Game:\n")
+print(tail(team_ratings %>% arrange(desc(DIFF_PG)) %>% select(TEAM_ABBREV, GF_PG, GA_PG, DIFF_PG), 5))

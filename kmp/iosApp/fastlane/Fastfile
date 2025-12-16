@@ -36,7 +36,8 @@ platform :ios do
     )
 
     build_app(
-      scheme: "Fastbreak",
+      workspace: "iosApp.xcworkspace",
+      scheme: "iosApp",
       export_method: "app-store",
       xcargs: "CODE_SIGN_STYLE=Manual PROVISIONING_PROFILE_SPECIFIER='match AppStore com.joebad.fastbreak' CODE_SIGN_IDENTITY='iPhone Distribution'",
       export_options: {
@@ -48,6 +49,16 @@ platform :ios do
     )
 
     upload_to_testflight(api_key: api_key)
+
+    # Upload dSYMs to Sentry for crash symbolication
+    if ENV["SENTRY_AUTH_TOKEN"]
+      sentry_upload_dif(
+        auth_token: ENV["SENTRY_AUTH_TOKEN"],
+        org_slug: "joe-badaczewski",
+        project_slug: "fastbreak-ios",
+        include_sources: true
+      )
+    end
 
     delete_keychain(name: keychain_name)
   end

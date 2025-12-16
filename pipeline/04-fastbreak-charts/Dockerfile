@@ -9,9 +9,10 @@ RUN apt-get update && \
 
 # Install remaining R packages (tidyverse deps already installed)
 RUN R -e "options(repos = c(CRAN = 'https://packagemanager.posit.co/cran/__linux__/jammy/latest')); \
-    install.packages(c('nflreadr', 'hoopR')); \
+    install.packages(c('nflreadr', 'hoopR', 'hockeyR')); \
     if (!require('nflreadr')) stop('nflreadr installation failed'); \
-    if (!require('hoopR')) stop('hoopR installation failed')"
+    if (!require('hoopR')) stop('hoopR installation failed'); \
+    if (!require('hockeyR')) stop('hockeyR installation failed')"
 
 # Create app directory
 WORKDIR /app

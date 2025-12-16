@@ -36,6 +36,10 @@ jobs:
       - name: Build KMP Framework
         run: ./gradlew :shared:linkReleaseFrameworkIosArm64
 
+      - name: Install CocoaPods
+        working-directory: kmp/iosApp
+        run: bundle exec pod install
+
       - name: Deploy to TestFlight
         working-directory: kmp/iosApp
         env:
@@ -45,4 +49,5 @@ jobs:
           APP_STORE_CONNECT_API_KEY_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
           APP_STORE_CONNECT_API_KEY_KEY: ${{ secrets.ASC_PRIVATE_KEY }}
           BUILD_NUMBER: ${{ github.run_number }}
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
         run: bundle exec fastlane ios beta

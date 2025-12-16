@@ -1,0 +1,72 @@
+name: Deploy to Google Play Beta
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'kmp/**'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: kmp
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Setup Gradle
+        uses: gradle/gradle-build-action@v3
+
+      - name: Generate build info
+        id: build_info
+        run: |
+          echo "build_number=${{ github.run_number }}" >> $GITHUB_OUTPUT
+
+      - name: Write local.properties
+        run: |
+          cat > local.properties << EOF
+          GOOGLE_AUTH_SERVER_ID=${{ secrets.GOOGLE_AUTH_SERVER_ID }}
+          API_BASE_URL=https://d2jyizt5xogu23.cloudfront.net
+          EOF
+
+      - name: Configure signing properties
+        run: |
+          cat >> gradle.properties << EOF
+
+          # Release signing configuration (from CI secrets)
+          RELEASE_STORE_FILE=../release-keystore.jks
+          RELEASE_KEY_ALIAS=${{ secrets.RELEASE_KEY_ALIAS }}
+          RELEASE_KEY_PASSWORD=${{ secrets.RELEASE_KEY_PASSWORD }}
+          RELEASE_STORE_PASSWORD=${{ secrets.RELEASE_STORE_PASSWORD }}
+          EOF
+
+      - name: Create keystore
+        run: |
+          echo "${{ secrets.RELEASE_KEYSTORE }}" | base64 -d > release-keystore.jks
+
+      - name: Build Android App Bundle
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+        run: |
+          ./gradlew :androidApp:bundleRelease --no-daemon \
+            -PVERSION_NAME="0.0.1-alpha-${{ steps.build_info.outputs.build_number }}" \
+            -PVERSION_CODE="${{ steps.build_info.outputs.build_number }}"
+
+      - name: Upload to Google Play Beta
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: com.joebad.fastbreak
+          releaseFiles: kmp/androidApp/build/outputs/bundle/release/*.aab
+          track: beta
+          status: completed

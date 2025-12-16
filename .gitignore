@@ -22,7 +22,7 @@ pipeline/**/weekly/*.json
 pipeline/**/daily/*.json
 
 server/nginx/static/*.json
-pipeline/04-fastbreak-charts/s3/.terraform/**
+pipeline/04-fastbreak-charts/aws/.terraform/**
 *.tfstate
 *.tfstate.*
 *.tfvars

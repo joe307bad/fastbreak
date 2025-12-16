@@ -10,6 +10,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import com.joebad.fastbreak.data.model.Registry
+import com.joebad.fastbreak.platform.AppVersion
 import com.joebad.fastbreak.ui.diagnostics.DiagnosticsInfo
 import com.joebad.fastbreak.ui.diagnostics.RegistryOverviewList
 import com.joebad.fastbreak.ui.diagnostics.SyncStatusRow
@@ -111,7 +112,20 @@ fun DrawerMenu(
                 }
             }
 
-            // Bottom padding for scroll
+            Spacer(modifier = Modifier.weight(1f))
+
+            // Version info at the bottom
+            HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Text(
+                text = "v${AppVersion.versionName} (${AppVersion.buildNumber})",
+                style = MaterialTheme.typography.bodySmall,
+                fontFamily = FontFamily.Monospace,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.align(Alignment.CenterHorizontally)
+            )
+
             Spacer(modifier = Modifier.height(16.dp))
         }
     }

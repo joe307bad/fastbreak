@@ -8,8 +8,10 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 # Install remaining R packages (tidyverse deps already installed)
+# hockeyR must be installed from GitHub for latest NHL API compatibility
 RUN R -e "options(repos = c(CRAN = 'https://packagemanager.posit.co/cran/__linux__/jammy/latest')); \
-    install.packages(c('nflreadr', 'hoopR', 'hockeyR')); \
+    install.packages(c('nflreadr', 'hoopR', 'devtools')); \
+    devtools::install_github('danmorse314/hockeyR'); \
     if (!require('nflreadr')) stop('nflreadr installation failed'); \
     if (!require('hoopR')) stop('hoopR installation failed'); \
     if (!require('hockeyR')) stop('hockeyR installation failed')"

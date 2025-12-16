@@ -15,6 +15,7 @@ import com.joebad.fastbreak.navigation.RootComponent
 import com.joebad.fastbreak.ui.container.RegistryContainer
 import com.joebad.fastbreak.ui.theme.SystemThemeDetector
 import com.joebad.fastbreak.ui.theme.ThemeRepository
+import com.joebad.fastbreak.platform.AppVersion
 import com.russhwolf.settings.Settings
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -23,6 +24,9 @@ import kotlinx.coroutines.SupervisorJob
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // Initialize app version info
+        AppVersion.init(this)
 
         val settings = Settings()
         val themeRepository = ThemeRepository(

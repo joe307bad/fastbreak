@@ -20,7 +20,6 @@ WORKDIR /app
 COPY weekly /app/weekly
 COPY daily /app/daily
 RUN mkdir -p /app/data
-COPY registry.json /app/data/registry.json
 
 # Copy cron configuration and startup script
 COPY crontab /etc/cron.d/r-cron

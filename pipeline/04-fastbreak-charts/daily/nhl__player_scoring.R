@@ -6,14 +6,20 @@ library(jsonlite)
 current_year <- as.numeric(format(Sys.Date(), "%Y"))
 current_month <- as.numeric(format(Sys.Date(), "%m"))
 
-# NHL season starts in October, so if we're in Jan-Sep, use previous year as season start
-nhl_season <- if (current_month >= 10) current_year else current_year - 1
+# NHL season starts in October
+# get_skater_stats_hr expects the END year of the season (e.g., 2025 for 2024-25 season)
+nhl_season_end <- if (current_month >= 10) current_year + 1 else current_year
+nhl_season_start <- nhl_season_end - 1
 
-cat("Processing NHL Player Scoring for", nhl_season, "-", nhl_season + 1, "season\n")
+cat("Processing NHL Player Scoring for", nhl_season_start, "-", nhl_season_end, "season\n")
 
 # Load skater stats using hockeyR
 skater_stats <- tryCatch({
-  hockeyR::get_skater_stats_hr(nhl_season)
+  result <- hockeyR::get_skater_stats_hr(season = nhl_season_end)
+  if (is.null(result) || nrow(result) == 0) {
+    stop("get_skater_stats_hr returned empty data")
+  }
+  result
 }, error = function(e) {
   cat("Error loading skater stats:", e$message, "\n")
   stop(e)
@@ -21,6 +27,8 @@ skater_stats <- tryCatch({
 
 cat("Loaded stats for", nrow(skater_stats), "skaters\n")
 cat("Available columns:", paste(names(skater_stats), collapse = ", "), "\n")
+cat("First row sample:\n")
+print(head(skater_stats, 1))
 
 # Filter to players with significant playing time (at least 20 games)
 # and get top scorers by points
@@ -69,7 +77,7 @@ data_points <- top_players %>%
 output_data <- list(
   sport = "NHL",
   visualizationType = "SCATTER_PLOT",
-  title = paste0("NHL Scoring Leaders - ", nhl_season, "-", substr(nhl_season + 1, 3, 4)),
+  title = paste0("NHL Scoring Leaders - ", nhl_season_start, "-", substr(nhl_season_end, 3, 4)),
   subtitle = "Goals vs Assists",
   description = "This chart shows the top 50 NHL scorers plotted by their goals and assists. Players in the top-right are complete offensive players who both score and create. Top-left are elite playmakers who primarily set up teammates. Bottom-right are pure goal scorers. The sum represents total points.",
   lastUpdated = format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC"),

@@ -38,7 +38,9 @@ jobs:
 
       - name: Install CocoaPods
         working-directory: kmp/iosApp
-        run: bundle exec pod install
+        run: |
+          gem install cocoapods
+          pod install
 
       - name: Deploy to TestFlight
         working-directory: kmp/iosApp

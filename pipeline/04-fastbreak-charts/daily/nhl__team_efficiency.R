@@ -6,14 +6,20 @@ library(jsonlite)
 current_year <- as.numeric(format(Sys.Date(), "%Y"))
 current_month <- as.numeric(format(Sys.Date(), "%m"))
 
-# NHL season starts in October, so if we're in Jan-Sep, use previous year as season start
-nhl_season <- if (current_month >= 10) current_year else current_year - 1
+# NHL season starts in October
+# get_standings expects the END year of the season (e.g., 2025 for 2024-25 season)
+nhl_season_end <- if (current_month >= 10) current_year + 1 else current_year
+nhl_season_start <- nhl_season_end - 1
 
-cat("Processing NHL Team Efficiency for", nhl_season, "-", nhl_season + 1, "season\n")
+cat("Processing NHL Team Efficiency for", nhl_season_start, "-", nhl_season_end, "season\n")
 
 # Load team standings using hockeyR
 standings <- tryCatch({
-  hockeyR::get_standings(nhl_season)
+  result <- hockeyR::get_standings(seasons = nhl_season_end)
+  if (is.null(result) || nrow(result) == 0) {
+    stop("get_standings returned empty data")
+  }
+  result
 }, error = function(e) {
   cat("Error loading standings:", e$message, "\n")
   stop(e)
@@ -21,6 +27,8 @@ standings <- tryCatch({
 
 cat("Loaded standings for", nrow(standings), "teams\n")
 cat("Available columns:", paste(names(standings), collapse = ", "), "\n")
+cat("First row sample:\n")
+print(head(standings, 1))
 
 # NHL team abbreviation mapping
 team_abbrevs <- c(
@@ -71,7 +79,7 @@ data_points <- team_ratings %>%
 output_data <- list(
   sport = "NHL",
   visualizationType = "SCATTER_PLOT",
-  title = paste0("NHL Team Efficiency - ", nhl_season, "-", substr(nhl_season + 1, 3, 4)),
+  title = paste0("NHL Team Efficiency - ", nhl_season_start, "-", substr(nhl_season_end, 3, 4)),
   subtitle = "Goals For vs Goals Against per Game",
   description = "Goals For per Game measures offensive output while Goals Against per Game measures defensive performance (lower is better). Teams in the top-right quadrant have elite offenses and defenses, making them Stanley Cup contenders. Goal differential per game is the best single measure of team quality.",
   lastUpdated = format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC"),

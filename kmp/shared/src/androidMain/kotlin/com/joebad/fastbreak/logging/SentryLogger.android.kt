@@ -46,7 +46,7 @@ actual object SentryLogger {
     actual fun captureException(throwable: Throwable, extras: Map<String, Any>?) {
         Sentry.captureException(throwable) { scope ->
             extras?.forEach { (key, value) ->
-                scope.setExtra(key, value)
+                scope.setExtra(key, value.toString())
             }
         }
     }

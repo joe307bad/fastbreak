@@ -28,3 +28,5 @@ pipeline/04-fastbreak-charts/aws/.terraform/**
 *.tfvars
 
 .env
+kmp/.kotlin/*
+kmp/fastbreak.keystore

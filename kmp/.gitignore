@@ -28,4 +28,4 @@ build/
 # Kotlin
 *.kotlin_metadata
 
-.kotlin
+.kotlinfastbreak.keystore

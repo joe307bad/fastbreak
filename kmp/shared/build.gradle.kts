@@ -65,7 +65,6 @@ kotlin {
             implementation(compose.material3)
             implementation(compose.materialIconsExtended)
             implementation(compose.ui)
-            // implementation(compose.components.resources) // Disabled - causes archive issues when not using Compose Resources
 
             // Decompose
             implementation(libs.decompose)
@@ -77,10 +76,6 @@ kotlin {
 
             // Koala Plot
             implementation(libs.koalaplot.core)
-
-            // Cupertino - disabled due to Compose version incompatibility
-            // implementation(libs.cupertino)
-            // implementation(libs.cupertino.adaptive)
 
             // Multiplatform Settings
             implementation(libs.multiplatform.settings)

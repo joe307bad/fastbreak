@@ -1,0 +1,26 @@
+# Build outputs
+**/build
+**/.gradle
+
+# IDE files
+.idea
+*.iml
+
+# iOS build artifacts
+iosApp/Pods
+iosApp/.symlinks
+iosApp/iosApp.xcworkspace/xcuserdata
+
+# Android build artifacts
+androidApp/build
+*.keystore
+
+# Local configuration
+local.properties
+
+# Git
+.git
+.gitignore
+
+# Kotlin
+.kotlin

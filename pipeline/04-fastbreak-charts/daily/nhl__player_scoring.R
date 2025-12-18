@@ -1,4 +1,4 @@
-library(hockeyR)
+library(httr)
 library(dplyr)
 library(jsonlite)
 
@@ -7,19 +7,31 @@ current_year <- as.numeric(format(Sys.Date(), "%Y"))
 current_month <- as.numeric(format(Sys.Date(), "%m"))
 
 # NHL season starts in October
-# get_skater_stats_hr expects the END year of the season (e.g., 2025 for 2024-25 season)
+# NHL API expects season format like 20242025
 nhl_season_end <- if (current_month >= 10) current_year + 1 else current_year
 nhl_season_start <- nhl_season_end - 1
+nhl_season_id <- paste0(nhl_season_start, nhl_season_end)
 
 cat("Processing NHL Player Scoring for", nhl_season_start, "-", nhl_season_end, "season\n")
 
-# Load skater stats using hockeyR
+# Load skater stats using NHL API
 skater_stats <- tryCatch({
-  result <- hockeyR::get_skater_stats_hr(season = nhl_season_end)
-  if (is.null(result) || nrow(result) == 0) {
-    stop("get_skater_stats_hr returned empty data")
+  api_url <- sprintf(
+    "https://api.nhle.com/stats/rest/en/skater/summary?isAggregate=false&isGame=false&limit=-1&cayenneExp=seasonId=%s%%20and%%20gameTypeId=2",
+    nhl_season_id
+  )
+  cat("Fetching from NHL API:", api_url, "\n")
+
+  response <- GET(api_url)
+  if (status_code(response) != 200) {
+    stop(sprintf("NHL API returned status %d", status_code(response)))
   }
-  result
+
+  result <- fromJSON(content(response, "text", encoding = "UTF-8"))
+  if (is.null(result$data) || nrow(result$data) == 0) {
+    stop("NHL API returned empty data")
+  }
+  result$data
 }, error = function(e) {
   cat("Error loading skater stats:", e$message, "\n")
   stop(e)
@@ -36,10 +48,12 @@ min_games <- 20
 
 qualified_players <- skater_stats %>%
   mutate(
-    GP = as.numeric(games),
+    GP = as.numeric(gamesPlayed),
     G = as.numeric(goals),
     A = as.numeric(assists),
-    PTS = as.numeric(points)
+    PTS = as.numeric(points),
+    player = skaterFullName,
+    team = teamAbbrevs
   ) %>%
   filter(
     GP >= min_games,
@@ -81,7 +95,7 @@ output_data <- list(
   subtitle = "Goals vs Assists",
   description = "This chart shows the top 50 NHL scorers plotted by their goals and assists. Players in the top-right are complete offensive players who both score and create. Top-left are elite playmakers who primarily set up teammates. Bottom-right are pure goal scorers. The sum represents total points.",
   lastUpdated = format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC"),
-  source = "hockeyR / Hockey Reference",
+  source = "NHL Stats API",
   xAxisLabel = "Goals",
   yAxisLabel = "Assists",
   xColumnLabel = "G",

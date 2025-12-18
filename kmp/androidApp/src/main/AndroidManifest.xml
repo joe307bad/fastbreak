@@ -9,6 +9,8 @@
         android:icon="@mipmap/ic_launcher"
         android:label="fastbreak"
         android:theme="@style/Theme.Fastbreak">
+
+        <meta-data android:name="io.sentry.auto-init" android:value="false" />
         <activity
             android:name=".MainActivity"
             android:exported="true"

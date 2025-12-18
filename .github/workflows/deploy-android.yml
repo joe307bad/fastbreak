@@ -63,4 +63,4 @@ jobs:
           packageName: com.joebad.fastbreak
           releaseFiles: kmp/androidApp/build/outputs/bundle/release/*.aab
           track: alpha
-          status: completed
+          status: draft

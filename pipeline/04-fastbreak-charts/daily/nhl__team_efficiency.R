@@ -1,4 +1,4 @@
-library(hockeyR)
+library(httr)
 library(dplyr)
 library(jsonlite)
 
@@ -7,19 +7,31 @@ current_year <- as.numeric(format(Sys.Date(), "%Y"))
 current_month <- as.numeric(format(Sys.Date(), "%m"))
 
 # NHL season starts in October
-# get_standings expects the END year of the season (e.g., 2025 for 2024-25 season)
+# NHL API expects season format like 20242025
 nhl_season_end <- if (current_month >= 10) current_year + 1 else current_year
 nhl_season_start <- nhl_season_end - 1
+nhl_season_id <- paste0(nhl_season_start, nhl_season_end)
 
 cat("Processing NHL Team Efficiency for", nhl_season_start, "-", nhl_season_end, "season\n")
 
-# Load team standings using hockeyR
+# Load team stats using NHL API
 standings <- tryCatch({
-  result <- hockeyR::get_standings(seasons = nhl_season_end)
-  if (is.null(result) || nrow(result) == 0) {
-    stop("get_standings returned empty data")
+  api_url <- sprintf(
+    "https://api.nhle.com/stats/rest/en/team/summary?cayenneExp=seasonId=%s%%20and%%20gameTypeId=2",
+    nhl_season_id
+  )
+  cat("Fetching from NHL API:", api_url, "\n")
+
+  response <- GET(api_url)
+  if (status_code(response) != 200) {
+    stop(sprintf("NHL API returned status %d", status_code(response)))
   }
-  result
+
+  result <- fromJSON(content(response, "text", encoding = "UTF-8"))
+  if (is.null(result$data) || nrow(result$data) == 0) {
+    stop("NHL API returned empty data")
+  }
+  result$data
 }, error = function(e) {
   cat("Error loading standings:", e$message, "\n")
   stop(e)
@@ -41,26 +53,25 @@ team_abbrevs <- c(
   "New Jersey Devils" = "NJD", "New York Islanders" = "NYI", "New York Rangers" = "NYR",
   "Ottawa Senators" = "OTT", "Philadelphia Flyers" = "PHI", "Pittsburgh Penguins" = "PIT",
   "San Jose Sharks" = "SJS", "Seattle Kraken" = "SEA", "St. Louis Blues" = "STL",
-  "Tampa Bay Lightning" = "TBL", "Toronto Maple Leafs" = "TOR", "Utah Hockey Club" = "UTA",
+  "Tampa Bay Lightning" = "TBL", "Toronto Maple Leafs" = "TOR",
+  "Utah Hockey Club" = "UTA", "Utah Mammoth" = "UTA",
   "Vancouver Canucks" = "VAN", "Vegas Golden Knights" = "VGK", "Washington Capitals" = "WSH",
   "Winnipeg Jets" = "WPG"
 )
 
-# Calculate goals for and against per game
+# Use API-provided per-game stats
 team_ratings <- standings %>%
   mutate(
-    GP = as.numeric(games),
-    GF = as.numeric(goals_for),
-    GA = as.numeric(goals_against),
-    GF_PG = round(GF / GP, 2),
-    GA_PG = round(GA / GP, 2),
-    DIFF_PG = round((GF - GA) / GP, 2),
-    TEAM_ABBREV = team_abbrevs[team_name]
+    GP = as.numeric(gamesPlayed),
+    GF_PG = round(goalsForPerGame, 2),
+    GA_PG = round(goalsAgainstPerGame, 2),
+    DIFF_PG = round(goalsForPerGame - goalsAgainstPerGame, 2),
+    TEAM_ABBREV = team_abbrevs[teamFullName]
   ) %>%
   filter(!is.na(GF_PG) & !is.na(GA_PG) & GP > 0)
 
 cat("\nTeam Ratings Preview:\n")
-print(head(team_ratings %>% arrange(desc(DIFF_PG)) %>% select(team_name, TEAM_ABBREV, GF_PG, GA_PG, DIFF_PG), 10))
+print(head(team_ratings %>% arrange(desc(DIFF_PG)) %>% select(teamFullName, TEAM_ABBREV, GF_PG, GA_PG, DIFF_PG), 10))
 
 # Convert to list format for JSON matching ScatterPlotVisualization model
 # For NHL: x = Goals For per Game, y = Goals Against per Game
@@ -83,7 +94,7 @@ output_data <- list(
   subtitle = "Goals For vs Goals Against per Game",
   description = "Goals For per Game measures offensive output while Goals Against per Game measures defensive performance (lower is better). Teams in the top-right quadrant have elite offenses and defenses, making them Stanley Cup contenders. Goal differential per game is the best single measure of team quality.",
   lastUpdated = format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC"),
-  source = "hockeyR / Hockey Reference",
+  source = "NHL Stats API",
   xAxisLabel = "Goals For / Game",
   yAxisLabel = "Goals Against / Game",
   xColumnLabel = "GF/G",

@@ -1,4 +1,4 @@
-name: Deploy to Google Play Beta
+name: Deploy to Google Play Alpha
 
 on:
   workflow_dispatch:
@@ -56,11 +56,11 @@ jobs:
             -PVERSION_NAME="0.0.1-alpha-${{ steps.build_info.outputs.build_number }}" \
             -PVERSION_CODE="${{ steps.build_info.outputs.build_number }}"
 
-      - name: Upload to Google Play Internal
+      - name: Upload to Google Play Alpha
         uses: r0adkll/upload-google-play@v1
         with:
           serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
           packageName: com.joebad.fastbreak
           releaseFiles: kmp/androidApp/build/outputs/bundle/release/*.aab
-          track: internal
+          track: alpha
           status: completed

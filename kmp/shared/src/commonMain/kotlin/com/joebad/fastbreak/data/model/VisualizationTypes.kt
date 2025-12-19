@@ -6,6 +6,7 @@ import com.joebad.fastbreak.data.serializers.InstantSerializer
 import kotlin.time.Instant
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseSerializers
+import kotlinx.serialization.json.JsonPrimitive
 
 // Base interface for all visualization types
 sealed interface VisualizationType {
@@ -126,4 +127,56 @@ data class TableVisualization(
     override val lastUpdated: Instant,
     override val source: String? = null,
     val dataPoints: List<TableDataPoint>
+) : VisualizationType
+
+// Matchup Report Card data structures
+@Serializable
+data class MatchupComparison(
+    val title: String,
+    val homeTeamValue: JsonPrimitive,
+    val awayTeamValue: JsonPrimitive,
+    /** When true, lower values are better (e.g., defensive stats, points allowed) */
+    val inverted: Boolean = false
+) {
+    /**
+     * Returns the home team value as a Double if it's numeric, null otherwise
+     */
+    fun homeValueAsDouble(): Double? = homeTeamValue.content.toDoubleOrNull()
+
+    /**
+     * Returns the away team value as a Double if it's numeric, null otherwise
+     */
+    fun awayValueAsDouble(): Double? = awayTeamValue.content.toDoubleOrNull()
+
+    /**
+     * Returns the home team value as a display string
+     */
+    fun homeValueDisplay(): String = homeTeamValue.content
+
+    /**
+     * Returns the away team value as a display string
+     */
+    fun awayValueDisplay(): String = awayTeamValue.content
+}
+
+@Serializable
+data class Matchup(
+    val homeTeam: String,
+    val awayTeam: String,
+    val week: Int,
+    val gameTime: String? = null,
+    val comparisons: List<MatchupComparison>
+)
+
+@Serializable
+data class MatchupVisualization(
+    override val sport: String,
+    override val visualizationType: String,
+    override val title: String,
+    override val subtitle: String,
+    override val description: String,
+    override val lastUpdated: Instant,
+    override val source: String? = null,
+    val week: Int,
+    val dataPoints: List<Matchup>
 ) : VisualizationType

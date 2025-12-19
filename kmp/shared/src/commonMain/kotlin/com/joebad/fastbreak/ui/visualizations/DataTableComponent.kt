@@ -63,6 +63,7 @@ fun DataTableComponent(
             is BarGraphVisualization -> BarDataTable(visualization.dataPoints)
             is LineChartVisualization -> LineDataTable(visualization.series)
             is TableVisualization -> GenericDataTable(visualization.dataPoints)
+            is MatchupVisualization -> MatchupReportCards(visualization.dataPoints)
         }
     }
 }
@@ -507,5 +508,161 @@ private fun GenericDataTable(data: List<TableDataPoint>) {
                 }
             }
         }
+    }
+}
+
+/**
+ * Matchup Report Cards - displays a list of matchups with comparison stats
+ */
+@Composable
+private fun MatchupReportCards(matchups: List<Matchup>) {
+    if (matchups.isEmpty()) {
+        Text("No matchups available", modifier = Modifier.padding(8.dp))
+        return
+    }
+
+    val verticalScrollState = rememberScrollState()
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .verticalScroll(verticalScrollState)
+            .padding(vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        matchups.forEach { matchup ->
+            MatchupCard(matchup)
+        }
+    }
+}
+
+@Composable
+private fun MatchupCard(matchup: Matchup) {
+    val dividerColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
+    val highlightColor = MaterialTheme.colorScheme.primary
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
+            .padding(12.dp)
+    ) {
+        // Matchup header: Away @ Home
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = matchup.awayTeam,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Text(
+                text = "  @  ",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Text(
+                text = matchup.homeTeam,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+        }
+
+        // Game time if available
+        matchup.gameTime?.let { time ->
+            Text(
+                text = time,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 4.dp),
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+            )
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+        HorizontalDivider(color = dividerColor, thickness = 1.dp)
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // Comparison rows
+        matchup.comparisons.forEach { comparison ->
+            ComparisonRow(
+                comparison = comparison,
+                awayTeam = matchup.awayTeam,
+                homeTeam = matchup.homeTeam,
+                highlightColor = highlightColor
+            )
+        }
+    }
+}
+
+@Composable
+private fun ComparisonRow(
+    comparison: MatchupComparison,
+    awayTeam: String,
+    homeTeam: String,
+    highlightColor: Color
+) {
+    val awayValue = comparison.awayValueDisplay()
+    val homeValue = comparison.homeValueDisplay()
+
+    // Determine which team has the better value (if numeric)
+    val awayNumeric = comparison.awayValueAsDouble()
+    val homeNumeric = comparison.homeValueAsDouble()
+
+    // Use the inverted property to determine if lower is better
+    val awayIsBetter = when {
+        awayNumeric == null || homeNumeric == null -> false
+        comparison.inverted -> awayNumeric < homeNumeric
+        else -> awayNumeric > homeNumeric
+    }
+
+    val homeIsBetter = when {
+        awayNumeric == null || homeNumeric == null -> false
+        comparison.inverted -> homeNumeric < awayNumeric
+        else -> homeNumeric > awayNumeric
+    }
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // Away team value
+        Text(
+            text = awayValue,
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = if (awayIsBetter) FontWeight.Bold else FontWeight.Normal,
+            color = if (awayIsBetter) highlightColor else MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.width(60.dp)
+        )
+
+        // Stat title (centered)
+        Text(
+            text = comparison.title,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.weight(1f),
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+
+        // Home team value
+        Text(
+            text = homeValue,
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = if (homeIsBetter) FontWeight.Bold else FontWeight.Normal,
+            color = if (homeIsBetter) highlightColor else MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.width(60.dp),
+            textAlign = androidx.compose.ui.text.style.TextAlign.End
+        )
     }
 }

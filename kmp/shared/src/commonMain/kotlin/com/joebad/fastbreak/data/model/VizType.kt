@@ -11,5 +11,6 @@ enum class VizType {
     SCATTER_PLOT,
     BAR_GRAPH,
     LINE_CHART,
-    TABLE
+    TABLE,
+    MATCHUP
 }

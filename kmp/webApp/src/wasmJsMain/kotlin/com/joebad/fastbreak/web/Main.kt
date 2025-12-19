@@ -4,8 +4,11 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -29,6 +32,9 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.ComposeViewport
 import com.joebad.fastbreak.data.model.BarGraphVisualization
 import com.joebad.fastbreak.data.model.LineChartVisualization
+import com.joebad.fastbreak.data.model.Matchup
+import com.joebad.fastbreak.data.model.MatchupComparison
+import com.joebad.fastbreak.data.model.MatchupVisualization
 import com.joebad.fastbreak.data.model.ScatterPlotVisualization
 import com.joebad.fastbreak.data.model.TableVisualization
 import com.joebad.fastbreak.data.model.VisualizationType
@@ -85,12 +91,18 @@ private fun parseVisualization(jsonContent: String): VisualizationType? {
     return try {
         val jsonElement = json.parseToJsonElement(jsonContent)
         val vizType = jsonElement.jsonObject["visualizationType"]?.jsonPrimitive?.content
+        val title = jsonElement.jsonObject["title"]?.jsonPrimitive?.content ?: "unknown"
+
+        println("Parsing chart: $title (type: $vizType)")
 
         when (vizType) {
             "SCATTER_PLOT" -> json.decodeFromString<ScatterPlotVisualization>(jsonContent)
             "BAR_GRAPH" -> json.decodeFromString<BarGraphVisualization>(jsonContent)
             "LINE_CHART" -> json.decodeFromString<LineChartVisualization>(jsonContent)
             "TABLE" -> json.decodeFromString<TableVisualization>(jsonContent)
+            "MATCHUP" -> json.decodeFromString<MatchupVisualization>(jsonContent).also {
+                println("  Successfully parsed MATCHUP with ${it.dataPoints.size} matchups")
+            }
             else -> {
                 println("Unknown visualization type: $vizType")
                 null
@@ -98,6 +110,7 @@ private fun parseVisualization(jsonContent: String): VisualizationType? {
         }
     } catch (e: Exception) {
         println("Failed to parse chart: ${e.message}")
+        e.printStackTrace()
         null
     }
 }
@@ -146,6 +159,11 @@ fun ChartGallery(
     val charts: List<VisualizationType> = remember {
         BundledChartData.charts.values.mapNotNull { jsonContent ->
             parseVisualization(jsonContent)
+        }.also { chartList ->
+            println("Parsed ${chartList.size} charts")
+            chartList.forEach { chart ->
+                println("  - ${chart.title} (${chart::class.simpleName})")
+            }
         }
     }
 
@@ -259,6 +277,12 @@ fun ChartGallery(
 
         val filteredCharts = sportGroups[selectedSport] ?: emptyList()
 
+        // Separate matchup visualizations from regular charts
+        val regularCharts = filteredCharts.filterNot { it is MatchupVisualization }
+        val matchupVisualizations = filteredCharts.filterIsInstance<MatchupVisualization>()
+
+        println("Selected sport: $selectedSport, Total: ${filteredCharts.size}, Regular: ${regularCharts.size}, Matchups: ${matchupVisualizations.size}")
+
         if (filteredCharts.isEmpty()) {
             Box(
                 modifier = Modifier.fillMaxSize(),
@@ -278,8 +302,16 @@ fun ChartGallery(
                 verticalArrangement = Arrangement.spacedBy(16.dp),
                 contentPadding = PaddingValues(end = 32.dp)
             ) {
-                items(filteredCharts) { viz ->
+                // Regular chart cards
+                items(regularCharts) { viz ->
                     ChartCard(viz)
+                }
+
+                // Matchup section - spans full width
+                matchupVisualizations.forEach { matchupViz ->
+                    item(span = { GridItemSpan(maxLineSpan) }) {
+                        MatchupSection(matchupViz)
+                    }
                 }
             }
         }
@@ -470,6 +502,12 @@ fun ChartCard(viz: VisualizationType) {
                     modifier = chartModifier
                 )
             }
+            is MatchupVisualization -> {
+                DataTableComponent(
+                    visualization = viz,
+                    modifier = chartModifier
+                )
+            }
         }
 
         // Footer: source and last updated
@@ -494,5 +532,297 @@ fun ChartCard(viz: VisualizationType) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
+    }
+}
+
+/**
+ * Section displaying matchup report cards in a grid layout
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun MatchupSection(visualization: MatchupVisualization) {
+    val matchups = visualization.dataPoints
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 24.dp, bottom = 16.dp, end = 32.dp)
+    ) {
+        // Section header
+        Text(
+            text = visualization.title,
+            fontFamily = LocalTypewriterFont.current,
+            fontWeight = FontWeight.Bold,
+            fontSize = 18.sp,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.padding(bottom = 4.dp)
+        )
+
+        Text(
+            text = visualization.subtitle,
+            fontFamily = LocalTypewriterFont.current,
+            fontSize = 12.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(bottom = 16.dp)
+        )
+
+        // Grid of matchup cards
+        FlowRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            matchups.forEach { matchup ->
+                MatchupCard(matchup)
+            }
+        }
+
+        // Footer with source and last updated
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 12.dp),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            visualization.source?.let { source ->
+                Text(
+                    text = "src: $source",
+                    fontFamily = LocalTypewriterFont.current,
+                    fontSize = 9.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Text(
+                text = formatRelativeTime(visualization.lastUpdated),
+                fontFamily = LocalTypewriterFont.current,
+                fontSize = 9.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+/**
+ * Individual matchup card showing team comparison
+ */
+@Composable
+fun MatchupCard(matchup: Matchup) {
+    val awayColor = Color(0xFF2196F3) // Blue
+    val homeColor = Color(0xFFFF5722) // Deep Orange
+
+    // Calculate edges
+    var awayEdges = 0
+    var homeEdges = 0
+
+    matchup.comparisons.forEach { comparison ->
+        val awayNumeric = comparison.awayValueAsDouble()
+        val homeNumeric = comparison.homeValueAsDouble()
+
+        if (awayNumeric != null && homeNumeric != null) {
+            val awayIsBetter = if (comparison.inverted) {
+                awayNumeric < homeNumeric
+            } else {
+                awayNumeric > homeNumeric
+            }
+            val homeIsBetter = if (comparison.inverted) {
+                homeNumeric < awayNumeric
+            } else {
+                homeNumeric > awayNumeric
+            }
+
+            if (awayIsBetter) awayEdges++
+            if (homeIsBetter) homeEdges++
+        }
+    }
+
+    Column(
+        modifier = Modifier
+            .width(320.dp)
+            .padding(16.dp)
+    ) {
+        // Team header
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Away team
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.weight(1f)
+            ) {
+                Text(
+                    text = matchup.awayTeam,
+                    fontFamily = LocalTypewriterFont.current,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 16.sp,
+                    color = awayColor
+                )
+                Text(
+                    text = "AWAY",
+                    fontFamily = LocalTypewriterFont.current,
+                    fontSize = 9.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            Text(
+                text = "@",
+                fontFamily = LocalTypewriterFont.current,
+                fontSize = 14.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 8.dp)
+            )
+
+            // Home team
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.weight(1f)
+            ) {
+                Text(
+                    text = matchup.homeTeam,
+                    fontFamily = LocalTypewriterFont.current,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 16.sp,
+                    color = homeColor
+                )
+                Text(
+                    text = "HOME",
+                    fontFamily = LocalTypewriterFont.current,
+                    fontSize = 9.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // Edge summary bar
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                text = "$awayEdges edges",
+                fontFamily = LocalTypewriterFont.current,
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Bold,
+                color = awayColor
+            )
+            Text(
+                text = "$homeEdges edges",
+                fontFamily = LocalTypewriterFont.current,
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Bold,
+                color = homeColor
+            )
+        }
+
+        Spacer(modifier = Modifier.height(4.dp))
+
+        // Visual edge bar
+        val total = awayEdges + homeEdges
+        val awayFraction = if (total > 0) awayEdges.toFloat() / total else 0.5f
+        val homeFraction = if (total > 0) homeEdges.toFloat() / total else 0.5f
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(8.dp)
+                .clip(RoundedCornerShape(4.dp))
+        ) {
+            if (awayEdges > 0 || homeEdges == 0) {
+                Box(
+                    modifier = Modifier
+                        .weight(if (total > 0) awayFraction else 0.5f)
+                        .fillMaxHeight()
+                        .background(awayColor)
+                )
+            }
+            if (homeEdges > 0 || awayEdges == 0) {
+                Box(
+                    modifier = Modifier
+                        .weight(if (total > 0) homeFraction else 0.5f)
+                        .fillMaxHeight()
+                        .background(homeColor)
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+        HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // Comparison rows
+        matchup.comparisons.forEach { comparison ->
+            MatchupComparisonRow(
+                comparison = comparison,
+                awayColor = awayColor,
+                homeColor = homeColor
+            )
+        }
+    }
+}
+
+@Composable
+private fun MatchupComparisonRow(
+    comparison: MatchupComparison,
+    awayColor: Color,
+    homeColor: Color
+) {
+    val awayValue = comparison.awayValueDisplay()
+    val homeValue = comparison.homeValueDisplay()
+    val awayNumeric = comparison.awayValueAsDouble()
+    val homeNumeric = comparison.homeValueAsDouble()
+
+    val awayIsBetter = when {
+        awayNumeric == null || homeNumeric == null -> false
+        comparison.inverted -> awayNumeric < homeNumeric
+        else -> awayNumeric > homeNumeric
+    }
+
+    val homeIsBetter = when {
+        awayNumeric == null || homeNumeric == null -> false
+        comparison.inverted -> homeNumeric < awayNumeric
+        else -> homeNumeric > awayNumeric
+    }
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 3.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // Away value
+        Text(
+            text = awayValue,
+            fontFamily = LocalTypewriterFont.current,
+            fontSize = 11.sp,
+            fontWeight = if (awayIsBetter) FontWeight.Bold else FontWeight.Normal,
+            color = if (awayIsBetter) awayColor else MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.width(50.dp)
+        )
+
+        // Stat title
+        Text(
+            text = comparison.title,
+            fontFamily = LocalTypewriterFont.current,
+            fontSize = 10.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.weight(1f)
+        )
+
+        // Home value
+        Text(
+            text = homeValue,
+            fontFamily = LocalTypewriterFont.current,
+            fontSize = 11.sp,
+            fontWeight = if (homeIsBetter) FontWeight.Bold else FontWeight.Normal,
+            color = if (homeIsBetter) homeColor else MaterialTheme.colorScheme.onSurface,
+            textAlign = TextAlign.End,
+            modifier = Modifier.width(50.dp)
+        )
     }
 }

@@ -6,6 +6,7 @@ import com.joebad.fastbreak.data.model.BarGraphVisualization
 import com.joebad.fastbreak.data.model.CachedChartData
 import com.joebad.fastbreak.data.model.ChartDefinition
 import com.joebad.fastbreak.data.model.LineChartVisualization
+import com.joebad.fastbreak.data.model.MatchupVisualization
 import com.joebad.fastbreak.data.model.RegistryEntry
 import com.joebad.fastbreak.data.model.ScatterPlotVisualization
 import com.joebad.fastbreak.data.model.Sport
@@ -279,6 +280,7 @@ class ChartDataSynchronizer(
                 VizType.BAR_GRAPH -> json.decodeFromString<BarGraphVisualization>(rawJson)
                 VizType.LINE_CHART -> json.decodeFromString<LineChartVisualization>(rawJson)
                 VizType.TABLE -> json.decodeFromString<TableVisualization>(rawJson)
+                VizType.MATCHUP -> json.decodeFromString<MatchupVisualization>(rawJson)
             }
 
             val chartId = fileKeyToChartId(fileKey)

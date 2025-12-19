@@ -189,6 +189,12 @@ private fun SuccessContent(visualization: VisualizationType) {
             // Source attribution at bottom
             SourceAttribution(source = visualization.source)
         }
+    } else if (visualization is MatchupVisualization) {
+        // Matchup has its own dedicated screen with dropdown selector
+        MatchupScreen(
+            visualization = visualization,
+            modifier = Modifier.fillMaxSize()
+        )
     } else {
         // For charts: use vertical scroll to show chart + data table
         val scrollState = rememberScrollState()
@@ -235,6 +241,9 @@ private fun SuccessContent(visualization: VisualizationType) {
                             }
                             is TableVisualization -> {
                                 // Handled above
+                            }
+                            is MatchupVisualization -> {
+                                // Matchup report cards - handled in DataTableComponent
                             }
                         }
                     }

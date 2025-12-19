@@ -33,6 +33,7 @@ import kotlin.math.floor
 import kotlin.math.log10
 import kotlin.math.pow
 import kotlin.math.roundToInt
+import kotlin.math.sqrt
 
 // Helper function for formatting floats in KMP common code
 private fun Float.formatTo(decimals: Int): String {
@@ -122,6 +123,215 @@ fun FourQuadrantScatterPlot(
         val b = (sumY - m * sumX) / n
 
         Pair(m, b)
+    }
+
+    // Only apply shading logic if there are more than 15 data points
+    val useSelectiveHighlighting = data.size > 15
+
+    // Calculate extreme players (outliers in each direction from the averages)
+    // These will always show labels, others will be transparent
+    val extremePlayerIndices = remember(data, avgPFF, avgEPA, yMultiplier, useSelectiveHighlighting) {
+        if (!useSelectiveHighlighting) {
+            // If <= 15 points, treat all as "extreme" (all visible with labels)
+            return@remember data.indices.toSet()
+        }
+
+        val indexed = data.mapIndexed { index, point ->
+            val transformedY = point.y * yMultiplier
+            index to point.copy(y = transformedY)
+        }
+
+        val extremes = mutableSetOf<Int>()
+
+        // Top 4 highest Y (best in Y metric)
+        indexed.sortedByDescending { it.second.y }.take(4).forEach { extremes.add(it.first) }
+        // Bottom 4 lowest Y (worst in Y metric)
+        indexed.sortedBy { it.second.y }.take(4).forEach { extremes.add(it.first) }
+        // Top 4 highest X (best in X metric)
+        indexed.sortedByDescending { it.second.x }.take(4).forEach { extremes.add(it.first) }
+        // Bottom 4 lowest X (worst in X metric)
+        indexed.sortedBy { it.second.x }.take(4).forEach { extremes.add(it.first) }
+
+        // Also include corner extremes (best/worst in both dimensions)
+        // Top-right quadrant extremes (high X, high Y)
+        indexed.filter { it.second.x > avgPFF && it.second.y > avgEPA }
+            .sortedByDescending { it.second.x + it.second.y }
+            .take(3).forEach { extremes.add(it.first) }
+        // Bottom-left quadrant extremes (low X, low Y)
+        indexed.filter { it.second.x < avgPFF && it.second.y < avgEPA }
+            .sortedBy { it.second.x + it.second.y }
+            .take(3).forEach { extremes.add(it.first) }
+
+        // Include 1-2 players closest to the center (most average)
+        indexed.sortedBy { (_, point) ->
+            val dx = point.x - avgPFF
+            val dy = point.y - avgEPA
+            sqrt(dx * dx + dy * dy)
+        }.take(2).forEach { extremes.add(it.first) }
+
+        extremes
+    }
+
+    // Calculate which labels can be shown without overlapping
+    // Recalculates when zoom changes - more labels fit when zoomed in
+    // Returns: Pair(direction, canShowLabel) for each point
+    // Direction: 0=right, 1=left, 2=above, 3=below, 4=above-right, 5=above-left, 6=below-right, 7=below-left
+    val labelPlacements = remember(data, avgPFF, avgEPA, yMultiplier, extremePlayerIndices, scale, useSelectiveHighlighting) {
+        // If not using selective highlighting (≤15 points), show all labels with simple positioning
+        if (!useSelectiveHighlighting) {
+            return@remember data.indices.map { index ->
+                val point = data[index]
+                val transformedY = point.y * yMultiplier
+                val isRight = point.x >= avgPFF
+                val isTop = transformedY >= avgEPA
+                val direction = when {
+                    isRight && isTop -> 1   // top-right: label left
+                    !isRight && isTop -> 0  // top-left: label right
+                    isRight && !isTop -> 1  // bottom-right: label left
+                    else -> 0               // bottom-left: label right
+                }
+                direction to true // All can show
+            }
+        }
+
+        // When zoomed out, only consider extreme points for labels
+        // When zoomed in, allow non-extreme points too
+        val zoomedOut = scale < 1.2f
+
+        // Scale factor: labels take up less normalized space when zoomed in
+        val zoomFactor = 1f / scale
+        val xMin = data.minOfOrNull { it.x } ?: 0.0
+        val xMax = data.maxOfOrNull { it.x } ?: 100.0
+        val xRange = (xMax - xMin).coerceAtLeast(0.001)
+
+        val yMin = data.minOfOrNull { it.y * yMultiplier } ?: 0.0
+        val yMax = data.maxOfOrNull { it.y * yMultiplier } ?: 1.0
+        val yRange = (yMax - yMin).coerceAtLeast(0.001)
+
+        // Normalize coordinates to 0-1 range for consistent overlap detection
+        data class NormalizedPoint(
+            val index: Int,
+            val nx: Double,
+            val ny: Double,
+            val labelLen: Int,
+            val isExtreme: Boolean,
+            val distFromEdge: Double // How far from the nearest edge (higher = more extreme)
+        )
+
+        val allPoints = data.mapIndexed { index, point ->
+            val nx = (point.x - xMin) / xRange
+            val ny = (point.y * yMultiplier - yMin) / yRange
+            // Distance from nearest edge - points near edges are more "extreme"
+            val distFromEdge = maxOf(
+                maxOf(nx, 1.0 - nx), // horizontal distance from edge
+                maxOf(ny, 1.0 - ny)  // vertical distance from edge
+            )
+            NormalizedPoint(index, nx, ny, point.label.length, extremePlayerIndices.contains(index), distFromEdge)
+        }
+
+        // Label sizes - make them larger when zoomed out to ensure proper collision detection
+        val labelH = 0.045 * zoomFactor
+
+        // Scale label width based on actual label length (approx 0.01 per character for mobile)
+        fun labelWidth(labelLen: Int): Double = (labelLen * 0.01 * zoomFactor).coerceIn(0.06 * zoomFactor, 0.22 * zoomFactor)
+
+        // For each direction, calculate the label rectangle
+        fun labelRect(nx: Double, ny: Double, labelLen: Int, direction: Int): List<Double> {
+            val labelW = labelWidth(labelLen)
+            val gap = 0.018 * zoomFactor // Gap between dot and label
+            val (ox, oy) = when (direction) {
+                0 -> gap to -labelH / 2          // right
+                1 -> -labelW - gap to -labelH / 2 // left
+                2 -> -labelW / 2 to -labelH - gap // above
+                3 -> -labelW / 2 to gap           // below
+                4 -> gap to -labelH - gap         // above-right
+                5 -> -labelW - gap to -labelH - gap // above-left
+                6 -> gap to gap                   // below-right
+                7 -> -labelW - gap to gap         // below-left
+                else -> gap to -labelH / 2
+            }
+            return listOf(nx + ox, ny + oy, nx + ox + labelW, ny + oy + labelH)
+        }
+
+        fun rectsOverlap(r1: List<Double>, r2: List<Double>): Boolean {
+            return !(r1[2] < r2[0] || r2[2] < r1[0] || r1[3] < r2[1] || r2[3] < r1[1])
+        }
+
+        fun getDirectionOrder(nx: Double, ny: Double): List<Int> {
+            val isRight = nx >= 0.5
+            val isTop = ny >= 0.5
+            val nearRight = nx > 0.85
+            val nearLeft = nx < 0.15
+            val nearTop = ny > 0.9
+            val nearBottom = ny < 0.1
+
+            return when {
+                nearRight && nearTop -> listOf(5, 1, 7, 2, 3, 0, 4, 6)
+                nearRight && nearBottom -> listOf(5, 1, 4, 2, 3, 0, 7, 6)
+                nearLeft && nearTop -> listOf(4, 0, 6, 2, 3, 1, 5, 7)
+                nearLeft && nearBottom -> listOf(4, 0, 5, 2, 3, 1, 6, 7)
+                nearRight -> listOf(1, 5, 7, 2, 3, 0, 4, 6)
+                nearLeft -> listOf(0, 4, 6, 2, 3, 1, 5, 7)
+                nearTop -> listOf(3, 6, 7, 0, 1, 2, 4, 5)
+                nearBottom -> listOf(2, 4, 5, 0, 1, 3, 6, 7)
+                isRight && isTop -> listOf(1, 5, 7, 2, 0, 3, 4, 6)
+                !isRight && isTop -> listOf(0, 4, 6, 2, 1, 3, 5, 7)
+                isRight && !isTop -> listOf(1, 5, 4, 2, 0, 3, 7, 6)
+                else -> listOf(0, 4, 5, 2, 1, 3, 6, 7)
+            }
+        }
+
+        // Greedy placement with smart collision detection
+        val placedLabels = mutableListOf<Pair<Int, List<Double>>>()
+        val results = mutableMapOf<Int, Pair<Int, Boolean>>() // index -> (direction, canShow)
+
+        // Sort extreme points by how "extreme" they are (distance from edge)
+        // Then sort non-extreme points by distance from center too
+        val sortedPoints = allPoints.sortedWith(
+            compareByDescending<NormalizedPoint> { it.isExtreme }
+                .thenByDescending { it.distFromEdge }
+                .thenByDescending {
+                    val dx = it.nx - 0.5
+                    val dy = it.ny - 0.5
+                    dx * dx + dy * dy
+                }
+        )
+
+        for (point in sortedPoints) {
+            // When zoomed out, skip non-extreme points entirely
+            if (zoomedOut && !point.isExtreme) {
+                results[point.index] = 0 to false
+                continue
+            }
+
+            val directionOrder = getDirectionOrder(point.nx, point.ny)
+            var bestDirection = directionOrder[0]
+            var foundNonOverlapping = false
+
+            for (dir in directionOrder) {
+                val rect = labelRect(point.nx, point.ny, point.labelLen, dir)
+                val hasOverlap = placedLabels.any { (_, placedRect) -> rectsOverlap(rect, placedRect) }
+                if (!hasOverlap) {
+                    bestDirection = dir
+                    foundNonOverlapping = true
+                    break
+                }
+            }
+
+            // Only show label if we found a non-overlapping position
+            // Even extreme points won't show if they overlap with already-placed labels
+            val canShow = foundNonOverlapping
+
+            if (canShow) {
+                val finalRect = labelRect(point.nx, point.ny, point.labelLen, bestDirection)
+                placedLabels.add(point.index to finalRect)
+            }
+
+            results[point.index] = bestDirection to canShow
+        }
+
+        // Return placements for all data points
+        data.indices.map { results[it] ?: (0 to false) }
     }
 
     val axisColor = MaterialTheme.colorScheme.onSurface
@@ -443,25 +653,50 @@ fun FourQuadrantScatterPlot(
                 right = width - rightPadding,
                 bottom = height - bottomPadding
             ) {
-                data.forEach { point ->
+                // First pass: draw points that won't show labels (transparent dots)
+                data.forEachIndexed { index, point ->
+                    val (_, canShowLabel) = labelPlacements.getOrElse(index) { 0 to false }
+                    if (canShowLabel) return@forEachIndexed // Skip, will draw in second pass
+
                     val x = leftPadding + (width - leftPadding - rightPadding) * (point.x.toFloat() - visibleMinX) / adjustedXRange
-                    // Use transformed Y value for positioning (multiplied by yMultiplier)
                     val transformedY = (point.y * yMultiplier).toFloat()
                     val y = height - bottomPadding - (height - topPadding - bottomPadding) * (transformedY - visibleMinY) / adjustedYRange
 
-                    // Only draw if point is in visible range
                     if (x >= leftPadding && x <= width - rightPadding && y >= topPadding && y <= height - bottomPadding) {
-                        // Determine quadrant based on comparison to data averages
-                        // Since avgEPA is already computed with transformed Y values, this comparison works naturally
-                        // Higher transformed Y = better (visually at top of chart)
                         val pointColor = when {
-                            point.x >= avgPFF && transformedY >= avgEPA -> topRightColor    // Top-right quadrant
-                            point.x < avgPFF && transformedY >= avgEPA -> topLeftColor      // Top-left quadrant
-                            point.x < avgPFF && transformedY < avgEPA -> bottomLeftColor    // Bottom-left quadrant
-                            else -> bottomRightColor                                         // Bottom-right quadrant
+                            point.x >= avgPFF && transformedY >= avgEPA -> topRightColor
+                            point.x < avgPFF && transformedY >= avgEPA -> topLeftColor
+                            point.x < avgPFF && transformedY < avgEPA -> bottomLeftColor
+                            else -> bottomRightColor
                         }
 
-                        // Draw point
+                        // Draw transparent dot for points without labels
+                        drawCircle(
+                            color = pointColor.copy(alpha = 0.3f),
+                            radius = 6f,
+                            center = Offset(x, y)
+                        )
+                    }
+                }
+
+                // Second pass: draw points that can show labels (full opacity with labels)
+                data.forEachIndexed { index, point ->
+                    val (direction, canShowLabel) = labelPlacements.getOrElse(index) { 0 to false }
+                    if (!canShowLabel) return@forEachIndexed // Already drawn in first pass
+
+                    val x = leftPadding + (width - leftPadding - rightPadding) * (point.x.toFloat() - visibleMinX) / adjustedXRange
+                    val transformedY = (point.y * yMultiplier).toFloat()
+                    val y = height - bottomPadding - (height - topPadding - bottomPadding) * (transformedY - visibleMinY) / adjustedYRange
+
+                    if (x >= leftPadding && x <= width - rightPadding && y >= topPadding && y <= height - bottomPadding) {
+                        val pointColor = when {
+                            point.x >= avgPFF && transformedY >= avgEPA -> topRightColor
+                            point.x < avgPFF && transformedY >= avgEPA -> topLeftColor
+                            point.x < avgPFF && transformedY < avgEPA -> bottomLeftColor
+                            else -> bottomRightColor
+                        }
+
+                        // Draw point with full opacity
                         drawCircle(
                             color = pointColor,
                             radius = 7f,
@@ -475,11 +710,27 @@ fun FourQuadrantScatterPlot(
                             style = Stroke(width = 1.5f)
                         )
 
-                        // Draw QB name label next to point
+                        // Draw label with collision-free positioning
+                        val labelMeasured = textMeasurer.measure(point.label, labelTextStyle)
+                        val labelWidth = labelMeasured.size.width.toFloat()
+                        val labelHeight = labelMeasured.size.height.toFloat()
+
+                        val labelOffset = when (direction) {
+                            0 -> Offset(10f, -labelHeight / 2)                    // right
+                            1 -> Offset(-labelWidth - 10f, -labelHeight / 2)      // left
+                            2 -> Offset(-labelWidth / 2, -labelHeight - 5f)       // above
+                            3 -> Offset(-labelWidth / 2, 10f)                     // below
+                            4 -> Offset(10f, -labelHeight - 5f)                   // above-right
+                            5 -> Offset(-labelWidth - 10f, -labelHeight - 5f)     // above-left
+                            6 -> Offset(10f, 10f)                                 // below-right
+                            7 -> Offset(-labelWidth - 10f, 10f)                   // below-left
+                            else -> Offset(10f, -labelHeight / 2)
+                        }
+
                         drawText(
                             textMeasurer,
                             point.label,
-                            topLeft = Offset(x + 10f, y - 6f),
+                            topLeft = Offset(x + labelOffset.x, y + labelOffset.y),
                             style = labelTextStyle
                         )
                     }

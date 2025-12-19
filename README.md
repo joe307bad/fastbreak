@@ -28,7 +28,7 @@ A Kotlin Multiplatform application providing interactive sports analytics charts
 
 ## Links
 
-- [Web App](https://fastbreak.fly.dev)
+- [Web App](https://fastbreak.joebad.com)
 - [Discord](https://discord.gg/KtqmASc6jn)
 
 ## License

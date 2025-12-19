@@ -17,6 +17,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
@@ -107,6 +108,18 @@ fun LineChartComponent(
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f)
+                .pointerInput(Unit) {
+                    awaitPointerEventScope {
+                        while (true) {
+                            val event = awaitPointerEvent()
+                            if (event.type == PointerEventType.Scroll) {
+                                val scrollDelta = event.changes.firstOrNull()?.scrollDelta?.y ?: 0f
+                                val zoomFactor = if (scrollDelta > 0) 0.9f else 1.1f
+                                scale = (scale * zoomFactor).coerceIn(0.5f, 3f)
+                            }
+                        }
+                    }
+                }
                 .pointerInput(Unit) {
                     detectTransformGestures { _, pan, zoom, _ ->
                         scale = (scale * zoom).coerceIn(0.5f, 3f)
@@ -399,7 +412,7 @@ fun LineChartComponent(
 
         // Info text
         Text(
-            text = "Pinch to zoom • Drag to pan",
+            text = "Scroll to zoom • Drag to pan",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(top = 4.dp, bottom = 2.dp)

@@ -64,7 +64,7 @@ fun MatchupScreen(
                 .padding(vertical = 12.dp)
         ) {
             OutlinedTextField(
-                value = "${selectedMatchup.awayTeam} @ ${selectedMatchup.homeTeam}",
+                value = "${selectedMatchup.homeTeam} vs ${selectedMatchup.awayTeam}",
                 onValueChange = {},
                 readOnly = true,
                 label = { Text("Select Matchup") },
@@ -82,7 +82,7 @@ fun MatchupScreen(
                 matchups.forEachIndexed { index, matchup ->
                     DropdownMenuItem(
                         text = {
-                            Text("${matchup.awayTeam} @ ${matchup.homeTeam}")
+                            Text("${matchup.homeTeam} vs ${matchup.awayTeam}")
                         },
                         onClick = {
                             selectedMatchupIndex = index
@@ -139,162 +139,142 @@ private fun MatchupComparisonCard(matchup: Matchup) {
     val homeColor = Color(0xFFFF5722) // Deep Orange
     val neutralColor = MaterialTheme.colorScheme.outline
 
-    Card(
+    Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 8.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+            .padding(vertical = 8.dp)
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp)
+        // Header with team names and edge summary
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            // Header with team names and edge summary
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+            // Home team (left side)
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.weight(1f)
             ) {
-                // Away team
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Text(
-                        text = matchup.awayTeam,
-                        style = MaterialTheme.typography.headlineMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = awayColor
-                    )
-                    Text(
-                        text = "AWAY",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-
-                // VS divider with edge counts
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier.padding(horizontal = 16.dp)
-                ) {
-                    Text(
-                        text = "@",
-                        style = MaterialTheme.typography.titleLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-
-                // Home team
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Text(
-                        text = matchup.homeTeam,
-                        style = MaterialTheme.typography.headlineMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = homeColor
-                    )
-                    Text(
-                        text = "HOME",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Edge summary bar
-            EdgeSummaryBar(
-                awayEdges = awayEdges,
-                homeEdges = homeEdges,
-                awayTeam = matchup.awayTeam,
-                homeTeam = matchup.homeTeam,
-                awayColor = awayColor,
-                homeColor = homeColor
-            )
-
-            Spacer(modifier = Modifier.height(20.dp))
-            HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // Comparison rows
-            comparisons.forEach { comparison ->
-                ComparisonRow(
-                    comparison = comparison,
-                    awayColor = awayColor,
-                    homeColor = homeColor,
-                    neutralColor = neutralColor
+                Text(
+                    text = matchup.homeTeam,
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = homeColor
                 )
             }
+
+            // VS divider
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.padding(horizontal = 16.dp)
+            ) {
+                Text(
+                    text = "vs",
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            // Away team (right side)
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.weight(1f)
+            ) {
+                Text(
+                    text = matchup.awayTeam,
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = awayColor
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Edge summary bar (home team on left, away team on right)
+        EdgeSummaryBar(
+            homeEdges = homeEdges,
+            awayEdges = awayEdges,
+            homeTeam = matchup.homeTeam,
+            awayTeam = matchup.awayTeam,
+            homeColor = homeColor,
+            awayColor = awayColor
+        )
+
+        Spacer(modifier = Modifier.height(20.dp))
+        HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // Comparison rows
+        comparisons.forEach { comparison ->
+            ComparisonRow(
+                comparison = comparison,
+                awayColor = awayColor,
+                homeColor = homeColor,
+                neutralColor = neutralColor
+            )
         }
     }
 }
 
 @Composable
 private fun EdgeSummaryBar(
-    awayEdges: Int,
     homeEdges: Int,
-    awayTeam: String,
+    awayEdges: Int,
     homeTeam: String,
-    awayColor: Color,
-    homeColor: Color
+    awayTeam: String,
+    homeColor: Color,
+    awayColor: Color
 ) {
-    val total = awayEdges + homeEdges
-    val awayFraction = if (total > 0) awayEdges.toFloat() / total else 0.5f
+    val total = homeEdges + awayEdges
     val homeFraction = if (total > 0) homeEdges.toFloat() / total else 0.5f
+    val awayFraction = if (total > 0) awayEdges.toFloat() / total else 0.5f
 
     Column(
         modifier = Modifier.fillMaxWidth()
     ) {
-        // Edge count labels
+        // Edge count labels (home on left, away on right)
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Text(
-                text = "$awayEdges edges",
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.Bold,
-                color = awayColor
-            )
             Text(
                 text = "$homeEdges edges",
                 style = MaterialTheme.typography.labelMedium,
                 fontWeight = FontWeight.Bold,
                 color = homeColor
             )
+            Text(
+                text = "$awayEdges edges",
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Bold,
+                color = awayColor
+            )
         }
 
         Spacer(modifier = Modifier.height(6.dp))
 
-        // Visual bar
+        // Visual bar (home on left, away on right)
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(12.dp)
                 .clip(RoundedCornerShape(6.dp))
         ) {
-            if (awayEdges > 0 || homeEdges == 0) {
-                Box(
-                    modifier = Modifier
-                        .weight(if (total > 0) awayFraction else 0.5f)
-                        .fillMaxHeight()
-                        .background(awayColor)
-                )
-            }
             if (homeEdges > 0 || awayEdges == 0) {
                 Box(
                     modifier = Modifier
                         .weight(if (total > 0) homeFraction else 0.5f)
                         .fillMaxHeight()
                         .background(homeColor)
+                )
+            }
+            if (awayEdges > 0 || homeEdges == 0) {
+                Box(
+                    modifier = Modifier
+                        .weight(if (total > 0) awayFraction else 0.5f)
+                        .fillMaxHeight()
+                        .background(awayColor)
                 )
             }
         }
@@ -319,7 +299,7 @@ private fun ComparisonRow(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Away value with edge indicator
+        // Home value with edge indicator (left side)
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.Start,
@@ -330,16 +310,16 @@ private fun ComparisonRow(
                 modifier = Modifier
                     .size(8.dp)
                     .background(
-                        color = if (edge == EdgeResult.AWAY) awayColor else Color.Transparent,
+                        color = if (edge == EdgeResult.HOME) homeColor else Color.Transparent,
                         shape = CircleShape
                     )
             )
             Spacer(modifier = Modifier.width(8.dp))
             Text(
-                text = awayValue,
+                text = homeValue,
                 style = MaterialTheme.typography.bodyLarge,
-                fontWeight = if (edge == EdgeResult.AWAY) FontWeight.Bold else FontWeight.Normal,
-                color = if (edge == EdgeResult.AWAY) awayColor else MaterialTheme.colorScheme.onSurface
+                fontWeight = if (edge == EdgeResult.HOME) FontWeight.Bold else FontWeight.Normal,
+                color = if (edge == EdgeResult.HOME) homeColor else MaterialTheme.colorScheme.onSurface
             )
         }
 
@@ -356,17 +336,17 @@ private fun ComparisonRow(
                 .padding(horizontal = 8.dp)
         )
 
-        // Home value with edge indicator
+        // Away value with edge indicator (right side)
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.End,
             modifier = Modifier.weight(1f)
         ) {
             Text(
-                text = homeValue,
+                text = awayValue,
                 style = MaterialTheme.typography.bodyLarge,
-                fontWeight = if (edge == EdgeResult.HOME) FontWeight.Bold else FontWeight.Normal,
-                color = if (edge == EdgeResult.HOME) homeColor else MaterialTheme.colorScheme.onSurface,
+                fontWeight = if (edge == EdgeResult.AWAY) FontWeight.Bold else FontWeight.Normal,
+                color = if (edge == EdgeResult.AWAY) awayColor else MaterialTheme.colorScheme.onSurface,
                 textAlign = TextAlign.End
             )
             Spacer(modifier = Modifier.width(8.dp))
@@ -375,7 +355,7 @@ private fun ComparisonRow(
                 modifier = Modifier
                     .size(8.dp)
                     .background(
-                        color = if (edge == EdgeResult.HOME) homeColor else Color.Transparent,
+                        color = if (edge == EdgeResult.AWAY) awayColor else Color.Transparent,
                         shape = CircleShape
                     )
             )

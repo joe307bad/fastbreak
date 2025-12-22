@@ -219,10 +219,11 @@ fun HomeScreen(
                 thickness = 1.dp
             )
 
-            // Filter charts for selected sport
-            val chartsForSport = registryState.registry?.charts?.filter { chart ->
-                chart.sport == selectedSport
-            } ?: emptyList()
+            // Filter charts for selected sport and sort alphabetically by title
+            val chartsForSport = registryState.registry?.charts
+                ?.filter { chart -> chart.sport == selectedSport }
+                ?.sortedBy { it.title }
+                ?: emptyList()
 
             // Check if entire registry is empty
             val registryIsEmpty = registryState.registry?.charts?.isEmpty() == true

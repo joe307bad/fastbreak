@@ -69,12 +69,18 @@ data class CachedChartData(
      */
     fun deserialize(): VisualizationType {
         val json = Json { ignoreUnknownKeys = true }
-        return when (visualizationType) {
-            VizType.SCATTER_PLOT -> json.decodeFromString<ScatterPlotVisualization>(dataJson)
+        val result = when (visualizationType) {
+            VizType.SCATTER_PLOT -> {
+                val scatter = json.decodeFromString<ScatterPlotVisualization>(dataJson)
+                println("CachedChartData - Deserialized ScatterPlot:")
+                println("  quadrantBottomRight: color=${scatter.quadrantBottomRight?.color}, lightModeColor=${scatter.quadrantBottomRight?.lightModeColor}")
+                scatter
+            }
             VizType.BAR_GRAPH -> json.decodeFromString<BarGraphVisualization>(dataJson)
             VizType.LINE_CHART -> json.decodeFromString<LineChartVisualization>(dataJson)
             VizType.TABLE -> json.decodeFromString<TableVisualization>(dataJson)
             VizType.MATCHUP -> json.decodeFromString<MatchupVisualization>(dataJson)
         }
+        return result
     }
 }

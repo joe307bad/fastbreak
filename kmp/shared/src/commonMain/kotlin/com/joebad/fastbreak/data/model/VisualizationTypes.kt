@@ -50,7 +50,8 @@ data class ScatterPlotDataPoint(
 @Serializable
 data class QuadrantConfig(
     val color: String,
-    val label: String
+    val label: String,
+    val lightModeColor: String? = null
 )
 
 @Serializable

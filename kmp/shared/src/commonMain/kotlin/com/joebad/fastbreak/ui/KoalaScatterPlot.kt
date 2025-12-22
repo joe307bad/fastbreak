@@ -1,0 +1,664 @@
+package com.joebad.fastbreak.ui
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.joebad.fastbreak.data.model.QuadrantConfig
+import com.joebad.fastbreak.data.model.ScatterPlotDataPoint
+import io.github.koalaplot.core.Symbol
+import io.github.koalaplot.core.line.LinePlot
+import io.github.koalaplot.core.style.LineStyle
+import io.github.koalaplot.core.util.ExperimentalKoalaPlotApi
+import io.github.koalaplot.core.util.VerticalRotation
+import io.github.koalaplot.core.util.rotateVertically
+import io.github.koalaplot.core.xygraph.DefaultPoint
+import io.github.koalaplot.core.xygraph.FloatLinearAxisModel
+import io.github.koalaplot.core.xygraph.TickPosition
+import io.github.koalaplot.core.xygraph.XYGraph
+import io.github.koalaplot.core.xygraph.XYGraphScope
+import io.github.koalaplot.core.xygraph.rememberAxisStyle
+import kotlin.math.roundToInt
+
+private fun parseHexColor(hex: String): Color {
+    val cleanHex = hex.removePrefix("#")
+    return Color(("FF$cleanHex").toLong(16))
+}
+
+// Format number to one decimal place
+private fun formatToTenth(value: Float): String {
+    val rounded = (value * 10).roundToInt() / 10.0
+    return if (rounded == rounded.toLong().toDouble()) {
+        rounded.toLong().toString()
+    } else {
+        val intPart = rounded.toLong()
+        val decPart = ((rounded - intPart) * 10).toInt().let { kotlin.math.abs(it) }
+        if (rounded < 0 && intPart == 0L) {
+            "-0.$decPart"
+        } else {
+            "$intPart.$decPart"
+        }
+    }
+}
+
+// Data class for regression line parameters
+private data class RegressionLine(
+    val slope: Float,
+    val intercept: Float
+)
+
+// Calculate linear regression using least squares
+private fun calculateRegression(points: List<Pair<Float, Float>>): RegressionLine? {
+    if (points.size < 2) return null
+
+    val n = points.size
+    val sumX = points.sumOf { it.first.toDouble() }
+    val sumY = points.sumOf { it.second.toDouble() }
+    val sumXY = points.sumOf { it.first.toDouble() * it.second.toDouble() }
+    val sumX2 = points.sumOf { it.first.toDouble() * it.first.toDouble() }
+
+    val denominator = n * sumX2 - sumX * sumX
+    if (denominator == 0.0) return null
+
+    val slope = (n * sumXY - sumX * sumY) / denominator
+    val intercept = (sumY - slope * sumX) / n
+
+    return RegressionLine(slope.toFloat(), intercept.toFloat())
+}
+
+// Data class for label positioning with collision detection
+private data class LabelPosition(
+    val label: String,
+    val x: Float,
+    val y: Float,
+    val color: Color,
+    val offsetY: Float = -14f // Default offset above point
+)
+
+// Smart label placement that tries different positions to avoid overlapping with dots
+private fun placeLabelsSmartly(
+    labels: List<LabelPosition>,
+    allPoints: List<Pair<Float, Float>>, // All data point positions
+    xRange: Float,
+    yRange: Float
+): List<LabelPosition> {
+    // Label dimensions as fraction of range
+    val labelWidthFraction = 0.04f
+    val labelHeightFraction = 0.025f
+
+    val labelWidth = xRange * labelWidthFraction
+    val labelHeight = yRange * labelHeightFraction
+
+    // Possible label offset positions (in dp, converted to fraction of range)
+    // Try above, below, left, and right of the point
+    val offsetPositions = listOf(
+        0f to -14f,    // Above (default)
+        0f to 14f,     // Below
+        -12f to -7f,   // Upper left
+        12f to -7f,    // Upper right
+        -12f to 7f,    // Lower left
+        12f to 7f      // Lower right
+    )
+
+    val placedLabels = mutableListOf<LabelPosition>()
+
+    // Sort by distance from center (prioritize outliers)
+    val avgX = labels.map { it.x }.average().toFloat()
+    val avgY = labels.map { it.y }.average().toFloat()
+
+    val sortedLabels = labels.sortedByDescending { label ->
+        val dx = (label.x - avgX) / xRange
+        val dy = (label.y - avgY) / yRange
+        dx * dx + dy * dy
+    }
+
+    for (labelPos in sortedLabels) {
+        var bestPosition: LabelPosition? = null
+        var minCollisions = Int.MAX_VALUE
+
+        // Try each offset position
+        for ((offsetXDp, offsetYDp) in offsetPositions) {
+            // Convert dp offsets to data coordinates (rough approximation)
+            val offsetX = (offsetXDp / 400f) * xRange // Assuming ~400dp chart width
+            val offsetY = (offsetYDp / 400f) * yRange
+
+            val labelCenterX = labelPos.x + offsetX
+            val labelCenterY = labelPos.y + offsetY
+
+            // Count collisions with other data points
+            var collisionCount = 0
+
+            // Check collision with all data points (except its own)
+            for ((pointX, pointY) in allPoints) {
+                if (pointX == labelPos.x && pointY == labelPos.y) continue // Skip own point
+
+                // Check if point is within label bounds
+                val xDist = kotlin.math.abs(pointX - labelCenterX)
+                val yDist = kotlin.math.abs(pointY - labelCenterY)
+
+                if (xDist < labelWidth / 2 && yDist < labelHeight / 2) {
+                    collisionCount++
+                }
+            }
+
+            // Check collision with already placed labels
+            for (placed in placedLabels) {
+                val placedCenterX = placed.x + ((placed.offsetY / 400f) * xRange)
+                val placedCenterY = placed.y + ((placed.offsetY / 400f) * yRange)
+
+                val xDist = kotlin.math.abs(labelCenterX - placedCenterX)
+                val yDist = kotlin.math.abs(labelCenterY - placedCenterY)
+
+                if (xDist < labelWidth && yDist < labelHeight) {
+                    collisionCount += 5 // Heavily penalize label-label collisions
+                }
+            }
+
+            // Keep track of best position
+            if (collisionCount < minCollisions) {
+                minCollisions = collisionCount
+                bestPosition = labelPos.copy(offsetY = offsetYDp)
+            }
+
+            // If we found a collision-free position, use it
+            if (collisionCount == 0) break
+        }
+
+        // Add the label with its best position
+        if (bestPosition != null) {
+            placedLabels.add(bestPosition)
+        }
+    }
+
+    return placedLabels
+}
+
+@OptIn(ExperimentalKoalaPlotApi::class)
+@Composable
+fun KoalaQuadrantScatterPlot(
+    data: List<ScatterPlotDataPoint>,
+    modifier: Modifier = Modifier,
+    title: String = "4-Quadrant Scatter Plot",
+    xAxisLabel: String = "X Axis",
+    yAxisLabel: String = "Y Axis",
+    invertYAxis: Boolean = false,
+    quadrantTopRight: QuadrantConfig? = null,
+    quadrantTopLeft: QuadrantConfig? = null,
+    quadrantBottomLeft: QuadrantConfig? = null,
+    quadrantBottomRight: QuadrantConfig? = null
+) {
+    // Use MaterialTheme colorScheme to detect app theme (not system theme)
+    val isDark = MaterialTheme.colorScheme.background == Color.Black ||
+                 MaterialTheme.colorScheme.background == Color(0xFF0A0A0A)
+
+    // Debug logging for quadrant configs
+    println("======================================")
+    println("KoalaScatterPlot - THEME CHECK")
+    println("KoalaScatterPlot - Background color: ${MaterialTheme.colorScheme.background}")
+    println("KoalaScatterPlot - isDark (computed from background): $isDark")
+    println("KoalaScatterPlot - quadrantBottomRight: color=${quadrantBottomRight?.color}, lightModeColor=${quadrantBottomRight?.lightModeColor}")
+    println("======================================")
+
+    // Quadrant colors - use lightModeColor if in light mode and provided
+    // Don't use remember() here so colors update immediately when theme changes
+    val topRightColor = quadrantTopRight?.let {
+        if (!isDark && it.lightModeColor != null) {
+            println("KoalaScatterPlot - Using lightModeColor for topRight: ${it.lightModeColor}")
+            parseHexColor(it.lightModeColor)
+        } else {
+            println("KoalaScatterPlot - Using regular color for topRight: ${it.color}")
+            parseHexColor(it.color)
+        }
+    } ?: Color(0xFF4CAF50)
+
+    val topLeftColor = quadrantTopLeft?.let {
+        if (!isDark && it.lightModeColor != null) {
+            println("KoalaScatterPlot - Using lightModeColor for topLeft: ${it.lightModeColor}")
+            parseHexColor(it.lightModeColor)
+        } else {
+            println("KoalaScatterPlot - Using regular color for topLeft: ${it.color}")
+            parseHexColor(it.color)
+        }
+    } ?: Color(0xFF2196F3)
+
+    val bottomLeftColor = quadrantBottomLeft?.let {
+        if (!isDark && it.lightModeColor != null) {
+            println("KoalaScatterPlot - Using lightModeColor for bottomLeft: ${it.lightModeColor}")
+            parseHexColor(it.lightModeColor)
+        } else {
+            println("KoalaScatterPlot - Using regular color for bottomLeft: ${it.color}")
+            parseHexColor(it.color)
+        }
+    } ?: Color(0xFFFF9800)
+
+    val bottomRightColor = quadrantBottomRight?.let {
+        if (!isDark && it.lightModeColor != null) {
+            println("KoalaScatterPlot - Using lightModeColor for bottomRight: ${it.lightModeColor}")
+            parseHexColor(it.lightModeColor)
+        } else {
+            println("KoalaScatterPlot - Using regular color for bottomRight: ${it.color}")
+            parseHexColor(it.color)
+        }
+    } ?: Color(0xFFF44336)
+
+    println("KoalaScatterPlot - bottomRightColor result: $bottomRightColor")
+
+    // Quadrant labels
+    val topRightLabel = quadrantTopRight?.label ?: "Elite"
+    val topLeftLabel = quadrantTopLeft?.label ?: "Efficient"
+    val bottomLeftLabel = quadrantBottomLeft?.label ?: "Struggling"
+    val bottomRightLabel = quadrantBottomRight?.label ?: "Inefficient"
+
+    // Y multiplier for axis inversion
+    val yMultiplier = if (invertYAxis) -1.0 else 1.0
+
+    // Calculate bounds with padding
+    data class PlotBounds(
+        val xMin: Float,
+        val xMax: Float,
+        val yMin: Float,
+        val yMax: Float,
+        val avgX: Float,
+        val avgY: Float
+    )
+
+    val bounds = remember(data, invertYAxis) {
+        val xValues = data.map { it.x }
+        val yValues = data.map { it.y * yMultiplier }
+
+        val minX = xValues.minOrNull() ?: 0.0
+        val maxX = xValues.maxOrNull() ?: 100.0
+        val minY = yValues.minOrNull() ?: -0.5
+        val maxY = yValues.maxOrNull() ?: 0.5
+
+        val xPadding = (maxX - minX) * 0.1
+        val yPadding = (maxY - minY) * 0.1
+
+        val avgX = xValues.average()
+        val avgY = yValues.average()
+
+        PlotBounds(
+            xMin = (minX - xPadding).toFloat(),
+            xMax = (maxX + xPadding).toFloat(),
+            yMin = (minY - yPadding).toFloat(),
+            yMax = (maxY + yPadding).toFloat(),
+            avgX = avgX.toFloat(),
+            avgY = avgY.toFloat()
+        )
+    }
+
+    val xMin = bounds.xMin
+    val xMax = bounds.xMax
+    val yMin = bounds.yMin
+    val yMax = bounds.yMax
+    val avgX = bounds.avgX
+    val avgY = bounds.avgY
+
+    // Calculate regression line
+    val regression = remember(data, yMultiplier) {
+        val points = data.map { it.x.toFloat() to (it.y * yMultiplier).toFloat() }
+        calculateRegression(points)
+    }
+
+    // Group data points by quadrant and prepare labels
+    data class QuadrantData(
+        val topRight: List<DefaultPoint<Float, Float>>,
+        val topLeft: List<DefaultPoint<Float, Float>>,
+        val bottomLeft: List<DefaultPoint<Float, Float>>,
+        val bottomRight: List<DefaultPoint<Float, Float>>,
+        val labels: List<LabelPosition>
+    )
+
+    val quadrantData = remember(data, avgX, avgY, yMultiplier, topRightColor, topLeftColor, bottomLeftColor, bottomRightColor) {
+        val tr = mutableListOf<DefaultPoint<Float, Float>>()
+        val tl = mutableListOf<DefaultPoint<Float, Float>>()
+        val bl = mutableListOf<DefaultPoint<Float, Float>>()
+        val br = mutableListOf<DefaultPoint<Float, Float>>()
+        val allLabels = mutableListOf<LabelPosition>()
+
+        data.forEach { point ->
+            val x = point.x.toFloat()
+            val y = (point.y * yMultiplier).toFloat()
+            val dp = DefaultPoint(x, y)
+
+            val color = when {
+                x >= avgX && y >= avgY -> {
+                    tr.add(dp)
+                    topRightColor
+                }
+                x < avgX && y >= avgY -> {
+                    tl.add(dp)
+                    topLeftColor
+                }
+                x < avgX && y < avgY -> {
+                    bl.add(dp)
+                    bottomLeftColor
+                }
+                else -> {
+                    br.add(dp)
+                    bottomRightColor
+                }
+            }
+
+            allLabels.add(LabelPosition(point.label, x, y, color))
+        }
+
+        QuadrantData(tr, tl, bl, br, allLabels)
+    }
+
+    val topRightPoints = quadrantData.topRight
+    val topLeftPoints = quadrantData.topLeft
+    val bottomLeftPoints = quadrantData.bottomLeft
+    val bottomRightPoints = quadrantData.bottomRight
+
+    // Track initial ranges for zoom calculation
+    val initialXRange = remember(xMin, xMax) { xMax - xMin }
+    val initialYRange = remember(yMin, yMax) { yMax - yMin }
+
+    // Create axis models
+    val xAxisModel = remember(xMin, xMax) {
+        FloatLinearAxisModel(
+            xMin..xMax,
+            allowZooming = true,
+            allowPanning = true
+        )
+    }
+
+    val yAxisModel = remember(yMin, yMax) {
+        FloatLinearAxisModel(
+            yMin..yMax,
+            allowZooming = true,
+            allowPanning = true
+        )
+    }
+
+    // Use smart label placement to avoid overlapping with dots
+    val visibleLabels = remember(quadrantData.labels, data, yMultiplier) {
+        // Collect all data point positions for collision detection
+        val allPoints = data.map { it.x.toFloat() to (it.y * yMultiplier).toFloat() }
+
+        placeLabelsSmartly(
+            labels = quadrantData.labels,
+            allPoints = allPoints,
+            xRange = xMax - xMin,
+            yRange = yMax - yMin
+        )
+    }
+
+    Column(
+        modifier = modifier,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        // Chart
+        XYGraph(
+            xAxisModel = xAxisModel,
+            yAxisModel = yAxisModel,
+            xAxisStyle = rememberAxisStyle(
+                color = MaterialTheme.colorScheme.onSurface,
+                tickPosition = TickPosition.Outside,
+                labelRotation = 0
+            ),
+            yAxisStyle = rememberAxisStyle(
+                color = MaterialTheme.colorScheme.onSurface,
+                tickPosition = TickPosition.Outside,
+                labelRotation = 0
+            ),
+            xAxisLabels = { value ->
+                Text(
+                    text = formatToTenth(value),
+                    fontSize = 10.sp,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            },
+            yAxisLabels = { value ->
+                Text(
+                    text = formatToTenth(value),
+                    fontSize = 10.sp,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            },
+            xAxisTitle = {
+                Text(
+                    text = xAxisLabel,
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.padding(top = 4.dp)
+                )
+            },
+            yAxisTitle = {
+                Text(
+                    text = yAxisLabel,
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier
+                        .rotateVertically(VerticalRotation.COUNTER_CLOCKWISE)
+                        .padding(end = 4.dp)
+                )
+            },
+            horizontalMajorGridLineStyle = LineStyle(
+                brush = SolidColor(MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)),
+                strokeWidth = 1.dp
+            ),
+            horizontalMinorGridLineStyle = null,
+            verticalMajorGridLineStyle = LineStyle(
+                brush = SolidColor(MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)),
+                strokeWidth = 1.dp
+            ),
+            verticalMinorGridLineStyle = null,
+            panZoomEnabled = true,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(400.dp)
+        ) {
+            // Draw regression line first (behind everything)
+            if (regression != null) {
+                val regY1 = regression.slope * xMin + regression.intercept
+                val regY2 = regression.slope * xMax + regression.intercept
+                LinePlot(
+                    data = listOf(DefaultPoint(xMin, regY1), DefaultPoint(xMax, regY2)),
+                    lineStyle = LineStyle(
+                        brush = SolidColor(Color(0xFF607D8B).copy(alpha = 0.7f)),
+                        strokeWidth = 2.dp
+                    )
+                )
+            }
+
+            // Draw quadrant divider lines at averages
+            // Vertical line at avgX
+            LinePlot(
+                data = listOf(DefaultPoint(avgX, yMin), DefaultPoint(avgX, yMax)),
+                lineStyle = LineStyle(
+                    brush = SolidColor(Color(0xFF9C27B0).copy(alpha = 0.6f)),
+                    strokeWidth = 2.dp,
+                    pathEffect = PathEffect.dashPathEffect(floatArrayOf(12f, 6f))
+                )
+            )
+
+            // Horizontal line at avgY
+            LinePlot(
+                data = listOf(DefaultPoint(xMin, avgY), DefaultPoint(xMax, avgY)),
+                lineStyle = LineStyle(
+                    brush = SolidColor(Color(0xFF9C27B0).copy(alpha = 0.6f)),
+                    strokeWidth = 2.dp,
+                    pathEffect = PathEffect.dashPathEffect(floatArrayOf(12f, 6f))
+                )
+            )
+
+            // Draw labels first so they appear behind the dots
+            visibleLabels.forEach { labelPos ->
+                PointLabel(
+                    x = labelPos.x,
+                    y = labelPos.y,
+                    label = labelPos.label,
+                    color = labelPos.color,
+                    offsetY = labelPos.offsetY
+                )
+            }
+
+            // Plot each quadrant with its color (on top of labels)
+            if (topRightPoints.isNotEmpty()) {
+                LinePlot(
+                    data = topRightPoints,
+                    lineStyle = null,
+                    symbol = { QuadrantSymbol(topRightColor) }
+                )
+            }
+
+            if (topLeftPoints.isNotEmpty()) {
+                LinePlot(
+                    data = topLeftPoints,
+                    lineStyle = null,
+                    symbol = { QuadrantSymbol(topLeftColor) }
+                )
+            }
+
+            if (bottomLeftPoints.isNotEmpty()) {
+                LinePlot(
+                    data = bottomLeftPoints,
+                    lineStyle = null,
+                    symbol = { QuadrantSymbol(bottomLeftColor) }
+                )
+            }
+
+            if (bottomRightPoints.isNotEmpty()) {
+                LinePlot(
+                    data = bottomRightPoints,
+                    lineStyle = null,
+                    symbol = { QuadrantSymbol(bottomRightColor) }
+                )
+            }
+        }
+
+        // Interaction hint
+        Text(
+            text = "Pinch to zoom - Drag to pan",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 4.dp, bottom = 2.dp)
+        )
+
+        // Quadrant legend with regression line
+        FlowRow(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 4.dp, horizontal = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterHorizontally),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            LegendItem(topRightLabel, topRightColor)
+            LegendItem(topLeftLabel, topLeftColor)
+            LegendItem(bottomLeftLabel, bottomLeftColor)
+            LegendItem(bottomRightLabel, bottomRightColor)
+            if (regression != null) {
+                LegendItem("Trend", Color(0xFF607D8B))
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalKoalaPlotApi::class)
+@Composable
+private fun QuadrantSymbol(color: Color) {
+    Box(
+        modifier = Modifier
+            .size(10.dp)
+            .background(color, CircleShape)
+    )
+}
+
+@OptIn(ExperimentalKoalaPlotApi::class)
+@Composable
+private fun XYGraphScope<Float, Float>.PointLabel(
+    x: Float,
+    y: Float,
+    label: String,
+    color: Color,
+    offsetY: Float = -14f
+) {
+    // Use MaterialTheme to detect app theme
+    val isDark = MaterialTheme.colorScheme.background == Color.Black ||
+                 MaterialTheme.colorScheme.background == Color(0xFF0A0A0A)
+
+    // Calculate label color - use darker colors for yellow/light colors in light mode
+    val labelColor = if (!isDark && isColorTooLight(color)) {
+        Color.Black
+    } else {
+        color.copy(alpha = 0.9f)
+    }
+
+    // Background color for label - matches theme
+    val labelBackgroundColor = if (isDark) {
+        Color(0xFF0A0A0A).copy(alpha = 0.85f)
+    } else {
+        Color.White.copy(alpha = 0.85f)
+    }
+
+    // Use LinePlot with a single point and custom symbol that includes text
+    LinePlot(
+        data = listOf(DefaultPoint(x, y)),
+        lineStyle = null,
+        symbol = {
+            // Label positioned with smart offset and background
+            Text(
+                text = label,
+                fontSize = 8.sp,
+                color = labelColor,
+                textAlign = TextAlign.Center,
+                maxLines = 1,
+                modifier = Modifier
+                    .offset(y = offsetY.dp)
+                    .background(labelBackgroundColor, CircleShape)
+            )
+        }
+    )
+}
+
+// Helper function to determine if a color is too light for visibility in light mode
+private fun isColorTooLight(color: Color): Boolean {
+    // Calculate relative luminance
+    val r = color.red
+    val g = color.green
+    val b = color.blue
+
+    // Use standard luminance formula
+    val luminance = 0.2126f * r + 0.7152f * g + 0.0722f * b
+
+    // If luminance > 0.5, consider it too light (yellow is around 0.92, orange is ~0.6)
+    // Lower threshold to catch more light colors
+    return luminance > 0.5f
+}
+
+@Composable
+private fun LegendItem(text: String, color: Color) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        modifier = Modifier.padding(vertical = 2.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(12.dp)
+                .background(color, CircleShape)
+        )
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodySmall,
+            maxLines = 1
+        )
+    }
+}

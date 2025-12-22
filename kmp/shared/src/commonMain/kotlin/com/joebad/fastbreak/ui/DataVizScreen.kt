@@ -214,7 +214,7 @@ private fun SuccessContent(visualization: VisualizationType) {
                     Box(modifier = Modifier.weight(1f)) {
                         when (visualization) {
                             is ScatterPlotVisualization -> {
-                                FourQuadrantScatterPlot(
+                                KoalaQuadrantScatterPlot(
                                     data = visualization.dataPoints,
                                     title = visualization.title,
                                     xAxisLabel = visualization.xAxisLabel,

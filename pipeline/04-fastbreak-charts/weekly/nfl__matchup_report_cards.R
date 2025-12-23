@@ -6,6 +6,10 @@ library(jsonlite)
 # Get current season
 current_season <- as.numeric(format(Sys.Date(), "%Y"))
 
+# Load team info for division and conference data
+teams_info <- nflreadr::load_teams() %>%
+  select(team_abbr, team_conf, team_division)
+
 cat("Loading NFL data for season:", current_season, "\n")
 
 # Load play-by-play data for stats calculations
@@ -160,6 +164,10 @@ matchups <- lapply(1:nrow(upcoming_games), function(i) {
   home <- game$home_team
   away <- game$away_team
 
+  # Get team info
+  home_info <- teams_info %>% filter(team_abbr == home)
+  away_info <- teams_info %>% filter(team_abbr == away)
+
   # Build game time string
   game_time <- tryCatch({
     if (!is.na(game$gameday) && !is.na(game$gametime)) {
@@ -286,13 +294,25 @@ matchups <- lapply(1:nrow(upcoming_games), function(i) {
     )))
   }
 
-  # Build matchup object
+  # Build matchup object with team metadata
   matchup <- list(
     homeTeam = home,
     awayTeam = away,
     week = as.integer(game$week),
     comparisons = comparisons
   )
+
+  # Add home team division and conference
+  if (nrow(home_info) > 0) {
+    matchup$homeTeamDivision <- home_info$team_division
+    matchup$homeTeamConference <- home_info$team_conf
+  }
+
+  # Add away team division and conference
+  if (nrow(away_info) > 0) {
+    matchup$awayTeamDivision <- away_info$team_division
+    matchup$awayTeamConference <- away_info$team_conf
+  }
 
   # Add game time if available
   if (!is.na(game_time)) {

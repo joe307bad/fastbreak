@@ -6,6 +6,10 @@ library(jsonlite)
 current_season <- as.numeric(format(Sys.Date(), "%Y"))
 pbp <- nflreadr::load_pbp(current_season)
 
+# Load team info for division and conference data
+teams_info <- nflreadr::load_teams() %>%
+  select(team_abbr, team_conf, team_division)
+
 # Get the most recent week with data
 most_recent_week <- max(pbp$week, na.rm = TRUE)
 
@@ -25,20 +29,23 @@ defense_snaps <- pbp %>%
   summarise(defense_snaps = n(), .groups = "drop") %>%
   rename(team = defteam)
 
-# Combine offense and defense snaps
+# Combine offense and defense snaps with team info
 team_snaps <- offense_snaps %>%
   left_join(defense_snaps, by = "team") %>%
+  left_join(teams_info, by = c("team" = "team_abbr")) %>%
   arrange(team)
 
 # Convert to list format for JSON matching ScatterPlotVisualization model
-# ScatterPlotDataPoint: label, x, y, sum
+# ScatterPlotDataPoint: label, x, y, sum, division, conference
 data_points <- team_snaps %>%
   rowwise() %>%
   mutate(data_point = list(list(
     label = team,
     x = as.integer(defense_snaps),
     y = as.integer(offense_snaps),
-    sum = as.integer(offense_snaps + defense_snaps)
+    sum = as.integer(offense_snaps + defense_snaps),
+    division = team_division,
+    conference = team_conf
   ))) %>%
   pull(data_point)
 

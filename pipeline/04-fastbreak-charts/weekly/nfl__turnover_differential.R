@@ -7,6 +7,10 @@ library(jsonlite)
 current_season <- as.numeric(format(Sys.Date(), "%Y"))
 pbp <- nflreadr::load_pbp(current_season)
 
+# Load team info for division and conference data
+teams_info <- nflreadr::load_teams() %>%
+  select(team_abbr, team_conf, team_division)
+
 # Get the most recent week with data
 most_recent_week <- max(pbp$week, na.rm = TRUE)
 
@@ -31,6 +35,7 @@ turnovers_committed <- pbp %>%
 # Combine and calculate differential
 turnover_diff <- turnovers_forced %>%
   full_join(turnovers_committed, by = "team") %>%
+  left_join(teams_info, by = c("team" = "team_abbr")) %>%
   mutate(
     turnovers_forced = replace_na(turnovers_forced, 0),
     turnovers_committed = replace_na(turnovers_committed, 0),
@@ -42,12 +47,14 @@ turnover_diff <- turnovers_forced %>%
 cat("Teams processed:", nrow(turnover_diff), "\n")
 
 # Convert to list format for JSON matching BarGraphVisualization model
-# BarGraphDataPoint: label, value
+# BarGraphDataPoint: label, value, division, conference
 data_points <- turnover_diff %>%
   rowwise() %>%
   mutate(data_point = list(list(
     label = team,
-    value = as.numeric(differential)
+    value = as.numeric(differential),
+    division = team_division,
+    conference = team_conf
   ))) %>%
   pull(data_point)
 

@@ -1,6 +1,11 @@
 library(rvest)
 library(dplyr)
 library(jsonlite)
+library(nflreadr)
+
+# Load team info for division data
+teams_info <- nflreadr::load_teams() %>%
+  select(team_abbr, team_division)
 
 # URL for playoff probabilities
 url <- "https://www.playoffstatus.com/nfl/nflpostseasonprob.html"
@@ -134,10 +139,11 @@ if (ncol(playoff_data) >= 10) {
   cleaned_data$make_playoffs <- clean_pct(playoff_data[[ncol(playoff_data)]])
 }
 
-# Filter out empty rows and sort by playoff odds
+# Filter out empty rows, join with division data, and sort by playoff odds
 cleaned_data <- cleaned_data %>%
   filter(!is.na(team) & team != "" & !grepl("^\\s*$", team)) %>%
   filter(!grepl("^Team$|^Conference$|^Division$", team, ignore.case = TRUE)) %>%
+  left_join(teams_info, by = c("team" = "team_abbr")) %>%
   arrange(desc(make_playoffs))
 
 cat("\nCleaned data preview:\n")
@@ -157,6 +163,10 @@ data_points <- lapply(1:nrow(cleaned_data), function(i) {
 
   if (!is.null(row$conference) && nzchar(row$conference)) {
     columns <- c(columns, list(list(label = "Conf", value = row$conference)))
+  }
+
+  if (!is.null(row$team_division) && !is.na(row$team_division) && nzchar(row$team_division)) {
+    columns <- c(columns, list(list(label = "Division", value = row$team_division)))
   }
 
   if (!is.null(row$record) && nzchar(row$record)) {

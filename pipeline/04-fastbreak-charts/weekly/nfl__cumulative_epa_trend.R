@@ -7,6 +7,10 @@ library(jsonlite)
 current_season <- as.numeric(format(Sys.Date(), "%Y"))
 pbp <- nflreadr::load_pbp(current_season)
 
+# Load team info for division and conference data
+teams_info <- nflreadr::load_teams() %>%
+  select(team_abbr, team_conf, team_division)
+
 # Get the most recent week with data
 most_recent_week <- max(pbp$week, na.rm = TRUE)
 
@@ -76,6 +80,9 @@ series_data <- lapply(seq_along(top_teams), function(i) {
     filter(team == team_name) %>%
     arrange(week)
 
+  # Get team info
+  team_meta <- teams_info %>% filter(team_abbr == team_name)
+
   # Create data points list
   data_points <- lapply(1:nrow(team_data), function(j) {
     list(
@@ -87,6 +94,8 @@ series_data <- lapply(seq_along(top_teams), function(i) {
   list(
     label = team_name,
     color = series_colors[i],
+    division = if(nrow(team_meta) > 0) team_meta$team_division else NA,
+    conference = if(nrow(team_meta) > 0) team_meta$team_conf else NA,
     dataPoints = data_points
   )
 })

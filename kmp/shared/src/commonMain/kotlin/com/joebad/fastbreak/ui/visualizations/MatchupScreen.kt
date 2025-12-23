@@ -61,12 +61,13 @@ fun MatchupScreen(
             onExpandedChange = { dropdownExpanded = it },
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(vertical = 12.dp)
+                .padding(vertical = 4.dp)
         ) {
             OutlinedTextField(
                 value = "${selectedMatchup.homeTeam} vs ${selectedMatchup.awayTeam}",
                 onValueChange = {},
                 readOnly = true,
+                singleLine = true,
                 label = { Text("Select Matchup") },
                 trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = dropdownExpanded) },
                 colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors(),

@@ -23,7 +23,9 @@ sealed interface VisualizationType {
 @Serializable
 data class BarGraphDataPoint(
     val label: String,
-    val value: Double
+    val value: Double,
+    val division: String? = null,
+    val conference: String? = null
 )
 
 @Serializable
@@ -44,7 +46,9 @@ data class ScatterPlotDataPoint(
     val label: String,
     val x: Double,
     val y: Double,
-    val sum: Double
+    val sum: Double,
+    val division: String? = null,
+    val conference: String? = null
 )
 
 @Serializable
@@ -90,7 +94,9 @@ data class LineChartSeries(
      * Optional hex color for this series (e.g., "#FF5722")
      * If not provided, a default color from the palette will be used
      */
-    val color: String? = null
+    val color: String? = null,
+    val division: String? = null,
+    val conference: String? = null
 )
 
 @Serializable
@@ -166,7 +172,11 @@ data class Matchup(
     val awayTeam: String,
     val week: Int,
     val gameTime: String? = null,
-    val comparisons: List<MatchupComparison>
+    val comparisons: List<MatchupComparison>,
+    val homeTeamDivision: String? = null,
+    val homeTeamConference: String? = null,
+    val awayTeamDivision: String? = null,
+    val awayTeamConference: String? = null
 )
 
 @Serializable

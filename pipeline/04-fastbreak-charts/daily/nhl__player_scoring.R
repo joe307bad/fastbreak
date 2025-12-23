@@ -42,6 +42,35 @@ cat("Available columns:", paste(names(skater_stats), collapse = ", "), "\n")
 cat("First row sample:\n")
 print(head(skater_stats, 1))
 
+# NHL division and conference mapping by team
+team_divisions <- c(
+  "ANA" = "Pacific", "ARI" = "Central", "BOS" = "Atlantic",
+  "BUF" = "Atlantic", "CGY" = "Pacific", "CAR" = "Metropolitan",
+  "CHI" = "Central", "COL" = "Central", "CBJ" = "Metropolitan",
+  "DAL" = "Central", "DET" = "Atlantic", "EDM" = "Pacific",
+  "FLA" = "Atlantic", "LAK" = "Pacific", "MIN" = "Central",
+  "MTL" = "Atlantic", "NSH" = "Central", "NJD" = "Metropolitan",
+  "NYI" = "Metropolitan", "NYR" = "Metropolitan", "OTT" = "Atlantic",
+  "PHI" = "Metropolitan", "PIT" = "Metropolitan", "SJS" = "Pacific",
+  "SEA" = "Pacific", "STL" = "Central", "TBL" = "Atlantic",
+  "TOR" = "Atlantic", "UTA" = "Central", "VAN" = "Pacific",
+  "VGK" = "Pacific", "WSH" = "Metropolitan", "WPG" = "Central"
+)
+
+team_conferences <- c(
+  "ANA" = "Western", "ARI" = "Western", "BOS" = "Eastern",
+  "BUF" = "Eastern", "CGY" = "Western", "CAR" = "Eastern",
+  "CHI" = "Western", "COL" = "Western", "CBJ" = "Eastern",
+  "DAL" = "Western", "DET" = "Eastern", "EDM" = "Western",
+  "FLA" = "Eastern", "LAK" = "Western", "MIN" = "Western",
+  "MTL" = "Eastern", "NSH" = "Western", "NJD" = "Eastern",
+  "NYI" = "Eastern", "NYR" = "Eastern", "OTT" = "Eastern",
+  "PHI" = "Eastern", "PIT" = "Eastern", "SJS" = "Western",
+  "SEA" = "Western", "STL" = "Western", "TBL" = "Eastern",
+  "TOR" = "Eastern", "UTA" = "Western", "VAN" = "Western",
+  "VGK" = "Western", "WSH" = "Eastern", "WPG" = "Western"
+)
+
 # Filter to players with significant playing time (at least 20 games)
 # and get top scorers by points
 min_games <- 20
@@ -83,7 +112,10 @@ data_points <- top_players %>%
     label = player,
     x = G,
     y = A,
-    sum = PTS
+    sum = PTS,
+    team = team,
+    division = team_divisions[team],
+    conference = team_conferences[team]
   ))) %>%
   pull(data_point)
 

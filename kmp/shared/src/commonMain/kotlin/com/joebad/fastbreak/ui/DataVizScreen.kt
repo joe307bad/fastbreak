@@ -170,6 +170,37 @@ private fun LoadingContent() {
 
 @Composable
 private fun SuccessContent(visualization: VisualizationType) {
+    // State for filters
+    var selectedFilters by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
+
+    // Extract filter options and apply filtering
+    val (filterOptions, filteredVisualization) = remember(visualization, selectedFilters) {
+        extractFiltersAndApplyFiltering(visualization, selectedFilters)
+    }
+
+    Column(modifier = Modifier.fillMaxSize()) {
+        // Show filter bar if there are any filterable properties
+        if (filterOptions.isNotEmpty()) {
+            FilterBar(
+                filters = filterOptions,
+                selectedFilters = selectedFilters,
+                onFilterChange = { key, value ->
+                    selectedFilters = if (value == null) {
+                        selectedFilters - key
+                    } else {
+                        selectedFilters + (key to value)
+                    }
+                }
+            )
+        }
+
+        // Render the visualization with filtered data
+        RenderVisualization(filteredVisualization)
+    }
+}
+
+@Composable
+private fun RenderVisualization(visualization: VisualizationType) {
     // TableVisualization has its own scrolling, so don't wrap it in verticalScroll
     if (visualization is TableVisualization) {
         // For tables: use Column with table taking most space, source at bottom
@@ -308,4 +339,182 @@ private sealed interface DataVizState {
     data object Loading : DataVizState
     data class Success(val data: VisualizationType) : DataVizState
     data class Error(val message: String) : DataVizState
+}
+
+/**
+ * Extracts available filter options and returns filtered visualization data
+ */
+private fun extractFiltersAndApplyFiltering(
+    visualization: VisualizationType,
+    selectedFilters: Map<String, String>
+): Pair<List<FilterOption>, VisualizationType> {
+    return when (visualization) {
+        is BarGraphVisualization -> {
+            val filters = extractBarGraphFilters(visualization.dataPoints)
+            val filtered = applyBarGraphFilters(visualization, selectedFilters)
+            filters to filtered
+        }
+        is ScatterPlotVisualization -> {
+            val filters = extractScatterPlotFilters(visualization.dataPoints)
+            val filtered = applyScatterPlotFilters(visualization, selectedFilters)
+            filters to filtered
+        }
+        is LineChartVisualization -> {
+            val filters = extractLineChartFilters(visualization.series)
+            val filtered = applyLineChartFilters(visualization, selectedFilters)
+            filters to filtered
+        }
+        is MatchupVisualization -> {
+            val filters = extractMatchupFilters(visualization.dataPoints)
+            val filtered = applyMatchupFilters(visualization, selectedFilters)
+            filters to filtered
+        }
+        else -> emptyList<FilterOption>() to visualization
+    }
+}
+
+// Bar Graph filtering
+private fun extractBarGraphFilters(dataPoints: List<BarGraphDataPoint>): List<FilterOption> {
+    val filters = mutableListOf<FilterOption>()
+
+    val divisions = dataPoints.mapNotNull { it.division }.distinct().sorted()
+    if (divisions.isNotEmpty()) {
+        filters.add(FilterOption("division", "Division", divisions))
+    }
+
+    val conferences = dataPoints.mapNotNull { it.conference }.distinct().sorted()
+    if (conferences.isNotEmpty()) {
+        filters.add(FilterOption("conference", "Conf", conferences))
+    }
+
+    return filters
+}
+
+private fun applyBarGraphFilters(
+    visualization: BarGraphVisualization,
+    selectedFilters: Map<String, String>
+): BarGraphVisualization {
+    if (selectedFilters.isEmpty()) return visualization
+
+    val filteredDataPoints = visualization.dataPoints.filter { point ->
+        selectedFilters.all { (key, value) ->
+            when (key) {
+                "division" -> point.division == value
+                "conference" -> point.conference == value
+                else -> true
+            }
+        }
+    }
+
+    return visualization.copy(dataPoints = filteredDataPoints)
+}
+
+// Scatter Plot filtering
+private fun extractScatterPlotFilters(dataPoints: List<ScatterPlotDataPoint>): List<FilterOption> {
+    val filters = mutableListOf<FilterOption>()
+
+    val divisions = dataPoints.mapNotNull { it.division }.distinct().sorted()
+    if (divisions.isNotEmpty()) {
+        filters.add(FilterOption("division", "Division", divisions))
+    }
+
+    val conferences = dataPoints.mapNotNull { it.conference }.distinct().sorted()
+    if (conferences.isNotEmpty()) {
+        filters.add(FilterOption("conference", "Conf", conferences))
+    }
+
+    return filters
+}
+
+private fun applyScatterPlotFilters(
+    visualization: ScatterPlotVisualization,
+    selectedFilters: Map<String, String>
+): ScatterPlotVisualization {
+    if (selectedFilters.isEmpty()) return visualization
+
+    val filteredDataPoints = visualization.dataPoints.filter { point ->
+        selectedFilters.all { (key, value) ->
+            when (key) {
+                "division" -> point.division == value
+                "conference" -> point.conference == value
+                else -> true
+            }
+        }
+    }
+
+    return visualization.copy(dataPoints = filteredDataPoints)
+}
+
+// Line Chart filtering
+private fun extractLineChartFilters(series: List<LineChartSeries>): List<FilterOption> {
+    val filters = mutableListOf<FilterOption>()
+
+    val divisions = series.mapNotNull { it.division }.distinct().sorted()
+    if (divisions.isNotEmpty()) {
+        filters.add(FilterOption("division", "Division", divisions))
+    }
+
+    val conferences = series.mapNotNull { it.conference }.distinct().sorted()
+    if (conferences.isNotEmpty()) {
+        filters.add(FilterOption("conference", "Conf", conferences))
+    }
+
+    return filters
+}
+
+private fun applyLineChartFilters(
+    visualization: LineChartVisualization,
+    selectedFilters: Map<String, String>
+): LineChartVisualization {
+    if (selectedFilters.isEmpty()) return visualization
+
+    val filteredSeries = visualization.series.filter { series ->
+        selectedFilters.all { (key, value) ->
+            when (key) {
+                "division" -> series.division == value
+                "conference" -> series.conference == value
+                else -> true
+            }
+        }
+    }
+
+    return visualization.copy(series = filteredSeries)
+}
+
+// Matchup filtering
+private fun extractMatchupFilters(dataPoints: List<Matchup>): List<FilterOption> {
+    val filters = mutableListOf<FilterOption>()
+
+    val divisions = (dataPoints.mapNotNull { it.homeTeamDivision } +
+            dataPoints.mapNotNull { it.awayTeamDivision }).distinct().sorted()
+    if (divisions.isNotEmpty()) {
+        filters.add(FilterOption("division", "Division", divisions))
+    }
+
+    val conferences = (dataPoints.mapNotNull { it.homeTeamConference } +
+            dataPoints.mapNotNull { it.awayTeamConference }).distinct().sorted()
+    if (conferences.isNotEmpty()) {
+        filters.add(FilterOption("conference", "Conf", conferences))
+    }
+
+    return filters
+}
+
+private fun applyMatchupFilters(
+    visualization: MatchupVisualization,
+    selectedFilters: Map<String, String>
+): MatchupVisualization {
+    if (selectedFilters.isEmpty()) return visualization
+
+    val filteredDataPoints = visualization.dataPoints.filter { matchup ->
+        selectedFilters.all { (key, value) ->
+            when (key) {
+                "division" -> matchup.homeTeamDivision == value || matchup.awayTeamDivision == value
+                "conference" -> matchup.homeTeamConference == value || matchup.awayTeamConference == value
+                else -> true
+            }
+        }
+    }
+
+    return visualization.copy(dataPoints = filteredDataPoints)
 }

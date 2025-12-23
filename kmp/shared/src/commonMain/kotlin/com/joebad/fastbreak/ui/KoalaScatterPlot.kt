@@ -426,8 +426,10 @@ fun KoalaQuadrantScatterPlot(
                 )
             },
             yAxisLabels = { value ->
+                // When invertYAxis is true, display the original (non-inverted) values
+                val displayValue = if (invertYAxis) value * -1f else value
                 Text(
-                    text = formatToTenth(value),
+                    text = formatToTenth(displayValue),
                     fontSize = 10.sp,
                     color = MaterialTheme.colorScheme.onSurface
                 )

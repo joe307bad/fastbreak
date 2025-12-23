@@ -26,6 +26,33 @@ player_stats <- tryCatch({
 cat("Loaded advanced stats for", nrow(player_stats), "players\n")
 cat("Available columns:", paste(names(player_stats), collapse = ", "), "\n")
 
+# NBA division and conference mapping by team
+team_divisions <- c(
+  "ATL" = "Southeast", "BOS" = "Atlantic", "BKN" = "Atlantic",
+  "CHA" = "Southeast", "CHI" = "Central", "CLE" = "Central",
+  "DAL" = "Southwest", "DEN" = "Northwest", "DET" = "Central",
+  "GSW" = "Pacific", "HOU" = "Southwest", "IND" = "Central",
+  "LAC" = "Pacific", "LAL" = "Pacific", "MEM" = "Southwest",
+  "MIA" = "Southeast", "MIL" = "Central", "MIN" = "Northwest",
+  "NOP" = "Southwest", "NYK" = "Atlantic", "OKC" = "Northwest",
+  "ORL" = "Southeast", "PHI" = "Atlantic", "PHX" = "Pacific",
+  "POR" = "Northwest", "SAC" = "Pacific", "SAS" = "Southwest",
+  "TOR" = "Atlantic", "UTA" = "Northwest", "WAS" = "Southeast"
+)
+
+team_conferences <- c(
+  "ATL" = "Eastern", "BOS" = "Eastern", "BKN" = "Eastern",
+  "CHA" = "Eastern", "CHI" = "Eastern", "CLE" = "Eastern",
+  "DAL" = "Western", "DEN" = "Western", "DET" = "Eastern",
+  "GSW" = "Western", "HOU" = "Western", "IND" = "Eastern",
+  "LAC" = "Western", "LAL" = "Western", "MEM" = "Western",
+  "MIA" = "Eastern", "MIL" = "Eastern", "MIN" = "Western",
+  "NOP" = "Western", "NYK" = "Eastern", "OKC" = "Western",
+  "ORL" = "Eastern", "PHI" = "Eastern", "PHX" = "Western",
+  "POR" = "Western", "SAC" = "Western", "SAS" = "Western",
+  "TOR" = "Eastern", "UTA" = "Western", "WAS" = "Eastern"
+)
+
 # Filter to players with significant playing time (at least 20 MPG and 15 games)
 # This ensures we're looking at meaningful sample sizes
 min_minutes <- 20
@@ -66,7 +93,10 @@ data_points <- top_players %>%
     label = PLAYER_NAME,
     x = round(USG_PCT * 100, 1),
     y = round(TS_PCT * 100, 1),
-    sum = round(PIE * 100, 1)
+    sum = round(PIE * 100, 1),
+    team = TEAM_ABBREVIATION,
+    division = team_divisions[TEAM_ABBREVIATION],
+    conference = team_conferences[TEAM_ABBREVIATION]
   ))) %>%
   pull(data_point)
 

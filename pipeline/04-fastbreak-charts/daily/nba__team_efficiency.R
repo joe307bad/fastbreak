@@ -52,6 +52,33 @@ team_abbrevs <- c(
   "Utah Jazz" = "UTA", "Washington Wizards" = "WAS"
 )
 
+# NBA division and conference mapping
+team_divisions <- c(
+  "ATL" = "Southeast", "BOS" = "Atlantic", "BKN" = "Atlantic",
+  "CHA" = "Southeast", "CHI" = "Central", "CLE" = "Central",
+  "DAL" = "Southwest", "DEN" = "Northwest", "DET" = "Central",
+  "GSW" = "Pacific", "HOU" = "Southwest", "IND" = "Central",
+  "LAC" = "Pacific", "LAL" = "Pacific", "MEM" = "Southwest",
+  "MIA" = "Southeast", "MIL" = "Central", "MIN" = "Northwest",
+  "NOP" = "Southwest", "NYK" = "Atlantic", "OKC" = "Northwest",
+  "ORL" = "Southeast", "PHI" = "Atlantic", "PHX" = "Pacific",
+  "POR" = "Northwest", "SAC" = "Pacific", "SAS" = "Southwest",
+  "TOR" = "Atlantic", "UTA" = "Northwest", "WAS" = "Southeast"
+)
+
+team_conferences <- c(
+  "ATL" = "Eastern", "BOS" = "Eastern", "BKN" = "Eastern",
+  "CHA" = "Eastern", "CHI" = "Eastern", "CLE" = "Eastern",
+  "DAL" = "Western", "DEN" = "Western", "DET" = "Eastern",
+  "GSW" = "Western", "HOU" = "Western", "IND" = "Eastern",
+  "LAC" = "Western", "LAL" = "Western", "MEM" = "Western",
+  "MIA" = "Eastern", "MIL" = "Eastern", "MIN" = "Western",
+  "NOP" = "Western", "NYK" = "Eastern", "OKC" = "Western",
+  "ORL" = "Eastern", "PHI" = "Eastern", "PHX" = "Western",
+  "POR" = "Western", "SAC" = "Western", "SAS" = "Western",
+  "TOR" = "Eastern", "UTA" = "Western", "WAS" = "Eastern"
+)
+
 # Extract offensive and defensive ratings
 # OFF_RATING = points scored per 100 possessions
 # DEF_RATING = points allowed per 100 possessions (lower is better)
@@ -77,7 +104,9 @@ data_points <- team_ratings %>%
     label = TEAM_ABBREV,
     x = round(OFF_RATING, 2),
     y = round(DEF_RATING, 2),
-    sum = round(NET_RATING, 2)
+    sum = round(NET_RATING, 2),
+    division = team_divisions[TEAM_ABBREV],
+    conference = team_conferences[TEAM_ABBREV]
   ))) %>%
   pull(data_point)
 

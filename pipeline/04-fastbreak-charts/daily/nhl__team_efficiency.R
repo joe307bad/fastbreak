@@ -59,6 +59,35 @@ team_abbrevs <- c(
   "Winnipeg Jets" = "WPG"
 )
 
+# NHL division and conference mapping
+team_divisions <- c(
+  "ANA" = "Pacific", "ARI" = "Central", "BOS" = "Atlantic",
+  "BUF" = "Atlantic", "CGY" = "Pacific", "CAR" = "Metropolitan",
+  "CHI" = "Central", "COL" = "Central", "CBJ" = "Metropolitan",
+  "DAL" = "Central", "DET" = "Atlantic", "EDM" = "Pacific",
+  "FLA" = "Atlantic", "LAK" = "Pacific", "MIN" = "Central",
+  "MTL" = "Atlantic", "NSH" = "Central", "NJD" = "Metropolitan",
+  "NYI" = "Metropolitan", "NYR" = "Metropolitan", "OTT" = "Atlantic",
+  "PHI" = "Metropolitan", "PIT" = "Metropolitan", "SJS" = "Pacific",
+  "SEA" = "Pacific", "STL" = "Central", "TBL" = "Atlantic",
+  "TOR" = "Atlantic", "UTA" = "Central", "VAN" = "Pacific",
+  "VGK" = "Pacific", "WSH" = "Metropolitan", "WPG" = "Central"
+)
+
+team_conferences <- c(
+  "ANA" = "Western", "ARI" = "Western", "BOS" = "Eastern",
+  "BUF" = "Eastern", "CGY" = "Western", "CAR" = "Eastern",
+  "CHI" = "Western", "COL" = "Western", "CBJ" = "Eastern",
+  "DAL" = "Western", "DET" = "Eastern", "EDM" = "Western",
+  "FLA" = "Eastern", "LAK" = "Western", "MIN" = "Western",
+  "MTL" = "Eastern", "NSH" = "Western", "NJD" = "Eastern",
+  "NYI" = "Eastern", "NYR" = "Eastern", "OTT" = "Eastern",
+  "PHI" = "Eastern", "PIT" = "Eastern", "SJS" = "Western",
+  "SEA" = "Western", "STL" = "Western", "TBL" = "Eastern",
+  "TOR" = "Eastern", "UTA" = "Western", "VAN" = "Western",
+  "VGK" = "Western", "WSH" = "Eastern", "WPG" = "Western"
+)
+
 # Use API-provided per-game stats
 team_ratings <- standings %>%
   mutate(
@@ -82,7 +111,9 @@ data_points <- team_ratings %>%
     label = TEAM_ABBREV,
     x = GF_PG,
     y = GA_PG,
-    sum = DIFF_PG
+    sum = DIFF_PG,
+    division = team_divisions[TEAM_ABBREV],
+    conference = team_conferences[TEAM_ABBREV]
   ))) %>%
   pull(data_point)
 

@@ -100,11 +100,18 @@ class RootComponent(
     }
 
     fun navigateToChart(chartId: String, sport: Sport, vizType: VizType) {
+        // First, pop any existing chart screens to avoid stacking charts
+        while (stack.value.active.configuration is Config.DataViz) {
+            navigation.pop()
+        }
+
         // Store the sport so we can select it when navigating back
         val homeChild = stack.value.items.firstOrNull { it.configuration is Config.Home }?.instance
         if (homeChild is Child.Home) {
             homeChild.component.selectSport(sport)
         }
+
+        // Now push the new chart
         navigation.push(Config.DataViz(chartId, sport, vizType))
     }
 

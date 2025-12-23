@@ -3,6 +3,8 @@ package com.joebad.fastbreak.ui
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -10,14 +12,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import com.joebad.fastbreak.data.model.Registry
-import com.joebad.fastbreak.platform.AppVersion
 import com.joebad.fastbreak.ui.diagnostics.DiagnosticsInfo
 import com.joebad.fastbreak.ui.diagnostics.RegistryOverviewList
-import com.joebad.fastbreak.ui.diagnostics.SyncStatusRow
 import com.joebad.fastbreak.ui.theme.ThemeMode
-// Cupertino library removed due to Compose version incompatibility
-// import io.github.alexzhirkevich.cupertino.CupertinoSegmentedControl
-// import io.github.alexzhirkevich.cupertino.CupertinoSegmentedControlTab
 
 @Composable
 fun DrawerMenu(
@@ -26,6 +23,8 @@ fun DrawerMenu(
     registry: Registry = Registry.empty(),
     diagnostics: DiagnosticsInfo = DiagnosticsInfo(),
     onRefreshRegistry: () -> Unit = {},
+    onNavigateToSettings: () -> Unit = {},
+    onChartClick: (com.joebad.fastbreak.data.model.ChartDefinition) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     ModalDrawerSheet(
@@ -33,100 +32,51 @@ fun DrawerMenu(
         drawerContainerColor = MaterialTheme.colorScheme.background
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(16.dp)
+            modifier = Modifier.fillMaxSize()
         ) {
-            // Sync status section
-            Text(
-                text = "sync status",
-                style = MaterialTheme.typography.titleSmall,
-                fontFamily = FontFamily.Monospace
-            )
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            SyncStatusRow(diagnostics = diagnostics)
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // Refresh button - disabled while syncing, but enabled if there's an error
-            OutlinedButton(
-                onClick = onRefreshRegistry,
-                enabled = !diagnostics.isSyncing || diagnostics.lastError != null,
-                modifier = Modifier.fillMaxWidth()
+            // Scrollable content
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .verticalScroll(rememberScrollState())
+                    .padding(16.dp)
             ) {
+                // Registry overview
                 Text(
-                    text = "refresh registry",
+                    text = "chart registry overview",
+                    style = MaterialTheme.typography.titleSmall,
                     fontFamily = FontFamily.Monospace
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                RegistryOverviewList(
+                    registry = registry,
+                    onChartClick = onChartClick
                 )
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
+            // Settings button pinned to bottom
             HorizontalDivider(color = MaterialTheme.colorScheme.outline)
-            Spacer(modifier = Modifier.height(16.dp))
 
-            // Registry overview
-            Text(
-                text = "registry overview",
-                style = MaterialTheme.typography.titleSmall,
-                fontFamily = FontFamily.Monospace
-            )
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            RegistryOverviewList(registry = registry)
-
-            Spacer(modifier = Modifier.height(24.dp))
-            HorizontalDivider(color = MaterialTheme.colorScheme.outline)
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Theme selector at bottom
-            Text(
-                text = "theme",
-                style = MaterialTheme.typography.titleSmall,
-                fontFamily = FontFamily.Monospace,
-                modifier = Modifier.padding(bottom = 8.dp)
-            )
-
-            // Material3 SegmentedButton replacement for Cupertino
-            SingleChoiceSegmentedButtonRow(
+            FilledTonalButton(
+                onClick = onNavigateToSettings,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(vertical = 8.dp)
+                    .padding(16.dp),
+                contentPadding = PaddingValues(vertical = 16.dp)
             ) {
-                SegmentedButton(
-                    selected = currentTheme == ThemeMode.LIGHT,
-                    onClick = { onThemeChange(ThemeMode.LIGHT) },
-                    shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
-                ) {
-                    Text(text = "light")
-                }
-                SegmentedButton(
-                    selected = currentTheme == ThemeMode.DARK,
-                    onClick = { onThemeChange(ThemeMode.DARK) },
-                    shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
-                ) {
-                    Text(text = "dark")
-                }
+                Icon(
+                    imageVector = Icons.Default.Settings,
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "settings",
+                    fontFamily = FontFamily.Monospace
+                )
             }
-
-            Spacer(modifier = Modifier.weight(1f))
-
-            // Version info at the bottom
-            HorizontalDivider(color = MaterialTheme.colorScheme.outline)
-            Spacer(modifier = Modifier.height(12.dp))
-
-            Text(
-                text = "v${AppVersion.versionName} (${AppVersion.buildNumber})",
-                style = MaterialTheme.typography.bodySmall,
-                fontFamily = FontFamily.Monospace,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.align(Alignment.CenterHorizontally)
-            )
-
-            Spacer(modifier = Modifier.height(16.dp))
         }
     }
 }

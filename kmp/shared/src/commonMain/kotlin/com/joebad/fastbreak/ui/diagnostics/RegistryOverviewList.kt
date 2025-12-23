@@ -1,16 +1,19 @@
 package com.joebad.fastbreak.ui.diagnostics
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -25,6 +28,7 @@ import com.joebad.fastbreak.data.model.Sport
 @Composable
 fun RegistryOverviewList(
     registry: Registry = Registry.empty(),
+    onChartClick: (ChartDefinition) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     if (registry.charts.isEmpty()) {
@@ -54,7 +58,10 @@ fun RegistryOverviewList(
 
                 // Chart items
                 sportCharts.forEach { chart ->
-                    ChartOverviewItem(chart)
+                    ChartOverviewItem(
+                        chart = chart,
+                        onClick = { onChartClick(chart) }
+                    )
                 }
             }
         }
@@ -65,12 +72,17 @@ fun RegistryOverviewList(
  * Single line chart item showing title and last updated time.
  */
 @Composable
-private fun ChartOverviewItem(chart: ChartDefinition) {
+private fun ChartOverviewItem(
+    chart: ChartDefinition,
+    onClick: () -> Unit
+) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 2.dp)
+            .clip(RoundedCornerShape(4.dp))
+            .clickable(onClick = onClick)
+            .padding(vertical = 4.dp, horizontal = 4.dp)
     ) {
         Text(
             text = chart.title,

@@ -32,6 +32,8 @@ jobs:
         id: build_info
         run: |
           echo "build_number=${{ github.run_number }}" >> $GITHUB_OUTPUT
+          VERSION_NAME=$(grep "VERSION_NAME=" gradle.properties | cut -d'=' -f2)
+          echo "version_name=${VERSION_NAME}" >> $GITHUB_OUTPUT
 
       - name: Write local.properties
         run: |
@@ -53,7 +55,7 @@ jobs:
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
         run: |
           ./gradlew :androidApp:bundleRelease --no-daemon \
-            -PVERSION_NAME="0.0.1-alpha-${{ steps.build_info.outputs.build_number }}" \
+            -PVERSION_NAME="${{ steps.build_info.outputs.version_name }}" \
             -PVERSION_CODE="${{ steps.build_info.outputs.build_number }}"
 
       - name: Upload to Google Play Alpha

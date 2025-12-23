@@ -15,6 +15,7 @@ import com.joebad.fastbreak.navigation.RootComponent
 import com.joebad.fastbreak.ui.DataVizScreen
 import com.joebad.fastbreak.ui.DrawerMenu
 import com.joebad.fastbreak.ui.HomeScreen
+import com.joebad.fastbreak.ui.SettingsScreen
 import com.joebad.fastbreak.ui.theme.AppTheme
 import kotlinx.coroutines.launch
 
@@ -39,7 +40,22 @@ fun App(rootComponent: RootComponent) {
                     },
                     registry = registryState.registry ?: com.joebad.fastbreak.data.model.Registry.empty(),
                     diagnostics = registryState.diagnostics,
-                    onRefreshRegistry = { rootComponent.refreshRegistry() }
+                    onRefreshRegistry = { rootComponent.refreshRegistry() },
+                    onNavigateToSettings = {
+                        scope.launch { drawerState.close() }
+                        rootComponent.navigateToSettings()
+                    },
+                    onChartClick = { chart ->
+                        scope.launch { drawerState.close() }
+                        // Mark the chart as viewed
+                        rootComponent.markChartAsViewed(chart.id)
+                        // Navigate to the chart from RootComponent directly
+                        rootComponent.navigateToChart(
+                            chart.id,
+                            chart.sport,
+                            chart.visualizationType
+                        )
+                    }
                 )
             }
         ) {
@@ -65,6 +81,15 @@ fun App(rootComponent: RootComponent) {
                     is RootComponent.Child.DataViz -> DataVizScreen(
                         component = child.component,
                         onMenuClick = { scope.launch { drawerState.open() } }
+                    )
+                    is RootComponent.Child.Settings -> SettingsScreen(
+                        component = child.component,
+                        currentTheme = themeMode,
+                        onThemeChange = { newTheme ->
+                            rootComponent.toggleTheme(newTheme)
+                        },
+                        diagnostics = registryState.diagnostics,
+                        onRefreshRegistry = { rootComponent.refreshRegistry() }
                     )
                 }
             }

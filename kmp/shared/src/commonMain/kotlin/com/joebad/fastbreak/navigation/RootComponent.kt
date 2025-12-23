@@ -95,6 +95,36 @@ class RootComponent(
         childFactory = ::child
     )
 
+    fun navigateToSettings() {
+        navigation.push(Config.Settings)
+    }
+
+    fun navigateToChart(chartId: String, sport: Sport, vizType: VizType) {
+        // Store the sport so we can select it when navigating back
+        val homeChild = stack.value.items.firstOrNull { it.configuration is Config.Home }?.instance
+        if (homeChild is Child.Home) {
+            homeChild.component.selectSport(sport)
+        }
+        navigation.push(Config.DataViz(chartId, sport, vizType))
+    }
+
+    fun navigateBackToHome() {
+        // Get the current chart's sport before navigating back
+        val currentConfig = stack.value.active.configuration
+        if (currentConfig is Config.DataViz) {
+            // Find the home component and select the sport
+            val homeChild = stack.value.items.firstOrNull { it.configuration is Config.Home }?.instance
+            if (homeChild is Child.Home) {
+                homeChild.component.selectSport(currentConfig.sport)
+            }
+        }
+
+        // Pop all screens until we're back at Home
+        while (stack.value.active.configuration != Config.Home) {
+            navigation.pop()
+        }
+    }
+
     private fun child(config: Config, componentContext: ComponentContext): Child =
         when (config) {
             is Config.Home -> Child.Home(
@@ -113,6 +143,12 @@ class RootComponent(
                     vizType = config.vizType,
                     chartDataRepository = chartDataRepository,
                     registryContainer = registryContainer,
+                    onNavigateBack = { navigateBackToHome() }
+                )
+            )
+            is Config.Settings -> Child.Settings(
+                SettingsComponent(
+                    componentContext = componentContext,
                     onNavigateBack = { navigation.pop() }
                 )
             )
@@ -121,6 +157,7 @@ class RootComponent(
     sealed class Child {
         data class Home(val component: HomeComponent) : Child()
         data class DataViz(val component: DataVizComponent) : Child()
+        data class Settings(val component: SettingsComponent) : Child()
     }
 
     @Serializable
@@ -130,5 +167,8 @@ class RootComponent(
 
         @Serializable
         data class DataViz(val chartId: String, val sport: Sport, val vizType: VizType) : Config
+
+        @Serializable
+        data object Settings : Config
     }
 }

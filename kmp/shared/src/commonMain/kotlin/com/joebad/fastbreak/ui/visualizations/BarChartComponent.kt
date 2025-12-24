@@ -41,13 +41,17 @@ private fun Float.formatTo(decimals: Int): String {
 @Composable
 fun BarChartComponent(
     data: List<BarGraphDataPoint>,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    highlightedTeamCodes: Set<String> = emptySet()
 ) {
     if (data.isEmpty()) return
 
     val primaryColor = MaterialTheme.colorScheme.primary
     val errorColor = MaterialTheme.colorScheme.error
     val axisColor = MaterialTheme.colorScheme.onSurface
+
+    // Check if highlighting is active
+    val isHighlighting = highlightedTeamCodes.isNotEmpty()
     val gridColor = MaterialTheme.colorScheme.outlineVariant
 
     // Zoom and pan state - start slightly zoomed out to show all bars
@@ -222,7 +226,19 @@ fun BarChartComponent(
                     val barHeight = abs(valueY - zeroY)
 
                     val barTop = if (point.value >= 0) valueY else zeroY
-                    val color = if (point.value < 0) errorColor else primaryColor
+
+                    // Check if this bar should be highlighted
+                    val isHighlighted = isHighlighting && highlightedTeamCodes.any { code ->
+                        point.label.contains(code, ignoreCase = true)
+                    }
+
+                    // Determine color and apply transparency if not highlighted
+                    val baseColor = if (point.value < 0) errorColor else primaryColor
+                    val color = if (isHighlighting && !isHighlighted) {
+                        baseColor.copy(alpha = 0.2f)
+                    } else {
+                        baseColor
+                    }
 
                     drawRect(
                         color = color,

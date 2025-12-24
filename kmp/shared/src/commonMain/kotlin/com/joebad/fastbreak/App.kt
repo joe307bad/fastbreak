@@ -25,6 +25,7 @@ fun App(rootComponent: RootComponent) {
 
     // Collect Orbit MVI state (Phase 6)
     val registryState by rootComponent.registryContainer.container.stateFlow.collectAsState()
+    val pinnedTeamsState by rootComponent.pinnedTeamsContainer.container.stateFlow.collectAsState()
 
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
@@ -80,7 +81,8 @@ fun App(rootComponent: RootComponent) {
                     )
                     is RootComponent.Child.DataViz -> DataVizScreen(
                         component = child.component,
-                        onMenuClick = { scope.launch { drawerState.open() } }
+                        onMenuClick = { scope.launch { drawerState.open() } },
+                        pinnedTeams = pinnedTeamsState.pinnedTeams
                     )
                     is RootComponent.Child.Settings -> SettingsScreen(
                         component = child.component,
@@ -89,7 +91,15 @@ fun App(rootComponent: RootComponent) {
                             rootComponent.toggleTheme(newTheme)
                         },
                         diagnostics = registryState.diagnostics,
-                        onRefreshRegistry = { rootComponent.refreshRegistry() }
+                        onRefreshRegistry = { rootComponent.refreshRegistry() },
+                        teamRosters = pinnedTeamsState.teamRosters,
+                        pinnedTeams = pinnedTeamsState.pinnedTeams,
+                        onPinTeam = { sport, teamCode, teamLabel ->
+                            rootComponent.pinnedTeamsContainer.pinTeam(sport, teamCode, teamLabel)
+                        },
+                        onUnpinTeam = { sport, teamCode ->
+                            rootComponent.pinnedTeamsContainer.unpinTeam(sport, teamCode)
+                        }
                     )
                 }
             }

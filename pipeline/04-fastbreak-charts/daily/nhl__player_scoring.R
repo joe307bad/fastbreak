@@ -108,15 +108,20 @@ print(head(top_players, 10))
 # Bottom-right = pure goal scorers (high goals, lower assists)
 data_points <- top_players %>%
   rowwise() %>%
-  mutate(data_point = list(list(
-    label = player,
-    x = G,
-    y = A,
-    sum = PTS,
-    team = team,
-    division = team_divisions[team],
-    conference = team_conferences[team]
-  ))) %>%
+  mutate(
+    team_code = team,
+    team_division = unname(team_divisions[team]),
+    team_conference = unname(team_conferences[team]),
+    data_point = list(list(
+      label = player,
+      x = G,
+      y = A,
+      sum = PTS,
+      teamCode = team_code,
+      division = if (!is.na(team_division)) team_division else NULL,
+      conference = if (!is.na(team_conference)) team_conference else NULL
+    ))
+  ) %>%
   pull(data_point)
 
 # Create output object with metadata matching ScatterPlotVisualization model
@@ -137,6 +142,7 @@ output_data <- list(
   quadrantTopLeft = list(color = "#2196F3", label = "Playmakers"),
   quadrantBottomLeft = list(color = "#9E9E9E", label = "Role Players"),
   quadrantBottomRight = list(color = "#FF9800", label = "Goal Scorers"),
+  subject = "PLAYER",
   dataPoints = data_points
 )
 

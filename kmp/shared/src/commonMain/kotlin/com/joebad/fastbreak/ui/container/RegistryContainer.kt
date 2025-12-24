@@ -24,7 +24,8 @@ class RegistryContainer(
     private val chartDataSynchronizer: ChartDataSynchronizer,
     private val chartDataRepository: ChartDataRepository,
     private val scope: CoroutineScope,
-    private val networkPermissionChecker: NetworkPermissionChecker = NetworkPermissionChecker()
+    private val networkPermissionChecker: NetworkPermissionChecker = NetworkPermissionChecker(),
+    val pinnedTeamsContainer: PinnedTeamsContainer? = null  // Optional dependency
 ) : ContainerHost<RegistryState, RegistrySideEffect> {
 
     override val container: Container<RegistryState, RegistrySideEffect> =
@@ -166,7 +167,7 @@ class RegistryContainer(
 
     /**
      * Loads the registry with 12-hour automatic update check.
-     * Also triggers chart data synchronization after loading.
+     * Also triggers chart data synchronization and team roster download after loading.
      */
     fun loadRegistry() = intent {
         reduce {
@@ -180,6 +181,10 @@ class RegistryContainer(
                 )
             )
         }
+
+        // Download team rosters immediately (don't wait for registry)
+        println("🏈 Downloading team rosters on startup...")
+        pinnedTeamsContainer?.downloadTeamRosters()
 
         registryManager.checkAndUpdateRegistry()
             .onSuccess { entries ->
@@ -336,6 +341,11 @@ class RegistryContainer(
                 try {
                     syncChartData(entries)
                     println("✅ Chart synchronization complete")
+
+                    // Also download team rosters after successful chart sync
+                    println("🏈 Downloading team rosters...")
+                    pinnedTeamsContainer?.downloadTeamRosters()
+                    println("✅ Team rosters download initiated")
                 } catch (e: Exception) {
                     println("❌ Chart synchronization failed: ${e.message}")
                     // Ensure isSyncing is cleared even on exception
@@ -382,6 +392,11 @@ class RegistryContainer(
                     try {
                         syncChartData(cachedEntries)
                         println("✅ Chart synchronization complete")
+
+                        // Also download team rosters after successful chart sync
+                        println("🏈 Downloading team rosters...")
+                        pinnedTeamsContainer?.downloadTeamRosters()
+                        println("✅ Team rosters download initiated")
                     } catch (e: Exception) {
                         println("❌ Chart synchronization failed: ${e.message}")
                         // Ensure isSyncing is cleared even on exception

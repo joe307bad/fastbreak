@@ -3,7 +3,9 @@ package com.joebad.fastbreak.ui.visualizations
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
@@ -33,45 +35,38 @@ fun FilterBar(
     var activeFilterKey by remember { mutableStateOf<String?>(null) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 8.dp, vertical = 4.dp),
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        filters.forEach { filter ->
-            val selectedValue = selectedFilters[filter.key]
-            FilterChip(
-                selected = selectedValue != null,
-                onClick = { activeFilterKey = filter.key },
-                label = {
-                    Text(
-                        text = selectedValue ?: filter.displayName,
-                        style = MaterialTheme.typography.labelSmall
-                    )
-                },
-                modifier = Modifier.height(28.dp)
-            )
-        }
-
-        // Reset button - only show if any filters are active
-        if (selectedFilters.isNotEmpty()) {
-            IconButton(
-                onClick = {
-                    // Clear all filters
-                    filters.forEach { filter ->
-                        onFilterChange(filter.key, null)
-                    }
-                },
-                modifier = Modifier.size(28.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Close,
-                    contentDescription = "Clear filters",
-                    modifier = Modifier.size(16.dp)
+    // Filter chips - parent is responsible for Row layout and scrolling
+    filters.forEach { filter ->
+        val selectedValue = selectedFilters[filter.key]
+        FilterChip(
+            selected = selectedValue != null,
+            onClick = { activeFilterKey = filter.key },
+            label = {
+                Text(
+                    text = selectedValue ?: filter.displayName,
+                    style = MaterialTheme.typography.labelSmall
                 )
-            }
+            },
+            modifier = Modifier.height(28.dp)
+        )
+    }
+
+    // Reset button - only show if any filters are active
+    if (selectedFilters.isNotEmpty()) {
+        IconButton(
+            onClick = {
+                // Clear all filters
+                filters.forEach { filter ->
+                    onFilterChange(filter.key, null)
+                }
+            },
+            modifier = Modifier.size(28.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Default.Close,
+                contentDescription = "Clear filters",
+                modifier = Modifier.size(16.dp)
+            )
         }
     }
 
@@ -79,15 +74,18 @@ fun FilterBar(
     if (activeFilterKey != null) {
         val activeFilter = filters.find { it.key == activeFilterKey }
         if (activeFilter != null) {
+            val scrollState = rememberScrollState()
+
             ModalBottomSheet(
                 onDismissRequest = { activeFilterKey = null },
                 sheetState = sheetState,
-                containerColor = MaterialTheme.colorScheme.background
+                containerColor = MaterialTheme.colorScheme.background,
+                dragHandle = { BottomSheetDefaults.DragHandle() }
             ) {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(bottom = 32.dp)
+                        .fillMaxHeight(0.9f)
                 ) {
                     // Sheet title
                     Text(
@@ -96,27 +94,37 @@ fun FilterBar(
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
                     )
 
-                    // "All" option
-                    FilterOptionItem(
-                        label = "All",
-                        isSelected = selectedFilters[activeFilter.key] == null,
-                        onClick = {
-                            onFilterChange(activeFilter.key, null)
-                            activeFilterKey = null
-                        }
-                    )
-
-                    // Individual filter values
-                    activeFilter.values.forEach { value ->
+                    // Scrollable content
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f)
+                            .verticalScroll(scrollState)
+                    ) {
+                        // "All" option
                         FilterOptionItem(
-                            label = value,
-                            isSelected = selectedFilters[activeFilter.key] == value,
+                            label = "All",
+                            isSelected = selectedFilters[activeFilter.key] == null,
                             onClick = {
-                                onFilterChange(activeFilter.key, value)
+                                onFilterChange(activeFilter.key, null)
                                 activeFilterKey = null
                             }
                         )
+
+                        // Individual filter values
+                        activeFilter.values.forEach { value ->
+                            FilterOptionItem(
+                                label = value,
+                                isSelected = selectedFilters[activeFilter.key] == value,
+                                onClick = {
+                                    onFilterChange(activeFilter.key, value)
+                                    activeFilterKey = null
+                                }
+                            )
+                        }
                     }
+
+                    Spacer(modifier = Modifier.height(32.dp))
                 }
             }
         }

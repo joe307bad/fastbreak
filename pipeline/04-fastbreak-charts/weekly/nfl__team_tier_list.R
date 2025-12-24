@@ -71,6 +71,7 @@ output_data <- list(
     lightModeColor = "#F57C00"
   ),
   source = "nflfastR / nflreadr",
+  subject = "TEAM",
   dataPoints = data_points
 )
 

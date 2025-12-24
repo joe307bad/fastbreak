@@ -56,8 +56,8 @@ fun RegistryOverviewList(
                     modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
                 )
 
-                // Chart items
-                sportCharts.forEach { chart ->
+                // Chart items (sorted alphabetically by title)
+                sportCharts.sortedBy { it.title }.forEach { chart ->
                     ChartOverviewItem(
                         chart = chart,
                         onClick = { onChartClick(chart) }

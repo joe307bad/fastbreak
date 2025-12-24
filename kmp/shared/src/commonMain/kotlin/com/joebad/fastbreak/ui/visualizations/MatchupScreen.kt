@@ -27,11 +27,32 @@ import com.joebad.fastbreak.data.model.MatchupVisualization
 @Composable
 fun MatchupScreen(
     visualization: MatchupVisualization,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    highlightedTeamCodes: Set<String> = emptySet()
 ) {
-    val matchups = visualization.dataPoints
+    // Filter matchups by highlighted teams if any are selected
+    val matchups = remember(visualization.dataPoints, highlightedTeamCodes) {
+        if (highlightedTeamCodes.isEmpty()) {
+            visualization.dataPoints
+        } else {
+            visualization.dataPoints.filter { matchup ->
+                highlightedTeamCodes.any { code ->
+                    matchup.homeTeam.contains(code, ignoreCase = true) ||
+                    matchup.awayTeam.contains(code, ignoreCase = true)
+                }
+            }
+        }
+    }
+
     var selectedMatchupIndex by remember { mutableStateOf(0) }
     var dropdownExpanded by remember { mutableStateOf(false) }
+
+    // Reset selected index when filtered matchups change
+    LaunchedEffect(matchups.size) {
+        if (selectedMatchupIndex >= matchups.size) {
+            selectedMatchupIndex = 0
+        }
+    }
 
     if (matchups.isEmpty()) {
         Box(

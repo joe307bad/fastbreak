@@ -1,5 +1,6 @@
 package com.joebad.fastbreak.ui
 
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -21,7 +22,8 @@ import kotlinx.coroutines.launch
 @Composable
 fun DataVizScreen(
     component: DataVizComponent,
-    onMenuClick: () -> Unit = {}
+    onMenuClick: () -> Unit = {},
+    pinnedTeams: List<PinnedTeam> = emptyList()
 ) {
     var state by remember { mutableStateOf<DataVizState>(DataVizState.Loading) }
     var refreshTrigger by remember { mutableStateOf(0) }
@@ -104,7 +106,10 @@ fun DataVizScreen(
         ) {
             when (val currentState = state) {
                 is DataVizState.Loading -> LoadingContent()
-                is DataVizState.Success -> SuccessContent(currentState.data)
+                is DataVizState.Success -> SuccessContent(
+                    visualization = currentState.data,
+                    pinnedTeams = pinnedTeams
+                )
                 is DataVizState.Error -> ErrorContent(
                     message = currentState.message,
                     onRetry = {
@@ -169,38 +174,147 @@ private fun LoadingContent() {
 }
 
 @Composable
-private fun SuccessContent(visualization: VisualizationType) {
-    // State for filters
+private fun SuccessContent(
+    visualization: VisualizationType,
+    pinnedTeams: List<PinnedTeam>
+) {
+    // State for filters and team highlighting
     var selectedFilters by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
+    var selectedTeamCodes by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var selectedPlayerLabels by remember { mutableStateOf<Set<String>>(emptySet()) }
 
-    // Extract filter options and apply filtering
-    val (filterOptions, filteredVisualization) = remember(visualization, selectedFilters) {
-        extractFiltersAndApplyFiltering(visualization, selectedFilters)
+    // Get pinned teams for this sport
+    val sportPinnedTeams = remember(pinnedTeams, visualization.sport) {
+        pinnedTeams.filter { it.sport == visualization.sport }
+    }
+
+    // Extract filter options and calculate which teams match the filter criteria
+    val (filterOptions, filterHighlightedTeamCodes) = remember(visualization, selectedFilters) {
+        val result = extractFiltersAndCalculateHighlights(visualization, selectedFilters)
+        println("🔍 DataVizScreen - Filter Options: ${result.first.map { "${it.key}=${it.values.size} options" }}")
+        println("🔍 DataVizScreen - Selected Filters: $selectedFilters")
+        println("🔍 DataVizScreen - Filter Highlights: ${result.second}")
+        result
+    }
+
+    // Combine team code highlights with filter highlights
+    val allHighlightedTeamCodes = remember(selectedTeamCodes, filterHighlightedTeamCodes, selectedPlayerLabels) {
+        val combined = selectedTeamCodes + filterHighlightedTeamCodes
+        println("🔍 DataVizScreen - Selected Team Codes: $selectedTeamCodes")
+        println("🔍 DataVizScreen - Selected Player Labels: $selectedPlayerLabels")
+        println("🔍 DataVizScreen - All Highlighted Team Codes: $combined")
+        combined
+    }
+
+    // For matchups, we still need to apply filtering (not just highlighting)
+    val displayVisualization = remember(visualization, selectedFilters) {
+        if (visualization is MatchupVisualization && selectedFilters.isNotEmpty()) {
+            applyMatchupFilters(visualization, selectedFilters)
+        } else {
+            visualization
+        }
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
-        // Show filter bar if there are any filterable properties
-        if (filterOptions.isNotEmpty()) {
-            FilterBar(
-                filters = filterOptions,
-                selectedFilters = selectedFilters,
-                onFilterChange = { key, value ->
-                    selectedFilters = if (value == null) {
-                        selectedFilters - key
-                    } else {
-                        selectedFilters + (key to value)
+        // Show filter bar if there are any filterable properties or pinned teams
+        if (filterOptions.isNotEmpty() || sportPinnedTeams.isNotEmpty()) {
+            val scrollState = rememberScrollState()
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(scrollState)
+                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Team filter badges (on the left)
+                if (sportPinnedTeams.isNotEmpty()) {
+                    sportPinnedTeams.forEach { pinnedTeam ->
+                        val isSelected = selectedTeamCodes.contains(pinnedTeam.teamCode)
+                        FilterChip(
+                            selected = isSelected,
+                            onClick = {
+                                selectedTeamCodes = if (isSelected) {
+                                    selectedTeamCodes - pinnedTeam.teamCode
+                                } else {
+                                    selectedTeamCodes + pinnedTeam.teamCode
+                                }
+                            },
+                            label = {
+                                Text(
+                                    text = pinnedTeam.teamCode,
+                                    style = MaterialTheme.typography.labelSmall
+                                )
+                            },
+                            modifier = Modifier.height(28.dp)
+                        )
                     }
                 }
-            )
+
+                // Standard filters (division, conference)
+                if (filterOptions.isNotEmpty()) {
+                    FilterBar(
+                        filters = filterOptions,
+                        selectedFilters = selectedFilters,
+                        onFilterChange = { key, value ->
+                            selectedFilters = if (value == null) {
+                                selectedFilters - key
+                            } else {
+                                selectedFilters + (key to value)
+                            }
+                        }
+                    )
+                }
+            }
         }
 
-        // Render the visualization with filtered data
-        RenderVisualization(filteredVisualization)
+        // Render the visualization with all data and highlighted teams
+        RenderVisualization(
+            visualization = displayVisualization,
+            highlightedTeamCodes = allHighlightedTeamCodes,
+            highlightedPlayerLabels = selectedPlayerLabels,
+            onTeamClick = { label ->
+                // For PLAYER scatter plots, highlight individual players by label
+                // For TEAM scatter plots (and others), highlight teams by extracting team code
+                val isPlayerSubject = (displayVisualization as? ScatterPlotVisualization)?.subject == "PLAYER"
+
+                println("🖱️ onTeamClick - label: '$label', isPlayerSubject: $isPlayerSubject, subject: ${(displayVisualization as? ScatterPlotVisualization)?.subject}")
+
+                if (isPlayerSubject) {
+                    // Toggle player label selection
+                    selectedPlayerLabels = if (selectedPlayerLabels.contains(label)) {
+                        selectedPlayerLabels - label
+                    } else {
+                        selectedPlayerLabels + label
+                    }
+                    println("🖱️ onTeamClick - Updated selectedPlayerLabels: $selectedPlayerLabels")
+                } else {
+                    // Extract team code from label (e.g., "PHI Eagles" -> "PHI")
+                    val teamCode = label.split(" ").firstOrNull()
+                    if (teamCode != null) {
+                        selectedTeamCodes = if (selectedTeamCodes.contains(teamCode)) {
+                            selectedTeamCodes - teamCode
+                        } else {
+                            selectedTeamCodes + teamCode
+                        }
+                        println("🖱️ onTeamClick - Updated selectedTeamCodes: $selectedTeamCodes")
+                    }
+                }
+            }
+        )
     }
 }
 
 @Composable
-private fun RenderVisualization(visualization: VisualizationType) {
+private fun RenderVisualization(
+    visualization: VisualizationType,
+    highlightedTeamCodes: Set<String> = emptySet(),
+    highlightedPlayerLabels: Set<String> = emptySet(),
+    onTeamClick: (String) -> Unit = {}
+) {
+    println("📊 RenderVisualization - highlightedPlayerLabels: $highlightedPlayerLabels")
+    println("📊 RenderVisualization - visualization type: ${visualization::class.simpleName}")
+
     // TableVisualization has its own scrolling, so don't wrap it in verticalScroll
     if (visualization is TableVisualization) {
         // For tables: use Column with table taking most space, source at bottom
@@ -212,6 +326,9 @@ private fun RenderVisualization(visualization: VisualizationType) {
             // Table takes remaining space
             DataTableComponent(
                 visualization = visualization,
+                onTeamClick = onTeamClick,
+                highlightedTeamCodes = highlightedTeamCodes,
+                highlightedPlayerLabels = highlightedPlayerLabels,
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f)
@@ -224,7 +341,8 @@ private fun RenderVisualization(visualization: VisualizationType) {
         // Matchup has its own dedicated screen with dropdown selector
         MatchupScreen(
             visualization = visualization,
-            modifier = Modifier.fillMaxSize()
+            modifier = Modifier.fillMaxSize(),
+            highlightedTeamCodes = highlightedTeamCodes
         )
     } else {
         // For charts: use vertical scroll to show chart + data table
@@ -255,18 +373,23 @@ private fun RenderVisualization(visualization: VisualizationType) {
                                     quadrantTopLeft = visualization.quadrantTopLeft,
                                     quadrantBottomLeft = visualization.quadrantBottomLeft,
                                     quadrantBottomRight = visualization.quadrantBottomRight,
+                                    subject = visualization.subject,
+                                    highlightedTeamCodes = highlightedTeamCodes,
+                                    highlightedPlayerLabels = highlightedPlayerLabels,
                                     modifier = Modifier.fillMaxWidth()
                                 )
                             }
                             is BarGraphVisualization -> {
                                 BarChartComponent(
                                     data = visualization.dataPoints,
+                                    highlightedTeamCodes = highlightedTeamCodes,
                                     modifier = Modifier.fillMaxWidth()
                                 )
                             }
                             is LineChartVisualization -> {
                                 LineChartComponent(
                                     series = visualization.series,
+                                    highlightedTeamCodes = highlightedTeamCodes,
                                     modifier = Modifier.fillMaxWidth()
                                 )
                             }
@@ -287,7 +410,10 @@ private fun RenderVisualization(visualization: VisualizationType) {
                 // Data table - full width, minimal padding
                 DataTableComponent(
                     visualization = visualization,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
+                    onTeamClick = onTeamClick,
+                    highlightedTeamCodes = highlightedTeamCodes,
+                    highlightedPlayerLabels = highlightedPlayerLabels
                 )
 
                 // Source attribution at bottom
@@ -342,34 +468,35 @@ private sealed interface DataVizState {
 }
 
 /**
- * Extracts available filter options and returns filtered visualization data
+ * Extracts available filter options and calculates which team codes match the filter criteria.
+ * Returns filter options and a set of team codes that should be highlighted.
  */
-private fun extractFiltersAndApplyFiltering(
+private fun extractFiltersAndCalculateHighlights(
     visualization: VisualizationType,
     selectedFilters: Map<String, String>
-): Pair<List<FilterOption>, VisualizationType> {
+): Pair<List<FilterOption>, Set<String>> {
     return when (visualization) {
         is BarGraphVisualization -> {
             val filters = extractBarGraphFilters(visualization.dataPoints)
-            val filtered = applyBarGraphFilters(visualization, selectedFilters)
-            filters to filtered
+            val highlights = calculateBarGraphHighlights(visualization.dataPoints, selectedFilters)
+            filters to highlights
         }
         is ScatterPlotVisualization -> {
-            val filters = extractScatterPlotFilters(visualization.dataPoints)
-            val filtered = applyScatterPlotFilters(visualization, selectedFilters)
-            filters to filtered
+            val filters = extractScatterPlotFilters(visualization.dataPoints, visualization.subject)
+            val highlights = calculateScatterPlotHighlights(visualization.dataPoints, selectedFilters, visualization.subject)
+            filters to highlights
         }
         is LineChartVisualization -> {
             val filters = extractLineChartFilters(visualization.series)
-            val filtered = applyLineChartFilters(visualization, selectedFilters)
-            filters to filtered
+            val highlights = calculateLineChartHighlights(visualization.series, selectedFilters)
+            filters to highlights
         }
         is MatchupVisualization -> {
             val filters = extractMatchupFilters(visualization.dataPoints)
-            val filtered = applyMatchupFilters(visualization, selectedFilters)
-            filters to filtered
+            // Matchups still use filtering, not highlighting
+            filters to emptySet()
         }
-        else -> emptyList<FilterOption>() to visualization
+        else -> emptyList<FilterOption>() to emptySet()
     }
 }
 
@@ -390,28 +517,44 @@ private fun extractBarGraphFilters(dataPoints: List<BarGraphDataPoint>): List<Fi
     return filters
 }
 
-private fun applyBarGraphFilters(
-    visualization: BarGraphVisualization,
+/**
+ * Calculate which bar graph data points match the filter criteria.
+ * Returns a set of team codes that should be highlighted.
+ */
+private fun calculateBarGraphHighlights(
+    dataPoints: List<BarGraphDataPoint>,
     selectedFilters: Map<String, String>
-): BarGraphVisualization {
-    if (selectedFilters.isEmpty()) return visualization
+): Set<String> {
+    if (selectedFilters.isEmpty()) return emptySet()
 
-    val filteredDataPoints = visualization.dataPoints.filter { point ->
-        selectedFilters.all { (key, value) ->
-            when (key) {
-                "division" -> point.division == value
-                "conference" -> point.conference == value
-                else -> true
+    return dataPoints
+        .filter { point ->
+            selectedFilters.any { (key, value) ->
+                when (key) {
+                    "division" -> point.division?.equals(value, ignoreCase = true) == true
+                    "conference" -> point.conference?.equals(value, ignoreCase = true) == true
+                    else -> true
+                }
             }
         }
-    }
-
-    return visualization.copy(dataPoints = filteredDataPoints)
+        .mapNotNull { it.label.split(" ").firstOrNull() }
+        .toSet()
 }
 
 // Scatter Plot filtering
-private fun extractScatterPlotFilters(dataPoints: List<ScatterPlotDataPoint>): List<FilterOption> {
+private fun extractScatterPlotFilters(dataPoints: List<ScatterPlotDataPoint>, subject: String?): List<FilterOption> {
     val filters = mutableListOf<FilterOption>()
+
+    // For TEAM scatter plots, extract team codes from labels (first word)
+    // For PLAYER scatter plots, use teamCode property
+    val teams = if (subject == "TEAM") {
+        dataPoints.mapNotNull { it.label.split(" ").firstOrNull() }.distinct().sorted()
+    } else {
+        dataPoints.mapNotNull { it.teamCode }.distinct().sorted()
+    }
+    if (teams.isNotEmpty()) {
+        filters.add(FilterOption("team", "Team", teams))
+    }
 
     val divisions = dataPoints.mapNotNull { it.division }.distinct().sorted()
     if (divisions.isNotEmpty()) {
@@ -426,23 +569,58 @@ private fun extractScatterPlotFilters(dataPoints: List<ScatterPlotDataPoint>): L
     return filters
 }
 
-private fun applyScatterPlotFilters(
-    visualization: ScatterPlotVisualization,
-    selectedFilters: Map<String, String>
-): ScatterPlotVisualization {
-    if (selectedFilters.isEmpty()) return visualization
+/**
+ * Calculate which scatter plot data points match the filter criteria.
+ * Returns a set of identifiers (team codes) that should be highlighted.
+ * If subject is "PLAYER", filters by teamCode and returns team codes.
+ * If subject is "TEAM", filters by checking if team code appears in label and returns team codes.
+ */
+private fun calculateScatterPlotHighlights(
+    dataPoints: List<ScatterPlotDataPoint>,
+    selectedFilters: Map<String, String>,
+    subject: String?
+): Set<String> {
+    println("🔍 calculateScatterPlotHighlights - Subject: $subject, Filters: $selectedFilters, DataPoints: ${dataPoints.size}")
 
-    val filteredDataPoints = visualization.dataPoints.filter { point ->
-        selectedFilters.all { (key, value) ->
-            when (key) {
-                "division" -> point.division == value
-                "conference" -> point.conference == value
-                else -> true
-            }
-        }
+    if (selectedFilters.isEmpty()) {
+        println("🔍 calculateScatterPlotHighlights - No filters selected, returning empty set")
+        return emptySet()
     }
 
-    return visualization.copy(dataPoints = filteredDataPoints)
+    val matchedPoints = dataPoints.filter { point ->
+        val matches = selectedFilters.any { (key, value) ->
+            val result = when (key) {
+                "team" -> {
+                    if (subject == "TEAM") {
+                        // For team scatter plots, check if team code appears in label
+                        point.label.contains(value, ignoreCase = true)
+                    } else {
+                        // For player scatter plots (or default), match against teamCode
+                        point.teamCode?.equals(value, ignoreCase = true) == true
+                    }
+                }
+                "division" -> point.division?.equals(value, ignoreCase = true) == true
+                "conference" -> point.conference?.equals(value, ignoreCase = true) == true
+                else -> true
+            }
+            println("🔍   Point '${point.label}' - Filter $key=$value: teamCode=${point.teamCode}, division=${point.division}, conference=${point.conference} -> $result")
+            result
+        }
+        matches
+    }
+
+    val highlights = matchedPoints.mapNotNull {
+        if (subject == "TEAM") {
+            // For team scatter plots, extract team code from label (first word)
+            it.label.split(" ").firstOrNull()
+        } else {
+            // Return teamCode for player scatter plots
+            it.teamCode
+        }
+    }.toSet()
+
+    println("🔍 calculateScatterPlotHighlights - Matched ${matchedPoints.size} points, Highlights: $highlights")
+    return highlights
 }
 
 // Line Chart filtering
@@ -462,23 +640,28 @@ private fun extractLineChartFilters(series: List<LineChartSeries>): List<FilterO
     return filters
 }
 
-private fun applyLineChartFilters(
-    visualization: LineChartVisualization,
+/**
+ * Calculate which line chart series match the filter criteria.
+ * Returns a set of team codes that should be highlighted.
+ */
+private fun calculateLineChartHighlights(
+    series: List<LineChartSeries>,
     selectedFilters: Map<String, String>
-): LineChartVisualization {
-    if (selectedFilters.isEmpty()) return visualization
+): Set<String> {
+    if (selectedFilters.isEmpty()) return emptySet()
 
-    val filteredSeries = visualization.series.filter { series ->
-        selectedFilters.all { (key, value) ->
-            when (key) {
-                "division" -> series.division == value
-                "conference" -> series.conference == value
-                else -> true
+    return series
+        .filter { s ->
+            selectedFilters.any { (key, value) ->
+                when (key) {
+                    "division" -> s.division?.equals(value, ignoreCase = true) == true
+                    "conference" -> s.conference?.equals(value, ignoreCase = true) == true
+                    else -> true
+                }
             }
         }
-    }
-
-    return visualization.copy(series = filteredSeries)
+        .mapNotNull { it.label.split(" ").firstOrNull() }
+        .toSet()
 }
 
 // Matchup filtering

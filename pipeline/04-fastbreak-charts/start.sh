@@ -70,6 +70,7 @@ run_scripts() {
 }
 
 # Run scripts on startup
+run_scripts "/app/startup" "startup"
 run_scripts "/app/daily" "daily"
 run_scripts "/app/weekly" "weekly"
 

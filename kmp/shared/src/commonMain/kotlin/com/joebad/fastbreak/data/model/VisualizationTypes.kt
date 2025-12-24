@@ -47,6 +47,7 @@ data class ScatterPlotDataPoint(
     val x: Double,
     val y: Double,
     val sum: Double,
+    val teamCode: String? = null,
     val division: String? = null,
     val conference: String? = null
 )
@@ -76,6 +77,7 @@ data class ScatterPlotVisualization(
     val quadrantTopLeft: QuadrantConfig? = null,
     val quadrantBottomLeft: QuadrantConfig? = null,
     val quadrantBottomRight: QuadrantConfig? = null,
+    val subject: String? = null,
     val dataPoints: List<ScatterPlotDataPoint>
 ) : VisualizationType
 

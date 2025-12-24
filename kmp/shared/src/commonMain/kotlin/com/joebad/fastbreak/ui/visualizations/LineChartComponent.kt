@@ -63,9 +63,13 @@ private fun Float.formatTo(decimals: Int): String {
 @Composable
 fun LineChartComponent(
     series: List<LineChartSeries>,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    highlightedTeamCodes: Set<String> = emptySet()
 ) {
     if (series.isEmpty() || series.all { it.dataPoints.isEmpty() }) return
+
+    // Check if highlighting is active
+    val isHighlighting = highlightedTeamCodes.isNotEmpty()
 
     // Default color palette as fallback when series don't specify colors
     val defaultColors = listOf(
@@ -322,7 +326,19 @@ fun LineChartComponent(
                 series.forEachIndexed { seriesIndex, lineSeries ->
                     if (lineSeries.dataPoints.size < 2) return@forEachIndexed
 
-                    val color = seriesColors[seriesIndex]
+                    // Check if this series should be highlighted
+                    val isHighlighted = isHighlighting && highlightedTeamCodes.any { code ->
+                        lineSeries.label.contains(code, ignoreCase = true)
+                    }
+
+                    // Apply transparency if highlighting is active and this series is not highlighted
+                    val baseColor = seriesColors[seriesIndex]
+                    val color = if (isHighlighting && !isHighlighted) {
+                        baseColor.copy(alpha = 0.2f)
+                    } else {
+                        baseColor
+                    }
+
                     val path = Path()
                     var pathStarted = false
 

@@ -10,6 +10,7 @@ import com.arkivanov.decompose.value.MutableValue
 import com.arkivanov.decompose.value.Value
 import com.joebad.fastbreak.data.model.Sport
 import com.joebad.fastbreak.data.model.VizType
+import com.joebad.fastbreak.ui.container.PinnedTeamsContainer
 import com.joebad.fastbreak.ui.container.RegistryContainer
 import com.joebad.fastbreak.ui.theme.ThemeMode
 import com.joebad.fastbreak.ui.theme.ThemeRepository
@@ -22,6 +23,7 @@ class RootComponent(
     componentContext: ComponentContext,
     private val themeRepository: ThemeRepository,
     val registryContainer: RegistryContainer,
+    val pinnedTeamsContainer: PinnedTeamsContainer,
     private val chartDataRepository: com.joebad.fastbreak.data.repository.ChartDataRepository
 ) : ComponentContext by componentContext {
 

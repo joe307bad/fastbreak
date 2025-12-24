@@ -9,9 +9,12 @@ import com.joebad.fastbreak.App
 import com.joebad.fastbreak.data.api.RegistryApi
 import com.joebad.fastbreak.data.repository.ChartDataRepository
 import com.joebad.fastbreak.data.repository.RegistryRepository
+import com.joebad.fastbreak.data.repository.TeamRosterRepository
 import com.joebad.fastbreak.domain.registry.ChartDataSynchronizer
 import com.joebad.fastbreak.domain.registry.RegistryManager
+import com.joebad.fastbreak.domain.teams.TeamRosterSynchronizer
 import com.joebad.fastbreak.navigation.RootComponent
+import com.joebad.fastbreak.ui.container.PinnedTeamsContainer
 import com.joebad.fastbreak.ui.container.RegistryContainer
 import com.joebad.fastbreak.ui.theme.SystemThemeDetector
 import com.joebad.fastbreak.ui.theme.ThemeRepository
@@ -55,18 +58,33 @@ class MainActivity : ComponentActivity() {
             chartDataRepository = chartDataRepository
         )
 
+        // Create TeamRosterRepository and TeamRosterSynchronizer
+        val teamRosterRepository = TeamRosterRepository(settings)
+        val teamRosterSynchronizer = TeamRosterSynchronizer(
+            teamRosterRepository = teamRosterRepository
+        )
+
+        // Create PinnedTeamsContainer
+        val pinnedTeamsContainer = PinnedTeamsContainer(
+            teamRosterRepository = teamRosterRepository,
+            teamRosterSynchronizer = teamRosterSynchronizer,
+            scope = scope
+        )
+
         // Create RegistryContainer (Phase 6 - Orbit MVI)
         val registryContainer = RegistryContainer(
             registryManager = registryManager,
             chartDataSynchronizer = chartDataSynchronizer,
             chartDataRepository = chartDataRepository,
-            scope = scope
+            scope = scope,
+            pinnedTeamsContainer = pinnedTeamsContainer
         )
 
         val rootComponent = RootComponent(
             componentContext = DefaultComponentContext(lifecycle = LifecycleRegistry()),
             themeRepository = themeRepository,
             registryContainer = registryContainer,
+            pinnedTeamsContainer = pinnedTeamsContainer,
             chartDataRepository = chartDataRepository
         )
 

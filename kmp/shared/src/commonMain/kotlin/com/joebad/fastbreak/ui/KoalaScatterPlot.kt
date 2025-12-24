@@ -200,7 +200,10 @@ fun KoalaQuadrantScatterPlot(
     quadrantTopRight: QuadrantConfig? = null,
     quadrantTopLeft: QuadrantConfig? = null,
     quadrantBottomLeft: QuadrantConfig? = null,
-    quadrantBottomRight: QuadrantConfig? = null
+    quadrantBottomRight: QuadrantConfig? = null,
+    subject: String? = null,
+    highlightedTeamCodes: Set<String> = emptySet(),
+    highlightedPlayerLabels: Set<String> = emptySet()
 ) {
     // Use MaterialTheme colorScheme to detect app theme (not system theme)
     val isDark = MaterialTheme.colorScheme.background == Color.Black ||
@@ -316,49 +319,107 @@ fun KoalaQuadrantScatterPlot(
     }
 
     // Group data points by quadrant and prepare labels
+    data class ColoredPoint(
+        val point: DefaultPoint<Float, Float>,
+        val color: Color
+    )
+
     data class QuadrantData(
-        val topRight: List<DefaultPoint<Float, Float>>,
-        val topLeft: List<DefaultPoint<Float, Float>>,
-        val bottomLeft: List<DefaultPoint<Float, Float>>,
-        val bottomRight: List<DefaultPoint<Float, Float>>,
+        val topRight: List<ColoredPoint>,
+        val topLeft: List<ColoredPoint>,
+        val bottomLeft: List<ColoredPoint>,
+        val bottomRight: List<ColoredPoint>,
         val labels: List<LabelPosition>
     )
 
-    val quadrantData = remember(data, avgX, avgY, yMultiplier, topRightColor, topLeftColor, bottomLeftColor, bottomRightColor) {
-        val tr = mutableListOf<DefaultPoint<Float, Float>>()
-        val tl = mutableListOf<DefaultPoint<Float, Float>>()
-        val bl = mutableListOf<DefaultPoint<Float, Float>>()
-        val br = mutableListOf<DefaultPoint<Float, Float>>()
+    val quadrantData = remember(data, avgX, avgY, yMultiplier, topRightColor, topLeftColor, bottomLeftColor, bottomRightColor, subject, highlightedTeamCodes, highlightedPlayerLabels) {
+        println("🎨 KoalaScatterPlot - Subject: $subject, Highlighted Team Codes: $highlightedTeamCodes, Highlighted Player Labels: $highlightedPlayerLabels, Data Points: ${data.size}")
+
+        val trNormal = mutableListOf<ColoredPoint>()
+        val tlNormal = mutableListOf<ColoredPoint>()
+        val blNormal = mutableListOf<ColoredPoint>()
+        val brNormal = mutableListOf<ColoredPoint>()
+        val trHighlighted = mutableListOf<ColoredPoint>()
+        val tlHighlighted = mutableListOf<ColoredPoint>()
+        val blHighlighted = mutableListOf<ColoredPoint>()
+        val brHighlighted = mutableListOf<ColoredPoint>()
         val allLabels = mutableListOf<LabelPosition>()
 
+        // Check if highlighting is active (either team codes or player labels)
+        val isHighlighting = highlightedTeamCodes.isNotEmpty() || highlightedPlayerLabels.isNotEmpty()
+
+        println("🎯 KoalaScatterPlot - Subject: $subject")
+        println("🎯 KoalaScatterPlot - highlightedTeamCodes: $highlightedTeamCodes")
+        println("🎯 KoalaScatterPlot - highlightedPlayerLabels: $highlightedPlayerLabels")
+        println("🎯 KoalaScatterPlot - isHighlighting: $isHighlighting")
+        println("🎯 KoalaScatterPlot - First 3 data point labels: ${data.take(3).map { it.label }}")
+
+        var highlightedCount = 0
         data.forEach { point ->
             val x = point.x.toFloat()
             val y = (point.y * yMultiplier).toFloat()
             val dp = DefaultPoint(x, y)
 
-            val color = when {
-                x >= avgX && y >= avgY -> {
-                    tr.add(dp)
-                    topRightColor
+            // Check if this point should be highlighted (using OR logic - match ANY criteria)
+            val matchesPlayerLabel = highlightedPlayerLabels.isNotEmpty() && highlightedPlayerLabels.contains(point.label)
+            val matchesTeamCode = when {
+                subject == "TEAM" && highlightedTeamCodes.isNotEmpty() -> {
+                    highlightedTeamCodes.any { code -> point.label.contains(code, ignoreCase = true) }
                 }
-                x < avgX && y >= avgY -> {
-                    tl.add(dp)
-                    topLeftColor
+                highlightedTeamCodes.isNotEmpty() -> {
+                    highlightedTeamCodes.contains(point.teamCode)
                 }
-                x < avgX && y < avgY -> {
-                    bl.add(dp)
-                    bottomLeftColor
+                else -> false
+            }
+
+            val isHighlighted = matchesPlayerLabel || matchesTeamCode
+
+            if (isHighlighted) {
+                highlightedCount++
+                if (matchesPlayerLabel) {
+                    println("🎯 MATCH! Point label '${point.label}' is in highlightedPlayerLabels")
                 }
-                else -> {
-                    br.add(dp)
-                    bottomRightColor
+                if (matchesTeamCode) {
+                    println("🎯 MATCH! Point teamCode '${point.teamCode}' matches team filter")
                 }
+            }
+
+            val baseColor = when {
+                x >= avgX && y >= avgY -> topRightColor
+                x < avgX && y >= avgY -> topLeftColor
+                x < avgX && y < avgY -> bottomLeftColor
+                else -> bottomRightColor
+            }
+
+            // Apply transparency if highlighting is active and this point is not highlighted
+            val color = if (isHighlighting && !isHighlighted) {
+                baseColor.copy(alpha = 0.1f)
+            } else {
+                baseColor
+            }
+
+            // Add colored point to appropriate quadrant (separate lists for highlighted vs normal)
+            val coloredPoint = ColoredPoint(dp, color)
+            when {
+                x >= avgX && y >= avgY -> if (isHighlighted) trHighlighted.add(coloredPoint) else trNormal.add(coloredPoint)
+                x < avgX && y >= avgY -> if (isHighlighted) tlHighlighted.add(coloredPoint) else tlNormal.add(coloredPoint)
+                x < avgX && y < avgY -> if (isHighlighted) blHighlighted.add(coloredPoint) else blNormal.add(coloredPoint)
+                else -> if (isHighlighted) brHighlighted.add(coloredPoint) else brNormal.add(coloredPoint)
             }
 
             allLabels.add(LabelPosition(point.label, x, y, color))
         }
 
-        QuadrantData(tr, tl, bl, br, allLabels)
+        println("🎯 KoalaScatterPlot - Total points highlighted: $highlightedCount out of ${data.size}")
+
+        // Combine lists with normal points first, highlighted points last (so they render on top)
+        QuadrantData(
+            topRight = trNormal + trHighlighted,
+            topLeft = tlNormal + tlHighlighted,
+            bottomLeft = blNormal + blHighlighted,
+            bottomRight = brNormal + brHighlighted,
+            labels = allLabels
+        )
     }
 
     val topRightPoints = quadrantData.topRight
@@ -512,36 +573,36 @@ fun KoalaQuadrantScatterPlot(
                 )
             }
 
-            // Plot each quadrant with its color (on top of labels)
-            if (topRightPoints.isNotEmpty()) {
+            // Plot each point individually with its own color (on top of labels)
+            topRightPoints.forEach { coloredPoint ->
                 LinePlot(
-                    data = topRightPoints,
+                    data = listOf(coloredPoint.point),
                     lineStyle = null,
-                    symbol = { QuadrantSymbol(topRightColor) }
+                    symbol = { QuadrantSymbol(coloredPoint.color) }
                 )
             }
 
-            if (topLeftPoints.isNotEmpty()) {
+            topLeftPoints.forEach { coloredPoint ->
                 LinePlot(
-                    data = topLeftPoints,
+                    data = listOf(coloredPoint.point),
                     lineStyle = null,
-                    symbol = { QuadrantSymbol(topLeftColor) }
+                    symbol = { QuadrantSymbol(coloredPoint.color) }
                 )
             }
 
-            if (bottomLeftPoints.isNotEmpty()) {
+            bottomLeftPoints.forEach { coloredPoint ->
                 LinePlot(
-                    data = bottomLeftPoints,
+                    data = listOf(coloredPoint.point),
                     lineStyle = null,
-                    symbol = { QuadrantSymbol(bottomLeftColor) }
+                    symbol = { QuadrantSymbol(coloredPoint.color) }
                 )
             }
 
-            if (bottomRightPoints.isNotEmpty()) {
+            bottomRightPoints.forEach { coloredPoint ->
                 LinePlot(
-                    data = bottomRightPoints,
+                    data = listOf(coloredPoint.point),
                     lineStyle = null,
-                    symbol = { QuadrantSymbol(bottomRightColor) }
+                    symbol = { QuadrantSymbol(coloredPoint.color) }
                 )
             }
         }
@@ -597,17 +658,21 @@ private fun XYGraphScope<Float, Float>.PointLabel(
                  MaterialTheme.colorScheme.background == Color(0xFF0A0A0A)
 
     // Calculate label color - use darker colors for yellow/light colors in light mode
+    // Preserve the original alpha if the point is dimmed (alpha < 0.5)
     val labelColor = if (!isDark && isColorTooLight(color)) {
-        Color.Black
+        Color.Black.copy(alpha = if (color.alpha < 0.5f) color.alpha else 1f)
     } else {
-        color.copy(alpha = 0.9f)
+        // If already dimmed, keep the dim alpha, otherwise use 0.9f
+        color.copy(alpha = if (color.alpha < 0.5f) color.alpha else 0.9f)
     }
 
     // Background color for label - matches theme
+    // Reduce background opacity if point is dimmed
+    val backgroundAlpha = if (color.alpha < 0.5f) color.alpha * 0.5f else 0.85f
     val labelBackgroundColor = if (isDark) {
-        Color(0xFF0A0A0A).copy(alpha = 0.85f)
+        Color(0xFF0A0A0A).copy(alpha = backgroundAlpha)
     } else {
-        Color.White.copy(alpha = 0.85f)
+        Color.White.copy(alpha = backgroundAlpha)
     }
 
     // Use LinePlot with a single point and custom symbol that includes text

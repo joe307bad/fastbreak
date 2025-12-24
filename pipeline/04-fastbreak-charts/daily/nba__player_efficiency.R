@@ -94,7 +94,7 @@ data_points <- top_players %>%
     x = round(USG_PCT * 100, 1),
     y = round(TS_PCT * 100, 1),
     sum = round(PIE * 100, 1),
-    team = TEAM_ABBREVIATION,
+    teamCode = TEAM_ABBREVIATION,
     division = team_divisions[TEAM_ABBREVIATION],
     conference = team_conferences[TEAM_ABBREVIATION]
   ))) %>%
@@ -118,6 +118,7 @@ output_data <- list(
   quadrantTopLeft = list(color = "#2196F3", label = "Efficient Role Players"),
   quadrantBottomLeft = list(color = "#9E9E9E", label = "Limited Role"),
   quadrantBottomRight = list(color = "#FF9800", label = "Volume Shooters"),
+  subject = "PLAYER",
   dataPoints = data_points
 )
 

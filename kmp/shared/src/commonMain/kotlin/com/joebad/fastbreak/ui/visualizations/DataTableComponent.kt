@@ -1,6 +1,7 @@
 package com.joebad.fastbreak.ui.visualizations
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -12,6 +13,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -42,7 +44,10 @@ private fun Double.formatTo(decimals: Int): String {
 @Composable
 fun DataTableComponent(
     visualization: VisualizationType,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onTeamClick: (String) -> Unit = {},
+    highlightedTeamCodes: Set<String> = emptySet(),
+    highlightedPlayerLabels: Set<String> = emptySet()
 ) {
     Column(
         modifier = modifier
@@ -58,11 +63,27 @@ fun DataTableComponent(
                 quadrantTopRight = visualization.quadrantTopRight,
                 quadrantTopLeft = visualization.quadrantTopLeft,
                 quadrantBottomLeft = visualization.quadrantBottomLeft,
-                quadrantBottomRight = visualization.quadrantBottomRight
+                quadrantBottomRight = visualization.quadrantBottomRight,
+                subject = visualization.subject,
+                onTeamClick = onTeamClick,
+                highlightedTeamCodes = highlightedTeamCodes,
+                highlightedPlayerLabels = highlightedPlayerLabels
             )
-            is BarGraphVisualization -> BarDataTable(visualization.dataPoints)
-            is LineChartVisualization -> LineDataTable(visualization.series)
-            is TableVisualization -> GenericDataTable(visualization.dataPoints)
+            is BarGraphVisualization -> BarDataTable(
+                data = visualization.dataPoints,
+                onTeamClick = onTeamClick,
+                highlightedTeamCodes = highlightedTeamCodes
+            )
+            is LineChartVisualization -> LineDataTable(
+                series = visualization.series,
+                onTeamClick = onTeamClick,
+                highlightedTeamCodes = highlightedTeamCodes
+            )
+            is TableVisualization -> GenericDataTable(
+                data = visualization.dataPoints,
+                onTeamClick = onTeamClick,
+                highlightedTeamCodes = highlightedTeamCodes
+            )
             is MatchupVisualization -> MatchupReportCards(visualization.dataPoints)
         }
     }
@@ -83,11 +104,15 @@ private fun ScatterDataTable(
     quadrantTopRight: QuadrantConfig? = null,
     quadrantTopLeft: QuadrantConfig? = null,
     quadrantBottomLeft: QuadrantConfig? = null,
-    quadrantBottomRight: QuadrantConfig? = null
+    quadrantBottomRight: QuadrantConfig? = null,
+    subject: String? = null,
+    onTeamClick: (String) -> Unit = {},
+    highlightedTeamCodes: Set<String> = emptySet(),
+    highlightedPlayerLabels: Set<String> = emptySet()
 ) {
     val horizontalScrollState = rememberScrollState()
 
-    // Calculate averages for quadrant determination
+    // Calculate averages for quadrant determination (using all data)
     val avgX = data.map { it.x }.average()
     val avgY = data.map { it.y }.average()
 
@@ -145,15 +170,39 @@ private fun ScatterDataTable(
             val score = if (invertYAxis) point.x - point.y else point.sum
             val quadrantColor = getQuadrantColor(point)
 
+            // Check if this team is highlighted
+            // For TEAM scatter plots, extract team code from label (first word)
+            // For PLAYER scatter plots, use the teamCode property
+            // Check if this row should be highlighted
+            val isHighlighted = when {
+                // If player labels are selected, check if this player is in the set
+                highlightedPlayerLabels.isNotEmpty() -> {
+                    highlightedPlayerLabels.contains(point.label)
+                }
+                // For team-based highlighting, extract and check team code
+                highlightedTeamCodes.isNotEmpty() -> {
+                    val teamCode = if (subject == "TEAM") {
+                        point.label.split(" ").firstOrNull() ?: ""
+                    } else {
+                        point.teamCode ?: ""
+                    }
+                    highlightedTeamCodes.contains(teamCode)
+                }
+                else -> false
+            }
+
             Row(
                 modifier = Modifier.padding(vertical = 8.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 TableCell((index + 1).toString(), 40.dp)
-                // Team name with colored dot
+                // Team name with colored dot (clickable)
                 Row(
-                    modifier = Modifier.width(130.dp),
+                    modifier = Modifier
+                        .width(130.dp)
+                        .clickable { onTeamClick(point.label) }
+                        .padding(vertical = 4.dp),
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -166,6 +215,7 @@ private fun ScatterDataTable(
                         text = point.label,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontWeight = if (isHighlighted) FontWeight.Bold else FontWeight.Normal,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -183,7 +233,11 @@ private fun ScatterDataTable(
 }
 
 @Composable
-private fun BarDataTable(data: List<BarGraphDataPoint>) {
+private fun BarDataTable(
+    data: List<BarGraphDataPoint>,
+    onTeamClick: (String) -> Unit = {},
+    highlightedTeamCodes: Set<String> = emptySet()
+) {
     val horizontalScrollState = rememberScrollState()
 
     Column(
@@ -208,12 +262,27 @@ private fun BarDataTable(data: List<BarGraphDataPoint>) {
 
         // Data rows sorted by value (descending)
         data.sortedByDescending { it.value }.forEachIndexed { index, point ->
+            val teamCode = point.label.split(" ").firstOrNull() ?: ""
+            val isHighlighted = highlightedTeamCodes.contains(teamCode)
+
             Row(
                 modifier = Modifier.padding(vertical = 8.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 TableCell((index + 1).toString(), 40.dp)
-                TableCell(point.label, 120.dp)
+                // Clickable team name
+                Text(
+                    text = point.label,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontWeight = if (isHighlighted) FontWeight.Bold else FontWeight.Normal,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier
+                        .width(120.dp)
+                        .clickable { onTeamClick(point.label) }
+                        .padding(vertical = 4.dp)
+                )
                 TableCell(point.value.formatTo(1), 100.dp)
             }
             HorizontalDivider(
@@ -225,7 +294,11 @@ private fun BarDataTable(data: List<BarGraphDataPoint>) {
 }
 
 @Composable
-private fun LineDataTable(series: List<LineChartSeries>) {
+private fun LineDataTable(
+    series: List<LineChartSeries>,
+    onTeamClick: (String) -> Unit = {},
+    highlightedTeamCodes: Set<String> = emptySet()
+) {
     val horizontalScrollState = rememberScrollState()
 
     Column(
@@ -233,14 +306,28 @@ private fun LineDataTable(series: List<LineChartSeries>) {
             .fillMaxWidth()
             .horizontalScroll(horizontalScrollState)
     ) {
-        // Header - show series names
+        // Header - show series names (clickable)
         Row(
             modifier = Modifier.padding(vertical = 8.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             TableHeader("Week/Game", 80.dp)
             series.forEach { s ->
-                TableHeader(s.label, 100.dp)
+                val teamCode = s.label.split(" ").firstOrNull() ?: ""
+                val isHighlighted = highlightedTeamCodes.contains(teamCode)
+
+                Text(
+                    text = s.label,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onBackground,
+                    fontWeight = if (isHighlighted) FontWeight.Bold else FontWeight.Normal,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier
+                        .width(100.dp)
+                        .clickable { onTeamClick(s.label) }
+                        .padding(vertical = 4.dp)
+                )
             }
         }
 
@@ -310,7 +397,11 @@ private fun TableCell(text: String, width: androidx.compose.ui.unit.Dp) {
  * Uses synchronized scroll states for smooth scrolling experience.
  */
 @Composable
-private fun GenericDataTable(data: List<TableDataPoint>) {
+private fun GenericDataTable(
+    data: List<TableDataPoint>,
+    onTeamClick: (String) -> Unit = {},
+    highlightedTeamCodes: Set<String> = emptySet()
+) {
     if (data.isEmpty()) {
         Text("No data available", modifier = Modifier.padding(8.dp))
         return
@@ -447,19 +538,36 @@ private fun GenericDataTable(data: List<TableDataPoint>) {
                     .background(backgroundColor)
             ) {
                 data.forEach { point ->
-                    Box(
+                    val teamCode = point.label.split(" ").firstOrNull() ?: ""
+                    val isHighlighted = highlightedTeamCodes.contains(teamCode)
+
+                    Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(rowHeight),
-                        contentAlignment = Alignment.CenterStart
+                            .height(rowHeight)
+                            .clickable { onTeamClick(point.label) }
+                            .background(backgroundColor)
+                            .padding(horizontal = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
+                        if (isHighlighted) {
+                            Box(
+                                modifier = Modifier
+                                    .size(6.dp)
+                                    .background(
+                                        color = MaterialTheme.colorScheme.primary,
+                                        shape = CircleShape
+                                    )
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                        }
                         Text(
                             text = point.label,
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontWeight = if (isHighlighted) FontWeight.Bold else FontWeight.Normal,
                             maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.padding(horizontal = 8.dp)
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
                     HorizontalDivider(color = dividerColor, thickness = 0.5.dp)

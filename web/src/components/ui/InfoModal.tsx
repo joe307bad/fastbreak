@@ -30,9 +30,18 @@ export function InfoModal() {
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
         </svg>
       </button>
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={() => setOpen(false)}>
-        <div className="bg-[var(--card)] border border-[var(--border)] rounded-lg max-w-xl w-full p-6" onClick={e => e.stopPropagation()}>
-          <h2 className="text-xl font-bold mb-4">fastbreak</h2>
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 overflow-y-auto" onClick={() => setOpen(false)}>
+        <div className="bg-[var(--card)] border border-[var(--border)] rounded-lg max-w-xl w-full my-auto p-6 relative" onClick={e => e.stopPropagation()}>
+          <button
+            onClick={() => setOpen(false)}
+            className="absolute top-4 right-4 p-1 hover:bg-[var(--border)] rounded transition-colors"
+            aria-label="Close"
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+          <h2 className="text-xl font-bold mb-4 pr-8">fastbreak</h2>
 
           <p className="text-[var(--muted)] text-sm mb-4">
             A fast dashboard that highlights advanced sports statistics across multiple leagues. Built to be fast, free, and packed with interactive charts that work great on mobile.

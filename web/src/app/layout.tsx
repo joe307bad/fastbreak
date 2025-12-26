@@ -11,6 +11,17 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "fastbreak",
   description: "Fast sports analytics dashboard",
+  openGraph: {
+    title: "fastbreak",
+    description: "Fast sports analytics dashboard",
+    images: ["/og-image.png"],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "fastbreak",
+    description: "Fast sports analytics dashboard",
+    images: ["/og-image.png"],
+  },
 };
 
 export default function RootLayout({

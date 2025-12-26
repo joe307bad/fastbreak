@@ -12,6 +12,7 @@ interface NodeData {
   y: number;
   label?: string;
   teamCode?: string;
+  originalY?: number;
 }
 
 interface Quadrants {
@@ -26,11 +27,10 @@ function getQuadrantColor(
   y: number,
   xMid: number,
   yMid: number,
-  invertY: boolean,
   quadrants: Quadrants
 ): string {
   const isHighX = x >= xMid;
-  const isHighY = invertY ? y <= yMid : y >= yMid;
+  const isHighY = y >= yMid;
 
   if (isHighX && isHighY) return quadrants.topRight?.color || '#888';
   if (!isHighX && isHighY) return quadrants.topLeft?.color || '#888';
@@ -41,14 +41,13 @@ function getQuadrantColor(
 function createNodesLayer(
   xMid: number,
   yMid: number,
-  invertY: boolean,
   quadrants: Quadrants
 ) {
   return function NodesLayer({ nodes }: ScatterPlotLayerProps<NodeData>) {
     return (
       <g>
         {nodes.map(node => {
-          const color = getQuadrantColor(node.data.x, node.data.y, xMid, yMid, invertY, quadrants);
+          const color = getQuadrantColor(node.data.x, node.data.y, xMid, yMid, quadrants);
           return (
             <circle
               key={node.id}
@@ -110,50 +109,56 @@ function createLabelsLayer(subject?: string) {
 function createQuadrantLayer(
   xMid: number,
   yMid: number,
-  invertY: boolean,
   quadrants: Quadrants
 ) {
   return function QuadrantLayer({ xScale, yScale, innerWidth, innerHeight }: ScatterPlotLayerProps<NodeData>) {
     const xMidPx = xScale(xMid);
     const yMidPx = yScale(yMid);
 
+    // Map screen regions to quadrants
+    // Screen coordinates: y=0 is top, y=innerHeight is bottom
+    // Top of screen = high Y values, bottom of screen = low Y values
     const regions = [
       {
+        // Top-right region of screen (x > xMidPx, y < yMidPx)
         x: xMidPx,
         y: 0,
         width: innerWidth - xMidPx,
         height: yMidPx,
-        quadrant: invertY ? quadrants.topRight : quadrants.topLeft,
+        quadrant: quadrants.topRight,
         labelX: innerWidth - 8,
         labelY: 16,
         anchor: 'end' as const,
       },
       {
+        // Top-left region of screen (x < xMidPx, y < yMidPx)
         x: 0,
         y: 0,
         width: xMidPx,
         height: yMidPx,
-        quadrant: invertY ? quadrants.topLeft : quadrants.bottomLeft,
+        quadrant: quadrants.topLeft,
         labelX: 8,
         labelY: 16,
         anchor: 'start' as const,
       },
       {
+        // Bottom-left region of screen (x < xMidPx, y > yMidPx)
         x: 0,
         y: yMidPx,
         width: xMidPx,
         height: innerHeight - yMidPx,
-        quadrant: invertY ? quadrants.bottomLeft : quadrants.topLeft,
+        quadrant: quadrants.bottomLeft,
         labelX: 8,
         labelY: innerHeight - 8,
         anchor: 'start' as const,
       },
       {
+        // Bottom-right region of screen (x > xMidPx, y > yMidPx)
         x: xMidPx,
         y: yMidPx,
         width: innerWidth - xMidPx,
         height: innerHeight - yMidPx,
-        quadrant: invertY ? quadrants.bottomRight : quadrants.topRight,
+        quadrant: quadrants.bottomRight,
         labelX: innerWidth - 8,
         labelY: innerHeight - 8,
         anchor: 'end' as const,
@@ -198,20 +203,22 @@ function createQuadrantLayer(
 }
 
 export function ScatterPlot({ data }: Props) {
+  // If invertYAxis is true, multiply y values by -1
   const chartData = [{
     id: data.subject || 'data',
     data: data.dataPoints.map(p => ({
       x: p.x,
-      y: p.y,
+      y: data.invertYAxis ? p.y * -1 : p.y,
       label: p.label,
       teamCode: p.teamCode,
+      originalY: p.y, // Keep original for tooltip
     })),
   }];
 
   const xValues = data.dataPoints.map(p => p.x);
-  const yValues = data.dataPoints.map(p => p.y);
-  const xMid = (Math.min(...xValues) + Math.max(...xValues)) / 2;
-  const yMid = (Math.min(...yValues) + Math.max(...yValues)) / 2;
+  const yValues = data.dataPoints.map(p => data.invertYAxis ? p.y * -1 : p.y);
+  const xMid = xValues.reduce((sum, val) => sum + val, 0) / xValues.length;
+  const yMid = yValues.reduce((sum, val) => sum + val, 0) / yValues.length;
 
   const quadrants: Quadrants = {
     topRight: data.quadrantTopRight,
@@ -220,8 +227,8 @@ export function ScatterPlot({ data }: Props) {
     bottomRight: data.quadrantBottomRight,
   };
 
-  const QuadrantLayer = createQuadrantLayer(xMid, yMid, data.invertYAxis || false, quadrants);
-  const NodesLayer = createNodesLayer(xMid, yMid, data.invertYAxis || false, quadrants);
+  const QuadrantLayer = createQuadrantLayer(xMid, yMid, quadrants);
+  const NodesLayer = createNodesLayer(xMid, yMid, quadrants);
   const LabelsLayer = createLabelsLayer(data.subject);
 
   return (
@@ -230,7 +237,7 @@ export function ScatterPlot({ data }: Props) {
         data={chartData}
         margin={{ top: 20, right: 20, bottom: 60, left: 70 }}
         xScale={{ type: 'linear', min: 'auto', max: 'auto' }}
-        yScale={{ type: 'linear', min: 'auto', max: 'auto', reverse: data.invertYAxis }}
+        yScale={{ type: 'linear', min: 'auto', max: 'auto' }}
         axisBottom={{
           tickSize: 0,
           tickPadding: 8,

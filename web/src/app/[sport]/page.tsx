@@ -65,7 +65,29 @@ export default async function SportPage({ params }: Props) {
               <div className="text-xs text-[var(--muted)] uppercase tracking-wider">
                 {data.visualizationType.replace('_', ' ')}
               </div>
-              <h3 className="text-sm font-bold mt-1">{data.title}</h3>
+              <div className="flex items-center justify-between mt-1">
+                <h3 className="text-sm font-bold">{data.title}</h3>
+                {data.description && (
+                  <div className="group relative">
+                    <svg
+                      className="w-4 h-4 text-[var(--muted)] hover:text-[var(--foreground)] transition-colors cursor-help"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                      />
+                    </svg>
+                    <div className="invisible group-hover:visible absolute right-0 top-6 z-10 w-64 p-3 bg-[var(--card)] border border-[var(--border)] rounded shadow-lg text-xs text-[var(--foreground)] font-normal">
+                      {data.description}
+                    </div>
+                  </div>
+                )}
+              </div>
             </header>
 
             <div className="h-[300px] md:h-[350px]">

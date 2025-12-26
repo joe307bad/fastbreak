@@ -1,7 +1,11 @@
 import type { MDXComponents } from "mdx/types";
+import { PlatformLinks } from "./src/components/ui/PlatformLinks";
+import { IntroScreenshots } from "./src/components/ui/IntroScreenshots";
 
 export function useMDXComponents(components: MDXComponents): MDXComponents {
   return {
+    PlatformLinks,
+    IntroScreenshots,
     h1: ({ children }) => (
       <h1 className="text-2xl font-bold mb-4">{children}</h1>
     ),

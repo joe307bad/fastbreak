@@ -31,6 +31,26 @@ export function BarChart({ data }: Props) {
           tickSize: 0,
           tickPadding: 8,
           tickRotation: -45,
+          renderTick: (tick) => {
+            const isEven = tick.tickIndex % 2 === 0;
+            return (
+              <g transform={`translate(${tick.x},${tick.y + (isEven ? 0 : 12)})`}>
+                <text
+                  textAnchor="end"
+                  dominantBaseline="central"
+                  transform="rotate(-45)"
+                  style={{
+                    fontFamily: 'var(--font-geist-mono), monospace',
+                    fontSize: 8,
+                    fontWeight: 600,
+                    fill: 'var(--foreground)',
+                  }}
+                >
+                  {tick.value}
+                </text>
+              </g>
+            );
+          },
         }}
         axisLeft={{
           tickSize: 0,

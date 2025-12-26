@@ -1,26 +1,45 @@
 ---
-title: "Introducing Fastbreak"
+title: "Introducing fastbreak"
 date: "2025-12-24"
 description: "The fastest sports analytics dashboard on the planet."
 author: "Joe Badaczewski"
 authorUrl: "https://joebad.com"
 ---
 
-We're excited to launch fastbreak, a new way to explore sports analytics.
+Fastbreak is a dashboard that highlights advanced sports statistics across multiple leagues. I built it to be fast, free, and interactive. This early development version accomplishes those goals, and I've been using it daily for a few weeks now.
 
-## Why fastbreak?
+Help me beta test it today:
 
-Sports data is everywhere, but it's often locked behind paywalls, buried in clunky interfaces, or just plain slow. We built fastbreak to fix that.
+<PlatformLinks />
 
-## What makes us different
+<IntroScreenshots />
 
-- **Fast** - Pages load instantly with static generation
-- **Cross-platform** - Web, iOS, and Android
-- **Free** - No subscriptions, no ads
-- **Interactive** - Explore data your way
+Beyond these core goals, fastbreak has several other focal points:
 
-## What's next
+### Conversation starter
 
-We're just getting started. Expect more sports, more charts, and more ways to dig into the data you care about.
+I want an app that gives me the tools to contribute meaningfully to sports conversations. Too often, I form opinions from talking heads on TV or podcasts. These folks have access to advanced tools that are only available to the media. Fastbreak can be a gateway to deeper, more informed, stat driven conversations about sports amongst fans.
 
-Join us on [Discord](https://discord.gg/KtqmASc6jn) to share feedback and help shape the future of fastbreak.
+### Fast and free
+
+Fastbreak delivers sports information to any device as quickly as possible, without ads or cost. We already deliver a lot of information and we're planning on adding much more. As fastbreak grows, speed will always be a paramount priority. I'll write more technical blog posts about fastbreak's architecture, but the high-level approach for this first iteration is to lean heavily on statically generated content delivered via CDN.
+
+### Interactivity and simplicity
+
+Fastbreak is full of interactivity so you can manipulate the data and charts on the dashboard. But almost as important as interactivity is simplicity. Fastbreak should be easy to use and understand. We want more people talking about advanced analytics, so the tools need to be accessible to beginners.
+
+### Cross platform and mobile first
+
+To reach as many users as possible, fastbreak is committed to being available on the most popular platforms. The initial version includes a web dashboard and native iOS and Android applications. There are many layers to achieving true cross-platform development with maximum code sharing—fastbreak makes trade-offs at certain layers but remains committed to those three platforms. How we build cross-platform applications will be a major technical topic for future dev logs.
+
+### Offline first architecture
+
+When I use a mobile app, I don't want it to be non-functional if I lose internet connection. Fastbreak will always work as long as you download the charts once when opening the app. Updates obviously need an internet connection, but the native iOS and Android apps are built to download all the latest data and cache it until the next update.
+
+### Source available and contributors welcome
+
+Fastbreak isn't technically open source since you can't take the code and make a profit off of it, but I am building it in public on [GitHub](https://github.com/joe307bad/fastbreak). I would love to have people contribute code, charts, ideas, and critical feedback.
+
+### Join the community
+
+I'd love to hear your feedback and ideas! Join the [Discord server](https://discord.gg/KtqmASc6jn) to chat with other users, share feature requests, or just talk sports.

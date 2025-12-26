@@ -35,13 +35,13 @@ export function InfoModal() {
           <h2 className="text-xl font-bold mb-4">fastbreak</h2>
 
           <p className="text-[var(--muted)] text-sm mb-4">
-            fastbreak is the fastest sports analytics dashboard on the planet.
+            A fast dashboard that highlights advanced sports statistics across multiple leagues. Built to be fast, free, and packed with interactive charts that work great on mobile.
           </p>
-          <ul className="text-[var(--muted)] text-sm mb-6 space-y-1">
-            <li>1. Makes sports analytics accessible and cross platform</li>
-            <li>2. Provides interactive visualizations</li>
-            <li>3. Loads fast</li>
-            <li>4. Free and no ads</li>
+          <ul className="text-[var(--muted)] text-sm mb-6 space-y-2">
+            <li><strong>Fast & Free</strong> - No ads, delivered via CDN</li>
+            <li><strong>Interactive & Simple</strong> - Accessible to beginners</li>
+            <li><strong>Cross-Platform</strong> - Web, iOS, and Android</li>
+            <li><strong>Offline-First</strong> - Native mobile apps work without internet connection</li>
           </ul>
 
           <div className="space-y-3 mb-6">

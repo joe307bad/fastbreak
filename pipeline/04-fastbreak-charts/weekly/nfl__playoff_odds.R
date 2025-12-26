@@ -147,8 +147,13 @@ if (ncol(playoff_data) >= 10) {
 cleaned_data <- cleaned_data %>%
   filter(!is.na(team) & team != "" & !grepl("^\\s*$", team)) %>%
   filter(!grepl("^Team$|^Conference$|^Division$", team, ignore.case = TRUE)) %>%
-  mutate(team_abbr = team_name_to_abbr[team]) %>%
-  mutate(team_abbr = ifelse(is.na(team_abbr), team, team_abbr)) %>%  # Fallback to original if not found
+  mutate(
+    # Clean up team names - remove "Forty-Niners" prefix and just keep "49ers"
+    team_clean = gsub("Forty-Niners", "", team),
+    team_clean = trimws(team_clean)
+  ) %>%
+  mutate(team_abbr = team_name_to_abbr[team_clean]) %>%
+  mutate(team_abbr = ifelse(is.na(team_abbr), team_clean, team_abbr)) %>%  # Fallback to cleaned team name if not found
   left_join(teams_info, by = "team_abbr") %>%
   arrange(desc(make_playoffs))
 

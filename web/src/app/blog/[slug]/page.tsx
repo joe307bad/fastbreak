@@ -26,6 +26,17 @@ export async function generateMetadata({ params }: Props) {
   return {
     title: `${post.title} | fastbreak`,
     description: post.description,
+    openGraph: {
+      title: `${post.title} | fastbreak`,
+      description: post.description,
+      images: ["/og-image.png"],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: `${post.title} | fastbreak`,
+      description: post.description,
+      images: ["/og-image.png"],
+    },
   };
 }
 

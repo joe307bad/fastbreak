@@ -7,7 +7,7 @@ const SPORTS = ['nfl', 'nba', 'nhl'] as const;
 
 export function SportTabs() {
   const pathname = usePathname();
-  const currentSport = pathname.split('/')[1]?.toLowerCase();
+  const currentSport = pathname.split('/')[1]?.toLowerCase() || 'nfl';
 
   return (
     <nav className="mb-4">

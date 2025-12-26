@@ -6,6 +6,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -28,6 +29,8 @@ fun DataVizScreen(
     var state by remember { mutableStateOf<DataVizState>(DataVizState.Loading) }
     var refreshTrigger by remember { mutableStateOf(0) }
     val scope = rememberCoroutineScope()
+    val sheetState = rememberModalBottomSheetState()
+    var showInfoSheet by remember { mutableStateOf(false) }
 
     // Observe registry state for sync failures
     val registryState by component.registryContainer.container.stateFlow.collectAsState()
@@ -84,6 +87,15 @@ fun DataVizScreen(
                     }
                 },
                 actions = {
+                    // Show info icon only when data is loaded and has a description
+                    if (state is DataVizState.Success && (state as DataVizState.Success).data.description.isNotEmpty()) {
+                        IconButton(onClick = { showInfoSheet = true }) {
+                            Icon(
+                                imageVector = Icons.Default.Info,
+                                contentDescription = "Chart Info"
+                            )
+                        }
+                    }
                     IconButton(onClick = component.onNavigateBack) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
@@ -151,6 +163,33 @@ fun DataVizScreen(
                             }
                         }
                     }
+                )
+            }
+        }
+    }
+
+    // Bottom sheet for chart description
+    if (showInfoSheet && state is DataVizState.Success) {
+        val visualization = (state as DataVizState.Success).data
+        ModalBottomSheet(
+            onDismissRequest = { showInfoSheet = false },
+            sheetState = sheetState
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp)
+                    .padding(bottom = 32.dp)
+            ) {
+                Text(
+                    text = visualization.title,
+                    style = MaterialTheme.typography.titleLarge,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+                Text(
+                    text = visualization.description,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }

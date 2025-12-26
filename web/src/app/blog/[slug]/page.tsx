@@ -23,19 +23,21 @@ export async function generateMetadata({ params }: Props) {
     return { title: "Not Found | fastbreak" };
   }
 
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://fastbreak.joebad.com";
+
   return {
     title: `${post.title} | fastbreak`,
     description: post.description,
     openGraph: {
       title: `${post.title} | fastbreak`,
       description: post.description,
-      images: ["/og-image.png"],
+      images: [`${siteUrl}/og-image.png`],
     },
     twitter: {
       card: "summary_large_image",
       title: `${post.title} | fastbreak`,
       description: post.description,
-      images: ["/og-image.png"],
+      images: [`${siteUrl}/og-image.png`],
     },
   };
 }

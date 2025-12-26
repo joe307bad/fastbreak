@@ -8,19 +8,22 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://fastbreak.joebad.com";
+
 export const metadata: Metadata = {
+  metadataBase: new URL(siteUrl),
   title: "fastbreak",
   description: "Fast sports analytics dashboard",
   openGraph: {
     title: "fastbreak",
     description: "Fast sports analytics dashboard",
-    images: ["/og-image.png"],
+    images: [`${siteUrl}/og-image.png`],
   },
   twitter: {
     card: "summary_large_image",
     title: "fastbreak",
     description: "Fast sports analytics dashboard",
-    images: ["/og-image.png"],
+    images: [`${siteUrl}/og-image.png`],
   },
 };
 

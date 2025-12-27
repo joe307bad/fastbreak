@@ -3,9 +3,22 @@ import { getAllPosts } from "@/lib/blog";
 
 export const dynamic = "force-static";
 
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://fastbreak.joebad.com";
+
 export const metadata = {
-  title: "Blog | fastbreak",
+  title: "Blog",
   description: "Updates and insights from the fastbreak team",
+  openGraph: {
+    title: "Blog",
+    description: "Updates and insights from the fastbreak team",
+    images: [`${siteUrl}/og-image.png`],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Blog",
+    description: "Updates and insights from the fastbreak team",
+    images: [`${siteUrl}/og-image.png`],
+  },
 };
 
 export default function BlogPage() {

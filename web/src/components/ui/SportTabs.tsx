@@ -10,7 +10,7 @@ export function SportTabs() {
   const currentSport = pathname.split('/')[1]?.toLowerCase() || 'nfl';
 
   return (
-    <nav className="mb-4">
+    <nav className="mb-2 md:mb-4">
       <div className="flex gap-0">
         {SPORTS.map(sport => {
           const isActive = currentSport === sport;
@@ -18,7 +18,7 @@ export function SportTabs() {
             <Link
               key={sport}
               href={`/${sport}`}
-              className={`px-6 py-3 text-sm font-bold uppercase tracking-wider border-b-2 transition-colors ${
+              className={`px-3 md:px-6 py-2 md:py-3 text-sm font-bold uppercase tracking-wider border-b-2 transition-colors ${
                 isActive
                   ? 'border-[var(--foreground)] text-[var(--foreground)]'
                   : 'border-transparent text-[var(--muted)] hover:text-[var(--foreground)]'

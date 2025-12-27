@@ -8,7 +8,7 @@ import { InfoModal } from './InfoModal';
 export function Header() {
   return (
     <header className="sticky top-0 z-40 bg-[var(--background)]">
-      <div className="max-w-7xl mx-auto px-4 h-10 flex items-center justify-between">
+      <div className="max-w-7xl mx-auto px-2 md:px-4 h-10 flex items-center justify-between">
         <Link href="/" className="flex items-center gap-2">
           <Image src="/logo.png" alt="Fastbreak" width={28} height={28} />
           <span className="font-bold text-lg">fastbreak</span>

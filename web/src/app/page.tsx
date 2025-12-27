@@ -36,14 +36,14 @@ export default async function Home() {
   ) as { key: string; data: MatchupData }[];
 
   return (
-    <main className="max-w-7xl mx-auto px-4">
+    <main className="max-w-7xl mx-auto px-0 md:px-4">
       <SportTabs />
 
-      <div className="grid gap-4 md:gap-6 grid-cols-1 lg:grid-cols-2">
+      <div className="grid gap-2 md:gap-6 grid-cols-1 lg:grid-cols-2">
         {charts.map(({ key, data }) => (
           <article
             key={key}
-            className="border border-[var(--border)] bg-[var(--card)] rounded p-4"
+            className="border border-[var(--border)] bg-[var(--card)] rounded-none md:rounded p-2 md:p-4"
           >
             <header className="mb-3">
               <div className="text-xs text-[var(--muted)] uppercase tracking-wider">

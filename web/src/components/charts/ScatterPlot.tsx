@@ -2,6 +2,7 @@
 
 import { ResponsiveScatterPlot, ScatterPlotLayerProps } from '@nivo/scatterplot';
 import { ScatterPlotData, QuadrantConfig } from '@/types/chart';
+import { useState, useEffect } from 'react';
 
 interface Props {
   data: ScatterPlotData;
@@ -12,7 +13,7 @@ interface NodeData {
   y: number;
   label?: string;
   teamCode?: string;
-  originalY?: number;
+  isOutlier?: boolean;
 }
 
 interface Quadrants {
@@ -41,22 +42,33 @@ function getQuadrantColor(
 function createNodesLayer(
   xMid: number,
   yMid: number,
-  quadrants: Quadrants
+  quadrants: Quadrants,
+  isMobile: boolean
 ) {
   return function NodesLayer({ nodes }: ScatterPlotLayerProps<NodeData>) {
     return (
       <g>
         {nodes.map(node => {
           const color = getQuadrantColor(node.data.x, node.data.y, xMid, yMid, quadrants);
+          const isOutlier = node.data.isOutlier || false;
+
+          // Outliers get larger radius and thicker stroke
+          const radius = isOutlier ? 8 : 6;
+          const strokeWidth = isOutlier ? 2.5 : 1.5;
+          // On mobile, non-outliers are transparent; on desktop, all points are fully visible
+          const fillOpacity = isMobile ? (isOutlier ? 1 : 0.15) : 1;
+
           return (
             <circle
               key={node.id}
               cx={node.x}
               cy={node.y}
-              r={6}
+              r={radius}
               fill={color}
+              fillOpacity={fillOpacity}
               stroke="var(--background)"
-              strokeWidth={1.5}
+              strokeWidth={strokeWidth}
+              strokeOpacity={fillOpacity}
             />
           );
         })}
@@ -65,12 +77,15 @@ function createNodesLayer(
   };
 }
 
-function createLabelsLayer(subject?: string) {
+function createLabelsLayer(subject?: string, isMobile?: boolean) {
   return function LabelsLayer({ nodes }: ScatterPlotLayerProps<NodeData>) {
     return (
       <g>
         {nodes.map(node => {
           const d = node.data;
+          // On mobile, only show labels for outliers; on desktop, show all labels
+          if (isMobile && !d.isOutlier) return null;
+
           const displayLabel = subject === 'PLAYER' ? (d.label || d.teamCode || '') : (d.teamCode || d.label || '');
           const labelWidth = displayLabel.length * 6 + 6;
           return (
@@ -115,12 +130,8 @@ function createQuadrantLayer(
     const xMidPx = xScale(xMid);
     const yMidPx = yScale(yMid);
 
-    // Map screen regions to quadrants
-    // Screen coordinates: y=0 is top, y=innerHeight is bottom
-    // Top of screen = high Y values, bottom of screen = low Y values
     const regions = [
       {
-        // Top-right region of screen (x > xMidPx, y < yMidPx)
         x: xMidPx,
         y: 0,
         width: innerWidth - xMidPx,
@@ -131,7 +142,6 @@ function createQuadrantLayer(
         anchor: 'end' as const,
       },
       {
-        // Top-left region of screen (x < xMidPx, y < yMidPx)
         x: 0,
         y: 0,
         width: xMidPx,
@@ -142,7 +152,6 @@ function createQuadrantLayer(
         anchor: 'start' as const,
       },
       {
-        // Bottom-left region of screen (x < xMidPx, y > yMidPx)
         x: 0,
         y: yMidPx,
         width: xMidPx,
@@ -153,7 +162,6 @@ function createQuadrantLayer(
         anchor: 'start' as const,
       },
       {
-        // Bottom-right region of screen (x > xMidPx, y > yMidPx)
         x: xMidPx,
         y: yMidPx,
         width: innerWidth - xMidPx,
@@ -203,22 +211,90 @@ function createQuadrantLayer(
 }
 
 export function ScatterPlot({ data }: Props) {
-  // If invertYAxis is true, multiply y values by -1
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  // Calculate means for both axes
+  const xValues = data.dataPoints.map(p => p.x);
+  const yValues = data.dataPoints.map(p => p.y);
+  const xMean = xValues.reduce((sum, val) => sum + val, 0) / xValues.length;
+  const yMean = yValues.reduce((sum, val) => sum + val, 0) / yValues.length;
+
+  // Identify outliers: top 3 points furthest from center in each quadrant
+  const outlierSet = new Set<string>();
+
+  if (data.dataPoints.length > 15) {
+    const quadrants = {
+      topRight: [] as Array<{ point: typeof data.dataPoints[0]; distance: number }>,
+      topLeft: [] as Array<{ point: typeof data.dataPoints[0]; distance: number }>,
+      bottomLeft: [] as Array<{ point: typeof data.dataPoints[0]; distance: number }>,
+      bottomRight: [] as Array<{ point: typeof data.dataPoints[0]; distance: number }>,
+    };
+
+    // Categorize points by quadrant and calculate distance from mean
+    data.dataPoints.forEach(point => {
+      const xDist = point.x - xMean;
+      const yDist = point.y - yMean;
+      const distance = Math.sqrt(xDist * xDist + yDist * yDist);
+
+      // For invertYAxis charts, flip the y comparison for quadrant categorization
+      const isHighX = point.x >= xMean;
+      const isHighY = data.invertYAxis ? point.y <= yMean : point.y >= yMean;
+
+      if (isHighX && isHighY) {
+        quadrants.topRight.push({ point, distance });
+      } else if (!isHighX && isHighY) {
+        quadrants.topLeft.push({ point, distance });
+      } else if (!isHighX && !isHighY) {
+        quadrants.bottomLeft.push({ point, distance });
+      } else {
+        quadrants.bottomRight.push({ point, distance });
+      }
+    });
+
+    // Get top 3 from each quadrant
+    Object.values(quadrants).forEach(quadrant => {
+      quadrant
+        .sort((a, b) => b.distance - a.distance)
+        .slice(0, 3)
+        .forEach(({ point }) => {
+          const id = `${point.x}-${point.y}`;
+          outlierSet.add(id);
+        });
+    });
+  }
+
+  // Prepare chart data with outlier flags
   const chartData = [{
     id: data.subject || 'data',
-    data: data.dataPoints.map(p => ({
-      x: p.x,
-      y: data.invertYAxis ? p.y * -1 : p.y,
-      label: p.label,
-      teamCode: p.teamCode,
-      originalY: p.y, // Keep original for tooltip
-    })),
+    data: data.dataPoints.map(p => {
+      const transformedY = data.invertYAxis ? p.y * -1 : p.y;
+      const pointId = `${p.x}-${p.y}`;
+      const isOutlier = outlierSet.has(pointId);
+
+      return {
+        x: p.x,
+        y: transformedY,
+        label: p.label,
+        teamCode: p.teamCode,
+        isOutlier,
+      };
+    }),
   }];
 
-  const xValues = data.dataPoints.map(p => p.x);
-  const yValues = data.dataPoints.map(p => data.invertYAxis ? p.y * -1 : p.y);
-  const xMid = xValues.reduce((sum, val) => sum + val, 0) / xValues.length;
-  const yMid = yValues.reduce((sum, val) => sum + val, 0) / yValues.length;
+  // Calculate midpoints for quadrant display (using transformed Y for visual consistency)
+  const transformedYValues = data.dataPoints.map(p => data.invertYAxis ? p.y * -1 : p.y);
+  const xMid = xMean;
+  const yMid = transformedYValues.reduce((sum, val) => sum + val, 0) / transformedYValues.length;
 
   const quadrants: Quadrants = {
     topRight: data.quadrantTopRight,
@@ -228,8 +304,8 @@ export function ScatterPlot({ data }: Props) {
   };
 
   const QuadrantLayer = createQuadrantLayer(xMid, yMid, quadrants);
-  const NodesLayer = createNodesLayer(xMid, yMid, quadrants);
-  const LabelsLayer = createLabelsLayer(data.subject);
+  const NodesLayer = createNodesLayer(xMid, yMid, quadrants, isMobile);
+  const LabelsLayer = createLabelsLayer(data.subject, isMobile);
 
   return (
     <div className="w-full h-full">

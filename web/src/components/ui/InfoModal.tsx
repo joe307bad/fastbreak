@@ -44,13 +44,13 @@ export function InfoModal() {
           <h2 className="text-xl font-bold mb-4 pr-8">fastbreak</h2>
 
           <p className="text-[var(--muted)] text-sm mb-4">
-            A fast dashboard that highlights advanced sports statistics across multiple leagues. Built to be fast, free, and packed with interactive charts that work great on mobile.
+            Fastbreak is a dashboard that highlights advanced sports statistics across multiple leagues. Fastbreak is built to be fast, free, and full of mobile-friendly, interactive charts.
           </p>
           <ul className="text-[var(--muted)] text-sm mb-6 space-y-2">
             <li><strong>Fast & Free</strong> - No ads, delivered via CDN</li>
             <li><strong>Interactive & Simple</strong> - Accessible to beginners</li>
             <li><strong>Cross-Platform</strong> - Web, iOS, and Android</li>
-            <li><strong>Offline-First</strong> - Native mobile apps work without internet connection</li>
+            <li><strong>Conversation starter</strong> - Talk ball with actual numbers</li>
           </ul>
 
           <div className="space-y-3 mb-6">
@@ -73,7 +73,7 @@ export function InfoModal() {
               className="flex items-center gap-3 p-3 border border-[var(--border)] rounded hover:bg-[var(--border)] transition-colors"
             >
               <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M17.523 2.78a.69.69 0 00-.49.19L13.03 6.97l-2.23-2.21a.68.68 0 00-.97 0L6.5 8.09l-4.39 8.24a.71.71 0 00.11.83.7.7 0 00.82.16l8.05-4.18 3.16 3.12a.68.68 0 00.97 0l2.24-2.21 4.03 3.98a.69.69 0 001.17-.49V3.47a.69.69 0 00-.69-.69h-4.44z"/>
+                <path d="M17.6 9.48l1.84-3.18c.16-.31.04-.69-.26-.85a.637.637 0 00-.83.22l-1.88 3.24a11.43 11.43 0 00-8.94 0L5.65 5.67a.643.643 0 00-.87-.2c-.28.18-.37.54-.22.83L6.4 9.48C3.3 11.25 1.28 14.44 1 18h22c-.28-3.56-2.3-6.75-5.4-8.52zM7 15.25a1.25 1.25 0 110-2.5 1.25 1.25 0 010 2.5zm10 0a1.25 1.25 0 110-2.5 1.25 1.25 0 010 2.5z"/>
               </svg>
               <span>Android (Beta - Join the Google Group)</span>
             </a>

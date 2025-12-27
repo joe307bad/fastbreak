@@ -20,22 +20,22 @@ export async function generateMetadata({ params }: Props) {
   const post = getPostBySlug(slug);
 
   if (!post) {
-    return { title: "Not Found | fastbreak" };
+    return { title: "Not Found" };
   }
 
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://fastbreak.joebad.com";
 
   return {
-    title: `${post.title} | fastbreak`,
+    title: post.title,
     description: post.description,
     openGraph: {
-      title: `${post.title} | fastbreak`,
+      title: post.title,
       description: post.description,
       images: [`${siteUrl}/og-image.png`],
     },
     twitter: {
       card: "summary_large_image",
-      title: `${post.title} | fastbreak`,
+      title: post.title,
       description: post.description,
       images: [`${siteUrl}/og-image.png`],
     },

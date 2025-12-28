@@ -47,8 +47,8 @@ ExecuteExternalTool /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeD
 
 ExecuteExternalTool /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang -v -E -dM -arch arm64 -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator18.2.sdk -x objective-c++ -c /dev/null
 
-Build description signature: d7047cc15476bfbde6844f0c71c85952
-Build description path: /Users/joebad/Library/Developer/Xcode/DerivedData/iosApp-ebymctczxilrbebggnnizxzxkyoh/Build/Intermediates.noindex/XCBuildData/d7047cc15476bfbde6844f0c71c85952.xcbuilddata
+Build description signature: 63f452662d72e35c3ad048c91b93ce8d
+Build description path: /Users/joebad/Library/Developer/Xcode/DerivedData/iosApp-ebymctczxilrbebggnnizxzxkyoh/Build/Intermediates.noindex/XCBuildData/63f452662d72e35c3ad048c91b93ce8d.xcbuilddata
 ClangStatCache /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang-stat-cache /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator18.2.sdk /Users/joebad/Library/Developer/Xcode/DerivedData/SDKStatCaches.noindex/iphonesimulator18.2-22C146-07b28473f605e47e75261259d3ef3b5a.sdkstatcache
     cd /Users/joebad/Source/fastbreak/kmp/iosApp
     /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang-stat-cache /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator18.2.sdk -o /Users/joebad/Library/Developer/Xcode/DerivedData/SDKStatCaches.noindex/iphonesimulator18.2-22C146-07b28473f605e47e75261259d3ef3b5a.sdkstatcache
@@ -434,7 +434,7 @@ PhaseScriptExecution Compile\ Kotlin\ Framework /Users/joebad/Library/Developer/
     export OTHER_SWIFT_FLAGS\=\ -D\ COCOAPODS
     export PACKAGE_TYPE\=com.apple.package-type.wrapper.application
     export PASCAL_STRINGS\=YES
-    export PATH\=/Applications/Xcode.app/Contents/SharedFrameworks/XCBuild.framework/Versions/A/PlugIns/XCBBuildService.bundle/Contents/PlugIns/XCBSpecifications.ideplugin/Contents/Resources:/Applications/Xcode.app/Contents/SharedFrameworks/XCBuild.framework/Versions/A/PlugIns/XCBBuildService.bundle/Contents/PlugIns/XCBSpecifications.ideplugin:/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin:/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/appleinternal/bin:/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/local/bin:/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/libexec:/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/usr/bin:/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/usr/appleinternal/bin:/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/usr/local/bin:/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/usr/bin:/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/usr/local/bin:/Applications/Xcode.app/Contents/Developer/usr/bin:/Applications/Xcode.app/Contents/Developer/usr/local/bin:/Users/joebad/.opencode/bin:/Applications/Docker.app/Contents/Resources/bin:/Users/joebad/.cabal/bin:/Users/joebad/.ghcup/bin:/Users/joebad/.nvm/versions/node/v23.6.1/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/Library/Apple/usr/bin:/usr/local/share/dotnet:/Users/joebad/.dotnet/tools:/Users/joebad/.local/bin:/Users/joebad/Library/Android/sdk/emulator:/Users/joebad/Library/Android/sdk/platform-tools
+    export PATH\=/Applications/Xcode.app/Contents/SharedFrameworks/XCBuild.framework/Versions/A/PlugIns/XCBBuildService.bundle/Contents/PlugIns/XCBSpecifications.ideplugin/Contents/Resources:/Applications/Xcode.app/Contents/SharedFrameworks/XCBuild.framework/Versions/A/PlugIns/XCBBuildService.bundle/Contents/PlugIns/XCBSpecifications.ideplugin:/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin:/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/appleinternal/bin:/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/local/bin:/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/libexec:/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/usr/bin:/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/usr/appleinternal/bin:/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/usr/local/bin:/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/usr/bin:/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/usr/local/bin:/Applications/Xcode.app/Contents/Developer/usr/bin:/Applications/Xcode.app/Contents/Developer/usr/local/bin:/Users/joebad/.opencode/bin:/Applications/Docker.app/Contents/Resources/bin:/Users/joebad/.cabal/bin:/Users/joebad/.ghcup/bin:/Users/joebad/.nvm/versions/node/v23.6.1/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/Library/Apple/usr/bin:/usr/local/share/dotnet:/Applications/Ghostty.app/Contents/MacOS:/Users/joebad/.local/bin:/Users/joebad/Library/Android/sdk/emulator:/Users/joebad/Library/Android/sdk/platform-tools
     export PATH_PREFIXES_EXCLUDED_FROM_HEADER_DEPENDENCIES\=/usr/include\ /usr/local/include\ /System/Library/Frameworks\ /System/Library/PrivateFrameworks\ /Applications/Xcode.app/Contents/Developer/Headers\ /Applications/Xcode.app/Contents/Developer/SDKs\ /Applications/Xcode.app/Contents/Developer/Platforms
     export PBDEVELOPMENTPLIST_PATH\=fastbreak.app/pbdevelopment.plist
     export PER_ARCH_OBJECT_FILE_DIR\=/Users/joebad/Library/Developer/Xcode/DerivedData/iosApp-ebymctczxilrbebggnnizxzxkyoh/Build/Intermediates.noindex/iosApp.build/Debug-iphonesimulator/iosApp.build/Objects-normal/undefined_arch
@@ -701,7 +701,7 @@ Type-safe project accessors is an incubating feature.
 > Task :shared:syncComposeResourcesForIos UP-TO-DATE
 > Task :shared:embedAndSignAppleFrameworkForXcode SKIPPED
 
-BUILD SUCCESSFUL in 551ms
+BUILD SUCCESSFUL in 493ms
 21 actionable tasks: 3 executed, 18 up-to-date
 
 Ld /Users/joebad/Library/Developer/Xcode/DerivedData/iosApp-ebymctczxilrbebggnnizxzxkyoh/Build/Products/Debug-iphonesimulator/fastbreak.app/fastbreak.debug.dylib normal (in target 'iosApp' from project 'iosApp')
@@ -727,31 +727,13 @@ ExtractAppIntentsMetadata (in target 'iosApp' from project 'iosApp')
     /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/appintentsmetadataprocessor --output /Users/joebad/Library/Developer/Xcode/DerivedData/iosApp-ebymctczxilrbebggnnizxzxkyoh/Build/Products/Debug-iphonesimulator/fastbreak.app --toolchain-dir /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain --module-name fastbreak --sdk-root /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator18.2.sdk --xcode-version 16C5032a --platform-family iOS --deployment-target 15.0 --bundle-identifier com.joebad.fastbreak --target-triple arm64-apple-ios15.0-simulator --binary-file /Users/joebad/Library/Developer/Xcode/DerivedData/iosApp-ebymctczxilrbebggnnizxzxkyoh/Build/Products/Debug-iphonesimulator/fastbreak.app/fastbreak --dependency-file /Users/joebad/Library/Developer/Xcode/DerivedData/iosApp-ebymctczxilrbebggnnizxzxkyoh/Build/Intermediates.noindex/iosApp.build/Debug-iphonesimulator/iosApp.build/Objects-normal/arm64/fastbreak_dependency_info.dat --stringsdata-file /Users/joebad/Library/Developer/Xcode/DerivedData/iosApp-ebymctczxilrbebggnnizxzxkyoh/Build/Intermediates.noindex/iosApp.build/Debug-iphonesimulator/iosApp.build/Objects-normal/arm64/ExtractedAppShortcutsMetadata.stringsdata --source-file-list /Users/joebad/Library/Developer/Xcode/DerivedData/iosApp-ebymctczxilrbebggnnizxzxkyoh/Build/Intermediates.noindex/iosApp.build/Debug-iphonesimulator/iosApp.build/Objects-normal/arm64/fastbreak.SwiftFileList --metadata-file-list /Users/joebad/Library/Developer/Xcode/DerivedData/iosApp-ebymctczxilrbebggnnizxzxkyoh/Build/Intermediates.noindex/iosApp.build/Debug-iphonesimulator/iosApp.build/fastbreak.DependencyMetadataFileList --swift-const-vals-list /Users/joebad/Library/Developer/Xcode/DerivedData/iosApp-ebymctczxilrbebggnnizxzxkyoh/Build/Intermediates.noindex/iosApp.build/Debug-iphonesimulator/iosApp.build/Objects-normal/arm64/fastbreak.SwiftConstValuesFileList --compile-time-extraction --deployment-aware-processing --validate-assistant-intents
 note: Metadata extraction skipped. No AppIntents.framework dependency found. (in target 'iosApp' from project 'iosApp')
 
-ProcessProductPackaging "" /Users/joebad/Library/Developer/Xcode/DerivedData/iosApp-ebymctczxilrbebggnnizxzxkyoh/Build/Intermediates.noindex/iosApp.build/Debug-iphonesimulator/fastbreakUITests.build/fastbreakUITests.xctest-Simulated.xcent (in target 'fastbreakUITests' from project 'iosApp')
-    cd /Users/joebad/Source/fastbreak/kmp/iosApp
-    
-    Entitlements:
-    
-    {
-    "application-identifier" = "4AJCFSNGAD.com.joebad.fastbreakUITests.xctrunner";
-    "keychain-access-groups" =     (
-        "4AJCFSNGAD.com.joebad.fastbreakUITests.xctrunner"
-    );
-}
-    
-    builtin-productPackagingUtility -entitlements -format xml -o /Users/joebad/Library/Developer/Xcode/DerivedData/iosApp-ebymctczxilrbebggnnizxzxkyoh/Build/Intermediates.noindex/iosApp.build/Debug-iphonesimulator/fastbreakUITests.build/fastbreakUITests.xctest-Simulated.xcent
-
-GenerateDSYMFile /Users/joebad/Library/Developer/Xcode/DerivedData/iosApp-ebymctczxilrbebggnnizxzxkyoh/Build/Products/Debug-iphonesimulator/fastbreak.app.dSYM /Users/joebad/Library/Developer/Xcode/DerivedData/iosApp-ebymctczxilrbebggnnizxzxkyoh/Build/Products/Debug-iphonesimulator/fastbreak.app/fastbreak (in target 'iosApp' from project 'iosApp')
-    cd /Users/joebad/Source/fastbreak/kmp/iosApp
-    /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/dsymutil -q /Users/joebad/Library/Developer/Xcode/DerivedData/iosApp-ebymctczxilrbebggnnizxzxkyoh/Build/Products/Debug-iphonesimulator/fastbreak.app/fastbreak -o /Users/joebad/Library/Developer/Xcode/DerivedData/iosApp-ebymctczxilrbebggnnizxzxkyoh/Build/Products/Debug-iphonesimulator/fastbreak.app.dSYM
-
 CopySwiftLibs /Users/joebad/Library/Developer/Xcode/DerivedData/iosApp-ebymctczxilrbebggnnizxzxkyoh/Build/Products/Debug-iphonesimulator/fastbreak.app (in target 'iosApp' from project 'iosApp')
     cd /Users/joebad/Source/fastbreak/kmp/iosApp
     builtin-swiftStdLibTool --copy --verbose --sign - --scan-executable /Users/joebad/Library/Developer/Xcode/DerivedData/iosApp-ebymctczxilrbebggnnizxzxkyoh/Build/Products/Debug-iphonesimulator/fastbreak.app/fastbreak.debug.dylib --scan-folder /Users/joebad/Library/Developer/Xcode/DerivedData/iosApp-ebymctczxilrbebggnnizxzxkyoh/Build/Products/Debug-iphonesimulator/fastbreak.app/Frameworks --scan-folder /Users/joebad/Library/Developer/Xcode/DerivedData/iosApp-ebymctczxilrbebggnnizxzxkyoh/Build/Products/Debug-iphonesimulator/fastbreak.app/PlugIns --scan-folder /Users/joebad/Library/Developer/Xcode/DerivedData/iosApp-ebymctczxilrbebggnnizxzxkyoh/Build/Products/Debug-iphonesimulator/fastbreak.app/SystemExtensions --scan-folder /Users/joebad/Library/Developer/Xcode/DerivedData/iosApp-ebymctczxilrbebggnnizxzxkyoh/Build/Products/Debug-iphonesimulator/fastbreak.app/Extensions --scan-folder /Users/joebad/Library/Developer/Xcode/DerivedData/iosApp-ebymctczxilrbebggnnizxzxkyoh/Build/Products/Debug-iphonesimulator/Pods_iosApp.framework --platform iphonesimulator --toolchain /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain --destination /Users/joebad/Library/Developer/Xcode/DerivedData/iosApp-ebymctczxilrbebggnnizxzxkyoh/Build/Products/Debug-iphonesimulator/fastbreak.app/Frameworks --strip-bitcode --strip-bitcode-tool /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/bitcode_strip --emit-dependency-info /Users/joebad/Library/Developer/Xcode/DerivedData/iosApp-ebymctczxilrbebggnnizxzxkyoh/Build/Intermediates.noindex/iosApp.build/Debug-iphonesimulator/iosApp.build/SwiftStdLibToolInputDependencies.dep --filter-for-swift-os
 
-ProcessProductPackagingDER /Users/joebad/Library/Developer/Xcode/DerivedData/iosApp-ebymctczxilrbebggnnizxzxkyoh/Build/Intermediates.noindex/iosApp.build/Debug-iphonesimulator/fastbreakUITests.build/fastbreakUITests.xctest-Simulated.xcent /Users/joebad/Library/Developer/Xcode/DerivedData/iosApp-ebymctczxilrbebggnnizxzxkyoh/Build/Intermediates.noindex/iosApp.build/Debug-iphonesimulator/fastbreakUITests.build/fastbreakUITests.xctest-Simulated.xcent.der (in target 'fastbreakUITests' from project 'iosApp')
+GenerateDSYMFile /Users/joebad/Library/Developer/Xcode/DerivedData/iosApp-ebymctczxilrbebggnnizxzxkyoh/Build/Products/Debug-iphonesimulator/fastbreak.app.dSYM /Users/joebad/Library/Developer/Xcode/DerivedData/iosApp-ebymctczxilrbebggnnizxzxkyoh/Build/Products/Debug-iphonesimulator/fastbreak.app/fastbreak (in target 'iosApp' from project 'iosApp')
     cd /Users/joebad/Source/fastbreak/kmp/iosApp
-    /usr/bin/derq query -f xml -i /Users/joebad/Library/Developer/Xcode/DerivedData/iosApp-ebymctczxilrbebggnnizxzxkyoh/Build/Intermediates.noindex/iosApp.build/Debug-iphonesimulator/fastbreakUITests.build/fastbreakUITests.xctest-Simulated.xcent -o /Users/joebad/Library/Developer/Xcode/DerivedData/iosApp-ebymctczxilrbebggnnizxzxkyoh/Build/Intermediates.noindex/iosApp.build/Debug-iphonesimulator/fastbreakUITests.build/fastbreakUITests.xctest-Simulated.xcent.der --raw
+    /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/dsymutil -q /Users/joebad/Library/Developer/Xcode/DerivedData/iosApp-ebymctczxilrbebggnnizxzxkyoh/Build/Products/Debug-iphonesimulator/fastbreak.app/fastbreak -o /Users/joebad/Library/Developer/Xcode/DerivedData/iosApp-ebymctczxilrbebggnnizxzxkyoh/Build/Products/Debug-iphonesimulator/fastbreak.app.dSYM
 
 GenerateDSYMFile /Users/joebad/Library/Developer/Xcode/DerivedData/iosApp-ebymctczxilrbebggnnizxzxkyoh/Build/Products/Debug-iphonesimulator/fastbreak.app.dSYM /Users/joebad/Library/Developer/Xcode/DerivedData/iosApp-ebymctczxilrbebggnnizxzxkyoh/Build/Products/Debug-iphonesimulator/fastbreak.app/fastbreak.debug.dylib (in target 'iosApp' from project 'iosApp')
     cd /Users/joebad/Source/fastbreak/kmp/iosApp
@@ -776,29 +758,13 @@ Validate /Users/joebad/Library/Developer/Xcode/DerivedData/iosApp-ebymctczxilrbe
     cd /Users/joebad/Source/fastbreak/kmp/iosApp
     builtin-validationUtility /Users/joebad/Library/Developer/Xcode/DerivedData/iosApp-ebymctczxilrbebggnnizxzxkyoh/Build/Products/Debug-iphonesimulator/fastbreak.app -infoplist-subpath Info.plist
 
-Ld /Users/joebad/Library/Developer/Xcode/DerivedData/iosApp-ebymctczxilrbebggnnizxzxkyoh/Build/Products/Debug-iphonesimulator/fastbreakUITests-Runner.app/PlugIns/fastbreakUITests.xctest/fastbreakUITests normal (in target 'fastbreakUITests' from project 'iosApp')
-    cd /Users/joebad/Source/fastbreak/kmp/iosApp
-    /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang -Xlinker -reproducible -target arm64-apple-ios18.2-simulator -bundle -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator18.2.sdk -O0 -L/Users/joebad/Library/Developer/Xcode/DerivedData/iosApp-ebymctczxilrbebggnnizxzxkyoh/Build/Intermediates.noindex/EagerLinkingTBDs/Debug-iphonesimulator -L/Users/joebad/Library/Developer/Xcode/DerivedData/iosApp-ebymctczxilrbebggnnizxzxkyoh/Build/Products/Debug-iphonesimulator -L/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/usr/lib -F/Users/joebad/Library/Developer/Xcode/DerivedData/iosApp-ebymctczxilrbebggnnizxzxkyoh/Build/Intermediates.noindex/EagerLinkingTBDs/Debug-iphonesimulator -F/Users/joebad/Library/Developer/Xcode/DerivedData/iosApp-ebymctczxilrbebggnnizxzxkyoh/Build/Products/Debug-iphonesimulator -iframework /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/Library/Frameworks -iframework /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator18.2.sdk/Developer/Library/Frameworks -filelist /Users/joebad/Library/Developer/Xcode/DerivedData/iosApp-ebymctczxilrbebggnnizxzxkyoh/Build/Intermediates.noindex/iosApp.build/Debug-iphonesimulator/fastbreakUITests.build/Objects-normal/arm64/fastbreakUITests.LinkFileList -Xlinker -rpath -Xlinker @loader_path/Frameworks -dead_strip -Xlinker -object_path_lto -Xlinker /Users/joebad/Library/Developer/Xcode/DerivedData/iosApp-ebymctczxilrbebggnnizxzxkyoh/Build/Intermediates.noindex/iosApp.build/Debug-iphonesimulator/fastbreakUITests.build/Objects-normal/arm64/fastbreakUITests_lto.o -Xlinker -export_dynamic -Xlinker -no_deduplicate -Xlinker -objc_abi_version -Xlinker 2 -fobjc-link-runtime -L/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/iphonesimulator -L/usr/lib/swift -Xlinker -add_ast_path -Xlinker /Users/joebad/Library/Developer/Xcode/DerivedData/iosApp-ebymctczxilrbebggnnizxzxkyoh/Build/Intermediates.noindex/iosApp.build/Debug-iphonesimulator/fastbreakUITests.build/Objects-normal/arm64/fastbreakUITests.swiftmodule -framework XCTest -lXCTestSwiftSupport -Xlinker -sectcreate -Xlinker __TEXT -Xlinker __entitlements -Xlinker /Users/joebad/Library/Developer/Xcode/DerivedData/iosApp-ebymctczxilrbebggnnizxzxkyoh/Build/Intermediates.noindex/iosApp.build/Debug-iphonesimulator/fastbreakUITests.build/fastbreakUITests.xctest-Simulated.xcent -Xlinker -sectcreate -Xlinker __TEXT -Xlinker __ents_der -Xlinker /Users/joebad/Library/Developer/Xcode/DerivedData/iosApp-ebymctczxilrbebggnnizxzxkyoh/Build/Intermediates.noindex/iosApp.build/Debug-iphonesimulator/fastbreakUITests.build/fastbreakUITests.xctest-Simulated.xcent.der -Xlinker -no_adhoc_codesign -Xlinker -dependency_info -Xlinker /Users/joebad/Library/Developer/Xcode/DerivedData/iosApp-ebymctczxilrbebggnnizxzxkyoh/Build/Intermediates.noindex/iosApp.build/Debug-iphonesimulator/fastbreakUITests.build/Objects-normal/arm64/fastbreakUITests_dependency_info.dat -o /Users/joebad/Library/Developer/Xcode/DerivedData/iosApp-ebymctczxilrbebggnnizxzxkyoh/Build/Products/Debug-iphonesimulator/fastbreakUITests-Runner.app/PlugIns/fastbreakUITests.xctest/fastbreakUITests
-
 CopySwiftLibs /Users/joebad/Library/Developer/Xcode/DerivedData/iosApp-ebymctczxilrbebggnnizxzxkyoh/Build/Products/Debug-iphonesimulator/fastbreakUITests-Runner.app/PlugIns/fastbreakUITests.xctest (in target 'fastbreakUITests' from project 'iosApp')
     cd /Users/joebad/Source/fastbreak/kmp/iosApp
     builtin-swiftStdLibTool --copy --verbose --sign - --scan-executable /Users/joebad/Library/Developer/Xcode/DerivedData/iosApp-ebymctczxilrbebggnnizxzxkyoh/Build/Products/Debug-iphonesimulator/fastbreakUITests-Runner.app/PlugIns/fastbreakUITests.xctest/fastbreakUITests --scan-folder /Users/joebad/Library/Developer/Xcode/DerivedData/iosApp-ebymctczxilrbebggnnizxzxkyoh/Build/Products/Debug-iphonesimulator/fastbreakUITests-Runner.app/PlugIns/fastbreakUITests.xctest/Frameworks --scan-folder /Users/joebad/Library/Developer/Xcode/DerivedData/iosApp-ebymctczxilrbebggnnizxzxkyoh/Build/Products/Debug-iphonesimulator/fastbreakUITests-Runner.app/PlugIns/fastbreakUITests.xctest/PlugIns --scan-folder /Users/joebad/Library/Developer/Xcode/DerivedData/iosApp-ebymctczxilrbebggnnizxzxkyoh/Build/Products/Debug-iphonesimulator/fastbreakUITests-Runner.app/PlugIns/fastbreakUITests.xctest/SystemExtensions --scan-folder /Users/joebad/Library/Developer/Xcode/DerivedData/iosApp-ebymctczxilrbebggnnizxzxkyoh/Build/Products/Debug-iphonesimulator/fastbreakUITests-Runner.app/PlugIns/fastbreakUITests.xctest/Extensions --platform iphonesimulator --toolchain /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain --destination /Users/joebad/Library/Developer/Xcode/DerivedData/iosApp-ebymctczxilrbebggnnizxzxkyoh/Build/Products/Debug-iphonesimulator/fastbreakUITests-Runner.app/PlugIns/fastbreakUITests.xctest/Frameworks --strip-bitcode --scan-executable /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/usr/lib/libXCTestSwiftSupport.dylib --strip-bitcode-tool /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/bitcode_strip --emit-dependency-info /Users/joebad/Library/Developer/Xcode/DerivedData/iosApp-ebymctczxilrbebggnnizxzxkyoh/Build/Intermediates.noindex/iosApp.build/Debug-iphonesimulator/fastbreakUITests.build/SwiftStdLibToolInputDependencies.dep --filter-for-swift-os
 
-ExtractAppIntentsMetadata (in target 'fastbreakUITests' from project 'iosApp')
-    cd /Users/joebad/Source/fastbreak/kmp/iosApp
-    /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/appintentsmetadataprocessor --output /Users/joebad/Library/Developer/Xcode/DerivedData/iosApp-ebymctczxilrbebggnnizxzxkyoh/Build/Products/Debug-iphonesimulator/fastbreakUITests-Runner.app/PlugIns/fastbreakUITests.xctest --toolchain-dir /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain --module-name fastbreakUITests --sdk-root /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator18.2.sdk --xcode-version 16C5032a --platform-family iOS --deployment-target 18.2 --bundle-identifier com.joebad.fastbreakUITests --target-triple arm64-apple-ios18.2-simulator --binary-file /Users/joebad/Library/Developer/Xcode/DerivedData/iosApp-ebymctczxilrbebggnnizxzxkyoh/Build/Products/Debug-iphonesimulator/fastbreakUITests-Runner.app/PlugIns/fastbreakUITests.xctest/fastbreakUITests --dependency-file /Users/joebad/Library/Developer/Xcode/DerivedData/iosApp-ebymctczxilrbebggnnizxzxkyoh/Build/Intermediates.noindex/iosApp.build/Debug-iphonesimulator/fastbreakUITests.build/Objects-normal/arm64/fastbreakUITests_dependency_info.dat --stringsdata-file /Users/joebad/Library/Developer/Xcode/DerivedData/iosApp-ebymctczxilrbebggnnizxzxkyoh/Build/Intermediates.noindex/iosApp.build/Debug-iphonesimulator/fastbreakUITests.build/Objects-normal/arm64/ExtractedAppShortcutsMetadata.stringsdata --source-file-list /Users/joebad/Library/Developer/Xcode/DerivedData/iosApp-ebymctczxilrbebggnnizxzxkyoh/Build/Intermediates.noindex/iosApp.build/Debug-iphonesimulator/fastbreakUITests.build/Objects-normal/arm64/fastbreakUITests.SwiftFileList --metadata-file-list /Users/joebad/Library/Developer/Xcode/DerivedData/iosApp-ebymctczxilrbebggnnizxzxkyoh/Build/Intermediates.noindex/iosApp.build/Debug-iphonesimulator/fastbreakUITests.build/fastbreakUITests.DependencyMetadataFileList --swift-const-vals-list /Users/joebad/Library/Developer/Xcode/DerivedData/iosApp-ebymctczxilrbebggnnizxzxkyoh/Build/Intermediates.noindex/iosApp.build/Debug-iphonesimulator/fastbreakUITests.build/Objects-normal/arm64/fastbreakUITests.SwiftConstValuesFileList --compile-time-extraction --deployment-aware-processing --validate-assistant-intents
-note: Metadata extraction skipped. No AppIntents.framework dependency found. (in target 'fastbreakUITests' from project 'iosApp')
-
 ProcessInfoPlistFile /Users/joebad/Library/Developer/Xcode/DerivedData/iosApp-ebymctczxilrbebggnnizxzxkyoh/Build/Products/Debug-iphonesimulator/fastbreakUITests-Runner.app/PlugIns/fastbreakUITests.xctest/Info.plist /Users/joebad/Library/Developer/Xcode/DerivedData/iosApp-ebymctczxilrbebggnnizxzxkyoh/Build/Intermediates.noindex/iosApp.build/Debug-iphonesimulator/fastbreakUITests.build/empty-fastbreakUITests.plist (in target 'fastbreakUITests' from project 'iosApp')
     cd /Users/joebad/Source/fastbreak/kmp/iosApp
     builtin-infoPlistUtility /Users/joebad/Library/Developer/Xcode/DerivedData/iosApp-ebymctczxilrbebggnnizxzxkyoh/Build/Intermediates.noindex/iosApp.build/Debug-iphonesimulator/fastbreakUITests.build/empty-fastbreakUITests.plist -producttype com.apple.product-type.bundle.ui-testing -expandbuildsettings -format binary -platform iphonesimulator -additionalcontentfile /Users/joebad/Library/Developer/Xcode/DerivedData/iosApp-ebymctczxilrbebggnnizxzxkyoh/Build/Intermediates.noindex/iosApp.build/Debug-iphonesimulator/fastbreakUITests.build/ProductTypeInfoPlistAdditions.plist -o /Users/joebad/Library/Developer/Xcode/DerivedData/iosApp-ebymctczxilrbebggnnizxzxkyoh/Build/Products/Debug-iphonesimulator/fastbreakUITests-Runner.app/PlugIns/fastbreakUITests.xctest/Info.plist
-
-CodeSign /Users/joebad/Library/Developer/Xcode/DerivedData/iosApp-ebymctczxilrbebggnnizxzxkyoh/Build/Products/Debug-iphonesimulator/fastbreakUITests-Runner.app/PlugIns/fastbreakUITests.xctest (in target 'fastbreakUITests' from project 'iosApp')
-    cd /Users/joebad/Source/fastbreak/kmp/iosApp
-    
-    Signing Identity:     "Sign to Run Locally"
-    
-    /usr/bin/codesign --force --sign - --timestamp\=none --generate-entitlement-der /Users/joebad/Library/Developer/Xcode/DerivedData/iosApp-ebymctczxilrbebggnnizxzxkyoh/Build/Products/Debug-iphonesimulator/fastbreakUITests-Runner.app/PlugIns/fastbreakUITests.xctest
 
 warning: Run script build phase 'Compile Kotlin Framework' will be run during every build because it does not specify any outputs. To address this issue, either add output dependencies to the script phase, or configure it to run in every build by unchecking "Based on dependency analysis" in the script phase. (in target 'iosApp' from project 'iosApp')
 ** TEST BUILD SUCCEEDED **
@@ -806,107 +772,107 @@ warning: Run script build phase 'Compile Kotlin Framework' will be run during ev
 --- xcodebuild: WARNING: Using the first of multiple matching destinations:
 { platform:iOS Simulator, id:F4287E9E-F062-4E74-9989-423619BD1A68, OS:18.2, name:iPhone 16 Pro }
 { platform:iOS Simulator, id:F4287E9E-F062-4E74-9989-423619BD1A68, OS:18.2, name:iPhone 16 Pro }
-2025-12-28 16:14:52.117914-0500 fastbreakUITests-Runner[75311:24317916] [Default] Running tests...
-Test Suite 'Selected tests' started at 2025-12-28 16:14:52.450.
-Test Suite 'fastbreakUITests.xctest' started at 2025-12-28 16:14:52.450.
-Test Suite 'DemoUITests' started at 2025-12-28 16:14:52.450.
+2025-12-28 16:25:41.229260-0500 fastbreakUITests-Runner[76331:24343772] [Default] Running tests...
+Test Suite 'Selected tests' started at 2025-12-28 16:25:41.561.
+Test Suite 'fastbreakUITests.xctest' started at 2025-12-28 16:25:41.561.
+Test Suite 'DemoUITests' started at 2025-12-28 16:25:41.561.
 Test Case '-[fastbreakUITests.DemoUITests testDemo_PinchToZoomAndPan]' started.
-    t =     0.00s Start Test at 2025-12-28 16:14:52.451
-    t =     0.10s Set Up
-    t =     0.10s     Open com.joebad.fastbreak
-    t =     0.10s         Launch com.joebad.fastbreak
-    t =     0.71s             Setting up automation session
-    t =     1.32s             Wait for com.joebad.fastbreak to idle
+    t =     0.00s Start Test at 2025-12-28 16:25:41.562
+    t =     0.02s Set Up
+    t =     0.02s     Open com.joebad.fastbreak
+    t =     0.02s         Launch com.joebad.fastbreak
+    t =     0.43s             Setting up automation session
+    t =     1.02s             Wait for com.joebad.fastbreak to idle
 ⏱ Waiting for app to load...
 🔍 Looking for 'NFL Team Tiers' text...
-    t =     5.54s Waiting 10.0s for StaticText (First Match) to exist
-    t =     6.58s     Checking `Expect predicate `existsNoRetry == 1` for object StaticText (First Match)`
-    t =     6.59s         Checking existence of `StaticText (First Match)`
+    t =     3.22s Waiting 10.0s for StaticText (First Match) to exist
+    t =     4.26s     Checking `Expect predicate `existsNoRetry == 1` for object StaticText (First Match)`
+    t =     4.26s         Checking existence of `StaticText (First Match)`
 ✓ Found 'NFL Team Tiers', tapping...
-    t =     6.66s Tap StaticText (First Match)
-    t =     6.66s     Wait for com.joebad.fastbreak to idle
-    t =     6.67s     Find the StaticText (First Match)
-    t =     6.69s     Check for interrupting elements affecting "NFL Team Tier List - Week 15" StaticText
-    t =     6.70s     Synthesize event
-    t =     6.99s     Wait for com.joebad.fastbreak to idle
+    t =     4.33s Tap StaticText (First Match)
+    t =     4.33s     Wait for com.joebad.fastbreak to idle
+    t =     4.34s     Find the StaticText (First Match)
+    t =     4.36s     Check for interrupting elements affecting "NFL Team Tier List - Week 15" StaticText
+    t =     4.37s     Synthesize event
+    t =     4.66s     Wait for com.joebad.fastbreak to idle
 🔍 Looking for chart element...
-    t =     9.23s Checking existence of `"chart" Other`
-    t =     9.47s Get number of matches for: Descendants matching type ScrollView
+    t =     5.67s Checking existence of `"chart" Other`
+    t =     5.84s Get number of matches for: Descendants matching type ScrollView
 ✓ Found chart via scrollView
-    t =     9.49s Checking existence of `ScrollView (First Match)`
+    t =     5.87s Checking existence of `ScrollView (First Match)`
 ✓ Chart found, starting pan and zoom demo...
   → Pinching to zoom in...
-    t =    10.51s Pinch with scale 2, velocity 1 in ScrollView (First Match)
-    t =    10.51s     Wait for com.joebad.fastbreak to idle
-    t =    10.52s     Find the ScrollView (First Match)
-    t =    10.54s     Check for interrupting elements affecting ScrollView
-    t =    10.58s     Synthesize event
-    t =    10.59s         Pinching with rect {{50, 50}, {302, 774}}
-    t =    12.93s     Wait for com.joebad.fastbreak to idle
+    t =     6.88s Pinch with scale 2, velocity 1 in ScrollView (First Match)
+    t =     6.88s     Wait for com.joebad.fastbreak to idle
+    t =     6.89s     Find the ScrollView (First Match)
+    t =     6.91s     Check for interrupting elements affecting ScrollView
+    t =     6.96s     Synthesize event
+    t =     6.97s         Pinching with rect {{50, 50}, {302, 774}}
+    t =     9.30s     Wait for com.joebad.fastbreak to idle
   → Panning left...
-    t =    14.94s Press ScrollView at {{0.0, 0.0}, {402.0, 874.0}}[0.90, 0.50] for 0.1 seconds, then drag to ScrollView at {{0.0, 0.0}, {402.0, 874.0}}[0.10, 0.50] with velocity of 250.00 pixels per second, and then hold for 0.0 seconds 
-    t =    14.94s     Wait for com.joebad.fastbreak to idle
-    t =    14.95s     Find the ScrollView at {{0.0, 0.0}, {402.0, 874.0}}
-    t =    14.97s     Check for interrupting elements affecting ScrollView
-    t =    15.07s     Synthesize event
-    t =    15.07s         Find the ScrollView at {{0.0, 0.0}, {402.0, 874.0}}
-    t =    15.08s         Find the ScrollView at {{0.0, 0.0}, {402.0, 874.0}}
-    t =    15.09s         Find the ScrollView at {{0.0, 0.0}, {402.0, 874.0}}
-    t =    15.10s         Find the ScrollView at {{0.0, 0.0}, {402.0, 874.0}}
-    t =    15.11s         Find the ScrollView at {{0.0, 0.0}, {402.0, 874.0}}
-    t =    16.76s     Wait for com.joebad.fastbreak to idle
+    t =    11.31s Press ScrollView at {{0.0, 0.0}, {402.0, 874.0}}[0.90, 0.50] for 0.1 seconds, then drag to ScrollView at {{0.0, 0.0}, {402.0, 874.0}}[0.10, 0.50] with velocity of 250.00 pixels per second, and then hold for 0.0 seconds 
+    t =    11.31s     Wait for com.joebad.fastbreak to idle
+    t =    11.31s     Find the ScrollView at {{0.0, 0.0}, {402.0, 874.0}}
+    t =    11.32s     Check for interrupting elements affecting ScrollView
+    t =    11.42s     Synthesize event
+    t =    11.42s         Find the ScrollView at {{0.0, 0.0}, {402.0, 874.0}}
+    t =    11.43s         Find the ScrollView at {{0.0, 0.0}, {402.0, 874.0}}
+    t =    11.44s         Find the ScrollView at {{0.0, 0.0}, {402.0, 874.0}}
+    t =    11.45s         Find the ScrollView at {{0.0, 0.0}, {402.0, 874.0}}
+    t =    11.46s         Find the ScrollView at {{0.0, 0.0}, {402.0, 874.0}}
+    t =    13.09s     Wait for com.joebad.fastbreak to idle
   → Panning right...
-    t =    17.79s Press ScrollView at {{0.0, 0.0}, {402.0, 874.0}}[0.10, 0.50] for 0.1 seconds, then drag to ScrollView at {{0.0, 0.0}, {402.0, 874.0}}[0.90, 0.50] with velocity of 250.00 pixels per second, and then hold for 0.0 seconds 
-    t =    17.79s     Wait for com.joebad.fastbreak to idle
-    t =    17.79s     Find the ScrollView at {{0.0, 0.0}, {402.0, 874.0}}
-    t =    17.81s     Check for interrupting elements affecting ScrollView
-    t =    17.90s     Synthesize event
-    t =    17.90s         Find the ScrollView at {{0.0, 0.0}, {402.0, 874.0}}
-    t =    17.91s         Find the ScrollView at {{0.0, 0.0}, {402.0, 874.0}}
-    t =    17.93s         Find the ScrollView at {{0.0, 0.0}, {402.0, 874.0}}
-    t =    17.94s         Find the ScrollView at {{0.0, 0.0}, {402.0, 874.0}}
-    t =    17.95s         Find the ScrollView at {{0.0, 0.0}, {402.0, 874.0}}
-    t =    19.59s     Wait for com.joebad.fastbreak to idle
+    t =    14.11s Press ScrollView at {{0.0, 0.0}, {402.0, 874.0}}[0.10, 0.50] for 0.1 seconds, then drag to ScrollView at {{0.0, 0.0}, {402.0, 874.0}}[0.90, 0.50] with velocity of 250.00 pixels per second, and then hold for 0.0 seconds 
+    t =    14.11s     Wait for com.joebad.fastbreak to idle
+    t =    14.12s     Find the ScrollView at {{0.0, 0.0}, {402.0, 874.0}}
+    t =    14.14s     Check for interrupting elements affecting ScrollView
+    t =    14.24s     Synthesize event
+    t =    14.24s         Find the ScrollView at {{0.0, 0.0}, {402.0, 874.0}}
+    t =    14.25s         Find the ScrollView at {{0.0, 0.0}, {402.0, 874.0}}
+    t =    14.26s         Find the ScrollView at {{0.0, 0.0}, {402.0, 874.0}}
+    t =    14.27s         Find the ScrollView at {{0.0, 0.0}, {402.0, 874.0}}
+    t =    14.28s         Find the ScrollView at {{0.0, 0.0}, {402.0, 874.0}}
+    t =    15.92s     Wait for com.joebad.fastbreak to idle
   → Panning up...
-    t =    20.62s Press ScrollView at {{0.0, 0.0}, {402.0, 874.0}}[0.50, 0.90] for 0.1 seconds, then drag to ScrollView at {{0.0, 0.0}, {402.0, 874.0}}[0.50, 0.10] with velocity of 250.00 pixels per second, and then hold for 0.0 seconds 
-    t =    20.62s     Wait for com.joebad.fastbreak to idle
-    t =    20.62s     Find the ScrollView at {{0.0, 0.0}, {402.0, 874.0}}
-    t =    20.64s     Check for interrupting elements affecting ScrollView
-    t =    20.66s     Synthesize event
-    t =    20.66s         Find the ScrollView at {{0.0, 0.0}, {402.0, 874.0}}
-    t =    20.67s         Find the ScrollView at {{0.0, 0.0}, {402.0, 874.0}}
-    t =    20.68s         Find the ScrollView at {{0.0, 0.0}, {402.0, 874.0}}
-    t =    20.69s         Find the ScrollView at {{0.0, 0.0}, {402.0, 874.0}}
-    t =    20.70s         Find the ScrollView at {{0.0, 0.0}, {402.0, 874.0}}
-    t =    23.85s     Wait for com.joebad.fastbreak to idle
+    t =    16.94s Press ScrollView at {{0.0, 0.0}, {402.0, 874.0}}[0.50, 0.90] for 0.1 seconds, then drag to ScrollView at {{0.0, 0.0}, {402.0, 874.0}}[0.50, 0.10] with velocity of 250.00 pixels per second, and then hold for 0.0 seconds 
+    t =    16.94s     Wait for com.joebad.fastbreak to idle
+    t =    16.95s     Find the ScrollView at {{0.0, 0.0}, {402.0, 874.0}}
+    t =    16.96s     Check for interrupting elements affecting ScrollView
+    t =    16.99s     Synthesize event
+    t =    16.99s         Find the ScrollView at {{0.0, 0.0}, {402.0, 874.0}}
+    t =    17.00s         Find the ScrollView at {{0.0, 0.0}, {402.0, 874.0}}
+    t =    17.01s         Find the ScrollView at {{0.0, 0.0}, {402.0, 874.0}}
+    t =    17.02s         Find the ScrollView at {{0.0, 0.0}, {402.0, 874.0}}
+    t =    17.03s         Find the ScrollView at {{0.0, 0.0}, {402.0, 874.0}}
+    t =    20.17s     Wait for com.joebad.fastbreak to idle
   → Panning down...
-    t =    24.87s Press ScrollView at {{0.0, 0.0}, {402.0, 874.0}}[0.50, 0.10] for 0.1 seconds, then drag to ScrollView at {{0.0, 0.0}, {402.0, 874.0}}[0.50, 0.90] with velocity of 250.00 pixels per second, and then hold for 0.0 seconds 
-    t =    24.87s     Wait for com.joebad.fastbreak to idle
-    t =    24.88s     Find the ScrollView at {{0.0, 0.0}, {402.0, 874.0}}
-    t =    24.89s     Check for interrupting elements affecting ScrollView
-    t =    24.91s     Synthesize event
-    t =    24.91s         Find the ScrollView at {{0.0, 0.0}, {402.0, 874.0}}
-    t =    24.92s         Find the ScrollView at {{0.0, 0.0}, {402.0, 874.0}}
-    t =    24.93s         Find the ScrollView at {{0.0, 0.0}, {402.0, 874.0}}
-    t =    24.94s         Find the ScrollView at {{0.0, 0.0}, {402.0, 874.0}}
-    t =    24.96s         Find the ScrollView at {{0.0, 0.0}, {402.0, 874.0}}
-    t =    28.09s     Wait for com.joebad.fastbreak to idle
+    t =    21.20s Press ScrollView at {{0.0, 0.0}, {402.0, 874.0}}[0.50, 0.10] for 0.1 seconds, then drag to ScrollView at {{0.0, 0.0}, {402.0, 874.0}}[0.50, 0.90] with velocity of 250.00 pixels per second, and then hold for 0.0 seconds 
+    t =    21.20s     Wait for com.joebad.fastbreak to idle
+    t =    21.20s     Find the ScrollView at {{0.0, 0.0}, {402.0, 874.0}}
+    t =    21.22s     Check for interrupting elements affecting ScrollView
+    t =    21.23s     Synthesize event
+    t =    21.23s         Find the ScrollView at {{0.0, 0.0}, {402.0, 874.0}}
+    t =    21.25s         Find the ScrollView at {{0.0, 0.0}, {402.0, 874.0}}
+    t =    21.26s         Find the ScrollView at {{0.0, 0.0}, {402.0, 874.0}}
+    t =    21.27s         Find the ScrollView at {{0.0, 0.0}, {402.0, 874.0}}
+    t =    21.28s         Find the ScrollView at {{0.0, 0.0}, {402.0, 874.0}}
+    t =    24.42s     Wait for com.joebad.fastbreak to idle
   → Pinching to zoom out...
 /Users/joebad/Source/fastbreak/kmp/iosApp/fastbreakUITests/DemoUITests.swift:112: error: -[fastbreakUITests.DemoUITests testDemo_PinchToZoomAndPan] : velocity must be less than zero when scale is less than 1 (NSInvalidArgumentException)
-    t =    29.15s Tear Down
-Test Case '-[fastbreakUITests.DemoUITests testDemo_PinchToZoomAndPan]' failed (29.395 seconds).
-Test Suite 'DemoUITests' failed at 2025-12-28 16:15:21.846.
-	 Executed 1 test, with 1 failure (1 unexpected) in 29.395 (29.396) seconds
-Test Suite 'fastbreakUITests.xctest' failed at 2025-12-28 16:15:21.847.
-	 Executed 1 test, with 1 failure (1 unexpected) in 29.395 (29.397) seconds
-Test Suite 'Selected tests' failed at 2025-12-28 16:15:21.849.
-	 Executed 1 test, with 1 failure (1 unexpected) in 29.395 (29.399) seconds
-2025-12-28 16:15:27.759 xcodebuild[75259:24317267] [MT] IDETestOperationsObserverDebug: 36.636 elapsed -- Testing started completed.
-2025-12-28 16:15:27.759 xcodebuild[75259:24317267] [MT] IDETestOperationsObserverDebug: 0.000 sec, +0.000 sec -- start
-2025-12-28 16:15:27.759 xcodebuild[75259:24317267] [MT] IDETestOperationsObserverDebug: 36.636 sec, +36.636 sec -- end
+    t =    25.47s Tear Down
+Test Case '-[fastbreakUITests.DemoUITests testDemo_PinchToZoomAndPan]' failed (25.693 seconds).
+Test Suite 'DemoUITests' failed at 2025-12-28 16:26:07.256.
+	 Executed 1 test, with 1 failure (1 unexpected) in 25.693 (25.695) seconds
+Test Suite 'fastbreakUITests.xctest' failed at 2025-12-28 16:26:07.257.
+	 Executed 1 test, with 1 failure (1 unexpected) in 25.693 (25.696) seconds
+Test Suite 'Selected tests' failed at 2025-12-28 16:26:07.258.
+	 Executed 1 test, with 1 failure (1 unexpected) in 25.693 (25.697) seconds
+2025-12-28 16:26:13.085 xcodebuild[76232:24342961] [MT] IDETestOperationsObserverDebug: 32.611 elapsed -- Testing started completed.
+2025-12-28 16:26:13.085 xcodebuild[76232:24342961] [MT] IDETestOperationsObserverDebug: 0.000 sec, +0.000 sec -- start
+2025-12-28 16:26:13.085 xcodebuild[76232:24342961] [MT] IDETestOperationsObserverDebug: 32.611 sec, +32.611 sec -- end
 
 Test session results, code coverage, and logs:
-	/Users/joebad/Library/Developer/Xcode/DerivedData/iosApp-ebymctczxilrbebggnnizxzxkyoh/Logs/Test/Test-Fastbreak-2025.12.28_16-14-44--0500.xcresult
+	/Users/joebad/Library/Developer/Xcode/DerivedData/iosApp-ebymctczxilrbebggnnizxzxkyoh/Logs/Test/Test-Fastbreak-2025.12.28_16-25-34--0500.xcresult
 
 Failing tests:
 	DemoUITests.testDemo_PinchToZoomAndPan()

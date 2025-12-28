@@ -20,9 +20,9 @@ class DemoUITests: XCTestCase {
     // MARK: - Demo: Pinch to Zoom and Pan on NFL Team Tiers
 
     func testDemo_PinchToZoomAndPan() throws {
-        // Wait for app to load
+        // Wait for app to load (reduced wait time)
         print("⏱ Waiting for app to load...")
-        sleep(UInt32(3))
+        sleep(UInt32(1))
 
         // Find and tap on "NFL Team Tiers" list item
         print("🔍 Looking for 'NFL Team Tiers' text...")
@@ -32,7 +32,7 @@ class DemoUITests: XCTestCase {
         if teamTiersText.waitForExistence(timeout: 10) {
             print("✓ Found 'NFL Team Tiers', tapping...")
             teamTiersText.tap()
-            sleep(UInt32(2))
+            sleep(UInt32(1))
         } else {
             print("⚠ 'NFL Team Tiers' not found, trying to find any element with 'Team Tiers'...")
             let anyTeamTiers = app.staticTexts.containing(NSPredicate(format: "label CONTAINS[c] 'Team Tiers'")).firstMatch
@@ -134,7 +134,7 @@ class DemoUITests: XCTestCase {
 
         // Final pause before ending
         print("✓ Demo complete!")
-        sleep(UInt32(2))
+        sleep(UInt32(1))
     }
 }
 

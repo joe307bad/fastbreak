@@ -12,6 +12,7 @@ OUTPUT_DIR="${OUTPUT_DIR:-$(dirname "$0")/../screenshots/demos}"
 TEST_NAME="${TEST_NAME:-testDemo_PinchToZoomAndPan}"
 FPS="${FPS:-10}"
 SCALE="${SCALE:-600}"
+RECORD_DELAY="${RECORD_DELAY:-0}"  # Seconds to wait after test starts before recording (to skip app launch)
 PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 
 # Colors for output
@@ -97,42 +98,61 @@ xcodebuild build \
     -configuration Debug \
     2>&1 | grep -E "Build succeeded|Build failed|error:" || true
 
-# Install and launch the app on the ORIGINAL simulator (not the clone)
-echo -e "  → Installing app to original simulator..."
+# Install the app (but don't launch yet - let the test launch it while recording)
+echo -e "  → Installing app to simulator..."
 APP_PATH=$(find ~/Library/Developer/Xcode/DerivedData/iosApp*/Build/Products/Debug-iphonesimulator -name "*.app" -type d 2>/dev/null | head -1)
 if [ -n "$APP_PATH" ]; then
     xcrun simctl install "$SIMULATOR_UDID" "$APP_PATH"
     echo -e "${GREEN}✓ App installed${NC}"
 
-    # Launch the app on the original simulator
-    echo -e "  → Launching app on original simulator..."
+    # Get bundle ID for later
     BUNDLE_ID=$(defaults read "$APP_PATH/Info.plist" CFBundleIdentifier 2>/dev/null || echo "com.joebad.fastbreak")
-    xcrun simctl launch "$SIMULATOR_UDID" "$BUNDLE_ID" > /dev/null 2>&1
-    echo -e "${GREEN}✓ App launched on original simulator${NC}"
-    sleep 3  # Wait for app to fully load
 else
     echo -e "${RED}✗ Could not find built app${NC}"
     exit 1
 fi
 echo ""
 
-# Start recording the original simulator (which now has the app running)
-echo -e "${GREEN}Starting screen recording on original simulator...${NC}"
-xcrun simctl io "$SIMULATOR_UDID" recordVideo --codec=h264 --force "$VIDEO_FILE" &
-RECORD_PID=$!
-echo -e "${GREEN}✓ Recording started (PID: $RECORD_PID)${NC}"
-sleep 2  # Give recording time to start
-echo ""
-
 # Run the UI test with parallel testing DISABLED (prevents cloning)
-echo -e "  → Running UI test (parallel testing disabled to prevent cloning)...${NC}"
+# We'll run this in background so we can start recording after app launches
+echo -e "  → Starting UI test in background...${NC}"
 xcodebuild build-for-testing test-without-building \
     -workspace iosApp/iosApp.xcworkspace \
     -scheme Fastbreak \
     -destination "platform=iOS Simulator,id=$SIMULATOR_UDID" \
     -only-testing:"fastbreakUITests/DemoUITests/${TEST_NAME}" \
     -parallel-testing-enabled NO \
-    2>&1 | tee "$OUTPUT_DIR/test-output.log" | grep -E "Test Case.*started|Test Case.*passed|Test Case.*failed|Testing.*succeeded|Testing failed:|Scheme.*not|does not contain|isn't a member" || true
+    > "$OUTPUT_DIR/test-output.log" 2>&1 &
+TEST_PID=$!
+echo -e "${GREEN}✓ Test started (PID: $TEST_PID)${NC}"
+
+# Wait for the app to appear in the process list (meaning it has launched)
+echo -e "  → Waiting for app to launch..."
+WAIT_COUNT=0
+while [ $WAIT_COUNT -lt 30 ]; do
+    if xcrun simctl spawn "$SIMULATOR_UDID" launchctl list | grep -q "$BUNDLE_ID"; then
+        echo -e "${GREEN}✓ App detected, waiting ${RECORD_DELAY}s before recording...${NC}"
+        sleep $RECORD_DELAY
+        break
+    fi
+    sleep 0.5
+    WAIT_COUNT=$((WAIT_COUNT + 1))
+done
+
+if [ $WAIT_COUNT -ge 30 ]; then
+    echo -e "${YELLOW}⚠ App launch not detected, starting recording anyway...${NC}"
+fi
+
+# Start recording now that app is visible
+echo -e "${GREEN}Starting screen recording...${NC}"
+xcrun simctl io "$SIMULATOR_UDID" recordVideo --codec=h264 --force "$VIDEO_FILE" &
+RECORD_PID=$!
+echo -e "${GREEN}✓ Recording started (PID: $RECORD_PID)${NC}"
+echo ""
+
+# Wait for the test to complete
+echo -e "  → Waiting for test to complete...${NC}"
+wait $TEST_PID 2>/dev/null || true
 
 
 # Check if test passed
@@ -200,5 +220,6 @@ echo -e "${YELLOW}💡 Tips:${NC}"
 echo -e "  • Edit demos in: scripts/DemoUITests.swift"
 echo -e "  • Run specific demo: TEST_NAME=testDemo_PinchToZoomAndPan ./scripts/record-ios-demo.sh"
 echo -e "  • Change quality: FPS=15 SCALE=800 ./scripts/record-ios-demo.sh"
+echo -e "  • Delay recording start: RECORD_DELAY=3 ./scripts/record-ios-demo.sh"
 echo -e "  • List available tests: grep 'func testDemo' scripts/DemoUITests.swift"
 echo ""

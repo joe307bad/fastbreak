@@ -172,10 +172,6 @@ data_points <- lapply(1:nrow(cleaned_data), function(i) {
 
   columns <- list()
 
-  if (!is.null(row$conference) && nzchar(row$conference)) {
-    columns <- c(columns, list(list(label = "Conf", value = row$conference)))
-  }
-
   if (!is.null(row$team_division) && !is.na(row$team_division) && nzchar(row$team_division)) {
     columns <- c(columns, list(list(label = "Division", value = row$team_division)))
   }

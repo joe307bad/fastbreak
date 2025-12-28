@@ -9,7 +9,8 @@ pbp <- nflreadr::load_pbp(current_season)
 
 # Load team info for division and conference data
 teams_info <- nflreadr::load_teams() %>%
-  select(team_abbr, team_conf, team_division)
+  select(team_abbr, team_conf, team_division) %>%
+  mutate(team_abbr = ifelse(team_abbr == "LA", "LAR", team_abbr))
 
 # Get the most recent week with data
 most_recent_week <- max(pbp$week, na.rm = TRUE)
@@ -24,7 +25,8 @@ weekly_epa <- pbp %>%
     offense_epa = sum(epa, na.rm = TRUE),
     .groups = "drop"
   ) %>%
-  rename(team = posteam)
+  rename(team = posteam) %>%
+  mutate(team = ifelse(team == "LA", "LAR", team))
 
 # Get defensive EPA allowed per team per week
 defensive_epa <- pbp %>%
@@ -34,7 +36,8 @@ defensive_epa <- pbp %>%
     defense_epa_allowed = sum(epa, na.rm = TRUE),
     .groups = "drop"
   ) %>%
-  rename(team = defteam)
+  rename(team = defteam) %>%
+  mutate(team = ifelse(team == "LA", "LAR", team))
 
 # Combine and calculate net EPA (offense - defense allowed, higher is better)
 team_weekly_epa <- weekly_epa %>%
@@ -53,15 +56,18 @@ cumulative_epa <- team_weekly_epa %>%
   ungroup()
 
 # Get final cumulative EPA to find top teams
+# Use each team's latest week (in case of bye weeks or different schedules)
 final_standings <- cumulative_epa %>%
-  filter(week == most_recent_week) %>%
+  group_by(team) %>%
+  filter(week == max(week)) %>%
+  ungroup() %>%
   arrange(desc(cumulative_net_epa))
 
 cat("\nTop 10 teams by Cumulative Net EPA:\n")
 print(head(final_standings %>% select(team, cumulative_net_epa), 10))
 
-# Select top 4 teams for the line chart
-top_teams <- head(final_standings$team, 4)
+# Select top 10 teams for the line chart
+top_teams <- head(final_standings$team, 10)
 cat("\nSelected teams for chart:", paste(top_teams, collapse = ", "), "\n")
 
 # Define distinct colors for each series line
@@ -70,7 +76,13 @@ series_colors <- c(
   "#E91E63",  # Pink
   "#2196F3",  # Blue
   "#4CAF50",  # Green
-  "#FF9800"   # Orange
+  "#FF9800",  # Orange
+  "#9C27B0",  # Purple
+  "#00BCD4",  # Cyan
+  "#FF5722",  # Deep Orange
+  "#795548",  # Brown
+  "#607D8B",  # Blue Grey
+  "#FFC107"   # Amber
 )
 
 # Filter to only top teams and build series data
@@ -105,8 +117,8 @@ output_data <- list(
   sport = "NFL",
   visualizationType = "LINE_CHART",
   title = paste("Cumulative EPA Trend - Week", most_recent_week),
-  subtitle = "Top 4 Teams Net EPA Over the Season",
-  description = "This chart tracks the cumulative Net EPA (Expected Points Added) for the top 4 NFL teams throughout the season. Net EPA combines offensive production with defensive efficiency - positive values mean the team is outperforming expectations. Teams with steeper upward slopes are playing at an elite level, while flat or declining lines indicate struggles. The gap between lines shows the relative dominance between top teams.",
+  subtitle = "Top 10 Teams Net EPA Over the Season",
+  description = "This chart tracks the cumulative Net EPA (Expected Points Added) for the top 10 NFL teams throughout the season. Net EPA combines offensive production with defensive efficiency - positive values mean the team is outperforming expectations. Teams with steeper upward slopes are playing at an elite level, while flat or declining lines indicate struggles. The gap between lines shows the relative dominance between top teams.",
   lastUpdated = format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC"),
   source = "nflfastR / nflreadr",
   series = series_data

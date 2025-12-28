@@ -7,7 +7,8 @@ cat("Generating NFL team roster\n")
 # Load NFL teams data
 teams <- nflreadr::load_teams() %>%
   filter(!is.na(team_abbr)) %>%
-  select(team_abbr, team_name, team_conf, team_division)
+  select(team_abbr, team_name, team_conf, team_division) %>%
+  mutate(team_abbr = ifelse(team_abbr == "LA", "LAR", team_abbr))
 
 cat("Loaded", nrow(teams), "NFL teams\n")
 

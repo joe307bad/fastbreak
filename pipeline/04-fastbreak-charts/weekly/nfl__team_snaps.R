@@ -8,7 +8,8 @@ pbp <- nflreadr::load_pbp(current_season)
 
 # Load team info for division and conference data
 teams_info <- nflreadr::load_teams() %>%
-  select(team_abbr, team_conf, team_division)
+  select(team_abbr, team_conf, team_division) %>%
+  mutate(team_abbr = ifelse(team_abbr == "LA", "LAR", team_abbr))
 
 # Get the most recent week with data
 most_recent_week <- max(pbp$week, na.rm = TRUE)
@@ -20,14 +21,16 @@ offense_snaps <- pbp %>%
   filter(week <= most_recent_week, !is.na(posteam)) %>%
   group_by(posteam) %>%
   summarise(offense_snaps = n(), .groups = "drop") %>%
-  rename(team = posteam)
+  rename(team = posteam) %>%
+  mutate(team = ifelse(team == "LA", "LAR", team))
 
 # Calculate total defensive snaps by team (plays where team is on defense)
 defense_snaps <- pbp %>%
   filter(week <= most_recent_week, !is.na(defteam)) %>%
   group_by(defteam) %>%
   summarise(defense_snaps = n(), .groups = "drop") %>%
-  rename(team = defteam)
+  rename(team = defteam) %>%
+  mutate(team = ifelse(team == "LA", "LAR", team))
 
 # Combine offense and defense snaps with team info
 team_snaps <- offense_snaps %>%

@@ -9,7 +9,8 @@ pbp <- nflreadr::load_pbp(current_season)
 
 # Load team info for division and conference data
 teams_info <- nflreadr::load_teams() %>%
-  select(team_abbr, team_conf, team_division)
+  select(team_abbr, team_conf, team_division) %>%
+  mutate(team_abbr = ifelse(team_abbr == "LA", "LAR", team_abbr))
 
 # Get the most recent week with data
 most_recent_week <- max(pbp$week, na.rm = TRUE)
@@ -22,7 +23,8 @@ turnovers_forced <- pbp %>%
   filter(interception == 1 | fumble_lost == 1) %>%
   group_by(defteam) %>%
   summarise(turnovers_forced = n(), .groups = "drop") %>%
-  rename(team = defteam)
+  rename(team = defteam) %>%
+  mutate(team = ifelse(team == "LA", "LAR", team))
 
 # Calculate turnovers committed (offensive turnovers)
 turnovers_committed <- pbp %>%
@@ -30,7 +32,8 @@ turnovers_committed <- pbp %>%
   filter(interception == 1 | fumble_lost == 1) %>%
   group_by(posteam) %>%
   summarise(turnovers_committed = n(), .groups = "drop") %>%
-  rename(team = posteam)
+  rename(team = posteam) %>%
+  mutate(team = ifelse(team == "LA", "LAR", team))
 
 # Combine and calculate differential
 turnover_diff <- turnovers_forced %>%

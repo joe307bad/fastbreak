@@ -8,7 +8,8 @@ pbp <- nflreadr::load_pbp(current_season)
 
 # Load team info for division and conference data
 teams_info <- nflreadr::load_teams() %>%
-  select(team_abbr, team_conf, team_division)
+  select(team_abbr, team_conf, team_division) %>%
+  mutate(team_abbr = ifelse(team_abbr == "LA", "LAR", team_abbr))
 
 # Get the most recent week with data
 most_recent_week <- max(pbp$week, na.rm = TRUE)
@@ -20,14 +21,16 @@ offense_epa <- pbp %>%
   filter(week <= most_recent_week, !is.na(epa), !is.na(posteam)) %>%
   group_by(posteam) %>%
   summarise(offense_epa_per_play = mean(epa, na.rm = TRUE), .groups = "drop") %>%
-  rename(team = posteam)
+  rename(team = posteam) %>%
+  mutate(team = ifelse(team == "LA", "LAR", team))
 
 # Calculate defensive EPA per play by team
 defense_epa <- pbp %>%
   filter(week <= most_recent_week, !is.na(epa), !is.na(defteam)) %>%
   group_by(defteam) %>%
   summarise(defense_epa_per_play = mean(epa, na.rm = TRUE), .groups = "drop") %>%
-  rename(team = defteam)
+  rename(team = defteam) %>%
+  mutate(team = ifelse(team == "LA", "LAR", team))
 
 # Combine offense and defense EPA with team info
 team_epa <- offense_epa %>%

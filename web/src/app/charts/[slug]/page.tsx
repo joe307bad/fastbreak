@@ -17,7 +17,7 @@ export async function generateMetadata({ params }: Props) {
   const key = slugToKey(slug);
   const data = await fetchChartData(key);
   return {
-    title: `${data.title} | fastbreak`,
+    title: `${data.title}`,
     description: data.subtitle || data.description,
   };
 }

@@ -18,7 +18,7 @@ export async function generateStaticParams() {
 export async function generateMetadata({ params }: Props) {
   const { sport } = await params;
   return {
-    title: `${sport.toUpperCase()} | fastbreak`,
+    title: `${sport.toUpperCase()}`,
   };
 }
 

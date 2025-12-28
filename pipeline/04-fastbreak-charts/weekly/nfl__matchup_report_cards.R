@@ -8,7 +8,8 @@ current_season <- as.numeric(format(Sys.Date(), "%Y"))
 
 # Load team info for division and conference data
 teams_info <- nflreadr::load_teams() %>%
-  select(team_abbr, team_conf, team_division)
+  select(team_abbr, team_conf, team_division) %>%
+  mutate(team_abbr = ifelse(team_abbr == "LA", "LAR", team_abbr))
 
 cat("Loading NFL data for season:", current_season, "\n")
 
@@ -23,7 +24,11 @@ cat("Most recent completed week:", most_recent_week, "\n")
 cat("Generating matchup report cards for week:", upcoming_week, "\n")
 
 # Load schedule to get upcoming games
-schedule <- nflreadr::load_schedules(current_season)
+schedule <- nflreadr::load_schedules(current_season) %>%
+  mutate(
+    home_team = ifelse(home_team == "LA", "LAR", home_team),
+    away_team = ifelse(away_team == "LA", "LAR", away_team)
+  )
 
 # Filter for upcoming week's games
 upcoming_games <- schedule %>%
@@ -48,42 +53,48 @@ offense_epa <- pbp %>%
   filter(week <= most_recent_week, !is.na(epa), !is.na(posteam)) %>%
   group_by(posteam) %>%
   summarise(off_epa = round(mean(epa, na.rm = TRUE), 3), .groups = "drop") %>%
-  rename(team = posteam)
+  rename(team = posteam) %>%
+  mutate(team = ifelse(team == "LA", "LAR", team))
 
 # 2. Defensive EPA per play (lower is better)
 defense_epa <- pbp %>%
   filter(week <= most_recent_week, !is.na(epa), !is.na(defteam)) %>%
   group_by(defteam) %>%
   summarise(def_epa = round(mean(epa, na.rm = TRUE), 3), .groups = "drop") %>%
-  rename(team = defteam)
+  rename(team = defteam) %>%
+  mutate(team = ifelse(team == "LA", "LAR", team))
 
 # 3. Pass EPA per play (offensive)
 pass_epa <- pbp %>%
   filter(week <= most_recent_week, !is.na(epa), !is.na(posteam), pass == 1) %>%
   group_by(posteam) %>%
   summarise(pass_epa = round(mean(epa, na.rm = TRUE), 3), .groups = "drop") %>%
-  rename(team = posteam)
+  rename(team = posteam) %>%
+  mutate(team = ifelse(team == "LA", "LAR", team))
 
 # 4. Rush EPA per play (offensive)
 rush_epa <- pbp %>%
   filter(week <= most_recent_week, !is.na(epa), !is.na(posteam), rush == 1) %>%
   group_by(posteam) %>%
   summarise(rush_epa = round(mean(epa, na.rm = TRUE), 3), .groups = "drop") %>%
-  rename(team = posteam)
+  rename(team = posteam) %>%
+  mutate(team = ifelse(team == "LA", "LAR", team))
 
 # 5. Pass defense EPA (lower is better)
 pass_def_epa <- pbp %>%
   filter(week <= most_recent_week, !is.na(epa), !is.na(defteam), pass == 1) %>%
   group_by(defteam) %>%
   summarise(pass_def_epa = round(mean(epa, na.rm = TRUE), 3), .groups = "drop") %>%
-  rename(team = defteam)
+  rename(team = defteam) %>%
+  mutate(team = ifelse(team == "LA", "LAR", team))
 
 # 6. Rush defense EPA (lower is better)
 rush_def_epa <- pbp %>%
   filter(week <= most_recent_week, !is.na(epa), !is.na(defteam), rush == 1) %>%
   group_by(defteam) %>%
   summarise(rush_def_epa = round(mean(epa, na.rm = TRUE), 3), .groups = "drop") %>%
-  rename(team = defteam)
+  rename(team = defteam) %>%
+  mutate(team = ifelse(team == "LA", "LAR", team))
 
 # 7. Turnovers forced
 turnovers_forced <- pbp %>%
@@ -91,7 +102,8 @@ turnovers_forced <- pbp %>%
   filter(interception == 1 | fumble_lost == 1) %>%
   group_by(defteam) %>%
   summarise(to_forced = n(), .groups = "drop") %>%
-  rename(team = defteam)
+  rename(team = defteam) %>%
+  mutate(team = ifelse(team == "LA", "LAR", team))
 
 # 8. Turnovers committed
 turnovers_committed <- pbp %>%
@@ -99,7 +111,8 @@ turnovers_committed <- pbp %>%
   filter(interception == 1 | fumble_lost == 1) %>%
   group_by(posteam) %>%
   summarise(to_committed = n(), .groups = "drop") %>%
-  rename(team = posteam)
+  rename(team = posteam) %>%
+  mutate(team = ifelse(team == "LA", "LAR", team))
 
 # 9. Points scored per game and points allowed per game from schedule
 team_records <- schedule %>%
@@ -117,6 +130,7 @@ team_records <- schedule %>%
     loss = points_for < points_against,
     tie = points_for == points_against
   ) %>%
+  mutate(team = ifelse(team == "LA", "LAR", team)) %>%
   group_by(team) %>%
   summarise(
     wins = sum(win),

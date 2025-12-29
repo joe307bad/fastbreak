@@ -15,6 +15,12 @@ export function Header() {
         </Link>
         <div className="flex items-center gap-1">
           <Link
+            href="/docs"
+            className="px-2 py-1 text-sm hover:bg-[var(--border)] rounded transition-colors"
+          >
+            Docs
+          </Link>
+          <Link
             href="/blog"
             className="px-2 py-1 text-sm hover:bg-[var(--border)] rounded transition-colors"
           >

@@ -1,17 +1,28 @@
 import type { MDXComponents } from "mdx/types";
 import { PlatformLinks } from "./src/components/ui/PlatformLinks";
 import { IntroScreenshots } from "./src/components/ui/IntroScreenshots";
+import { PlatformSupport } from "./src/components/ui/PlatformSupport";
+import { BetaLinks } from "./src/components/ui/BetaLinks";
+import { PinchToZoomDemo } from "./src/components/ui/PinchToZoomDemo";
+import { ManageTeamsDemo } from "./src/components/ui/ManageTeamsDemo";
+import { HighlightingDataPointsDemo } from "./src/components/ui/HighlightingDataPointsDemo";
+import { NavigateChartsDemo } from "./src/components/ui/NavigateChartsDemo";
+import { HeadingWithAnchor } from "./src/components/ui/HeadingWithAnchor";
 
 export function useMDXComponents(components: MDXComponents): MDXComponents {
   return {
     PlatformLinks,
     IntroScreenshots,
+    PlatformSupport,
+    BetaLinks,
+    PinchToZoomDemo,
+    ManageTeamsDemo,
+    HighlightingDataPointsDemo,
+    NavigateChartsDemo,
     h1: ({ children }) => (
       <h1 className="text-2xl font-bold mb-4">{children}</h1>
     ),
-    h2: ({ children }) => (
-      <h2 className="text-xl font-bold mt-6 mb-3">{children}</h2>
-    ),
+    h2: (props) => <HeadingWithAnchor {...props} />,
     h3: ({ children }) => (
       <h3 className="text-lg font-bold mt-4 mb-2">{children}</h3>
     ),

@@ -9,6 +9,7 @@ import remarkGfm from 'remark-gfm';
 import { BetaLinks } from '@/components/ui/BetaLinks';
 import { PlatformSupport } from '@/components/ui/PlatformSupport';
 import { PinchToZoomDemo } from '@/components/ui/PinchToZoomDemo';
+import { ManageTeamsDemo } from '@/components/ui/ManageTeamsDemo';
 
 interface DocMetadata {
   title: string;
@@ -26,6 +27,7 @@ const components: MDXComponents = {
   BetaLinks,
   PlatformSupport,
   PinchToZoomDemo,
+  ManageTeamsDemo,
 };
 
 export async function generateStaticParams() {

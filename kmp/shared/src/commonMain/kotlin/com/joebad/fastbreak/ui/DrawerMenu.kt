@@ -9,6 +9,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import com.joebad.fastbreak.data.model.Registry
@@ -63,7 +64,8 @@ fun DrawerMenu(
                 onClick = onNavigateToSettings,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(16.dp),
+                    .padding(16.dp)
+                    .testTag("settings-button"),
                 contentPadding = PaddingValues(vertical = 16.dp)
             ) {
                 Icon(

@@ -16,9 +16,10 @@ export function PinchToZoomDemo() {
       {/* Right side - Information sections */}
       <div className="flex flex-col gap-6 flex-1">
         <div>
-          <h3 className="text-lg font-bold mb-2 mt-0">When was this released?</h3>
+          <h3 className="text-lg font-bold mb-2 mt-0">How do I use this?</h3>
           <p className="text-[var(--muted)] leading-relaxed">
-            December 2024 - Available in the initial release of fastbreak on iOS and Android.
+            Open any chart in the app. Use two fingers to pinch in or out on the chart to zoom.
+            Once zoomed in, drag with one finger to pan around and explore different areas of the data.
           </p>
         </div>
 

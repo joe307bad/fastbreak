@@ -9,12 +9,10 @@ export function InfoModal() {
     return (
       <button
         onClick={() => setOpen(true)}
-        className="p-2 hover:bg-[var(--border)] rounded transition-colors"
-        aria-label="About"
+        className="px-4 py-2 bg-blue-600 text-white rounded font-medium hover:bg-blue-700 transition-colors text-sm"
+        aria-label="Join the beta"
       >
-        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
+        Join the beta
       </button>
     );
   }
@@ -23,12 +21,10 @@ export function InfoModal() {
     <>
       <button
         onClick={() => setOpen(true)}
-        className="p-2 hover:bg-[var(--border)] rounded transition-colors"
-        aria-label="About"
+        className="px-4 py-2 bg-blue-600 text-white rounded font-medium hover:bg-blue-700 transition-colors text-sm"
+        aria-label="Join the beta"
       >
-        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
+        Join the beta
       </button>
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 overflow-y-auto" onClick={() => setOpen(false)}>
         <div className="bg-[var(--card)] border border-[var(--border)] rounded-lg max-w-xl w-full my-auto p-6 relative" onClick={e => e.stopPropagation()}>

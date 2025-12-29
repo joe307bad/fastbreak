@@ -151,4 +151,180 @@ class DemoUITests {
 
         println("✓ Demo complete!")
     }
+
+    /**
+     * Demo test: Manage teams and filter chart data
+     * Shows: Side menu > Settings > Manage teams > Search > Select team > NHL tab > Filter chart
+     */
+    @Test
+    fun testDemo_ManageTeamsAndFilter() {
+        println("🎬 RECORDING_READY - Starting demo...")
+
+        println("⏱ Waiting for app to load...")
+        Thread.sleep(1500)
+
+        // Open side menu by clicking the hamburger menu icon (faster - no extra pause)
+        println("🔍 Looking for hamburger menu icon...")
+        val menuIcon = device.wait(
+            Until.findObject(By.desc("Menu")),
+            3000
+        )
+
+        if (menuIcon != null) {
+            println("✓ Found menu icon, clicking...")
+            menuIcon.click()
+            Thread.sleep(1000)  // Reduced wait time
+            println("✓ Side menu should be open")
+        } else {
+            println("⚠ Menu icon not found, trying click at top left corner...")
+            // Click at approximate location of menu icon (top left)
+            device.click(60, 138)
+            Thread.sleep(1000)
+        }
+
+        // Find and tap "Settings" button by text
+        println("🔍 Looking for 'settings' button...")
+        val settingsButton = device.wait(
+            Until.findObject(By.textContains("settings")),
+            3000
+        )
+
+        if (settingsButton != null) {
+            println("✓ Found 'settings' button, tapping...")
+            settingsButton.click()
+            Thread.sleep(1000)
+        } else {
+            println("⚠ settings button not found")
+        }
+
+        // Find and tap "Manage Teams" option
+        println("🔍 Looking for 'Manage Teams' option...")
+        val manageTeamsText = device.wait(
+            Until.findObject(By.textContains("manage teams")),
+            3000
+        )
+
+        if (manageTeamsText != null) {
+            println("✓ Found 'Manage Teams', tapping...")
+            manageTeamsText.click()
+            Thread.sleep(800)
+        } else {
+            println("⚠ Manage Teams not found")
+        }
+
+        // Search for Pittsburgh Penguins
+        println("🔍 Looking for search field...")
+        val searchFieldSelector = UiSelector().className("android.widget.EditText")
+        val searchField = device.findObject(searchFieldSelector)
+
+        if (searchField.exists()) {
+            println("✓ Found search field, entering 'Pittsburgh Penguins'...")
+            searchField.click()
+            Thread.sleep(1000)
+            searchField.setText("Pittsburgh Penguins")
+            Thread.sleep(1000)
+        } else {
+            println("⚠ Search field not found")
+        }
+
+        // Select Pittsburgh Penguins from results
+        println("🔍 Looking for Pittsburgh Penguins in results...")
+        val penguinsResult = device.wait(
+            Until.findObject(By.textContains("Pittsburgh Penguins")),
+            3000
+        ) ?: device.wait(
+            Until.findObject(By.textContains("Penguins")),
+            2000
+        )
+
+        if (penguinsResult != null) {
+            println("✓ Found Penguins, selecting...")
+            penguinsResult.click()
+            Thread.sleep(500)
+        } else {
+            println("⚠ Pittsburgh Penguins not found in results")
+        }
+
+        // Close the team selector bottom sheet first
+        println("🔍 Closing team selector bottom sheet...")
+        device.pressBack()
+        Thread.sleep(500)
+
+        // Now navigate back from Settings to home screen
+        println("🔍 Looking for Settings back button...")
+        val settingsBackButton = device.wait(
+            Until.findObject(By.desc("Back")),
+            3000
+        )
+
+        if (settingsBackButton != null) {
+            println("✓ Found Settings back button, tapping...")
+            settingsBackButton.click()
+            Thread.sleep(500)
+        } else {
+            println("⚠ Settings back button not found, using device back...")
+            device.pressBack()
+            Thread.sleep(500)
+        }
+
+        // Switch to NHL tab
+        println("🔍 Looking for NHL tab...")
+        val nhlTab = device.wait(
+            Until.findObject(By.text("NHL")),
+            3000
+        )
+
+        if (nhlTab != null) {
+            println("✓ Found NHL tab, tapping...")
+            nhlTab.click()
+            Thread.sleep(1000)
+        } else {
+            println("⚠ NHL tab not found")
+        }
+
+        // Find and tap "Scoring Leaders" chart
+        println("🔍 Looking for 'Scoring Leaders' chart...")
+        val scoringLeadersChart = device.wait(
+            Until.findObject(By.textContains("Scoring Leader")),
+            5000
+        )
+
+        if (scoringLeadersChart != null) {
+            println("✓ Found 'Scoring Leaders', tapping...")
+            scoringLeadersChart.click()
+            Thread.sleep(1000)
+        } else {
+            println("⚠ Scoring Leaders chart not found")
+        }
+
+        // Find and tap PIT filter badge
+        println("🔍 Looking for 'PIT' filter badge...")
+        val pitBadge = device.wait(
+            Until.findObject(By.text("PIT")),
+            3000
+        )
+
+        if (pitBadge != null) {
+            println("✓ Found 'PIT' badge, tapping...")
+            pitBadge.click()
+            Thread.sleep(1000)
+        } else {
+            println("⚠ PIT badge not found, trying alternative search...")
+            // Try to find any clickable element with PIT text
+            val pitAlt = device.wait(
+                Until.findObject(By.textContains("PIT").clickable(true)),
+                2000
+            )
+            if (pitAlt != null) {
+                pitAlt.click()
+                Thread.sleep(1000)
+            }
+        }
+
+        // Final pause to show the filtered chart
+        println("✓ Showing filtered chart...")
+        Thread.sleep(2000)
+
+        println("✓ Demo complete!")
+    }
 }

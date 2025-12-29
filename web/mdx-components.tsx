@@ -4,6 +4,8 @@ import { IntroScreenshots } from "./src/components/ui/IntroScreenshots";
 import { PlatformSupport } from "./src/components/ui/PlatformSupport";
 import { BetaLinks } from "./src/components/ui/BetaLinks";
 import { PinchToZoomDemo } from "./src/components/ui/PinchToZoomDemo";
+import { ManageTeamsDemo } from "./src/components/ui/ManageTeamsDemo";
+import { HighlightingDataPointsDemo } from "./src/components/ui/HighlightingDataPointsDemo";
 
 export function useMDXComponents(components: MDXComponents): MDXComponents {
   return {
@@ -12,6 +14,8 @@ export function useMDXComponents(components: MDXComponents): MDXComponents {
     PlatformSupport,
     BetaLinks,
     PinchToZoomDemo,
+    ManageTeamsDemo,
+    HighlightingDataPointsDemo,
     h1: ({ children }) => (
       <h1 className="text-2xl font-bold mb-4">{children}</h1>
     ),

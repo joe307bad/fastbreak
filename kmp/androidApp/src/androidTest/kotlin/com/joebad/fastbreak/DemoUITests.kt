@@ -327,4 +327,172 @@ class DemoUITests {
 
         println("✓ Demo complete!")
     }
+
+    /**
+     * Demo test: Highlighting data points
+     * Shows: NBA tab > Select PHI and LAL badges > Division badge > Southwest Division > Select top 3 players
+     */
+    @Test
+    fun testDemo_HighlightingDataPoints() {
+        println("🎬 RECORDING_READY - Starting demo...")
+
+        println("⏱ Waiting for app to load...")
+        Thread.sleep(1500)
+
+        // Switch to NBA tab
+        println("🔍 Looking for NBA tab...")
+        val nbaTab = device.wait(
+            Until.findObject(By.text("NBA")),
+            3000
+        )
+
+        if (nbaTab != null) {
+            println("✓ Found NBA tab, tapping...")
+            nbaTab.click()
+            Thread.sleep(1000)
+        } else {
+            println("⚠ NBA tab not found")
+        }
+
+        // Find and tap "Player Efficiency" chart
+        println("🔍 Looking for 'Player Efficiency' chart...")
+        val playerEfficiency = device.wait(
+            Until.findObject(By.textContains("Player Efficiency")),
+            5000
+        )
+
+        if (playerEfficiency != null) {
+            println("✓ Found 'Player Efficiency', tapping...")
+            playerEfficiency.click()
+            Thread.sleep(1000)
+        } else {
+            println("⚠ Player Efficiency chart not found")
+        }
+
+        // Find and tap PHI badge
+        println("🔍 Looking for 'PHI' filter badge...")
+        val phiBadge = device.wait(
+            Until.findObject(By.text("PHI")),
+            3000
+        )
+
+        if (phiBadge != null) {
+            println("✓ Found 'PHI' badge, tapping...")
+            phiBadge.click()
+            Thread.sleep(1000)
+        } else {
+            println("⚠ PHI badge not found")
+        }
+
+        // Find and tap LAL badge
+        println("🔍 Looking for 'LAL' filter badge...")
+        val lalBadge = device.wait(
+            Until.findObject(By.text("LAL")),
+            3000
+        )
+
+        if (lalBadge != null) {
+            println("✓ Found 'LAL' badge, tapping...")
+            lalBadge.click()
+            Thread.sleep(1000)
+        } else {
+            println("⚠ LAL badge not found")
+        }
+
+        // Find and tap Division badge to open division selector
+        println("🔍 Looking for 'Division' badge...")
+        val divisionBadge = device.wait(
+            Until.findObject(By.textContains("Division")),
+            3000
+        )
+
+        if (divisionBadge != null) {
+            println("✓ Found 'Division' badge, tapping...")
+            divisionBadge.click()
+            Thread.sleep(1000)
+        } else {
+            println("⚠ Division badge not found")
+        }
+
+        // Select Southwest Division from the list
+        println("🔍 Looking for 'Southwest' division...")
+        val southwestDivision = device.wait(
+            Until.findObject(By.textContains("Southwest")),
+            3000
+        )
+
+        if (southwestDivision != null) {
+            println("✓ Found 'Southwest' division, selecting...")
+            southwestDivision.click()
+            Thread.sleep(1000)
+        } else {
+            println("⚠ Southwest division not found")
+        }
+
+        // Scroll down to find player names
+        println("📜 Scrolling down to find player names...")
+        device.swipe(
+            device.displayWidth / 2,
+            device.displayHeight * 2 / 3,
+            device.displayWidth / 2,
+            device.displayHeight / 3,
+            10
+        )
+        Thread.sleep(800)
+
+        // Select the top three player names in the list
+        // We'll look for clickable text elements that are player names
+        println("🔍 Selecting top three players...")
+
+        // Get all clickable elements (potential player names)
+        // We'll try to find and click the first three distinct player name elements
+        for (i in 1..3) {
+            println("  → Selecting player $i...")
+
+            // Find clickable elements that might be player names
+            // Strategy: find text elements that are clickable and not badges/tabs
+            val playerElements = device.findObjects(By.clickable(true))
+
+            if (playerElements.size >= i) {
+                // Filter out known UI elements (tabs, badges, etc.) and select data points
+                val potentialPlayers = playerElements.filter { element ->
+                    val text = element.text
+                    text != null &&
+                    !text.contains("NBA") &&
+                    !text.contains("NFL") &&
+                    !text.contains("NHL") &&
+                    !text.contains("Division") &&
+                    text.length > 3  // Player names are longer than 3 chars
+                }
+
+                if (potentialPlayers.size >= i) {
+                    val player = potentialPlayers[i - 1]
+                    println("  ✓ Clicking player: ${player.text}")
+                    player.click()
+                    Thread.sleep(500)
+                } else {
+                    println("  ⚠ Not enough player elements found")
+                }
+            }
+        }
+
+        Thread.sleep(1000)
+
+        // Scroll back up
+        println("📜 Scrolling back up...")
+        device.swipe(
+            device.displayWidth / 2,
+            device.displayHeight / 3,
+            device.displayWidth / 2,
+            device.displayHeight * 2 / 3,
+            10
+        )
+        Thread.sleep(1000)
+
+        // Final pause to show the result
+        println("✓ Showing highlighted data points...")
+        Thread.sleep(2000)
+
+        println("✓ Demo complete!")
+    }
 }

@@ -10,6 +10,7 @@ import { BetaLinks } from '@/components/ui/BetaLinks';
 import { PlatformSupport } from '@/components/ui/PlatformSupport';
 import { PinchToZoomDemo } from '@/components/ui/PinchToZoomDemo';
 import { ManageTeamsDemo } from '@/components/ui/ManageTeamsDemo';
+import { HighlightingDataPointsDemo } from '@/components/ui/HighlightingDataPointsDemo';
 
 interface DocMetadata {
   title: string;
@@ -28,6 +29,7 @@ const components: MDXComponents = {
   PlatformSupport,
   PinchToZoomDemo,
   ManageTeamsDemo,
+  HighlightingDataPointsDemo
 };
 
 export async function generateStaticParams() {

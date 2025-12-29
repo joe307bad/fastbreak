@@ -8,6 +8,7 @@ import type { MDXComponents } from 'mdx/types';
 import remarkGfm from 'remark-gfm';
 import { BetaLinks } from '@/components/ui/BetaLinks';
 import { PlatformSupport } from '@/components/ui/PlatformSupport';
+import { PinchToZoomDemo } from '@/components/ui/PinchToZoomDemo';
 
 interface DocMetadata {
   title: string;
@@ -24,6 +25,7 @@ const components: MDXComponents = {
   td: (props) => <td {...props} />,
   BetaLinks,
   PlatformSupport,
+  PinchToZoomDemo,
 };
 
 export async function generateStaticParams() {

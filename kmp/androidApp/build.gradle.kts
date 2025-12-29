@@ -24,6 +24,8 @@ android {
         targetSdk = 35
         versionCode = (project.findProperty("VERSION_CODE") as String?)?.toIntOrNull() ?: 1
         versionName = (project.findProperty("VERSION_NAME") as String?) ?: "1.0"
+
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     val releaseStoreFile = localProperties.getProperty("RELEASE_STORE_FILE", "")
@@ -75,4 +77,10 @@ dependencies {
     implementation(libs.multiplatform.settings.no.arg)
     implementation(libs.ktor.client.core)
     implementation(libs.sentry.android)
+
+    // UI Automator dependencies for automated testing
+    androidTestImplementation("androidx.test.ext:junit:1.2.1")
+    androidTestImplementation("androidx.test:runner:1.6.2")
+    androidTestImplementation("androidx.test:rules:1.6.1")
+    androidTestImplementation("androidx.test.uiautomator:uiautomator:2.3.0")
 }

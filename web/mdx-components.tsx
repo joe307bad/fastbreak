@@ -1,11 +1,17 @@
 import type { MDXComponents } from "mdx/types";
 import { PlatformLinks } from "./src/components/ui/PlatformLinks";
 import { IntroScreenshots } from "./src/components/ui/IntroScreenshots";
+import { PlatformSupport } from "./src/components/ui/PlatformSupport";
+import { BetaLinks } from "./src/components/ui/BetaLinks";
+import { PinchToZoomDemo } from "./src/components/ui/PinchToZoomDemo";
 
 export function useMDXComponents(components: MDXComponents): MDXComponents {
   return {
     PlatformLinks,
     IntroScreenshots,
+    PlatformSupport,
+    BetaLinks,
+    PinchToZoomDemo,
     h1: ({ children }) => (
       <h1 className="text-2xl font-bold mb-4">{children}</h1>
     ),

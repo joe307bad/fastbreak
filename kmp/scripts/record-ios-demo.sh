@@ -100,7 +100,7 @@ xcodebuild build \
 
 # Install the app (but don't launch yet - let the test launch it while recording)
 echo -e "  → Installing app to simulator..."
-APP_PATH=$(find ~/Library/Developer/Xcode/DerivedData/iosApp*/Build/Products/Debug-iphonesimulator -name "*.app" -type d 2>/dev/null | head -1)
+APP_PATH=$(find ~/Library/Developer/Xcode/DerivedData/iosApp*/Build/Products/Debug-iphonesimulator -name "*.app" -type d 2>/dev/null | grep -v "Runner" | grep -v "UITests" | head -1)
 if [ -n "$APP_PATH" ]; then
     xcrun simctl install "$SIMULATOR_UDID" "$APP_PATH"
     echo -e "${GREEN}✓ App installed${NC}"

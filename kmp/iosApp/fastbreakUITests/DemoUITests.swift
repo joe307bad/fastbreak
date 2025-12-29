@@ -17,6 +17,35 @@ class DemoUITests: XCTestCase {
         app = nil
     }
 
+    // MARK: - Helper Methods for Pinch Gestures
+
+    /// Performs a pinch-out (zoom in) gesture on an element at a specific vertical position
+    func performPinchOut(on element: XCUIElement, atNormalizedY y: CGFloat) {
+        // Start with fingers close together, move them apart
+        let center = element.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: y))
+        let leftStart = element.coordinate(withNormalizedOffset: CGVector(dx: 0.45, dy: y))
+        let leftEnd = element.coordinate(withNormalizedOffset: CGVector(dx: 0.25, dy: y))
+        let rightStart = element.coordinate(withNormalizedOffset: CGVector(dx: 0.55, dy: y))
+        let rightEnd = element.coordinate(withNormalizedOffset: CGVector(dx: 0.75, dy: y))
+
+        // Simulate two fingers moving apart
+        leftStart.press(forDuration: 0.05, thenDragTo: leftEnd)
+        rightStart.press(forDuration: 0.05, thenDragTo: rightEnd)
+    }
+
+    /// Performs a pinch-in (zoom out) gesture on an element at a specific vertical position
+    func performPinchIn(on element: XCUIElement, atNormalizedY y: CGFloat) {
+        // Start with fingers far apart, move them together
+        let leftStart = element.coordinate(withNormalizedOffset: CGVector(dx: 0.25, dy: y))
+        let leftEnd = element.coordinate(withNormalizedOffset: CGVector(dx: 0.45, dy: y))
+        let rightStart = element.coordinate(withNormalizedOffset: CGVector(dx: 0.75, dy: y))
+        let rightEnd = element.coordinate(withNormalizedOffset: CGVector(dx: 0.55, dy: y))
+
+        // Simulate two fingers moving together
+        leftStart.press(forDuration: 0.05, thenDragTo: leftEnd)
+        rightStart.press(forDuration: 0.05, thenDragTo: rightEnd)
+    }
+
     // MARK: - Demo: Pinch to Zoom and Pan on NFL Team Tiers
 
     func testDemo_PinchToZoomAndPan() throws {
@@ -46,32 +75,29 @@ class DemoUITests: XCTestCase {
         }
 
         // Find the chart element
-        print("🔍 Looking for chart element...")
-        // Try multiple ways to find the chart
+        print("🔍 Looking for chart element with testTag 'chart'...")
         var chartElement: XCUIElement?
 
-        // Try by accessibility identifier first
+        // Try by accessibility identifier first (testTag becomes accessibilityIdentifier on iOS)
         let chartById = app.otherElements["chart"].firstMatch
-        if chartById.exists {
+        if chartById.waitForExistence(timeout: 5) {
             chartElement = chartById
-            print("✓ Found chart by identifier 'chart'")
-        }
+            print("✓ Found chart by testTag identifier 'chart'")
+        } else {
+            print("⚠ Chart with testTag not found, trying fallback methods...")
 
-        // Try to find any scrollable view or chart-like element
-        if chartElement == nil {
+            // Try to find any scrollable view or chart-like element
             let scrollViews = app.scrollViews
             if scrollViews.count > 0 {
                 chartElement = scrollViews.firstMatch
                 print("✓ Found chart via scrollView")
-            }
-        }
-
-        // Try to find by other elements
-        if chartElement == nil {
-            let otherElements = app.otherElements.element(boundBy: 0)
-            if otherElements.exists {
-                chartElement = otherElements
-                print("✓ Using first otherElement as chart")
+            } else {
+                // Try to find by other elements
+                let otherElements = app.otherElements.element(boundBy: 0)
+                if otherElements.exists {
+                    chartElement = otherElements
+                    print("✓ Using first otherElement as chart")
+                }
             }
         }
 
@@ -82,40 +108,34 @@ class DemoUITests: XCTestCase {
             // Initial pause to show the chart
             sleep(UInt32(1))
 
-            // Zoom in (pinch out)
-            print("  → Pinching to zoom in...")
-            chart.pinch(withScale: 2.0, velocity: 1.0)
+            // Zoom in - manual two-finger pinch out gesture on upper chart area
+            print("  → Zooming in with pinch out gesture...")
+            performPinchOut(on: chart, atNormalizedY: 0.25)
             sleep(UInt32(2))
 
-            // Pan left
+            // Pan around while zoomed
             print("  → Panning left...")
-            chart.swipeLeft(velocity: .slow)
+            let panStart = chart.coordinate(withNormalizedOffset: CGVector(dx: 0.65, dy: 0.25))
+            let panEnd = chart.coordinate(withNormalizedOffset: CGVector(dx: 0.35, dy: 0.25))
+            panStart.press(forDuration: 0.1, thenDragTo: panEnd)
             sleep(UInt32(1))
 
             // Pan right
             print("  → Panning right...")
-            chart.swipeRight(velocity: .slow)
+            let panRight = chart.coordinate(withNormalizedOffset: CGVector(dx: 0.35, dy: 0.25))
+            let panRightEnd = chart.coordinate(withNormalizedOffset: CGVector(dx: 0.65, dy: 0.25))
+            panRight.press(forDuration: 0.1, thenDragTo: panRightEnd)
             sleep(UInt32(1))
 
-            // Pan up
-            print("  → Panning up...")
-            chart.swipeUp(velocity: .slow)
-            sleep(UInt32(1))
-
-            // Pan down
-            print("  → Panning down...")
-            chart.swipeDown(velocity: .slow)
-            sleep(UInt32(1))
-
-            // Zoom out (pinch in)
-            print("  → Pinching to zoom out...")
-            chart.pinch(withScale: 0.5, velocity: 1.0)
+            // Zoom out - manual two-finger pinch in gesture
+            print("  → Zooming out with pinch in gesture...")
+            performPinchIn(on: chart, atNormalizedY: 0.25)
             sleep(UInt32(2))
 
-            // Final zoom in to show it works
+            // Final zoom in
             print("  → Final zoom in...")
-            chart.pinch(withScale: 1.8, velocity: 1.0)
-            sleep(UInt32(1))
+            performPinchOut(on: chart, atNormalizedY: 0.25)
+            sleep(UInt32(2))
 
         } else {
             print("⚠ Chart element not found")

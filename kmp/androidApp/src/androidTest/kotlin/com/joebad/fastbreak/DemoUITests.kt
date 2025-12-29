@@ -495,4 +495,96 @@ class DemoUITests {
 
         println("✓ Demo complete!")
     }
+
+    /**
+     * Demo test: Navigate through all charts and show info bottom sheet
+     * Shows: Cumulative EPA > Back > Team Snaps > Back > Playoff Odds > Back > Turnover Differential > Info button
+     */
+    @Test
+    fun testDemo_NavigateChartsAndShowInfo() {
+        println("🎬 RECORDING_READY - Starting demo...")
+
+        println("⏱ Waiting for app to load...")
+        Thread.sleep(1500)
+
+        // Define the charts to visit in order
+        val chartNames = listOf(
+            "Cumulative EPA",
+            "Team Snaps",
+            "Playoff Odds",
+            "Turnover Differential"
+        )
+
+        for ((index, chartName) in chartNames.withIndex()) {
+            val isLastChart = index == chartNames.size - 1
+            println("📊 Looking for '$chartName' chart...")
+
+            // Find the chart by name
+            val chart = device.wait(
+                Until.findObject(By.textContains(chartName)),
+                5000
+            )
+
+            if (chart != null) {
+                println("  ✓ Found '$chartName', tapping...")
+                chart.click()
+                Thread.sleep(1000)
+
+                // If this is the last chart (Turnover Differential), click the info button
+                if (isLastChart) {
+                    println("  🔍 Looking for info button on '$chartName'...")
+                    val infoButton = device.wait(
+                        Until.findObject(By.desc("Chart Info")),
+                        3000
+                    )
+
+                    if (infoButton != null) {
+                        println("  ✓ Found info button, tapping...")
+                        infoButton.click()
+                        Thread.sleep(1500)
+
+                        // Show the bottom sheet for a moment
+                        println("  ✓ Bottom sheet description should be visible")
+                        Thread.sleep(2000)
+
+                        // Close the bottom sheet
+                        println("  → Closing bottom sheet...")
+                        device.pressBack()
+                        Thread.sleep(500)
+                    } else {
+                        println("  ⚠ Info button not found, trying to click top-right area...")
+                        // Try clicking the approximate location of info button (top right)
+                        device.click(device.displayWidth - 100, 200)
+                        Thread.sleep(1500)
+
+                        // If bottom sheet opened, close it
+                        device.pressBack()
+                        Thread.sleep(500)
+                    }
+                }
+
+                // Navigate back to the chart list
+                println("  ← Navigating back to chart list...")
+                val backButton = device.wait(
+                    Until.findObject(By.desc("Back")),
+                    2000
+                )
+
+                if (backButton != null) {
+                    backButton.click()
+                } else {
+                    device.pressBack()
+                }
+                Thread.sleep(800)
+            } else {
+                println("  ⚠ '$chartName' chart not found, skipping...")
+            }
+        }
+
+        // Final pause
+        println("✓ Showing final chart list view...")
+        Thread.sleep(1500)
+
+        println("✓ Demo complete!")
+    }
 }

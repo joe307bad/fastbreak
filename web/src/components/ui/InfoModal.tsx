@@ -12,7 +12,12 @@ export function InfoModal() {
         className="px-4 py-2 bg-blue-600 text-white rounded font-medium hover:bg-blue-700 transition-colors text-sm"
         aria-label="Join the beta"
       >
-        Join the beta
+        <span className="hidden md:inline">Join the beta</span>
+        <svg className="w-5 h-5 md:hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <circle cx="12" cy="12" r="10" />
+          <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+          <line x1="12" y1="17" x2="12.01" y2="17" />
+        </svg>
       </button>
     );
   }
@@ -24,7 +29,12 @@ export function InfoModal() {
         className="px-4 py-2 bg-blue-600 text-white rounded font-medium hover:bg-blue-700 transition-colors text-sm"
         aria-label="Join the beta"
       >
-        Join the beta
+        <span className="hidden md:inline">Join the beta</span>
+        <svg className="w-5 h-5 md:hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <circle cx="12" cy="12" r="10" />
+          <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+          <line x1="12" y1="17" x2="12.01" y2="17" />
+        </svg>
       </button>
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 overflow-y-auto" onClick={() => setOpen(false)}>
         <div className="bg-[var(--card)] border border-[var(--border)] rounded-lg max-w-xl w-full my-auto p-6 relative" onClick={e => e.stopPropagation()}>

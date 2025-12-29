@@ -43,39 +43,41 @@ export function PlatformSupport({ ios = false, android = false, web = false, ver
   ];
 
   return (
-    <div className="flex gap-3 my-4 items-center">
-      {platforms.map((platform) => (
-        <div
-          key={platform.name}
-          className="relative"
-          onMouseEnter={() => setHoveredPlatform(platform.name)}
-          onMouseLeave={() => setHoveredPlatform(null)}
-        >
+    <div className="overflow-x-auto my-4">
+      <div className="flex gap-3 items-center min-w-max">
+        {platforms.map((platform) => (
           <div
-            className={`flex items-center gap-2 px-3 py-2 border rounded transition-all ${
-              platform.supported
-                ? 'border-green-600 text-green-600 bg-green-600/10'
-                : 'border-red-600 text-red-600 bg-red-600/10'
-            }`}
+            key={platform.name}
+            className="relative flex-shrink-0"
+            onMouseEnter={() => setHoveredPlatform(platform.name)}
+            onMouseLeave={() => setHoveredPlatform(null)}
           >
-            {platform.icon}
-            <span className="text-xs font-medium">{platform.name}</span>
-          </div>
-          {hoveredPlatform === platform.name && (
-            <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-[var(--foreground)] text-[var(--background)] text-xs rounded whitespace-nowrap z-10">
-              {platform.supported
-                ? `Supported on ${platform.name}`
-                : `Not supported on ${platform.name}`}
-              <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent border-t-[var(--foreground)]"></div>
+            <div
+              className={`flex items-center gap-2 px-3 py-2 border rounded transition-all whitespace-nowrap ${
+                platform.supported
+                  ? 'border-green-600 text-green-600 bg-green-600/10'
+                  : 'border-red-600 text-red-600 bg-red-600/10'
+              }`}
+            >
+              {platform.icon}
+              <span className="text-xs font-medium">{platform.name}</span>
             </div>
-          )}
+            {hoveredPlatform === platform.name && (
+              <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-[var(--foreground)] text-[var(--background)] text-xs rounded whitespace-nowrap z-10">
+                {platform.supported
+                  ? `Supported on ${platform.name}`
+                  : `Not supported on ${platform.name}`}
+                <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent border-t-[var(--foreground)]"></div>
+              </div>
+            )}
+          </div>
+        ))}
+        <div className="flex items-center gap-2 px-3 py-2 border rounded bg-blue-600/10 border-blue-600 text-blue-600 flex-shrink-0 whitespace-nowrap">
+          <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z"/>
+          </svg>
+          <span className="text-xs font-medium">Released in {version}</span>
         </div>
-      ))}
-      <div className="flex items-center gap-2 px-3 py-2 border rounded bg-blue-600/10 border-blue-600 text-blue-600">
-        <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
-          <path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z"/>
-        </svg>
-        <span className="text-xs font-medium">Released in {version}</span>
       </div>
     </div>
   );

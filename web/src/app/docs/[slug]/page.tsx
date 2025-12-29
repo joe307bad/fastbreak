@@ -6,11 +6,15 @@ import { MDXRemote } from 'next-mdx-remote/rsc';
 import { notFound } from 'next/navigation';
 import type { MDXComponents } from 'mdx/types';
 import remarkGfm from 'remark-gfm';
+import rehypeSlug from 'rehype-slug';
 import { BetaLinks } from '@/components/ui/BetaLinks';
 import { PlatformSupport } from '@/components/ui/PlatformSupport';
 import { PinchToZoomDemo } from '@/components/ui/PinchToZoomDemo';
 import { ManageTeamsDemo } from '@/components/ui/ManageTeamsDemo';
 import { HighlightingDataPointsDemo } from '@/components/ui/HighlightingDataPointsDemo';
+import { NavigateChartsDemo } from '@/components/ui/NavigateChartsDemo';
+import { HeadingWithAnchor } from '@/components/ui/HeadingWithAnchor';
+import { ScrollToHash } from '@/components/ui/ScrollToHash';
 
 interface DocMetadata {
   title: string;
@@ -25,11 +29,13 @@ const components: MDXComponents = {
   tr: (props) => <tr {...props} />,
   th: (props) => <th {...props} />,
   td: (props) => <td {...props} />,
+  h2: (props) => <HeadingWithAnchor {...props} />,
   BetaLinks,
   PlatformSupport,
   PinchToZoomDemo,
   ManageTeamsDemo,
-  HighlightingDataPointsDemo
+  HighlightingDataPointsDemo,
+  NavigateChartsDemo
 };
 
 export async function generateStaticParams() {
@@ -80,12 +86,14 @@ export default async function DocPage({ params }: { params: Promise<{ slug: stri
 
   return (
     <article className="docs-content">
+      <ScrollToHash />
       <MDXRemote
         source={content}
         components={components}
         options={{
           mdxOptions: {
             remarkPlugins: [remarkGfm],
+            rehypePlugins: [rehypeSlug],
           },
         }}
       />

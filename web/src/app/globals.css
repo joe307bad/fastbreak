@@ -49,9 +49,10 @@ body {
 .docs-content h2 {
   font-size: 1.25rem;
   font-weight: 700;
-  margin-top: 2rem;
+  margin-top: 0;
   margin-bottom: 1rem;
   line-height: 1.3;
+  padding-top: 2.5rem;
 }
 
 .docs-content h3 {

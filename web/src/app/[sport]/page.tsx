@@ -15,6 +15,9 @@ export async function generateStaticParams() {
   return VALID_SPORTS.map(sport => ({ sport }));
 }
 
+// Revalidate this page once per day (86400 seconds = 24 hours)
+export const revalidate = 86400;
+
 export async function generateMetadata({ params }: Props) {
   const { sport } = await params;
   return {

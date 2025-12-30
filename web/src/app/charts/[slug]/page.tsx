@@ -12,6 +12,9 @@ export async function generateStaticParams() {
   }));
 }
 
+// Revalidate this page once per day (86400 seconds = 24 hours)
+export const revalidate = 86400;
+
 export async function generateMetadata({ params }: Props) {
   const { slug } = await params;
   const key = slugToKey(slug);

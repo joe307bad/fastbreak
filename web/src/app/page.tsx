@@ -10,6 +10,9 @@ export const metadata: Metadata = {
   description: 'Fast sports analytics dashboard',
 };
 
+// Revalidate this page once per day (86400 seconds = 24 hours)
+export const revalidate = 86400;
+
 export default async function Home() {
   const sport = 'nfl';
 

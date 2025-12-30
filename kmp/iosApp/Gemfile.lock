@@ -1,7 +1,7 @@
 GIT
-  remote: https://github.com/CocoaPods/Xcodeproj.git
-  revision: ab3dfa504b5a97cae3a653a8924f4616dcaa062e
-  branch: master
+  remote: https://github.com/sprzenus/Xcodeproj.git
+  revision: 5a3a202b172d9d28740ad210e8fa69b243226ea0
+  branch: fix_issue_996_xcode16
   specs:
     xcodeproj (1.27.0)
       CFPropertyList (>= 2.3.3, < 4.0)

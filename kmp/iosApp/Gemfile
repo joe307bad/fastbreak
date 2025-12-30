@@ -1,6 +1,6 @@
 source "https://rubygems.org"
 
-gem "xcodeproj", git: "https://github.com/CocoaPods/Xcodeproj.git", branch: "master"
+gem "xcodeproj", git: "https://github.com/sprzenus/Xcodeproj.git", branch: "fix_issue_996_xcode16"
 gem "fastlane"
 gem "cocoapods"
 

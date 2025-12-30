@@ -1,5 +1,6 @@
 source "https://rubygems.org"
 
+gem "xcodeproj", git: "https://github.com/CocoaPods/Xcodeproj.git", branch: "master"
 gem "fastlane"
 gem "cocoapods"
 

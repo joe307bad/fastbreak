@@ -1,7 +1,20 @@
+GIT
+  remote: https://github.com/CocoaPods/Xcodeproj.git
+  revision: ab3dfa504b5a97cae3a653a8924f4616dcaa062e
+  branch: master
+  specs:
+    xcodeproj (1.27.0)
+      CFPropertyList (>= 2.3.3, < 4.0)
+      atomos (~> 0.1.3)
+      claide (>= 1.0.2, < 2.0)
+      colored2 (~> 3.1)
+      nanaimo (~> 0.4.0)
+      rexml (>= 3.3.6, < 4.0)
+
 GEM
   remote: https://rubygems.org/
   specs:
-    CFPropertyList (3.0.9)
+    CFPropertyList (3.0.8)
     abbrev (0.1.2)
     activesupport (7.2.3)
       base64
@@ -296,13 +309,6 @@ GEM
     uber (0.1.0)
     unicode-display_width (2.6.0)
     word_wrap (1.0.0)
-    xcodeproj (1.27.0)
-      CFPropertyList (>= 2.3.3, < 4.0)
-      atomos (~> 0.1.3)
-      claide (>= 1.0.2, < 2.0)
-      colored2 (~> 3.1)
-      nanaimo (~> 0.4.0)
-      rexml (>= 3.3.6, < 4.0)
     xcpretty (0.4.1)
       rouge (~> 3.28.0)
     xcpretty-travis-formatter (1.0.1)
@@ -325,6 +331,7 @@ DEPENDENCIES
   cocoapods
   fastlane
   fastlane-plugin-sentry
+  xcodeproj!
 
 BUNDLED WITH
    2.5.11

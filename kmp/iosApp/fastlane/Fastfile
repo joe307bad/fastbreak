@@ -37,7 +37,7 @@ platform :ios do
 
     build_app(
       workspace: "iosApp.xcworkspace",
-      scheme: "iosApp",
+      scheme: "Fastbreak",
       export_method: "app-store",
       xcargs: "CODE_SIGN_STYLE=Manual PROVISIONING_PROFILE_SPECIFIER='match AppStore com.joebad.fastbreak' CODE_SIGN_IDENTITY='iPhone Distribution'",
       export_options: {

@@ -2,6 +2,7 @@
   {
     "id": "navigate-charts",
     "title": "Viewing visualizations",
+    "sortOrder": 1,
     "demoGif": "/02-manual-screenshots/04-navigate-charts-and-show-info.gif",
     "demoAlt": "Navigating through charts and showing info demo",
     "platforms": {
@@ -20,6 +21,7 @@
   {
     "id": "pinch-zoom",
     "title": "Pinch to Zoom, Drag to pan",
+    "sortOrder": 2,
     "demoGif": "/02-manual-screenshots/01-pinch-to-zoom.gif",
     "demoAlt": "Pinch to zoom and drag to pan demo",
     "platforms": {
@@ -38,6 +40,7 @@
   {
     "id": "pin-teams",
     "title": "Pinning teams",
+    "sortOrder": 3,
     "demoGif": "/02-manual-screenshots/02-manage-teams-and-filter.gif",
     "demoAlt": "Managing teams and filtering demo",
     "platforms": {
@@ -56,6 +59,7 @@
   {
     "id": "highlight-data-points",
     "title": "Highlighting data points",
+    "sortOrder": 4,
     "demoGif": "/02-manual-screenshots/03-highlighting-data-points.gif",
     "demoAlt": "Highlighting data points demo",
     "platforms": {
@@ -69,6 +73,25 @@
       "howToUse": "Tap on any data point in a chart to highlight it and see detailed information. The selected point will be emphasized while other points fade slightly, making it easier to focus on specific values.",
       "whatItDoes": "Provides an interactive way to explore individual data points in charts. When you tap a point, a tooltip or detail view appears showing the exact values, team name, and any relevant contextual information.",
       "whyUseful": "Charts often contain many overlapping or closely-spaced data points. Highlighting lets you precisely examine individual values without confusion, and the detailed view provides context that might not fit in the main chart."
+    }
+  },
+  {
+    "id": "offline-support",
+    "title": "Offline support",
+    "sortOrder": 5,
+    "demoGif": "/02-manual-screenshots/05-refresh-button.gif",
+    "demoAlt": "Refresh button demo showing offline support",
+    "platforms": {
+      "ios": true,
+      "android": true,
+      "web": false
+    },
+    "dateReleased": "2025-12-29",
+    "version": "1.3.0",
+    "sections": {
+      "howToUse": "Tap the refresh button in the top-right corner of the header to update all charts with the latest data. Alternatively, open Settings from the side menu and tap 'Refresh Registry' to manually sync the chart data. Visual indicators will show when charts are being updated.",
+      "whatItDoes": "Enables the mobile apps to work completely offline once charts are downloaded initially. When you refresh, the app downloads and caches all chart data locally on your device. The refresh button provides visual feedback during the update process, showing loading states and success indicators.",
+      "whyUseful": "Once you've refreshed the data, you can view all charts without an internet connection, making fastbreak perfect for situations with poor connectivity or when you want to save mobile data. The visual indicators ensure you always know when you're viewing the most current data versus cached data, giving you confidence in the information you're seeing."
     }
   }
 ]

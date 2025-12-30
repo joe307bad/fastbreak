@@ -10,6 +10,7 @@ type SortMode = 'all' | 'latest';
 interface ManualFeature {
   id: string;
   title: string;
+  sortOrder: number;
   demoGif: string;
   demoAlt: string;
   platforms: {
@@ -33,8 +34,8 @@ export function ManualPage() {
     if (sortMode === 'latest') {
       return new Date(b.dateReleased).getTime() - new Date(a.dateReleased).getTime();
     }
-    // For 'all', maintain original order from JSON
-    return 0;
+    // For 'all', sort by sortOrder
+    return a.sortOrder - b.sortOrder;
   });
 
   return (
@@ -66,14 +67,14 @@ export function ManualPage() {
         </button>
       </div>
 
-      {sortedFeatures.map((feature, index) => {
+      {sortedFeatures.map((feature) => {
         const headingId = feature.id;
 
         return (
         <div key={feature.id}>
           <h2 id={headingId} className="text-2xl font-bold mb-4 group scroll-mt-20">
             <a href={`#${headingId}`} className="flex items-center gap-2 no-underline hover:underline">
-              {sortMode === 'all' ? `${index + 1}. ` : ''}{feature.title}
+              {feature.sortOrder}. {feature.title}
               <svg
                 className="w-5 h-5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
                 viewBox="0 0 24 24"

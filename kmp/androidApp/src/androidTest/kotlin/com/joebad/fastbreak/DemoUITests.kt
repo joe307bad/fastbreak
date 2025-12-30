@@ -497,6 +497,64 @@ class DemoUITests {
     }
 
     /**
+     * Demo test: Refresh button in header
+     * Shows: Opening the app > Tapping refresh button in header
+     */
+    @Test
+    fun testDemo_RefreshButton() {
+        println("🎬 RECORDING_READY - Starting demo...")
+
+        println("⏱ Waiting for app to load...")
+        Thread.sleep(1500)
+
+        // Look for the refresh button in the header
+        println("🔍 Looking for refresh button in header...")
+        val refreshButton = device.wait(
+            Until.findObject(By.desc("Refresh")),
+            5000
+        )
+
+        if (refreshButton != null) {
+            println("✓ Found refresh button, tapping...")
+            refreshButton.click()
+            Thread.sleep(1000)
+
+            // Show the refreshed state
+            println("✓ Data should be refreshing...")
+            Thread.sleep(2000)
+        } else {
+            println("⚠ Refresh button not found, trying alternative search...")
+
+            // Try to find by icon or clickable element at typical refresh button location
+            val refreshAlt = device.wait(
+                Until.findObject(By.descContains("refresh").clickable(true)),
+                3000
+            )
+
+            if (refreshAlt != null) {
+                println("✓ Found refresh button (alternative), tapping...")
+                refreshAlt.click()
+                Thread.sleep(1000)
+                println("✓ Data should be refreshing...")
+                Thread.sleep(2000)
+            } else {
+                println("⚠ Refresh button not found by description, trying top-right corner...")
+                // Try clicking approximate location of refresh button (top right area)
+                device.click(device.displayWidth - 150, 138)
+                Thread.sleep(1000)
+                println("✓ Attempted to tap refresh button location...")
+                Thread.sleep(2000)
+            }
+        }
+
+        // Final pause to show the refreshed content
+        println("✓ Showing refreshed content...")
+        Thread.sleep(2000)
+
+        println("✓ Demo complete!")
+    }
+
+    /**
      * Demo test: Navigate through all charts and show info bottom sheet
      * Shows: Cumulative EPA > Back > Team Snaps > Back > Playoff Odds > Back > Turnover Differential > Info button
      */

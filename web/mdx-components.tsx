@@ -8,6 +8,7 @@ import { ManageTeamsDemo } from "./src/components/ui/ManageTeamsDemo";
 import { HighlightingDataPointsDemo } from "./src/components/ui/HighlightingDataPointsDemo";
 import { NavigateChartsDemo } from "./src/components/ui/NavigateChartsDemo";
 import { HeadingWithAnchor } from "./src/components/ui/HeadingWithAnchor";
+import { ManualPage } from "./src/components/ui/ManualPage";
 
 export function useMDXComponents(components: MDXComponents): MDXComponents {
   return {
@@ -19,6 +20,7 @@ export function useMDXComponents(components: MDXComponents): MDXComponents {
     ManageTeamsDemo,
     HighlightingDataPointsDemo,
     NavigateChartsDemo,
+    ManualPage,
     h1: ({ children }) => (
       <h1 className="text-2xl font-bold mb-4">{children}</h1>
     ),

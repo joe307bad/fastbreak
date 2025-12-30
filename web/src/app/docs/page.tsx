@@ -22,6 +22,7 @@ const components: MDXComponents = {
   td: (props) => <td {...props} />,
   BetaLinks,
   PlatformSupport,
+  
 };
 
 export default function DocsPage() {

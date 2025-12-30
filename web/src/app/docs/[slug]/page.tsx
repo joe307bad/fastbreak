@@ -15,6 +15,7 @@ import { HighlightingDataPointsDemo } from '@/components/ui/HighlightingDataPoin
 import { NavigateChartsDemo } from '@/components/ui/NavigateChartsDemo';
 import { HeadingWithAnchor } from '@/components/ui/HeadingWithAnchor';
 import { ScrollToHash } from '@/components/ui/ScrollToHash';
+import { ManualPage } from '@/components/ui/ManualPage';
 
 interface DocMetadata {
   title: string;
@@ -35,7 +36,8 @@ const components: MDXComponents = {
   PinchToZoomDemo,
   ManageTeamsDemo,
   HighlightingDataPointsDemo,
-  NavigateChartsDemo
+  NavigateChartsDemo,
+  ManualPage
 };
 
 export async function generateStaticParams() {

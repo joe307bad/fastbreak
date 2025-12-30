@@ -13,6 +13,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlin.math.ceil
 import com.joebad.fastbreak.data.model.LineChartSeries
 import io.github.koalaplot.core.line.LinePlot
 import io.github.koalaplot.core.style.LineStyle
@@ -208,27 +209,40 @@ fun LineChartComponent(
             }
         }
 
-        // Series legend
-        Row(
+        // Series legend - max 5 items per row
+        val maxItemsPerRow = 5
+        val numRows = ceil(series.size.toDouble() / maxItemsPerRow).toInt()
+
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(vertical = 4.dp, horizontal = 8.dp),
-            horizontalArrangement = Arrangement.SpaceEvenly
+            verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
-            series.forEachIndexed { index, lineSeries ->
+            repeat(numRows) { rowIndex ->
                 Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceEvenly
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(12.dp)
-                            .background(seriesColors[index], CircleShape)
-                    )
-                    Text(
-                        text = lineSeries.label,
-                        style = MaterialTheme.typography.bodySmall
-                    )
+                    val startIndex = rowIndex * maxItemsPerRow
+                    val endIndex = minOf(startIndex + maxItemsPerRow, series.size)
+
+                    for (index in startIndex until endIndex) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(12.dp)
+                                    .background(seriesColors[index], CircleShape)
+                            )
+                            Text(
+                                text = series[index].label,
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                    }
                 }
             }
         }

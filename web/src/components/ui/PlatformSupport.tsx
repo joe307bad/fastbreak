@@ -6,11 +6,32 @@ interface PlatformSupportProps {
   ios?: boolean;
   android?: boolean;
   web?: boolean;
-  version?: string;
+  dateReleased?: string;
 }
 
-export function PlatformSupport({ ios = false, android = false, web = false, version = '1.0.0' }: PlatformSupportProps) {
-  const [hoveredPlatform, setHoveredPlatform] = useState<string | null>(null);
+function getRelativeTime(dateString: string): string {
+  const releaseDate = new Date(dateString);
+  const now = new Date();
+  const diffMs = now.getTime() - releaseDate.getTime();
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+  if (diffDays < 1) {
+    return 'Released today';
+  } else if (diffDays === 1) {
+    return 'Released 1 day ago';
+  } else if (diffDays < 30) {
+    return `Released ${diffDays} days ago`;
+  } else if (diffDays < 365) {
+    const months = Math.floor(diffDays / 30);
+    return months === 1 ? 'Released 1 month ago' : `Released ${months} months ago`;
+  } else {
+    const years = Math.floor(diffDays / 365);
+    return years === 1 ? 'Released 1 year ago' : `Released ${years} years ago`;
+  }
+}
+
+export function PlatformSupport({ ios = false, android = false, web = false, dateReleased }: PlatformSupportProps) {
+  const [activePlatform, setActivePlatform] = useState<string | null>(null);
 
   const platforms = [
     {
@@ -42,6 +63,10 @@ export function PlatformSupport({ ios = false, android = false, web = false, ver
     },
   ];
 
+  const handleToggleTooltip = (platformName: string) => {
+    setActivePlatform(activePlatform === platformName ? null : platformName);
+  };
+
   return (
     <div className="overflow-x-auto my-4">
       <div className="flex gap-3 items-center min-w-max">
@@ -49,20 +74,22 @@ export function PlatformSupport({ ios = false, android = false, web = false, ver
           <div
             key={platform.name}
             className="relative flex-shrink-0"
-            onMouseEnter={() => setHoveredPlatform(platform.name)}
-            onMouseLeave={() => setHoveredPlatform(null)}
+            onMouseEnter={() => setActivePlatform(platform.name)}
+            onMouseLeave={() => setActivePlatform(null)}
           >
-            <div
+            <button
+              onClick={() => handleToggleTooltip(platform.name)}
               className={`flex items-center gap-2 px-3 py-2 border rounded transition-all whitespace-nowrap ${
                 platform.supported
                   ? 'border-green-600 text-green-600 bg-green-600/10'
                   : 'border-red-600 text-red-600 bg-red-600/10'
               }`}
+              aria-label={`${platform.name} - ${platform.supported ? 'Supported' : 'Not supported'}`}
             >
               {platform.icon}
               <span className="text-xs font-medium">{platform.name}</span>
-            </div>
-            {hoveredPlatform === platform.name && (
+            </button>
+            {activePlatform === platform.name && (
               <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-[var(--foreground)] text-[var(--background)] text-xs rounded whitespace-nowrap z-10">
                 {platform.supported
                   ? `Supported on ${platform.name}`
@@ -72,12 +99,14 @@ export function PlatformSupport({ ios = false, android = false, web = false, ver
             )}
           </div>
         ))}
-        <div className="flex items-center gap-2 px-3 py-2 border rounded bg-blue-600/10 border-blue-600 text-blue-600 flex-shrink-0 whitespace-nowrap">
-          <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z"/>
-          </svg>
-          <span className="text-xs font-medium">Released in {version}</span>
-        </div>
+        {dateReleased && (
+          <div className="flex items-center gap-2 px-3 py-2 border rounded bg-blue-600/10 border-blue-600 text-blue-600 flex-shrink-0 whitespace-nowrap">
+            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z"/>
+            </svg>
+            <span className="text-xs font-medium">{getRelativeTime(dateReleased)}</span>
+          </div>
+        )}
       </div>
     </div>
   );

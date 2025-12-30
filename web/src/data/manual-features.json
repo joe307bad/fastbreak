@@ -1,0 +1,74 @@
+[
+  {
+    "id": "navigate-charts",
+    "title": "Viewing visualizations",
+    "demoGif": "/02-manual-screenshots/04-navigate-charts-and-show-info.gif",
+    "demoAlt": "Navigating through charts and showing info demo",
+    "platforms": {
+      "ios": true,
+      "android": true,
+      "web": true
+    },
+    "dateReleased": "2025-12-27",
+    "version": "1.0.0",
+    "sections": {
+      "howToUse": "Browse the main screen to see all available charts for your selected sport. Tap any chart to view the full interactive version. On the chart screen, tap the info icon (ℹ) in the top-right corner to see a description of what the chart displays.",
+      "whatItDoes": "Fastbreak's core functionality is viewing different types of statistical visualizations. Each chart includes an info button that provides context about the metrics being displayed, helping you understand what the data represents and how to interpret it.",
+      "whyUseful": "With dozens of different charts covering all aspects of each sport, fastbreak helps you quickly find the exact data you're looking for. The info descriptions ensure you understand each metric, making it easier to discover insights and compare stats meaningfully."
+    }
+  },
+  {
+    "id": "pinch-zoom",
+    "title": "Pinch to Zoom, Drag to pan",
+    "demoGif": "/02-manual-screenshots/01-pinch-to-zoom.gif",
+    "demoAlt": "Pinch to zoom and drag to pan demo",
+    "platforms": {
+      "ios": true,
+      "android": true,
+      "web": false
+    },
+    "dateReleased": "2025-12-27",
+    "version": "1.0.0",
+    "sections": {
+      "howToUse": "Use two fingers to pinch in or out on any chart to zoom. Once zoomed, drag with one finger to pan around and explore different areas of the visualization.",
+      "whatItDoes": "Provides intuitive touch gestures for exploring detailed charts on mobile devices. Pinch gestures control zoom level, while drag gestures allow you to navigate around the zoomed view.",
+      "whyUseful": "When charts contain lots of data points or detailed information, zooming and panning lets you focus on specific areas of interest without losing context. This is especially useful for time-series data or crowded visualizations."
+    }
+  },
+  {
+    "id": "pin-teams",
+    "title": "Pinning teams",
+    "demoGif": "/02-manual-screenshots/02-manage-teams-and-filter.gif",
+    "demoAlt": "Managing teams and filtering demo",
+    "platforms": {
+      "ios": true,
+      "android": true,
+      "web": false
+    },
+    "dateReleased": "2025-12-27",
+    "version": "1.1.0",
+    "sections": {
+      "howToUse": "Tap the filter icon to open the team selector. Select your favorite teams to pin them. Pinned teams will be highlighted in all charts, making them easier to track across different visualizations.",
+      "whatItDoes": "Allows you to select and highlight specific teams across all charts in the app. Your pinned teams are saved and persist across sessions, so you don't need to select them every time.",
+      "whyUseful": "If you follow specific teams, pinning them makes it much easier to find and compare their stats across different charts. The persistent highlighting helps you quickly identify your teams' performance in any visualization."
+    }
+  },
+  {
+    "id": "highlight-data-points",
+    "title": "Highlighting data points",
+    "demoGif": "/02-manual-screenshots/03-highlighting-data-points.gif",
+    "demoAlt": "Highlighting data points demo",
+    "platforms": {
+      "ios": true,
+      "android": true,
+      "web": false
+    },
+    "dateReleased": "2025-12-27",
+    "version": "1.2.0",
+    "sections": {
+      "howToUse": "Tap on any data point in a chart to highlight it and see detailed information. The selected point will be emphasized while other points fade slightly, making it easier to focus on specific values.",
+      "whatItDoes": "Provides an interactive way to explore individual data points in charts. When you tap a point, a tooltip or detail view appears showing the exact values, team name, and any relevant contextual information.",
+      "whyUseful": "Charts often contain many overlapping or closely-spaced data points. Highlighting lets you precisely examine individual values without confusion, and the detailed view provides context that might not fit in the main chart."
+    }
+  }
+]

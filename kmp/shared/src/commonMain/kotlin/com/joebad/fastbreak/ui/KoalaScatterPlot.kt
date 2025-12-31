@@ -1,5 +1,6 @@
 package com.joebad.fastbreak.ui
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
@@ -13,7 +14,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.graphics.PathEffect
@@ -541,7 +545,44 @@ fun KoalaQuadrantScatterPlot(
                 .fillMaxWidth()
                 .height(400.dp)
         ) {
-            // Draw regression line first (behind everything)
+            // Draw quadrant backgrounds first (behind everything)
+            // Top Right quadrant (x >= avgX, y >= avgY)
+            QuadrantBackground(
+                xMin = avgX,
+                xMax = xMax,
+                yMin = avgY,
+                yMax = yMax,
+                color = topRightColor.copy(alpha = 0.15f)
+            )
+
+            // Top Left quadrant (x < avgX, y >= avgY)
+            QuadrantBackground(
+                xMin = xMin,
+                xMax = avgX,
+                yMin = avgY,
+                yMax = yMax,
+                color = topLeftColor.copy(alpha = 0.15f)
+            )
+
+            // Bottom Left quadrant (x < avgX, y < avgY)
+            QuadrantBackground(
+                xMin = xMin,
+                xMax = avgX,
+                yMin = yMin,
+                yMax = avgY,
+                color = bottomLeftColor.copy(alpha = 0.15f)
+            )
+
+            // Bottom Right quadrant (x >= avgX, y < avgY)
+            QuadrantBackground(
+                xMin = avgX,
+                xMax = xMax,
+                yMin = yMin,
+                yMax = avgY,
+                color = bottomRightColor.copy(alpha = 0.15f)
+            )
+
+            // Draw regression line (on top of backgrounds)
             if (regression != null) {
                 val regY1 = regression.slope * xMin + regression.intercept
                 val regY2 = regression.slope * xMax + regression.intercept
@@ -655,6 +696,32 @@ private fun QuadrantSymbol(color: Color) {
             .size(10.dp)
             .background(color, CircleShape)
     )
+}
+
+@OptIn(ExperimentalKoalaPlotApi::class)
+@Composable
+private fun XYGraphScope<Float, Float>.QuadrantBackground(
+    xMin: Float,
+    xMax: Float,
+    yMin: Float,
+    yMax: Float,
+    color: Color
+) {
+    // Create multiple horizontal lines to fill the area
+    // Optimized approach: Use 50 lines with 2dp stroke width for better performance
+    val numLines = 50
+    val yStep = (yMax - yMin) / numLines
+
+    for (i in 0 until numLines) {
+        val y = yMin + (i * yStep)
+        LinePlot(
+            data = listOf(DefaultPoint(xMin, y), DefaultPoint(xMax, y)),
+            lineStyle = LineStyle(
+                brush = SolidColor(color),
+                strokeWidth = 2.dp
+            )
+        )
+    }
 }
 
 @OptIn(ExperimentalKoalaPlotApi::class)

@@ -1,12 +1,15 @@
 package com.joebad.fastbreak.ui.visualizations
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -679,6 +682,9 @@ private fun CumulativeEPAChart(team1: TeamAnalytics, team2: TeamAnalytics) {
 
 @Composable
 private fun WeeklyEPAScatterPlot(team1: TeamAnalytics, team2: TeamAnalytics) {
+    // State for selected week range
+    var selectedWeekRange by remember { mutableStateOf<IntRange?>(null) }
+
     Text(
         text = "Weekly Offensive vs Defensive EPA",
         style = MaterialTheme.typography.titleSmall,
@@ -686,26 +692,78 @@ private fun WeeklyEPAScatterPlot(team1: TeamAnalytics, team2: TeamAnalytics) {
         modifier = Modifier.padding(bottom = 8.dp)
     )
 
+    // Week range filter badges - horizontally scrollable
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState())
+            .padding(bottom = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        WeekRangeBadge(
+            label = "All Weeks",
+            isSelected = selectedWeekRange == null,
+            onClick = { selectedWeekRange = null }
+        )
+        WeekRangeBadge(
+            label = "Weeks 1-6",
+            isSelected = selectedWeekRange == 1..6,
+            onClick = { selectedWeekRange = 1..6 }
+        )
+        WeekRangeBadge(
+            label = "Weeks 7-12",
+            isSelected = selectedWeekRange == 7..12,
+            onClick = { selectedWeekRange = 7..12 }
+        )
+        WeekRangeBadge(
+            label = "Weeks 13-18",
+            isSelected = selectedWeekRange == 13..18,
+            onClick = { selectedWeekRange = 13..18 }
+        )
+    }
+
+    // Create all data points with consistent team colors
+    val weekRange = selectedWeekRange // Capture to avoid smart cast issues
+
     val team1Points = team1.weeklyEPA.map {
+        val weekLabel = "W${it.week}"
         ScatterPlotDataPoint(
-            label = "${team1.code} W${it.week}",
+            label = "${team1.code} $weekLabel",
             x = it.offensiveEPA,
             y = it.defensiveEPA,
             sum = it.offensiveEPA + it.defensiveEPA,
             teamCode = team1.code,
-            color = "#2196F3" // Blue for team1
+            color = "#2196F3" // Always use consistent blue for team1
         )
     }
 
     val team2Points = team2.weeklyEPA.map {
+        val weekLabel = "W${it.week}"
         ScatterPlotDataPoint(
-            label = "${team2.code} W${it.week}",
+            label = "${team2.code} $weekLabel",
             x = it.offensiveEPA,
             y = it.defensiveEPA,
             sum = it.offensiveEPA + it.defensiveEPA,
             teamCode = team2.code,
-            color = "#FF9800" // Orange for team2
+            color = "#FF9800" // Always use consistent orange for team2
         )
+    }
+
+    // Build highlighted labels set based on selected week range
+    val highlightedLabels = if (weekRange != null) {
+        // Only highlight the weeks within the selected range
+        (team1Points + team2Points)
+            .filter { point ->
+                // Extract week number from label (format is "TEAM W##")
+                val weekMatch = "W(\\d+)".toRegex().find(point.label)
+                weekMatch?.groupValues?.get(1)?.toIntOrNull()?.let { week ->
+                    week in weekRange
+                } ?: false
+            }
+            .map { it.label }
+            .toSet()
+    } else {
+        emptySet() // Empty set means no highlighting (all points shown at full opacity)
     }
 
     KoalaQuadrantScatterPlot(
@@ -715,10 +773,11 @@ private fun WeeklyEPAScatterPlot(team1: TeamAnalytics, team2: TeamAnalytics) {
         xAxisLabel = "Offensive EPA",
         yAxisLabel = "Defensive EPA",
         invertYAxis = false,
-        quadrantTopRight = QuadrantConfig(label = "Elite", color = "#E8F5E9", lightModeColor = "#E8F5E9"),
-        quadrantTopLeft = QuadrantConfig(label = "Good Defense", color = "#E3F2FD", lightModeColor = "#E3F2FD"),
-        quadrantBottomLeft = QuadrantConfig(label = "Poor", color = "#FFF3E0", lightModeColor = "#FFF3E0"),
-        quadrantBottomRight = QuadrantConfig(label = "Good Offense", color = "#FFF9C4", lightModeColor = "#FFF9C4")
+        highlightedPlayerLabels = highlightedLabels,
+        quadrantTopRight = QuadrantConfig(label = "Elite", color = "#4CAF50", lightModeColor = "#4CAF50"),     // Green (good offense + good defense)
+        quadrantTopLeft = QuadrantConfig(label = "Good Defense", color = "#FFEB3B", lightModeColor = "#FFEB3B"),  // Yellow (bad offense + good defense)
+        quadrantBottomLeft = QuadrantConfig(label = "Poor", color = "#F44336", lightModeColor = "#F44336"),      // Red (bad offense + bad defense)
+        quadrantBottomRight = QuadrantConfig(label = "Good Offense", color = "#FF9800", lightModeColor = "#FF9800") // Orange (good offense + bad defense)
     )
 
     // Add legend for team colors
@@ -762,5 +821,30 @@ private fun WeeklyEPAScatterPlot(team1: TeamAnalytics, team2: TeamAnalytics) {
                 fontWeight = FontWeight.Medium
             )
         }
+    }
+}
+
+@Composable
+private fun WeekRangeBadge(
+    label: String,
+    isSelected: Boolean,
+    onClick: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .clickable(onClick = onClick)
+            .background(
+                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+                shape = RoundedCornerShape(16.dp)
+            )
+            .padding(horizontal = 12.dp, vertical = 6.dp)
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+            fontSize = 10.sp
+        )
     }
 }

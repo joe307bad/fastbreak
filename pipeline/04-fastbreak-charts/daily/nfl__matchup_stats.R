@@ -6,9 +6,7 @@ library(tidyr)
 library(jsonlite)
 library(httr)
 
-# Check environment
-is_prod <- Sys.getenv("ENV") == "PROD"
-cat("Running in", ifelse(is_prod, "PRODUCTION", "DEVELOPMENT"), "mode\n")
+# Script runs in production mode by default
 
 # Constants
 MIN_GAMES_QB <- 8
@@ -253,17 +251,12 @@ current_week_games <- schedules %>%
 if (nrow(current_week_games) == 0) {
   cat("No upcoming games found, using most recent week\n")
   current_week_games <- schedules %>%
-    filter(week == max(week), game_type == "REG") %>%
-    head(1)
+    filter(week == max(week), game_type == "REG")
 }
 
 cat("Found", nrow(current_week_games), "games for current week\n")
 
-# In dev mode, use only first matchup
-if (!is_prod) {
-  current_week_games <- current_week_games %>% head(1)
-  cat("DEV MODE: Using only first matchup\n")
-}
+# Process all matchups
 
 # ============================================================================
 # STEP 9: Fetch odds from ESPN API
@@ -613,11 +606,7 @@ cat("Generated stats for", length(matchups_json), "matchup(s)\n")
 s3_bucket <- Sys.getenv("AWS_S3_BUCKET")
 
 if (nzchar(s3_bucket)) {
-  s3_key <- if (is_prod) {
-    "nfl__matchup_stats.json"
-  } else {
-    "dev/nfl__matchup_stats.json"
-  }
+  s3_key <- "dev/nfl__matchup_stats.json"
 
   s3_path <- paste0("s3://", s3_bucket, "/", s3_key)
   cmd <- paste("aws s3 cp", shQuote(tmp_file), shQuote(s3_path), "--content-type application/json")
@@ -629,30 +618,48 @@ if (nzchar(s3_bucket)) {
 
   cat("Uploaded to S3:", s3_path, "\n")
 
-  # Update DynamoDB with metadata (skip in dev mode per requirements)
-  if (is_prod) {
-    dynamodb_table <- Sys.getenv("AWS_DYNAMODB_TABLE", "fastbreak-file-timestamps")
-    utc_timestamp <- format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC")
-    chart_title <- paste0("NFL Matchup Stats - Week ", current_week_games$week[1])
-    chart_interval <- "daily"
+  # Update DynamoDB with metadata
+  dynamodb_table <- Sys.getenv("AWS_DYNAMODB_TABLE", "fastbreak-file-timestamps")
+  utc_timestamp <- format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC")
+  chart_title <- paste0("NFL Matchup Stats - Week ", current_week_games$week[1])
+  chart_interval <- "daily"
 
-    dynamodb_item <- sprintf(
-      '{"file_key": {"S": "%s"}, "updatedAt": {"S": "%s"}, "title": {"S": "%s"}, "interval": {"S": "%s"}}',
-      s3_key, utc_timestamp, chart_title, chart_interval
-    )
-    dynamodb_cmd <- sprintf(
-      'aws dynamodb put-item --table-name %s --item %s',
-      shQuote(dynamodb_table),
-      shQuote(dynamodb_item)
-    )
+  dynamodb_item <- sprintf(
+    '{"file_key": {"S": "%s"}, "updatedAt": {"S": "%s"}, "title": {"S": "%s"}, "interval": {"S": "%s"}}',
+    s3_key, utc_timestamp, chart_title, chart_interval
+  )
+  dynamodb_cmd <- sprintf(
+    'aws dynamodb put-item --table-name %s --item %s',
+    shQuote(dynamodb_table),
+    shQuote(dynamodb_item)
+  )
 
-    dynamodb_result <- system(dynamodb_cmd)
+  dynamodb_result <- system(dynamodb_cmd)
 
-    if (dynamodb_result != 0) {
-      warning("Failed to update DynamoDB timestamp (non-fatal)")
-    } else {
-      cat("Updated DynamoDB:", dynamodb_table, "key:", s3_key, "\n")
-    }
+  if (dynamodb_result != 0) {
+    warning("Failed to update DynamoDB timestamp (non-fatal)")
+  } else {
+    cat("Updated DynamoDB:", dynamodb_table, "key:", s3_key, "\n")
+  }
+
+  # Insert pipeline execution record
+  pipeline_file_key <- "dev/nfl__matchup_stats.json"
+  pipeline_item <- sprintf(
+    '{"file_key": {"S": "%s"}, "updatedAt": {"S": "%s"}, "title": {"S": "%s"}, "interval": {"S": "%s"}}',
+    pipeline_file_key, utc_timestamp, chart_title, chart_interval
+  )
+  pipeline_cmd <- sprintf(
+    'aws dynamodb put-item --table-name %s --item %s',
+    shQuote(dynamodb_table),
+    shQuote(pipeline_item)
+  )
+
+  pipeline_result <- system(pipeline_cmd)
+
+  if (pipeline_result != 0) {
+    warning("Failed to update DynamoDB pipeline record (non-fatal)")
+  } else {
+    cat("Updated DynamoDB pipeline record:", pipeline_file_key, "\n")
   }
 } else {
   cat("AWS_S3_BUCKET not set, skipping S3 upload\n")
@@ -663,6 +670,3 @@ if (nzchar(s3_bucket)) {
 }
 
 cat("\n=== COMPLETE ===\n")
-if (!is_prod) {
-  cat("DEV MODE: Processed first matchup only. Set ENV=PROD to process all matchups and update DynamoDB\n")
-}

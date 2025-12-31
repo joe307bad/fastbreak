@@ -386,11 +386,21 @@ fun KoalaQuadrantScatterPlot(
                 }
             }
 
-            val baseColor = when {
-                x >= avgX && y >= avgY -> topRightColor
-                x < avgX && y >= avgY -> topLeftColor
-                x < avgX && y < avgY -> bottomLeftColor
-                else -> bottomRightColor
+            // Use custom color from data point if provided, otherwise use quadrant color
+            val baseColor = if (point.color != null) {
+                parseHexColor(point.color) ?: when {
+                    x >= avgX && y >= avgY -> topRightColor
+                    x < avgX && y >= avgY -> topLeftColor
+                    x < avgX && y < avgY -> bottomLeftColor
+                    else -> bottomRightColor
+                }
+            } else {
+                when {
+                    x >= avgX && y >= avgY -> topRightColor
+                    x < avgX && y >= avgY -> topLeftColor
+                    x < avgX && y < avgY -> bottomLeftColor
+                    else -> bottomRightColor
+                }
             }
 
             // Apply transparency if highlighting is active and this point is not highlighted

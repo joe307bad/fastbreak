@@ -331,6 +331,24 @@ fun HomeScreen(
                             }
                         }
 
+                        // Hardcoded playoff bracket item for NFL
+                        if (selectedSport == Sport.NFL) {
+                            item {
+                                VisualizationItem(
+                                    title = "NFL Playoff Bracket",
+                                    description = "Interactive playoff bracket with swipe navigation",
+                                    interval = null,
+                                    lastUpdated = Clock.System.now(),
+                                    viewed = true,
+                                    isSyncing = false,
+                                    isReady = true,
+                                    onClick = {
+                                        component.onNavigateToDataViz("playoff-bracket-nfl", Sport.NFL, com.joebad.fastbreak.data.model.VizType.PLAYOFF_BRACKET)
+                                    }
+                                )
+                            }
+                        }
+
                         items(chartsForSport) { chart ->
                             // Determine chart sync state
                             val isSyncing = registryState.syncProgress?.isChartSyncing(chart.id) == true

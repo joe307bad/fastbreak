@@ -49,7 +49,8 @@ data class ScatterPlotDataPoint(
     val sum: Double,
     val teamCode: String? = null,
     val division: String? = null,
-    val conference: String? = null
+    val conference: String? = null,
+    val color: String? = null // Optional hex color for the dot (e.g., "#2196F3")
 )
 
 @Serializable

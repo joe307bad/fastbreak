@@ -41,6 +41,14 @@ fun DataVizScreen(
         state = DataVizState.Loading
 
         try {
+            // Check if this is the hardcoded playoff bracket
+            if (component.chartId == "playoff-bracket-nfl") {
+                // Create fake NFL playoff data
+                val fakePlayoffData = createFakeNFLPlayoffData()
+                state = DataVizState.Success(fakePlayoffData)
+                return@LaunchedEffect
+            }
+
             // First check if this chart failed during synchronization
             val syncProgress = registryState.syncProgress
             val failedChart = syncProgress?.failedCharts?.find { it.first == component.chartId }
@@ -387,6 +395,23 @@ private fun RenderVisualization(
             modifier = Modifier.fillMaxSize(),
             highlightedTeamCodes = highlightedTeamCodes
         )
+    } else if (visualization is PlayoffBracketVisualization) {
+        // Playoff bracket: horizontally scrollable with source pinned to bottom
+        Box(modifier = Modifier.fillMaxSize()) {
+            PlayoffBracketComponent(
+                visualization = visualization,
+                modifier = Modifier.fillMaxSize()
+            )
+
+            // Source attribution pinned to bottom
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+            ) {
+                SourceAttribution(source = visualization.source)
+            }
+        }
     } else {
         // For charts: use vertical scroll to show chart + data table
         val scrollState = rememberScrollState()
@@ -433,6 +458,12 @@ private fun RenderVisualization(
                                 LineChartComponent(
                                     series = visualization.series,
                                     highlightedTeamCodes = highlightedTeamCodes,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                            }
+                            is PlayoffBracketVisualization -> {
+                                PlayoffBracketComponent(
+                                    visualization = visualization,
                                     modifier = Modifier.fillMaxWidth()
                                 )
                             }
@@ -743,4 +774,79 @@ private fun applyMatchupFilters(
     }
 
     return visualization.copy(dataPoints = filteredDataPoints)
+}
+
+/**
+ * Creates fake NFL playoff bracket data for demonstration
+ */
+private fun createFakeNFLPlayoffData(): PlayoffBracketVisualization {
+    // AFC Teams
+    val chiefs = PlayoffTeam("Kansas City Chiefs", "KC", 1, "AFC")
+    val bills = PlayoffTeam("Buffalo Bills", "BUF", 2, "AFC")
+    val ravens = PlayoffTeam("Baltimore Ravens", "BAL", 3, "AFC")
+    val texans = PlayoffTeam("Houston Texans", "HOU", 4, "AFC")
+    val steelers = PlayoffTeam("Pittsburgh Steelers", "PIT", 5, "AFC")
+    val chargers = PlayoffTeam("Los Angeles Chargers", "LAC", 6, "AFC")
+    val broncos = PlayoffTeam("Denver Broncos", "DEN", 7, "AFC")
+
+    // NFC Teams
+    val eagles = PlayoffTeam("Philadelphia Eagles", "PHI", 1, "NFC")
+    val lions = PlayoffTeam("Detroit Lions", "DET", 2, "NFC")
+    val rams = PlayoffTeam("Los Angeles Rams", "LAR", 3, "NFC")
+    val buccaneers = PlayoffTeam("Tampa Bay Buccaneers", "TB", 4, "NFC")
+    val vikings = PlayoffTeam("Minnesota Vikings", "MIN", 5, "NFC")
+    val commanders = PlayoffTeam("Washington Commanders", "WSH", 6, "NFC")
+    val packers = PlayoffTeam("Green Bay Packers", "GB", 7, "NFC")
+
+    // Wild Card Round
+    val wildCardRound = PlayoffRound(
+        name = "Wild Card Round",
+        matchups = listOf(
+            PlayoffMatchup(texans, chargers, winner = texans),
+            PlayoffMatchup(ravens, steelers, winner = ravens),
+            PlayoffMatchup(bills, broncos, winner = bills),
+            PlayoffMatchup(buccaneers, commanders, winner = buccaneers),
+            PlayoffMatchup(rams, vikings, winner = rams),
+            PlayoffMatchup(eagles, packers, winner = eagles)
+        )
+    )
+
+    // Divisional Round
+    val divisionalRound = PlayoffRound(
+        name = "Divisional Round",
+        matchups = listOf(
+            PlayoffMatchup(chiefs, texans, winner = chiefs),
+            PlayoffMatchup(ravens, bills, winner = bills),
+            PlayoffMatchup(lions, commanders, winner = lions),
+            PlayoffMatchup(eagles, rams, winner = eagles)
+        )
+    )
+
+    // Conference Championships
+    val conferenceChampionships = PlayoffRound(
+        name = "Conference Championships",
+        matchups = listOf(
+            PlayoffMatchup(chiefs, bills, winner = chiefs),
+            PlayoffMatchup(eagles, lions, winner = eagles)
+        )
+    )
+
+    // Super Bowl
+    val superBowl = PlayoffRound(
+        name = "Super Bowl",
+        matchups = listOf(
+            PlayoffMatchup(chiefs, eagles, winner = null) // No winner yet
+        )
+    )
+
+    return PlayoffBracketVisualization(
+        sport = "NFL",
+        visualizationType = "PLAYOFF_BRACKET",
+        title = "NFL Playoff Bracket",
+        subtitle = "2024-2025 Season",
+        description = "Interactive NFL playoff bracket with swipe navigation between rounds",
+        lastUpdated = kotlin.time.Clock.System.now(),
+        source = "Fake Demo Data",
+        rounds = listOf(wildCardRound, divisionalRound, conferenceChampionships, superBowl)
+    )
 }

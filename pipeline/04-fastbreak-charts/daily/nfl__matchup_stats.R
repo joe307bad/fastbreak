@@ -51,9 +51,12 @@ player_stats_weekly <- tryCatch({
   player_data %>%
     group_by(team, week) %>%
     summarise(
-      passing_epa = sum(passing_epa, na.rm = TRUE),
-      rushing_epa = sum(rushing_epa, na.rm = TRUE),
-      receiving_epa = sum(receiving_epa, na.rm = TRUE),
+      passing_epa_total = sum(passing_epa, na.rm = TRUE),
+      passing_attempts = sum(attempts, na.rm = TRUE),
+      rushing_epa_total = sum(rushing_epa, na.rm = TRUE),
+      rushing_carries = sum(carries, na.rm = TRUE),
+      receiving_epa_total = sum(receiving_epa, na.rm = TRUE),
+      receiving_targets = sum(targets, na.rm = TRUE),
       passing_cpoe = mean(passing_cpoe, na.rm = TRUE),
       pacr = mean(pacr, na.rm = TRUE),
       passing_first_downs = sum(passing_first_downs, na.rm = TRUE),
@@ -89,18 +92,30 @@ cat("Loaded weekly team stats:", nrow(team_stats_weekly), "rows\n")
 team_season_totals <- team_stats_weekly %>%
   group_by(team) %>%
   summarise(
-    passing_epa = sum(passing_epa, na.rm = TRUE),
-    rushing_epa = sum(rushing_epa, na.rm = TRUE),
-    receiving_epa = sum(receiving_epa, na.rm = TRUE),
+    passing_epa_total = sum(passing_epa_total, na.rm = TRUE),
+    passing_attempts = sum(passing_attempts, na.rm = TRUE),
+    rushing_epa_total = sum(rushing_epa_total, na.rm = TRUE),
+    rushing_carries = sum(rushing_carries, na.rm = TRUE),
+    receiving_epa_total = sum(receiving_epa_total, na.rm = TRUE),
+    receiving_targets = sum(receiving_targets, na.rm = TRUE),
     passing_cpoe = mean(passing_cpoe, na.rm = TRUE),
     pacr = mean(pacr, na.rm = TRUE),
     passing_first_downs = sum(passing_first_downs, na.rm = TRUE),
     sacks_suffered = sum(sacks_suffered, na.rm = TRUE),
-    def_epa = sum(def_epa_total, na.rm = TRUE),
+    off_epa_total = sum(off_epa_total, na.rm = TRUE),
+    off_plays = sum(off_plays, na.rm = TRUE),
+    def_epa_total = sum(def_epa_total, na.rm = TRUE),
+    def_plays = sum(def_plays, na.rm = TRUE),
     .groups = "drop"
   ) %>%
   mutate(
-    off_epa = passing_epa + rushing_epa,
+    # Calculate EPA per play for offense and defense
+    off_epa = if_else(off_plays > 0, off_epa_total / off_plays, NA_real_),
+    def_epa = if_else(def_plays > 0, def_epa_total / def_plays, NA_real_),
+    # Calculate EPA per attempt/carry/target for passing/rushing/receiving
+    passing_epa = if_else(passing_attempts > 0, passing_epa_total / passing_attempts, NA_real_),
+    rushing_epa = if_else(rushing_carries > 0, rushing_epa_total / rushing_carries, NA_real_),
+    receiving_epa = if_else(receiving_targets > 0, receiving_epa_total / receiving_targets, NA_real_),
     passing_epa_rank = rank(-passing_epa),
     rushing_epa_rank = rank(-rushing_epa),
     receiving_epa_rank = rank(-receiving_epa),
@@ -123,7 +138,7 @@ cum_epa_by_team <- team_stats_weekly %>%
   group_by(team) %>%
   arrange(week) %>%
   mutate(
-    cum_epa = cumsum(passing_epa + rushing_epa)
+    cum_epa = cumsum(passing_epa_total + rushing_epa_total)
   ) %>%
   select(team, week, cum_epa) %>%
   ungroup()
@@ -476,12 +491,12 @@ build_team_json <- function(team_abbr, cum_epa_df, season_totals, top_players_df
   }
 
   current_stats <- list(
-    def_epa = list(value = round(team_totals$def_epa[1], 2), rank = as.integer(team_totals$def_epa_rank[1])),
-    off_epa = list(value = round(team_totals$off_epa[1], 2), rank = as.integer(team_totals$off_epa_rank[1])),
-    passing_epa = list(value = round(team_totals$passing_epa[1], 2), rank = as.integer(team_totals$passing_epa_rank[1])),
-    rushing_epa = list(value = round(team_totals$rushing_epa[1], 2), rank = as.integer(team_totals$rushing_epa_rank[1])),
+    def_epa = list(value = round(team_totals$def_epa[1], 3), rank = as.integer(team_totals$def_epa_rank[1])),
+    off_epa = list(value = round(team_totals$off_epa[1], 3), rank = as.integer(team_totals$off_epa_rank[1])),
+    passing_epa = list(value = round(team_totals$passing_epa[1], 3), rank = as.integer(team_totals$passing_epa_rank[1])),
+    rushing_epa = list(value = round(team_totals$rushing_epa[1], 3), rank = as.integer(team_totals$rushing_epa_rank[1])),
     passing_cpoe = list(value = round(team_totals$passing_cpoe[1], 3), rank = as.integer(team_totals$passing_cpoe_rank[1])),
-    receiving_epa = list(value = round(team_totals$receiving_epa[1], 2), rank = as.integer(team_totals$receiving_epa_rank[1])),
+    receiving_epa = list(value = round(team_totals$receiving_epa[1], 3), rank = as.integer(team_totals$receiving_epa_rank[1])),
     pacr = list(value = round(team_totals$pacr[1], 2), rank = as.integer(team_totals$pacr_rank[1])),
     passing_first_downs = list(value = as.integer(team_totals$passing_first_downs[1]), rank = as.integer(team_totals$passing_first_downs_rank[1])),
     sacks_suffered = list(value = as.integer(team_totals$sacks_suffered[1]), rank = as.integer(team_totals$sacks_suffered_rank[1]))

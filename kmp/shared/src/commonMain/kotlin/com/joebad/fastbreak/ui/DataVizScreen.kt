@@ -15,6 +15,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.joebad.fastbreak.data.model.*
 import com.joebad.fastbreak.navigation.DataVizComponent
 import com.joebad.fastbreak.ui.visualizations.*
@@ -83,6 +84,7 @@ fun DataVizScreen(
                     }
                     Text(
                         text = titleText,
+                        fontSize = 16.sp,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )

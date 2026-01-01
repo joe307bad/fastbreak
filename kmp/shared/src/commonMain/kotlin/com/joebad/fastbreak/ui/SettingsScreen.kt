@@ -12,6 +12,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.joebad.fastbreak.data.model.PinnedTeam
 import com.joebad.fastbreak.data.model.TeamRoster
 import com.joebad.fastbreak.navigation.SettingsComponent

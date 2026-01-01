@@ -1,6 +1,9 @@
 package com.joebad.fastbreak.ui.visualizations
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -16,6 +19,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.joebad.fastbreak.data.model.*
+import com.joebad.fastbreak.ui.KoalaQuadrantScatterPlot
 import kotlin.math.round
 import kotlinx.serialization.json.*
 
@@ -305,6 +309,109 @@ private fun FiveColumnRowWithRanks(
 }
 
 /**
+ * Navigation badge for Stats/Charts toggle
+ */
+@Composable
+private fun NavigationBadge(
+    text: String,
+    isSelected: Boolean,
+    onClick: () -> Unit
+) {
+    val backgroundColor = if (isSelected) {
+        MaterialTheme.colorScheme.primary
+    } else {
+        MaterialTheme.colorScheme.surfaceVariant
+    }
+
+    val textColor = if (isSelected) {
+        MaterialTheme.colorScheme.onPrimary
+    } else {
+        MaterialTheme.colorScheme.onSurfaceVariant
+    }
+
+    Box(
+        modifier = Modifier
+            .background(backgroundColor, RoundedCornerShape(12.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelMedium,
+            fontSize = 11.sp,
+            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+            color = textColor
+        )
+    }
+}
+
+/**
+ * Matchup badge showing team abbreviations
+ */
+@Composable
+private fun MatchupBadge(
+    awayTeam: String,
+    homeTeam: String,
+    isSelected: Boolean,
+    onClick: () -> Unit
+) {
+    val backgroundColor = if (isSelected) {
+        MaterialTheme.colorScheme.primaryContainer
+    } else {
+        MaterialTheme.colorScheme.surface
+    }
+
+    val borderColor = if (isSelected) {
+        MaterialTheme.colorScheme.primary
+    } else {
+        MaterialTheme.colorScheme.outline
+    }
+
+    val textColor = if (isSelected) {
+        MaterialTheme.colorScheme.onPrimaryContainer
+    } else {
+        MaterialTheme.colorScheme.onSurface
+    }
+
+    Box(
+        modifier = Modifier
+            .background(backgroundColor, RoundedCornerShape(12.dp))
+            .border(1.dp, borderColor, RoundedCornerShape(12.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 10.dp, vertical = 6.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = awayTeam,
+                style = MaterialTheme.typography.labelMedium,
+                fontSize = 11.sp,
+                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                color = textColor
+            )
+            Text(
+                text = "vs",
+                style = MaterialTheme.typography.labelMedium,
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Normal,
+                color = textColor.copy(alpha = 0.7f)
+            )
+            Text(
+                text = homeTeam,
+                style = MaterialTheme.typography.labelMedium,
+                fontSize = 11.sp,
+                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                color = textColor
+            )
+        }
+    }
+}
+
+/**
  * Screen for displaying MATCHUP_V2 comprehensive stats with tabs for Stats and Charts
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -328,7 +435,6 @@ fun MatchupV2Screen(
     }
 
     var selectedMatchupIndex by remember { mutableStateOf(0) }
-    var dropdownExpanded by remember { mutableStateOf(false) }
     var selectedTab by remember { mutableStateOf(0) }
 
     // Reset selected index when filtered matchups change
@@ -362,62 +468,55 @@ fun MatchupV2Screen(
             .fillMaxSize()
             .padding(horizontal = 16.dp)
     ) {
-        // Dropdown selector
-        ExposedDropdownMenuBox(
-            expanded = dropdownExpanded,
-            onExpandedChange = { dropdownExpanded = it },
+        // Badge-based navigation row
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(vertical = 4.dp)
+                .padding(vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            OutlinedTextField(
-                value = "$awayTeam vs $homeTeam",
-                onValueChange = {},
-                readOnly = true,
-                singleLine = true,
-                label = { Text("Select Matchup") },
-                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = dropdownExpanded) },
-                colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors(),
+            // Stats/Charts toggle badges
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                NavigationBadge(
+                    text = "Stats",
+                    isSelected = selectedTab == 0,
+                    onClick = { selectedTab = 0 }
+                )
+                NavigationBadge(
+                    text = "Charts",
+                    isSelected = selectedTab == 1,
+                    onClick = { selectedTab = 1 }
+                )
+            }
+
+            // Vertical divider
+            Box(
                 modifier = Modifier
-                    .menuAnchor()
-                    .fillMaxWidth()
+                    .width(1.dp)
+                    .height(20.dp)
+                    .padding(horizontal = 8.dp)
+                    .background(MaterialTheme.colorScheme.outlineVariant)
             )
 
-            ExposedDropdownMenu(
-                expanded = dropdownExpanded,
-                onDismissRequest = { dropdownExpanded = false }
+            // Horizontally scrollable matchup badges
+            Row(
+                modifier = Modifier
+                    .weight(1f)
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 matchups.forEachIndexed { index, (key, _) ->
                     val teams = key.split("-")
-                    DropdownMenuItem(
-                        text = {
-                            Text("${teams[0].uppercase()} vs ${teams[1].uppercase()}")
-                        },
-                        onClick = {
-                            selectedMatchupIndex = index
-                            dropdownExpanded = false
-                        },
-                        contentPadding = ExposedDropdownMenuDefaults.ItemContentPadding
+                    MatchupBadge(
+                        awayTeam = teams[0].uppercase(),
+                        homeTeam = teams[1].uppercase(),
+                        isSelected = selectedMatchupIndex == index,
+                        onClick = { selectedMatchupIndex = index }
                     )
                 }
             }
-        }
-
-        // Tab Row
-        TabRow(
-            selectedTabIndex = selectedTab,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Tab(
-                selected = selectedTab == 0,
-                onClick = { selectedTab = 0 },
-                text = { Text("Stats") }
-            )
-            Tab(
-                selected = selectedTab == 1,
-                onClick = { selectedTab = 1 },
-                text = { Text("Charts") }
-            )
         }
 
         // Tab content
@@ -1030,25 +1129,366 @@ private fun ChartsTab(
     homeTeam: String,
     matchup: MatchupV2
 ) {
-    // Placeholder for charts implementation
-    Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+    val scrollState = rememberScrollState()
+
+    // Extract team data from JSON
+    val awayTeamData = matchup.getObject(awayTeam.lowercase())
+    val homeTeamData = matchup.getObject(homeTeam.lowercase())
+
+    if (awayTeamData == null || homeTeamData == null) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
         ) {
-            Text(
-                text = "Charts Coming Soon",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold
+            Text("Team data not available")
+        }
+        return
+    }
+
+    // Extract team stats
+    val awayTeamStats = awayTeamData.getObject("team_stats")
+    val homeTeamStats = homeTeamData.getObject("team_stats")
+
+    if (awayTeamStats == null || homeTeamStats == null) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            Text("Chart data not available")
+        }
+        return
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(scrollState)
+            .padding(vertical = 8.dp)
+    ) {
+        // Cumulative EPA Chart
+        CumulativeEPAChartV2(
+            awayTeam = awayTeam,
+            homeTeam = homeTeam,
+            awayTeamStats = awayTeamStats,
+            homeTeamStats = homeTeamStats
+        )
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        // Weekly EPA Scatter Plot
+        WeeklyEPAScatterPlotV2(
+            awayTeam = awayTeam,
+            homeTeam = homeTeam,
+            awayTeamStats = awayTeamStats,
+            homeTeamStats = homeTeamStats
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+    }
+}
+
+@Composable
+private fun CumulativeEPAChartV2(
+    awayTeam: String,
+    homeTeam: String,
+    awayTeamStats: JsonObject,
+    homeTeamStats: JsonObject
+) {
+    Text(
+        text = "Cumulative EPA Over Season",
+        style = MaterialTheme.typography.titleSmall,
+        fontWeight = FontWeight.Bold,
+        modifier = Modifier.padding(bottom = 8.dp)
+    )
+
+    // Extract cum_epa_by_week data
+    val awayCumEPA = awayTeamStats.getObject("cum_epa_by_week")
+    val homeCumEPA = homeTeamStats.getObject("cum_epa_by_week")
+
+    if (awayCumEPA == null || homeCumEPA == null) {
+        Text(
+            text = "Cumulative EPA data not available",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        return
+    }
+
+    // Parse data points for line chart
+    val awayDataPoints = awayCumEPA.keys.mapNotNull { weekKey ->
+        val weekNum = weekKey.removePrefix("week-").toIntOrNull()
+        val epaValue = awayCumEPA.getDouble(weekKey)
+        if (weekNum != null && epaValue != null) {
+            LineChartDataPoint(x = weekNum.toDouble(), y = epaValue)
+        } else null
+    }.sortedBy { it.x }
+
+    val homeDataPoints = homeCumEPA.keys.mapNotNull { weekKey ->
+        val weekNum = weekKey.removePrefix("week-").toIntOrNull()
+        val epaValue = homeCumEPA.getDouble(weekKey)
+        if (weekNum != null && epaValue != null) {
+            LineChartDataPoint(x = weekNum.toDouble(), y = epaValue)
+        } else null
+    }.sortedBy { it.x }
+
+    // Create series with team colors
+    val series = listOf(
+        LineChartSeries(
+            label = awayTeam,
+            dataPoints = awayDataPoints,
+            color = "#2196F3" // Blue for away team
+        ),
+        LineChartSeries(
+            label = homeTeam,
+            dataPoints = homeDataPoints,
+            color = "#FF5722" // Deep Orange for home team
+        )
+    )
+
+    LineChartComponent(
+        series = series,
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(250.dp)
+        yAxisTitle = "Cumulative EPA"
+    )
+
+    // Add legend for team colors
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 8.dp),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(12.dp)
+                    .background(Team1Color, CircleShape)
             )
             Text(
-                text = "Cumulative EPA and EPA by Week visualizations",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                text = awayTeam,
+                style = MaterialTheme.typography.bodySmall,
+                fontWeight = FontWeight.Medium
             )
         }
+
+        Spacer(modifier = Modifier.width(16.dp))
+
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(12.dp)
+                    .background(Team2Color, CircleShape)
+            )
+            Text(
+                text = homeTeam,
+                style = MaterialTheme.typography.bodySmall,
+                fontWeight = FontWeight.Medium
+            )
+        }
+    }
+}
+
+@Composable
+private fun WeeklyEPAScatterPlotV2(
+    awayTeam: String,
+    homeTeam: String,
+    awayTeamStats: JsonObject,
+    homeTeamStats: JsonObject
+) {
+    // State for selected week range
+    var selectedWeekRange by remember { mutableStateOf<IntRange?>(null) }
+
+    Text(
+        text = "Weekly Offensive vs Defensive EPA",
+        style = MaterialTheme.typography.titleSmall,
+        fontWeight = FontWeight.Bold,
+        modifier = Modifier.padding(bottom = 8.dp)
+    )
+
+    // Week range filter badges - horizontally scrollable
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState())
+            .padding(bottom = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        WeekRangeBadge(
+            label = "All Weeks",
+            isSelected = selectedWeekRange == null,
+            onClick = { selectedWeekRange = null }
+        )
+        WeekRangeBadge(
+            label = "Weeks 1-6",
+            isSelected = selectedWeekRange == 1..6,
+            onClick = { selectedWeekRange = 1..6 }
+        )
+        WeekRangeBadge(
+            label = "Weeks 7-12",
+            isSelected = selectedWeekRange == 7..12,
+            onClick = { selectedWeekRange = 7..12 }
+        )
+        WeekRangeBadge(
+            label = "Weeks 13-18",
+            isSelected = selectedWeekRange == 13..18,
+            onClick = { selectedWeekRange = 13..18 }
+        )
+    }
+
+    // Extract epa_by_week data
+    val awayEPAByWeek = awayTeamStats.getObject("epa_by_week")
+    val homeEPAByWeek = homeTeamStats.getObject("epa_by_week")
+
+    if (awayEPAByWeek == null || homeEPAByWeek == null) {
+        Text(
+            text = "Weekly EPA data not available",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        return
+    }
+
+    // Parse scatter plot data points
+    val awayPoints = awayEPAByWeek.keys.mapNotNull { weekKey ->
+        val weekNum = weekKey.removePrefix("week-").toIntOrNull()
+        val weekData = awayEPAByWeek.getObject(weekKey)
+        val offEPA = weekData?.getDouble("off")
+        val defEPA = weekData?.getDouble("def")
+
+        if (weekNum != null && offEPA != null && defEPA != null) {
+            ScatterPlotDataPoint(
+                label = "$awayTeam W$weekNum",
+                x = offEPA,
+                y = defEPA,
+                sum = offEPA + defEPA,
+                teamCode = awayTeam,
+                color = "#2196F3" // Blue for away team
+            )
+        } else null
+    }
+
+    val homePoints = homeEPAByWeek.keys.mapNotNull { weekKey ->
+        val weekNum = weekKey.removePrefix("week-").toIntOrNull()
+        val weekData = homeEPAByWeek.getObject(weekKey)
+        val offEPA = weekData?.getDouble("off")
+        val defEPA = weekData?.getDouble("def")
+
+        if (weekNum != null && offEPA != null && defEPA != null) {
+            ScatterPlotDataPoint(
+                label = "$homeTeam W$weekNum",
+                x = offEPA,
+                y = defEPA,
+                sum = offEPA + defEPA,
+                teamCode = homeTeam,
+                color = "#FF5722" // Deep Orange for home team
+            )
+        } else null
+    }
+
+    // Build highlighted labels set based on selected week range
+    val weekRange = selectedWeekRange
+    val highlightedLabels = if (weekRange != null) {
+        (awayPoints + homePoints)
+            .filter { point ->
+                val weekMatch = "W(\\d+)".toRegex().find(point.label)
+                weekMatch?.groupValues?.get(1)?.toIntOrNull()?.let { week ->
+                    week in weekRange
+                } ?: false
+            }
+            .map { it.label }
+            .toSet()
+    } else {
+        emptySet()
+    }
+
+    KoalaQuadrantScatterPlot(
+        data = awayPoints + homePoints,
+        modifier = Modifier.fillMaxWidth(),
+        title = "",
+        xAxisLabel = "Offensive EPA",
+        yAxisLabel = "Defensive EPA",
+        invertYAxis = false,
+        highlightedPlayerLabels = highlightedLabels,
+        quadrantTopRight = QuadrantConfig(label = "Elite", color = "#4CAF50", lightModeColor = "#4CAF50"),
+        quadrantTopLeft = QuadrantConfig(label = "Good Defense", color = "#FFEB3B", lightModeColor = "#FFEB3B"),
+        quadrantBottomLeft = QuadrantConfig(label = "Poor", color = "#F44336", lightModeColor = "#F44336"),
+        quadrantBottomRight = QuadrantConfig(label = "Good Offense", color = "#FF9800", lightModeColor = "#FF9800")
+    )
+
+    // Add legend for team colors
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 8.dp),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(12.dp)
+                    .background(Team1Color, CircleShape)
+            )
+            Text(
+                text = awayTeam,
+                style = MaterialTheme.typography.bodySmall,
+                fontWeight = FontWeight.Medium
+            )
+        }
+
+        Spacer(modifier = Modifier.width(16.dp))
+
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(12.dp)
+                    .background(Team2Color, CircleShape)
+            )
+            Text(
+                text = homeTeam,
+                style = MaterialTheme.typography.bodySmall,
+                fontWeight = FontWeight.Medium
+            )
+        }
+    }
+}
+
+@Composable
+private fun WeekRangeBadge(
+    label: String,
+    isSelected: Boolean,
+    onClick: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .clickable(onClick = onClick)
+            .background(
+                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+                shape = RoundedCornerShape(16.dp)
+            )
+            .padding(horizontal = 12.dp, vertical = 6.dp)
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+            fontSize = 10.sp
+        )
     }
 }

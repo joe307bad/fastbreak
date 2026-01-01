@@ -1,6 +1,7 @@
 package com.joebad.fastbreak.ui.visualizations
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
@@ -11,6 +12,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlin.math.ceil
@@ -22,8 +25,11 @@ import io.github.koalaplot.core.xygraph.DefaultPoint
 import io.github.koalaplot.core.xygraph.FloatLinearAxisModel
 import io.github.koalaplot.core.xygraph.XYGraph
 import io.github.koalaplot.core.xygraph.rememberAxisStyle
+import io.github.koalaplot.core.util.VerticalRotation
+import io.github.koalaplot.core.util.rotateVertically
 import kotlin.math.abs
 import kotlin.math.roundToInt
+
 
 /**
  * Format number to one decimal place
@@ -71,7 +77,8 @@ private fun parseHexColor(hex: String?): Color? {
 fun LineChartComponent(
     series: List<LineChartSeries>,
     modifier: Modifier = Modifier,
-    highlightedTeamCodes: Set<String> = emptySet()
+    highlightedTeamCodes: Set<String> = emptySet(),
+    yAxisTitle: String? = null
 ) {
     if (series.isEmpty() || series.all { it.dataPoints.isEmpty() }) return
 
@@ -158,9 +165,12 @@ fun LineChartComponent(
             },
             yAxisTitle = {
                 Text(
-                    text = "Value",
+                    text = yAxisTitle ?: "",
                     fontSize = 11.sp,
-                    color = MaterialTheme.colorScheme.onSurface
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier
+                        .rotateVertically(VerticalRotation.COUNTER_CLOCKWISE)
+                        .padding(end = 4.dp)
                 )
             },
             horizontalMajorGridLineStyle = LineStyle(
@@ -176,7 +186,7 @@ fun LineChartComponent(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(400.dp)
-                .padding(8.dp)
+                .padding(start = 4.dp, end = 4.dp, top = 16.dp, bottom = 4.dp)
         ) {
             series.forEachIndexed { seriesIndex, lineSeries ->
                 if (lineSeries.dataPoints.size < 2) return@forEachIndexed

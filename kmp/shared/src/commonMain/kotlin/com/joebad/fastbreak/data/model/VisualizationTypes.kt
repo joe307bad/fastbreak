@@ -194,3 +194,95 @@ data class MatchupVisualization(
     val week: Int,
     val dataPoints: List<Matchup>
 ) : VisualizationType
+
+// MATCHUP_V2 data structures (new comprehensive matchup stats)
+@Serializable
+data class StatWithRank(
+    val value: Double?,
+    val rank: Int?
+)
+
+@Serializable
+data class EPAByWeek(
+    val off: Double?,
+    val def: Double?
+)
+
+@Serializable
+data class TeamStatsV2(
+    val cum_epa_by_week: Map<String, Double>, // e.g., "week-1" -> 0.5
+    val epa_by_week: Map<String, EPAByWeek>,  // e.g., "week-1" -> { off: 0.1, def: -0.2 }
+    val current: Map<String, StatWithRank>     // e.g., "off_epa" -> { value: 0.5, rank: 12 }
+)
+
+@Serializable
+data class QBStats(
+    val name: String,
+    val passing_epa: StatWithRank?,
+    val passing_cpoe: StatWithRank?,
+    val pacr: StatWithRank?,
+    val passing_air_yards: StatWithRank?
+)
+
+@Serializable
+data class RBStats(
+    val name: String,
+    val rushing_epa: StatWithRank?,
+    val rushing_first_downs: StatWithRank?,
+    val carries: StatWithRank?,
+    val receiving_epa: StatWithRank?,
+    val target_share: StatWithRank?
+)
+
+@Serializable
+data class ReceiverStats(
+    val name: String,
+    val wopr: StatWithRank?,
+    val receiving_epa: StatWithRank?,
+    val racr: StatWithRank?,
+    val target_share: StatWithRank?,
+    val air_yards_share: StatWithRank?
+)
+
+@Serializable
+data class PlayerStatsV2(
+    val qb: QBStats?,
+    val rbs: List<RBStats>,
+    val receivers: List<ReceiverStats>
+)
+
+@Serializable
+data class TeamDataV2(
+    val team_stats: TeamStatsV2,
+    val players: PlayerStatsV2
+)
+
+@Serializable
+data class GameOddsV2(
+    val spread: Double?,
+    val moneyline: String?,
+    val over_under: Double?
+)
+
+@Serializable
+data class CommonOpponentGame(
+    val week: Int,
+    val result: String, // "W" or "L"
+    val score: String   // e.g., "27-19"
+)
+
+// Using JsonObject to handle dynamic team properties
+typealias MatchupV2 = kotlinx.serialization.json.JsonObject
+
+@Serializable
+data class MatchupV2Visualization(
+    override val sport: String,
+    override val visualizationType: String,
+    override val title: String,
+    override val subtitle: String,
+    override val description: String,
+    override val lastUpdated: Instant,
+    override val source: String? = null,
+    val week: Int,
+    val dataPoints: Map<String, MatchupV2> // matchup key (e.g., "car-tb") -> matchup data
+) : VisualizationType

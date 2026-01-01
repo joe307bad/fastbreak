@@ -7,6 +7,7 @@ import com.joebad.fastbreak.data.model.CachedChartData
 import com.joebad.fastbreak.data.model.ChartDefinition
 import com.joebad.fastbreak.data.model.LineChartVisualization
 import com.joebad.fastbreak.data.model.MatchupVisualization
+import com.joebad.fastbreak.data.model.MatchupV2Visualization
 import com.joebad.fastbreak.data.model.PlayoffBracketVisualization
 import com.joebad.fastbreak.data.model.RegistryEntry
 import com.joebad.fastbreak.data.model.ScatterPlotVisualization
@@ -282,6 +283,7 @@ class ChartDataSynchronizer(
                 VizType.LINE_CHART -> json.decodeFromString<LineChartVisualization>(rawJson)
                 VizType.TABLE -> json.decodeFromString<TableVisualization>(rawJson)
                 VizType.MATCHUP -> json.decodeFromString<MatchupVisualization>(rawJson)
+                VizType.MATCHUP_V2 -> json.decodeFromString<MatchupV2Visualization>(rawJson)
                 VizType.PLAYOFF_BRACKET -> json.decodeFromString<PlayoffBracketVisualization>(rawJson)
             }
 

@@ -395,6 +395,13 @@ private fun RenderVisualization(
             modifier = Modifier.fillMaxSize(),
             highlightedTeamCodes = highlightedTeamCodes
         )
+    } else if (visualization is MatchupV2Visualization) {
+        // MatchupV2 has its own dedicated screen with dropdown selector and tabs
+        MatchupV2Screen(
+            visualization = visualization,
+            modifier = Modifier.fillMaxSize(),
+            highlightedTeamCodes = highlightedTeamCodes
+        )
     } else if (visualization is PlayoffBracketVisualization) {
         // Playoff bracket: horizontally scrollable with source pinned to bottom
         Box(modifier = Modifier.fillMaxSize()) {
@@ -472,6 +479,9 @@ private fun RenderVisualization(
                             }
                             is MatchupVisualization -> {
                                 // Matchup report cards - handled in DataTableComponent
+                            }
+                            is MatchupV2Visualization -> {
+                                // Handled by MatchupV2Screen below
                             }
                         }
                     }

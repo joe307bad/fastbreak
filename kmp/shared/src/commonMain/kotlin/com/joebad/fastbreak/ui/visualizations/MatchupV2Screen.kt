@@ -123,7 +123,9 @@ private fun ThreeColumnRow(
     leftColor: Color = MaterialTheme.colorScheme.onSurface,
     centerColor: Color = MaterialTheme.colorScheme.primary,
     rightColor: Color = MaterialTheme.colorScheme.onSurface,
-    advantage: Int = 0 // -1 for left (away team), 0 for even, 1 for right (home team)
+    advantage: Int = 0, // -1 for left (away team), 0 for even, 1 for right (home team)
+    centerMaxLines: Int = Int.MAX_VALUE,
+    centerOverflow: androidx.compose.ui.text.style.TextOverflow = androidx.compose.ui.text.style.TextOverflow.Clip
 ) {
     Row(
         modifier = modifier
@@ -161,7 +163,10 @@ private fun ThreeColumnRow(
             textAlign = TextAlign.Center,
             fontSize = 11.sp,
             fontWeight = centerWeight,
-            color = centerColor
+            color = centerColor,
+            maxLines = centerMaxLines,
+            overflow = centerOverflow,
+            softWrap = false
         )
 
         Row(
@@ -421,23 +426,31 @@ fun MatchupV2Screen(
     modifier: Modifier = Modifier,
     highlightedTeamCodes: Set<String> = emptySet()
 ) {
-    // Filter matchups by highlighted teams if any are selected
+    // Reorder matchups to put highlighted team matchups first
     val matchups = remember(visualization.dataPoints, highlightedTeamCodes) {
+        val allMatchups = visualization.dataPoints.toList()
+
         if (highlightedTeamCodes.isEmpty()) {
-            visualization.dataPoints.toList()
+            allMatchups
         } else {
-            visualization.dataPoints.filter { (key, _) ->
+            // Partition matchups into those with highlighted teams and those without
+            // Matchup keys are in format "away-home" (e.g., "buf-kc")
+            // Search for the 3-letter team code (case-insensitive) in the key
+            val (pinnedMatchups, otherMatchups) = allMatchups.partition { (key, _) ->
+                val teams = key.split("-")
                 highlightedTeamCodes.any { code ->
-                    key.contains(code.lowercase())
+                    teams.any { team -> team.equals(code, ignoreCase = true) }
                 }
-            }.toList()
+            }
+            // Put pinned matchups first, followed by others
+            pinnedMatchups + otherMatchups
         }
     }
 
-    var selectedMatchupIndex by remember { mutableStateOf(0) }
+    var selectedMatchupIndex by remember(highlightedTeamCodes) { mutableStateOf(0) }
     var selectedTab by remember { mutableStateOf(0) }
 
-    // Reset selected index when filtered matchups change
+    // Reset selected index when matchups list changes (e.g., data updated)
     LaunchedEffect(matchups.size) {
         if (selectedMatchupIndex >= matchups.size) {
             selectedMatchupIndex = 0
@@ -688,14 +701,23 @@ private fun StatsTab(
         Spacer(modifier = Modifier.height(12.dp))
 
         // H2H Record
-        matchup.getString("h2h_record")?.let { record ->
-            Text(
-                text = "Head-to-Head: $record",
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.Bold,
-                fontSize = 11.sp,
-                modifier = Modifier.padding(bottom = 4.dp)
-            )
+        matchup.get("h2h_record")?.let { h2hElement ->
+            // Check if it's an array before trying to access as jsonArray
+            if (h2hElement is kotlinx.serialization.json.JsonArray && h2hElement.isNotEmpty()) {
+                Text(
+                    text = "Head-to-Head",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 11.sp,
+                    modifier = Modifier.padding(bottom = 4.dp)
+                )
+
+                HeadToHeadComparison(
+                    awayTeam = awayTeam,
+                    homeTeam = homeTeam,
+                    h2hMatchups = h2hElement
+                )
+            }
         }
 
         Spacer(modifier = Modifier.height(12.dp))
@@ -1049,6 +1071,40 @@ private fun PlayerStatsComparisonJson(
 }
 
 @Composable
+private fun HeadToHeadComparison(
+    awayTeam: String,
+    homeTeam: String,
+    h2hMatchups: kotlinx.serialization.json.JsonArray
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        h2hMatchups.forEach { matchupElement ->
+            val matchupObj = matchupElement.jsonObject
+            val week = matchupObj.getInt("week")
+            val finalScore = matchupObj.getString("finalScore")
+            val winner = matchupObj.getString("winner")
+
+            if (week != null && finalScore != null && winner != null) {
+                // Determine advantage based on winner
+                val advantage = when (winner.uppercase()) {
+                    awayTeam -> -1
+                    homeTeam -> 1
+                    else -> 0 // TIE or unknown
+                }
+
+                ThreeColumnRow(
+                    leftText = if (winner == awayTeam) "W" else if (winner == homeTeam) "L" else "T",
+                    centerText = "W$week: $finalScore",
+                    rightText = if (winner == homeTeam) "W" else if (winner == awayTeam) "L" else "T",
+                    advantage = advantage,
+                    centerMaxLines = 1,
+                    centerOverflow = androidx.compose.ui.text.style.TextOverflow.Visible
+                )
+            }
+        }
+    }
+}
+
+@Composable
 private fun CommonOpponentsComparison(
     awayTeam: String,
     homeTeam: String,
@@ -1249,7 +1305,7 @@ private fun CumulativeEPAChartV2(
         series = series,
         modifier = Modifier
             .fillMaxWidth()
-            .height(250.dp)
+            .height(250.dp),
         yAxisTitle = "Cumulative EPA"
     )
 

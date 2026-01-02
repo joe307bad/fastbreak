@@ -251,10 +251,17 @@ private fun SuccessContent(
     }
 
     // Combine team code highlights with filter highlights
-    val allHighlightedTeamCodes = remember(selectedTeamCodes, filterHighlightedTeamCodes, selectedPlayerLabels) {
-        val combined = selectedTeamCodes + filterHighlightedTeamCodes
+    // For MatchupV2Visualization, automatically include pinned teams
+    val allHighlightedTeamCodes = remember(selectedTeamCodes, filterHighlightedTeamCodes, selectedPlayerLabels, sportPinnedTeams, visualization) {
+        val pinnedTeamCodes = if (visualization is MatchupV2Visualization) {
+            sportPinnedTeams.map { it.teamCode }.toSet()
+        } else {
+            emptySet()
+        }
+        val combined = selectedTeamCodes + filterHighlightedTeamCodes + pinnedTeamCodes
         println("🔍 DataVizScreen - Selected Team Codes: $selectedTeamCodes")
         println("🔍 DataVizScreen - Selected Player Labels: $selectedPlayerLabels")
+        println("🔍 DataVizScreen - Pinned Team Codes: $pinnedTeamCodes")
         println("🔍 DataVizScreen - All Highlighted Team Codes: $combined")
         combined
     }
@@ -270,7 +277,8 @@ private fun SuccessContent(
 
     Column(modifier = Modifier.fillMaxSize()) {
         // Show filter bar if there are any filterable properties or pinned teams
-        if (filterOptions.isNotEmpty() || sportPinnedTeams.isNotEmpty()) {
+        // BUT hide it for MatchupV2Visualization (it handles pinned teams internally)
+        if ((filterOptions.isNotEmpty() || sportPinnedTeams.isNotEmpty()) && visualization !is MatchupV2Visualization) {
             val scrollState = rememberScrollState()
             Row(
                 modifier = Modifier

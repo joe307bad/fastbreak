@@ -286,11 +286,27 @@ odds_data <- tryCatch({
   list(events = list())
 })
 
+# Helper function to normalize team abbreviations for ESPN API
+normalize_team_abbr <- function(abbr) {
+  # ESPN uses different abbreviations for some teams
+  # WSH instead of WAS for Washington
+  # LAR instead of LA for Los Angeles Rams
+  case_when(
+    abbr == "WAS" ~ "WSH",
+    abbr == "LA" ~ "LAR",
+    TRUE ~ abbr
+  )
+}
+
 # Helper function to extract odds for a game
 get_odds_for_game <- function(home_team, away_team) {
   default_odds <- list(spread = NULL, moneyline = NULL, over_under = NULL)
 
   if (is.null(odds_data$events)) return(default_odds)
+
+  # Normalize team abbreviations for ESPN API comparison
+  home_team_normalized <- normalize_team_abbr(home_team)
+  away_team_normalized <- normalize_team_abbr(away_team)
 
   for (event in odds_data$events) {
     if (is.null(event$competitions)) next
@@ -298,7 +314,7 @@ get_odds_for_game <- function(home_team, away_team) {
     if (is.null(comp$competitors)) next
 
     teams <- sapply(comp$competitors, function(x) x$team$abbreviation)
-    if (home_team %in% teams && away_team %in% teams) {
+    if (home_team_normalized %in% teams && away_team_normalized %in% teams) {
       if (!is.null(comp$odds) && length(comp$odds) > 0) {
         odds <- comp$odds[[1]]
 
@@ -333,17 +349,36 @@ get_h2h_record <- function(team1, team2, schedules_df) {
     )
 
   if (nrow(h2h_games) == 0) {
-    return(NULL)
+    return(list())
   }
 
-  # Calculate wins for team1
-  team1_wins <- sum(
-    (h2h_games$home_team == team1 & h2h_games$home_score > h2h_games$away_score) |
-    (h2h_games$away_team == team1 & h2h_games$away_score > h2h_games$home_score)
-  )
-  team1_losses <- nrow(h2h_games) - team1_wins
+  # Build array of matchup objects
+  h2h_array <- lapply(seq_len(nrow(h2h_games)), function(i) {
+    game <- h2h_games[i, ]
 
-  return(paste0(team1_wins, "-", team1_losses))
+    # Determine winner
+    winner <- if (game$home_score > game$away_score) {
+      game$home_team
+    } else if (game$away_score > game$home_score) {
+      game$away_team
+    } else {
+      "TIE"
+    }
+
+    # Build final score string
+    final_score <- paste0(
+      game$away_team, " ", game$away_score, " - ",
+      game$home_team, " ", game$home_score
+    )
+
+    list(
+      week = as.integer(game$week),
+      finalScore = final_score,
+      winner = winner
+    )
+  })
+
+  return(h2h_array)
 }
 
 # Helper function to find common opponents
@@ -583,7 +618,7 @@ for (i in 1:nrow(current_week_games)) {
   # Build matchup JSON
   matchup <- list(
     odds = odds,
-    h2h_record = h2h,
+    h2h_record = I(h2h),  # Use I() to prevent auto_unbox from converting empty list to null
     common_opponents = common_opps
   )
   matchup[[tolower(home_team)]] <- home_json

@@ -164,22 +164,29 @@ player_stats_filtered <- player_stats %>%
   group_by(player_id, player_name, team, position) %>%
   summarise(
     games = n_distinct(week),
-    # QB stats
-    passing_epa = sum(passing_epa, na.rm = TRUE),
+    # QB stats (EPA per attempt)
+    passing_epa_total = sum(passing_epa, na.rm = TRUE),
+    passing_attempts = sum(attempts, na.rm = TRUE),
     passing_cpoe = mean(passing_cpoe, na.rm = TRUE),
     pacr = mean(pacr, na.rm = TRUE),
     passing_air_yards = sum(passing_air_yards, na.rm = TRUE),
-    # RB stats
-    rushing_epa = sum(rushing_epa, na.rm = TRUE),
+    # RB stats (EPA per carry/target)
+    rushing_epa_total = sum(rushing_epa, na.rm = TRUE),
     rushing_first_downs = sum(rushing_first_downs, na.rm = TRUE),
     carries = sum(carries, na.rm = TRUE),
-    receiving_epa = sum(receiving_epa, na.rm = TRUE),
+    receiving_epa_total = sum(receiving_epa, na.rm = TRUE),
     targets = sum(targets, na.rm = TRUE),
     # WR/TE stats
     wopr = mean(wopr, na.rm = TRUE),
     racr = mean(racr, na.rm = TRUE),
     air_yards_share = mean(air_yards_share, na.rm = TRUE),
     .groups = "drop"
+  ) %>%
+  mutate(
+    # Calculate EPA per play
+    passing_epa = if_else(passing_attempts > 0, passing_epa_total / passing_attempts, NA_real_),
+    rushing_epa = if_else(carries > 0, rushing_epa_total / carries, NA_real_),
+    receiving_epa = if_else(targets > 0, receiving_epa_total / targets, NA_real_)
   ) %>%
   filter(
     (position == "QB" & games >= MIN_GAMES_QB) |
@@ -300,7 +307,13 @@ normalize_team_abbr <- function(abbr) {
 
 # Helper function to extract odds for a game
 get_odds_for_game <- function(home_team, away_team) {
-  default_odds <- list(spread = NULL, moneyline = NULL, over_under = NULL)
+  default_odds <- list(
+    home_spread = NULL,
+    home_moneyline = NULL,
+    away_spread = NULL,
+    away_moneyline = NULL,
+    over_under = NULL
+  )
 
   if (is.null(odds_data$events)) return(default_odds)
 
@@ -318,16 +331,39 @@ get_odds_for_game <- function(home_team, away_team) {
       if (!is.null(comp$odds) && length(comp$odds) > 0) {
         odds <- comp$odds[[1]]
 
-        # Extract moneyline (home team odds as string, e.g., "-142" or "+120")
-        moneyline <- NULL
+        # Extract home team spread from pointSpread
+        home_spread <- NULL
+        if (!is.null(odds$pointSpread) && !is.null(odds$pointSpread$home) &&
+            !is.null(odds$pointSpread$home$close) && !is.null(odds$pointSpread$home$close$line)) {
+          home_spread <- odds$pointSpread$home$close$line
+        }
+
+        # Extract away team spread from pointSpread
+        away_spread <- NULL
+        if (!is.null(odds$pointSpread) && !is.null(odds$pointSpread$away) &&
+            !is.null(odds$pointSpread$away$close) && !is.null(odds$pointSpread$away$close$line)) {
+          away_spread <- odds$pointSpread$away$close$line
+        }
+
+        # Extract home team moneyline
+        home_moneyline <- NULL
         if (!is.null(odds$moneyline) && !is.null(odds$moneyline$home) &&
             !is.null(odds$moneyline$home$close) && !is.null(odds$moneyline$home$close$odds)) {
-          moneyline <- odds$moneyline$home$close$odds
+          home_moneyline <- odds$moneyline$home$close$odds
+        }
+
+        # Extract away team moneyline
+        away_moneyline <- NULL
+        if (!is.null(odds$moneyline) && !is.null(odds$moneyline$away) &&
+            !is.null(odds$moneyline$away$close) && !is.null(odds$moneyline$away$close$odds)) {
+          away_moneyline <- odds$moneyline$away$close$odds
         }
 
         return(list(
-          spread = if (!is.null(odds$spread)) odds$spread else NULL,
-          moneyline = moneyline,
+          home_spread = home_spread,
+          home_moneyline = home_moneyline,
+          away_spread = away_spread,
+          away_moneyline = away_moneyline,
           over_under = if (!is.null(odds$overUnder)) odds$overUnder else NULL
         ))
       }
@@ -639,7 +675,7 @@ output_data <- list(
   visualizationType = "MATCHUP_V2",
   title = paste0("Week ", current_week, " Matchup Stats"),
   subtitle = "Comprehensive statistical analysis for all matchups",
-  description = "Detailed matchup statistics including team performance metrics, player stats, head-to-head records, and common opponent results. EPA (Expected Points Added) measures the value of each play by comparing expected points before and after the play.",
+  description = "Detailed matchup statistics including team performance metrics, player stats, head-to-head records, and common opponent results. EPA (Expected Points Added) measures the value of each play by comparing expected points before and after the play. CPOE (Completion Percentage Over Expected) measures pass accuracy relative to expectation. PACR (Pass Air Conversion Ratio) measures how efficiently receivers convert air yards to actual yards. All EPA stats are per play through the current week.",
   lastUpdated = format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC"),
   source = "nflfastR / nflreadr / ESPN",
   week = as.integer(current_week),

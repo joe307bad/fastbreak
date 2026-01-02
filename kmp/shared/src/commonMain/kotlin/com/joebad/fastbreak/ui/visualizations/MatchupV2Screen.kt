@@ -613,11 +613,13 @@ private fun StatsTab(
 
         // Odds section
         matchup.getObject("odds")?.let { oddsJson ->
-            val spread = oddsJson.getDouble("spread")
-            val moneyline = oddsJson.getString("moneyline")
+            val homeSpread = oddsJson.getString("home_spread")
+            val awaySpread = oddsJson.getString("away_spread")
+            val homeMoneyline = oddsJson.getString("home_moneyline")
+            val awayMoneyline = oddsJson.getString("away_moneyline")
             val overUnder = oddsJson.getDouble("over_under")
 
-            if (spread != null || moneyline != null || overUnder != null) {
+            if (homeSpread != null || awaySpread != null || homeMoneyline != null || awayMoneyline != null || overUnder != null) {
                 Text(
                     text = "Betting Odds",
                     style = MaterialTheme.typography.titleSmall,
@@ -630,26 +632,37 @@ private fun StatsTab(
                     modifier = Modifier.fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    spread?.let {
-                        val spreadText = if (it > 0) "+${it.format(1)}" else it.format(1)
+                    // Spread row - show both teams
+                    if (awaySpread != null && homeSpread != null) {
                         ThreeColumnRow(
-                            leftText = spreadText,
+                            leftText = awaySpread,
                             centerText = "Spread",
-                            rightText = "-"
+                            rightText = homeSpread
                         )
                     }
-                    moneyline?.let {
+
+                    // Moneyline row - show both teams
+                    if (awayMoneyline != null && homeMoneyline != null) {
                         ThreeColumnRow(
-                            leftText = it,
+                            leftText = awayMoneyline,
                             centerText = "Moneyline",
-                            rightText = "-"
+                            rightText = homeMoneyline
                         )
                     }
-                    overUnder?.let {
+
+                    // Over/Under - show under the favored team (negative spread/moneyline)
+                    overUnder?.let { ou ->
+                        // Determine which team is favored (has negative spread or moneyline starting with "-")
+                        val homeFavored = homeSpread?.startsWith("-") == true || homeMoneyline?.startsWith("-") == true
+                        val awayFavored = awaySpread?.startsWith("-") == true || awayMoneyline?.startsWith("-") == true
+
+                        val leftText = if (awayFavored) ou.format(1) else ""
+                        val rightText = if (homeFavored) ou.format(1) else ""
+
                         ThreeColumnRow(
-                            leftText = "-",
+                            leftText = leftText,
                             centerText = "O/U",
-                            rightText = it.format(1)
+                            rightText = rightText
                         )
                     }
                 }

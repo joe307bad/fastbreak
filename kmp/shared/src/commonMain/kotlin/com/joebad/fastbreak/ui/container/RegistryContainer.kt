@@ -64,33 +64,38 @@ class RegistryContainer(
      * Used to reconstruct the registry for UI display after sync.
      */
     private fun buildRegistryFromCache(): Registry? {
-        println("🔨 RegistryContainer.buildRegistryFromCache()")
+        println("═══════════════════════════════════════════════════════")
+        println("🔨 BUILD REGISTRY: Starting buildRegistryFromCache()")
+        println("═══════════════════════════════════════════════════════")
+
         val chartIds = chartDataSynchronizer.getCachedChartIds()
-        println("   Cached chart IDs: ${chartIds.size}")
+        println("📦 BUILD REGISTRY: Found ${chartIds.size} cached chart ID(s):")
         chartIds.forEach { println("   - $it") }
 
         if (chartIds.isEmpty()) {
-            println("   ⚠️ No cached charts found, returning null")
+            println("⚠️  BUILD REGISTRY: No cached charts found, returning null")
+            println("═══════════════════════════════════════════════════════")
             return null
         }
 
         val charts = chartIds.mapNotNull { chartId ->
             val cached = chartDataSynchronizer.getCachedChartData(chartId)
             if (cached == null) {
-                println("   ⚠️ No cached data for chart: $chartId")
+                println("   ⚠️ BUILD REGISTRY: No cached data for chart: $chartId")
                 return@mapNotNull null
             }
             val chartDef = chartDataSynchronizer.buildChartDefinition(chartId, cached)
             if (chartDef != null) {
-                println("   ✅ Built ChartDefinition: ${chartDef.id} (${chartDef.sport}, ${chartDef.visualizationType})")
+                println("   ✅ BUILD REGISTRY: Built '${chartDef.title}' (id=${chartDef.id}, type=${chartDef.visualizationType})")
             } else {
-                println("   ⚠️ Failed to build ChartDefinition for: $chartId")
+                println("   ⚠️ BUILD REGISTRY: Failed to build ChartDefinition for: $chartId")
             }
             chartDef
         }
 
         if (charts.isEmpty()) {
-            println("   ⚠️ No valid charts built, returning null")
+            println("⚠️  BUILD REGISTRY: No valid charts built, returning null")
+            println("═══════════════════════════════════════════════════════")
             return null
         }
 
@@ -99,7 +104,9 @@ class RegistryContainer(
             lastUpdated = Clock.System.now(),
             charts = charts
         )
-        println("   ✅ Built Registry with ${registry.charts.size} charts")
+        println("✅ BUILD REGISTRY: Complete - built ${registry.charts.size} chart(s):")
+        registry.charts.forEach { println("   - ${it.title} (id=${it.id})") }
+        println("═══════════════════════════════════════════════════════")
         return registry
     }
 

@@ -7,6 +7,8 @@ import com.joebad.fastbreak.data.model.CachedChartData
 import com.joebad.fastbreak.data.model.ChartDefinition
 import com.joebad.fastbreak.data.model.LineChartVisualization
 import com.joebad.fastbreak.data.model.MatchupVisualization
+import com.joebad.fastbreak.data.model.MatchupV2Visualization
+import com.joebad.fastbreak.data.model.PlayoffBracketVisualization
 import com.joebad.fastbreak.data.model.RegistryEntry
 import com.joebad.fastbreak.data.model.ScatterPlotVisualization
 import com.joebad.fastbreak.data.model.Sport
@@ -79,6 +81,12 @@ class ChartDataSynchronizer(
 
         if (chartsNeedingUpdate.isEmpty()) {
             println("✓ All charts already synced, nothing to update")
+
+            // Clean up orphaned charts even when nothing needs updating
+            println("🔧 SYNC: About to call cleanupOrphanedCharts() with ${registryEntries.size} registry entries (early path)")
+            cleanupOrphanedCharts(registryEntries)
+            println("🔧 SYNC: cleanupOrphanedCharts() completed (early path)")
+
             // Nothing to update - all charts already synced
             val allChartIds = registryEntries.keys.map { fileKeyToChartId(it) }.toSet()
             send(
@@ -189,6 +197,11 @@ class ChartDataSynchronizer(
         println("   Successfully synced: ${syncedCharts.size}")
         println("   Failed: ${failedCharts.size}")
 
+        // Clean up cached charts that are no longer in the registry
+        println("🔧 SYNC: About to call cleanupOrphanedCharts() with ${registryEntries.size} registry entries")
+        cleanupOrphanedCharts(registryEntries)
+        println("🔧 SYNC: cleanupOrphanedCharts() completed")
+
         // Emit final progress with all results
         val finalSnapshot = stateMutex.withLock {
             SyncProgress(
@@ -281,6 +294,8 @@ class ChartDataSynchronizer(
                 VizType.LINE_CHART -> json.decodeFromString<LineChartVisualization>(rawJson)
                 VizType.TABLE -> json.decodeFromString<TableVisualization>(rawJson)
                 VizType.MATCHUP -> json.decodeFromString<MatchupVisualization>(rawJson)
+                VizType.MATCHUP_V2 -> json.decodeFromString<MatchupV2Visualization>(rawJson)
+                VizType.PLAYOFF_BRACKET -> json.decodeFromString<PlayoffBracketVisualization>(rawJson)
             }
 
             val chartId = fileKeyToChartId(fileKey)
@@ -421,5 +436,51 @@ class ChartDataSynchronizer(
      */
     fun markChartAsViewed(chartId: String): Boolean {
         return chartDataRepository.markChartAsViewed(chartId)
+    }
+
+    /**
+     * Removes cached charts that are no longer present in the registry.
+     * This cleanup ensures we don't keep stale chart data that's been removed from the server.
+     *
+     * @param registryEntries Map of file_key to RegistryEntry from the current registry
+     */
+    private fun cleanupOrphanedCharts(registryEntries: Map<String, RegistryEntry>) {
+        println("═══════════════════════════════════════════════════════")
+        println("🧹 CLEANUP: Starting orphaned charts cleanup")
+        println("═══════════════════════════════════════════════════════")
+
+        // Get all currently cached chart IDs
+        val cachedChartIds = chartDataRepository.getAllChartIds()
+        println("📦 CLEANUP: Found ${cachedChartIds.size} cached chart(s):")
+        cachedChartIds.forEach { println("   - $it") }
+
+        // Build set of valid chart IDs from the registry
+        val validChartIds = registryEntries.keys.map { fileKeyToChartId(it) }.toSet()
+        println("📋 CLEANUP: Registry has ${validChartIds.size} valid chart(s):")
+        validChartIds.forEach { println("   - $it") }
+
+        // Find orphaned charts (cached but not in registry)
+        val orphanedChartIds = cachedChartIds.filter { it !in validChartIds }
+
+        if (orphanedChartIds.isEmpty()) {
+            println("✅ CLEANUP: No orphaned charts found - all cached charts are valid")
+            println("═══════════════════════════════════════════════════════")
+            return
+        }
+
+        println("⚠️  CLEANUP: Found ${orphanedChartIds.size} orphaned chart(s) to remove:")
+        orphanedChartIds.forEach { chartId ->
+            println("   🗑️  Removing: $chartId")
+            chartDataRepository.deleteChartData(chartId)
+            println("   ✅ Deleted: $chartId")
+        }
+
+        // Verify deletion
+        val remainingChartIds = chartDataRepository.getAllChartIds()
+        println("📦 CLEANUP: After deletion, ${remainingChartIds.size} chart(s) remain in cache:")
+        remainingChartIds.forEach { println("   - $it") }
+
+        println("✅ CLEANUP: Complete - removed ${orphanedChartIds.size} orphaned chart(s)")
+        println("═══════════════════════════════════════════════════════")
     }
 }

@@ -645,4 +645,226 @@ class DemoUITests {
 
         println("✓ Demo complete!")
     }
+
+    /**
+     * Demo test: Week 18 Matchup Worksheet interaction
+     * Shows: Opening app > Week 18 Matchup Worksheet > Scroll through matchup badges >
+     *        Select TEN vs JAX > Scroll stats > View charts > Scroll charts
+     */
+    @Test
+    fun testDemo_Week18MatchupWorksheet() {
+        println("🎬 RECORDING_READY - Starting demo...")
+
+        println("⏱ Waiting for app to load...")
+        Thread.sleep(1500)
+
+        // Find and tap on "Week 18 Matchup Worksheet" chart
+        println("🔍 Looking for 'Week 18 Matchup Worksheet' chart...")
+        val matchupWorksheet = device.wait(
+            Until.findObject(By.textContains("Week 18 Matchup Worksheet")),
+            10000
+        )
+
+        if (matchupWorksheet != null) {
+            println("✓ Found 'Week 18 Matchup Worksheet', tapping...")
+            matchupWorksheet.click()
+            Thread.sleep(1500)
+        } else {
+            println("⚠ 'Week 18 Matchup Worksheet' not found, trying alternative search...")
+            val alternativeText = device.wait(
+                Until.findObject(By.textContains("Matchup Worksheet")),
+                5000
+            )
+            if (alternativeText != null) {
+                alternativeText.click()
+                Thread.sleep(1500)
+            } else {
+                println("⚠ Could not find Matchup Worksheet, continuing anyway...")
+                Thread.sleep(1000)
+            }
+        }
+
+        println("✓ Matchup Worksheet should be visible")
+        Thread.sleep(1500)
+
+        // Scroll through the matchup badges at the top (horizontal scroll from right to left)
+        println("📱 Scrolling through matchup badges...")
+        // The badges are in the top navigation area after the Stats/Charts tabs
+        // Try a position closer to where the badges should be (around 1/8 to 1/7 of screen height)
+        val badgesY = device.displayHeight / 7
+        println("  → Swiping through matchup badges (right to left)...")
+        // Start from far right, swipe to center-left to scroll the badge list
+        device.swipe(
+            device.displayWidth - 100,  // Start from near right edge
+            badgesY,
+            device.displayWidth / 4,    // Swipe to left quarter
+            badgesY,
+            25  // Even slower swipe
+        )
+        Thread.sleep(2000)
+
+        // Select TEN vs JAX matchup by searching for it
+        println("🔍 Looking for 'TEN' vs 'JAX' matchup...")
+        val tenJaxBadge = device.wait(
+            Until.findObject(By.textContains("TEN")),
+            5000
+        )
+
+        if (tenJaxBadge != null) {
+            println("✓ Found TEN matchup badge, tapping...")
+            tenJaxBadge.click()
+            Thread.sleep(1500)
+        } else {
+            println("⚠ TEN badge not found, trying to find JAX...")
+            val jaxBadge = device.wait(
+                Until.findObject(By.textContains("JAX")),
+                3000
+            )
+            if (jaxBadge != null) {
+                println("✓ Found JAX matchup badge, tapping...")
+                jaxBadge.click()
+                Thread.sleep(1500)
+            } else {
+                println("⚠ Could not find TEN vs JAX matchup, selecting current matchup...")
+                device.click(device.displayWidth / 2, badgesY)
+                Thread.sleep(1500)
+            }
+        }
+
+        println("✓ Matchup selected, stats should be visible")
+
+        // Scroll down through the stats once
+        println("📜 Scrolling down through stats...")
+        println("  → Scrolling to view stats...")
+        device.swipe(
+            device.displayWidth / 2,
+            device.displayHeight * 2 / 3,
+            device.displayWidth / 2,
+            device.displayHeight / 3,
+            15
+        )
+        Thread.sleep(1500)
+
+        // Find and tap on "Charts" tab/button
+        println("🔍 Looking for 'Charts' tab...")
+        val chartsTab = device.wait(
+            Until.findObject(By.textContains("Charts")),
+            5000
+        )
+
+        if (chartsTab != null) {
+            println("✓ Found 'Charts' tab, tapping...")
+            chartsTab.click()
+            Thread.sleep(1500)
+        } else {
+            println("⚠ 'Charts' tab not found, trying alternative search...")
+            // Try finding by text "Chart" (singular)
+            val chartAlt = device.wait(
+                Until.findObject(By.textContains("Chart")),
+                3000
+            )
+            if (chartAlt != null) {
+                chartAlt.click()
+                Thread.sleep(1500)
+            } else {
+                println("⚠ Could not find Charts tab")
+            }
+        }
+
+        println("✓ Charts view should be visible")
+        Thread.sleep(1000)
+
+        // Find the scatter plot title to get its position for scrolling
+        println("📜 Scrolling down to view scatter plot...")
+        println("  → Looking for scatter plot title...")
+
+        // First, try to find the title "Weekly Offensive vs Defensive EPA"
+        val scatterPlotTitle = device.wait(
+            Until.findObject(By.textContains("Weekly Offensive")),
+            5000
+        )
+
+        if (scatterPlotTitle != null) {
+            println("  ✓ Found scatter plot title, using it as scroll reference")
+            val titleBounds = scatterPlotTitle.visibleBounds
+            val scrollFromY = titleBounds.top
+
+            // Scroll from the title position - longer distance to show more of the scatter plot
+            device.swipe(
+                device.displayWidth / 2,
+                scrollFromY + 50,  // Start just below the title
+                device.displayWidth / 2,
+                scrollFromY - 400,  // Scroll up a longer distance to show more content
+                25  // Slower scroll to make it more visible
+            )
+        } else {
+            println("  ⚠ Title not found, using estimated position for scroll")
+            // Fallback: scroll from a position that should be below the first chart
+            device.swipe(
+                device.displayWidth / 2,
+                device.displayHeight * 3 / 5,
+                device.displayWidth / 2,
+                device.displayHeight / 5,  // Longer scroll distance
+                25
+            )
+        }
+
+        Thread.sleep(2000)
+
+        // Select "Weeks 1-6" badge on the scatter plot
+        println("🔍 Looking for 'Weeks 1-6' badge...")
+        val weeks16Badge = device.wait(
+            Until.findObject(By.textContains("Weeks 1-6")),
+            5000
+        )
+
+        if (weeks16Badge != null) {
+            println("✓ Found 'Weeks 1-6' badge, tapping...")
+            weeks16Badge.click()
+            Thread.sleep(1500)
+        } else {
+            println("⚠ 'Weeks 1-6' badge not found, trying alternative...")
+            val weeks1Badge = device.wait(
+                Until.findObject(By.textContains("1-6")),
+                3000
+            )
+            if (weeks1Badge != null) {
+                weeks1Badge.click()
+                Thread.sleep(1500)
+            } else {
+                println("⚠ Could not find Weeks 1-6 badge")
+            }
+        }
+
+        // Select "Weeks 7-12" badge on the scatter plot
+        println("🔍 Looking for 'Weeks 7-12' badge...")
+        val weeks712Badge = device.wait(
+            Until.findObject(By.textContains("Weeks 7-12")),
+            5000
+        )
+
+        if (weeks712Badge != null) {
+            println("✓ Found 'Weeks 7-12' badge, tapping...")
+            weeks712Badge.click()
+            Thread.sleep(1500)
+        } else {
+            println("⚠ 'Weeks 7-12' badge not found, trying alternative...")
+            val weeks7Badge = device.wait(
+                Until.findObject(By.textContains("7-12")),
+                3000
+            )
+            if (weeks7Badge != null) {
+                weeks7Badge.click()
+                Thread.sleep(1500)
+            } else {
+                println("⚠ Could not find Weeks 7-12 badge")
+            }
+        }
+
+        // Final pause to show the charts
+        println("✓ Showing final charts view...")
+        Thread.sleep(2000)
+
+        println("✓ Demo complete!")
+    }
 }

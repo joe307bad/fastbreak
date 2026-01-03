@@ -17,9 +17,11 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.arkivanov.decompose.extensions.compose.subscribeAsState
 import com.joebad.fastbreak.data.model.Sport
 import com.joebad.fastbreak.navigation.HomeComponent
@@ -224,8 +226,12 @@ fun HomeScreen(
             )
 
             // Filter charts for selected sport and sort alphabetically by title
+            // Hide NFL Playoff Bracket until it's ready for production
             val chartsForSport = registryState.registry?.charts
-                ?.filter { chart -> chart.sport == selectedSport }
+                ?.filter { chart ->
+                    chart.sport == selectedSport &&
+                    !chart.title.contains("NFL Playoff Bracket", ignoreCase = true)
+                }
                 ?.sortedBy { it.title }
                 ?: emptyList()
 
@@ -330,6 +336,25 @@ fun HomeScreen(
                                 )
                             }
                         }
+
+                        // Hardcoded playoff bracket item for NFL - HIDDEN until ready for production
+                        // Uncomment when ready to show:
+                        // if (selectedSport == Sport.NFL) {
+                        //     item {
+                        //         VisualizationItem(
+                        //             title = "NFL Playoff Bracket",
+                        //             description = "Interactive playoff bracket with swipe navigation",
+                        //             interval = null,
+                        //             lastUpdated = Clock.System.now(),
+                        //             viewed = true,
+                        //             isSyncing = false,
+                        //             isReady = true,
+                        //             onClick = {
+                        //                 component.onNavigateToDataViz("playoff-bracket-nfl", Sport.NFL, com.joebad.fastbreak.data.model.VizType.PLAYOFF_BRACKET)
+                        //             }
+                        //         )
+                        //     }
+                        // }
 
                         items(chartsForSport) { chart ->
                             // Determine chart sync state
@@ -506,7 +531,14 @@ private fun SyncProgressIndicator(
     }
 
     val contentColor = when {
-        isComplete && !hasFailures -> Color(0xFF81C784) // Light green for visibility in dark mode
+        isComplete && !hasFailures -> {
+            // Use darker green in light mode, lighter green in dark mode
+            if (MaterialTheme.colorScheme.surface.luminance() > 0.5f) {
+                Color(0xFF1B5E20) // Dark green for light mode
+            } else {
+                Color(0xFF81C784) // Light green for dark mode
+            }
+        }
         isComplete && hasFailures -> MaterialTheme.colorScheme.onErrorContainer
         else -> MaterialTheme.colorScheme.onPrimaryContainer
     }

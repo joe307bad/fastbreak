@@ -12,5 +12,7 @@ enum class VizType {
     BAR_GRAPH,
     LINE_CHART,
     TABLE,
-    MATCHUP
+    MATCHUP,
+    MATCHUP_V2,
+    PLAYOFF_BRACKET
 }

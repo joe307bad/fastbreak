@@ -164,7 +164,7 @@ player_stats_filtered <- player_stats %>%
   group_by(player_id, player_name, team, position) %>%
   summarise(
     games = n_distinct(week),
-    # QB stats (EPA per attempt)
+    # QB stats (EPA per attempt/carry - includes passing and rushing)
     passing_epa_total = sum(passing_epa, na.rm = TRUE),
     passing_attempts = sum(attempts, na.rm = TRUE),
     passing_cpoe = mean(passing_cpoe, na.rm = TRUE),
@@ -186,7 +186,11 @@ player_stats_filtered <- player_stats %>%
     # Calculate EPA per play
     passing_epa = if_else(passing_attempts > 0, passing_epa_total / passing_attempts, NA_real_),
     rushing_epa = if_else(carries > 0, rushing_epa_total / carries, NA_real_),
-    receiving_epa = if_else(targets > 0, receiving_epa_total / targets, NA_real_)
+    receiving_epa = if_else(targets > 0, receiving_epa_total / targets, NA_real_),
+    # For QBs: total EPA per play (passing + rushing combined)
+    qb_total_plays = if_else(position == "QB", passing_attempts + carries, NA_real_),
+    qb_total_epa = if_else(position == "QB", passing_epa_total + rushing_epa_total, NA_real_),
+    qb_epa_per_play = if_else(position == "QB" & qb_total_plays > 0, qb_total_epa / qb_total_plays, NA_real_)
   ) %>%
   filter(
     (position == "QB" & games >= MIN_GAMES_QB) |
@@ -201,6 +205,7 @@ player_stats_ranked <- player_stats_filtered %>%
   group_by(position) %>%
   mutate(
     # QB ranks
+    qb_epa_per_play_rank = if_else(position == "QB", rank(-qb_epa_per_play), NA_real_),
     passing_epa_rank = if_else(position == "QB", rank(-passing_epa), NA_real_),
     passing_cpoe_rank = if_else(position == "QB", rank(-passing_cpoe), NA_real_),
     pacr_rank = if_else(position == "QB", rank(-pacr), NA_real_),
@@ -209,8 +214,10 @@ player_stats_ranked <- player_stats_filtered %>%
     rushing_epa_rank = if_else(position == "RB", rank(-rushing_epa), NA_real_),
     rushing_first_downs_rank = if_else(position == "RB", rank(-rushing_first_downs), NA_real_),
     carries_rank = if_else(position == "RB", rank(-carries), NA_real_),
-    receiving_epa_rank = if_else(position == "RB", rank(-receiving_epa), NA_real_),
+    rb_receiving_epa_rank = if_else(position == "RB", rank(-receiving_epa), NA_real_),
+    targets_rank = if_else(position == "RB", rank(-targets), NA_real_),
     # WR/TE ranks
+    receiving_epa_rank = if_else(position %in% c("WR", "TE"), rank(-receiving_epa), NA_real_),
     wopr_rank = if_else(position %in% c("WR", "TE"), rank(-wopr), NA_real_),
     racr_rank = if_else(position %in% c("WR", "TE"), rank(-racr), NA_real_),
     air_yards_share_rank = if_else(position %in% c("WR", "TE"), rank(-air_yards_share), NA_real_)
@@ -584,6 +591,7 @@ build_team_json <- function(team_abbr, cum_epa_df, season_totals, top_players_df
   qb_json <- if (nrow(qb) > 0) {
     list(
       name = qb$player_name[1],
+      total_epa = list(value = na_to_null(round(qb$qb_epa_per_play[1], 2)), rank = na_to_null(as.integer(qb$qb_epa_per_play_rank[1]))),
       passing_epa = list(value = na_to_null(round(qb$passing_epa[1], 2)), rank = na_to_null(as.integer(qb$passing_epa_rank[1]))),
       passing_cpoe = list(value = na_to_null(round(qb$passing_cpoe[1], 3)), rank = na_to_null(as.integer(qb$passing_cpoe_rank[1]))),
       pacr = list(value = na_to_null(round(qb$pacr[1], 2)), rank = na_to_null(as.integer(qb$pacr_rank[1]))),
@@ -597,7 +605,8 @@ build_team_json <- function(team_abbr, cum_epa_df, season_totals, top_players_df
       rushing_epa = list(value = na_to_null(round(rbs$rushing_epa[i], 2)), rank = na_to_null(as.integer(rbs$rushing_epa_rank[i]))),
       rushing_first_downs = list(value = na_to_null(as.integer(rbs$rushing_first_downs[i])), rank = na_to_null(as.integer(rbs$rushing_first_downs_rank[i]))),
       carries = list(value = na_to_null(as.integer(rbs$carries[i])), rank = na_to_null(as.integer(rbs$carries_rank[i]))),
-      receiving_epa = list(value = na_to_null(round(rbs$receiving_epa[i], 2)), rank = na_to_null(as.integer(rbs$receiving_epa_rank[i]))),
+      receiving_epa = list(value = na_to_null(round(rbs$receiving_epa[i], 2)), rank = na_to_null(as.integer(rbs$rb_receiving_epa_rank[i]))),
+      targets = list(value = na_to_null(as.integer(rbs$targets[i])), rank = na_to_null(as.integer(rbs$targets_rank[i]))),
       target_share = list(value = na_to_null(round(rbs$target_share[i], 3)), rank = na_to_null(as.integer(rbs$target_share_rank[i])))
     )
   })
@@ -673,9 +682,9 @@ current_week <- current_week_games$week[1]
 output_data <- list(
   sport = "NFL",
   visualizationType = "MATCHUP_V2",
-  title = paste0("Week ", current_week, " Matchup Stats"),
+  title = paste0("Week ", current_week, " Matchup Worksheets"),
   subtitle = "Comprehensive statistical analysis for all matchups",
-  description = "Detailed matchup statistics including team performance metrics, player stats, head-to-head records, and common opponent results. EPA (Expected Points Added) measures the value of each play by comparing expected points before and after the play. CPOE (Completion Percentage Over Expected) measures pass accuracy relative to expectation. PACR (Pass Air Conversion Ratio) measures how efficiently receivers convert air yards to actual yards. All EPA stats are per play through the current week.",
+  description = "Detailed matchup statistics including team performance metrics, player stats, head-to-head records, and common opponent results. \n\n • EPA (Expected Points Added) measures the value of each play by comparing expected points before and after the play. \n\n • For QBs, Total EPA per play includes both passing and rushing plays combined. \n\n • CPOE (Completion Percentage Over Expected) measures pass accuracy relative to expectation. \n\n • PACR (Pass Air Conversion Ratio) measures how efficiently receivers convert air yards to actual yards. \n\n • WOPR (Weighted Opportunity Rating) measures a receiver's opportunity share combining targets and air yards. \n\n • RACR (Receiver Air Conversion Ratio) measures how efficiently a receiver converts air yards to actual receiving yards. \n\n • All EPA stats are per play through the current week.",
   lastUpdated = format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC"),
   source = "nflfastR / nflreadr / ESPN",
   week = as.integer(current_week),
@@ -707,7 +716,7 @@ if (nzchar(s3_bucket)) {
   # Update DynamoDB with metadata
   dynamodb_table <- Sys.getenv("AWS_DYNAMODB_TABLE", "fastbreak-file-timestamps")
   utc_timestamp <- format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC")
-  chart_title <- paste0("NFL Matchup Stats - Week ", current_week_games$week[1])
+  chart_title <- paste0("NFL Matchup Worksheets - Week ", current_week_games$week[1])
   chart_interval <- "daily"
 
   dynamodb_item <- sprintf(

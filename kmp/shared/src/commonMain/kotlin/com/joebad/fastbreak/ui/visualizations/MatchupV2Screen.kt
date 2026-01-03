@@ -28,28 +28,30 @@ private val Team1Color = Color(0xFF2196F3) // Blue (away team)
 private val Team2Color = Color(0xFFFF5722) // Deep Orange (home team)
 
 /**
- * Helper function to get rank background color
+ * Helper function to get rank background color for team/QB stats (1-32 scale)
  * Ranks 1-10: Dark green shades
- * Ranks 11-22: Light green to light red (very pale around rank 16)
- * Ranks 23-32: Dark red shades
+ * Ranks 11-22: Green to orange transition
+ * Ranks 23-32: Red shades
+ * Ranks >32: Same as rank 32 (dark red)
  */
-private fun getRankColor(rank: Int?): Color {
-    if (rank == null || rank < 1 || rank > 32) return Color.Transparent
+private fun getTeamRankColor(rank: Int?): Color {
+    if (rank == null || rank < 1) return Color.Transparent
+
+    // Clamp rank to 32 for color calculation
+    val clampedRank = if (rank > 32) 32 else rank
 
     return when {
-        rank <= 10 -> {
+        clampedRank <= 10 -> {
             // Ranks 1-10: Dark green to medium green
-            // Rank 1: #006400 (dark green), Rank 10: #228B22 (forest green)
-            val ratio = (rank - 1) / 9f
-            val red = (ratio * 34).toInt()
+            val ratio = (clampedRank - 1) / 9f
+            val red = (0 + ratio * 34).toInt()
             val green = (100 + ratio * 39).toInt()
-            val blue = (ratio * 34).toInt()
+            val blue = (0 + ratio * 34).toInt()
             Color(red, green, blue)
         }
-        rank <= 22 -> {
-            // Ranks 11-22: Light green to light red (darker middle for readability)
-            // Rank 11: Light green, Rank 16: Medium gray-green, Rank 22: Light red
-            val ratio = (rank - 11) / 11f
+        clampedRank <= 22 -> {
+            // Ranks 11-22: Light green to orange transition
+            val ratio = (clampedRank - 11) / 11f
             val red = (140 + ratio * 75).toInt()
             val green = (160 - ratio * 60).toInt()
             val blue = (120 - ratio * 40).toInt()
@@ -57,8 +59,51 @@ private fun getRankColor(rank: Int?): Color {
         }
         else -> {
             // Ranks 23-32: Medium red to dark red
-            // Rank 23: #CD5C5C (indian red), Rank 32: #8B0000 (dark red)
-            val ratio = (rank - 23) / 9f
+            val ratio = (clampedRank - 23) / 9f
+            val red = (205 - ratio * 66).toInt()
+            val green = (92 - ratio * 92).toInt()
+            val blue = (92 - ratio * 92).toInt()
+            Color(red, green, blue)
+        }
+    }
+}
+
+/**
+ * Helper function to get rank background color for player stats (1-64 scale)
+ * Ranks 1-21: Green shades (dark to medium green)
+ * Ranks 22-43: Orange shades (green-orange to red-orange transition)
+ * Ranks 44-64: Red shades (medium to dark red)
+ * Ranks >64: Same as rank 64 (dark red)
+ */
+private fun getPlayerRankColor(rank: Int?): Color {
+    if (rank == null || rank < 1) return Color.Transparent
+
+    // Clamp rank to 64 for color calculation
+    val clampedRank = if (rank > 64) 64 else rank
+
+    return when {
+        clampedRank <= 21 -> {
+            // Ranks 1-21: Dark green to medium green
+            // Rank 1: #006400 (dark green), Rank 21: #32CD32 (lime green)
+            val ratio = (clampedRank - 1) / 20f
+            val red = (0 + ratio * 50).toInt()
+            val green = (100 + ratio * 105).toInt()
+            val blue = (0 + ratio * 50).toInt()
+            Color(red, green, blue)
+        }
+        clampedRank <= 43 -> {
+            // Ranks 22-43: Green-orange to red-orange transition
+            // Rank 22: #FFA500 (orange), Rank 43: #FF6347 (tomato)
+            val ratio = (clampedRank - 22) / 21f
+            val red = (180 + ratio * 75).toInt()
+            val green = (140 - ratio * 41).toInt()
+            val blue = (50 - ratio * 21).toInt()
+            Color(red, green, blue)
+        }
+        else -> {
+            // Ranks 44-64+: Medium red to dark red
+            // Rank 44: #CD5C5C (indian red), Rank 64: #8B0000 (dark red)
+            val ratio = (clampedRank - 44) / 20f
             val red = (205 - ratio * 66).toInt()
             val green = (92 - ratio * 92).toInt()
             val blue = (92 - ratio * 92).toInt()
@@ -204,7 +249,8 @@ private fun FiveColumnRowWithRanks(
     centerText: String,
     rightValue: String,
     rightRank: Int?,
-    advantage: Int = 0
+    advantage: Int = 0,
+    usePlayerRankColors: Boolean = false // true for player stats (64 scale), false for team stats (32 scale)
 ) {
     Row(
         modifier = Modifier
@@ -241,7 +287,10 @@ private fun FiveColumnRowWithRanks(
         Box(
             modifier = Modifier
                 .width(28.dp)
-                .background(getRankColor(leftRank), RoundedCornerShape(4.dp))
+                .background(
+                    if (usePlayerRankColors) getPlayerRankColor(leftRank) else getTeamRankColor(leftRank),
+                    RoundedCornerShape(4.dp)
+                )
                 .padding(4.dp),
             contentAlignment = Alignment.Center
         ) {
@@ -274,7 +323,10 @@ private fun FiveColumnRowWithRanks(
         Box(
             modifier = Modifier
                 .width(28.dp)
-                .background(getRankColor(rightRank), RoundedCornerShape(4.dp))
+                .background(
+                    if (usePlayerRankColors) getPlayerRankColor(rightRank) else getTeamRankColor(rightRank),
+                    RoundedCornerShape(4.dp)
+                )
                 .padding(4.dp),
             contentAlignment = Alignment.Center
         ) {
@@ -922,7 +974,7 @@ private fun PlayerStatsComparisonJson(
 
             // QB Stats
             val qbStats = listOf(
-                "passing_epa" to "Pass EPA",
+                "total_epa" to "Total EPA",
                 "passing_cpoe" to "Pass CPOE"
             )
 
@@ -966,7 +1018,7 @@ private fun PlayerStatsComparisonJson(
         val homeRBs = homePlayerStats.get("rbs")?.jsonArray
 
         if (awayRBs != null && homeRBs != null && awayRBs.isNotEmpty() && homeRBs.isNotEmpty()) {
-            val maxRBs = minOf(awayRBs.size, homeRBs.size, 2) // Show top 2 RBs
+            val maxRBs = minOf(awayRBs.size, homeRBs.size) // Show all RBs from JSON
 
             for (i in 0 until maxRBs) {
                 val awayRB = awayRBs.getOrNull(i)?.jsonObject
@@ -1012,7 +1064,8 @@ private fun PlayerStatsComparisonJson(
                             centerText = "Rush EPA",
                             rightValue = homeText,
                             rightRank = homeRank,
-                            advantage = advantage
+                            advantage = advantage,
+                            usePlayerRankColors = true // RB stats use 64-rank scale
                         )
                     }
 
@@ -1026,7 +1079,7 @@ private fun PlayerStatsComparisonJson(
         val homeWRs = homePlayerStats.get("receivers")?.jsonArray
 
         if (awayWRs != null && homeWRs != null && awayWRs.isNotEmpty() && homeWRs.isNotEmpty()) {
-            val maxWRs = minOf(awayWRs.size, homeWRs.size, 2) // Show top 2 WRs
+            val maxWRs = minOf(awayWRs.size, homeWRs.size) // Show all receivers from JSON
 
             for (i in 0 until maxWRs) {
                 val awayWR = awayWRs.getOrNull(i)?.jsonObject
@@ -1072,7 +1125,8 @@ private fun PlayerStatsComparisonJson(
                             centerText = "Rec EPA",
                             rightValue = homeText,
                             rightRank = homeRank,
-                            advantage = advantage
+                            advantage = advantage,
+                            usePlayerRankColors = true // WR/TE stats use 64-rank scale
                         )
                     }
 

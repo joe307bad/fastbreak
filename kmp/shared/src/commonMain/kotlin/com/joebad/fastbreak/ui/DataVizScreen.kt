@@ -192,6 +192,7 @@ fun DataVizScreen(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
                     .padding(16.dp)
                     .padding(bottom = 32.dp)
             ) {

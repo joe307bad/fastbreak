@@ -1,4 +1,4 @@
-export type VisualizationType = 'SCATTER_PLOT' | 'LINE_CHART' | 'BAR_CHART' | 'BAR_GRAPH' | 'TABLE' | 'MATCHUP';
+export type VisualizationType = 'SCATTER_PLOT' | 'LINE_CHART' | 'BAR_CHART' | 'BAR_GRAPH' | 'TABLE' | 'MATCHUP' | 'MATCHUP_V2';
 
 export interface QuadrantConfig {
   color: string;
@@ -106,7 +106,13 @@ export interface MatchupData extends BaseChartData {
   dataPoints: MatchupDataPoint[];
 }
 
-export type ChartData = ScatterPlotData | LineChartData | BarChartData | TableData | MatchupData;
+export interface MatchupV2Data extends BaseChartData {
+  visualizationType: 'MATCHUP_V2';
+  week?: number;
+  dataPoints: MatchupDataPoint[];
+}
+
+export type ChartData = ScatterPlotData | LineChartData | BarChartData | TableData | MatchupData | MatchupV2Data;
 
 export interface RegistryEntry {
   interval: string;

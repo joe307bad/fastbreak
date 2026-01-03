@@ -93,5 +93,24 @@
       "whatItDoes": "Enables the mobile apps to work completely offline once charts are downloaded initially. When you refresh, the app downloads and caches all chart data locally on your device. The refresh button provides visual feedback during the update process, showing loading states and success indicators.",
       "whyUseful": "Once you've refreshed the data, you can view all charts without an internet connection, making fastbreak perfect for situations with poor connectivity or when you want to save mobile data. The visual indicators ensure you always know when you're viewing the most current data versus cached data, giving you confidence in the information you're seeing."
     }
+  },
+  {
+    "id": "matchup-worksheet",
+    "title": "Matchup Worksheets",
+    "sortOrder": 6,
+    "demoGif": "/02-manual-screenshots/06-week18-matchup-worksheet.gif",
+    "demoAlt": "Matchup Worksheet demo showing matchup selection and chart interaction",
+    "platforms": {
+      "ios": true,
+      "android": true,
+      "web": false
+    },
+    "dateReleased": "2026-01-03",
+    "version": "1.4.0",
+    "sections": {
+      "howToUse": "Open the Matchup Worksheets from the NFL charts list. Scroll through the matchup badges at the top to browse different games, then tap a matchup to select it. View detailed team statistics in the Stats tab, or switch to the Charts tab to see visual comparisons. In the Charts tab, use the week range badges to filter the scatter plot by specific timeframes.",
+      "whatItDoes": "Provides comprehensive head-to-head analysis for NFL matchups throughout the season. The worksheet combines team statistics, performance charts, and historical data in one interactive view. You can explore cumulative EPA trends, weekly offensive vs defensive performance, key player stats, head-to-head records, and common opponent comparisons for each matchup.",
+      "whyUseful": "The Matchup Worksheet consolidates all the information you need to analyze any week's games in one place. By combining stats and charts with interactive filtering, you can quickly compare teams across multiple dimensions and identify key factors that might determine the outcome. The ability to switch between matchups and timeframes makes it easy to analyze multiple games and spot trends throughout the season."
+    }
   }
 ]

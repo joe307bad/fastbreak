@@ -25,6 +25,6 @@ export function ChartRenderer({ data }: Props) {
     case 'MATCHUP':
       return <Matchup data={data} />;
     default:
-      return <div>Unsupported visualization type</div>;
+      return null;
   }
 }

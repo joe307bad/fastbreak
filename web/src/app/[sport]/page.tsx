@@ -46,8 +46,11 @@ export default async function SportPage({ params }: Props) {
     chart => chart.data.sport.toLowerCase() === sport.toLowerCase()
   );
 
+  // List of supported visualization types on web
+  const SUPPORTED_TYPES = ['SCATTER_PLOT', 'LINE_CHART', 'BAR_CHART', 'BAR_GRAPH', 'TABLE', 'MATCHUP'];
+
   const charts = sportCharts.filter(
-    chart => chart.data.visualizationType !== 'MATCHUP'
+    chart => SUPPORTED_TYPES.includes(chart.data.visualizationType) && chart.data.visualizationType !== 'MATCHUP'
   );
 
   const matchups = sportCharts.filter(

@@ -400,15 +400,11 @@ private fun RenderVisualization(
             SourceAttribution(source = visualization.source)
         }
     } else if (visualization is MatchupVisualization) {
-        // Matchup has its own dedicated screen with dropdown selector
-        MatchupScreen(
-            visualization = visualization,
-            modifier = Modifier.fillMaxSize(),
-            highlightedTeamCodes = highlightedTeamCodes
-        )
+        // TODO: Matchup screen was removed
+        Box(modifier = Modifier.fillMaxSize())
     } else if (visualization is MatchupV2Visualization) {
         // MatchupV2 has its own dedicated screen with dropdown selector and tabs
-        MatchupV2Screen(
+        MatchupWorksheet(
             visualization = visualization,
             modifier = Modifier.fillMaxSize(),
             highlightedTeamCodes = highlightedTeamCodes
@@ -449,7 +445,7 @@ private fun RenderVisualization(
                     Box(modifier = Modifier.weight(1f)) {
                         when (visualization) {
                             is ScatterPlotVisualization -> {
-                                KoalaQuadrantScatterPlot(
+                                QuadrantScatterPlot(
                                     data = visualization.dataPoints,
                                     title = visualization.title,
                                     xAxisLabel = visualization.xAxisLabel,
@@ -492,7 +488,7 @@ private fun RenderVisualization(
                                 // Matchup report cards - handled in DataTableComponent
                             }
                             is MatchupV2Visualization -> {
-                                // Handled by MatchupV2Screen below
+                                // Handled by MatchupWorksheet below
                             }
                         }
                     }

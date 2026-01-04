@@ -196,7 +196,7 @@ private fun placeLabelsSmartly(
 
 @OptIn(ExperimentalKoalaPlotApi::class)
 @Composable
-fun KoalaQuadrantScatterPlot(
+fun QuadrantScatterPlot(
     data: List<ScatterPlotDataPoint>,
     modifier: Modifier = Modifier,
     title: String = "4-Quadrant Scatter Plot",

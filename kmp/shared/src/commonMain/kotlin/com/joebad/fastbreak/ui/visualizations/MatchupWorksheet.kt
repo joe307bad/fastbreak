@@ -19,7 +19,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.joebad.fastbreak.data.model.*
-import com.joebad.fastbreak.ui.KoalaQuadrantScatterPlot
+import com.joebad.fastbreak.ui.QuadrantScatterPlot
 import kotlin.math.round
 import kotlinx.serialization.json.*
 
@@ -473,7 +473,7 @@ private fun MatchupBadge(
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MatchupV2Screen(
+fun MatchupWorksheet(
     visualization: MatchupV2Visualization,
     modifier: Modifier = Modifier,
     highlightedTeamCodes: Set<String> = emptySet()
@@ -1533,7 +1533,7 @@ private fun WeeklyEPAScatterPlotV2(
         emptySet()
     }
 
-    KoalaQuadrantScatterPlot(
+    QuadrantScatterPlot(
         data = awayPoints + homePoints,
         modifier = Modifier.fillMaxWidth(),
         title = "",

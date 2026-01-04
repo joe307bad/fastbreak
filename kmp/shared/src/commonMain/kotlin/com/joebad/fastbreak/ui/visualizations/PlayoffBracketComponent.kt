@@ -101,16 +101,17 @@ fun PlayoffBracketComponent(
         }
     }
 
+    // TODO: MatchupAnalyticsSheet was removed
     // Show analytics bottom sheet when a matchup is selected
-    selectedMatchup?.let { matchup ->
-        if (matchup.team1 != null && matchup.team2 != null) {
-            val analytics = generateMatchupAnalytics(matchup)
-            MatchupAnalyticsSheet(
-                analytics = analytics,
-                onDismiss = { selectedMatchup = null }
-            )
-        }
-    }
+    // selectedMatchup?.let { matchup ->
+    //     if (matchup.team1 != null && matchup.team2 != null) {
+    //         val analytics = generateMatchupAnalytics(matchup)
+    //         MatchupAnalyticsSheet(
+    //             analytics = analytics,
+    //             onDismiss = { selectedMatchup = null }
+    //         )
+    //     }
+    // }
 }
 
 @Composable

@@ -975,7 +975,10 @@ private fun PlayerStatsComparisonJson(
             // QB Stats
             val qbStats = listOf(
                 "total_epa" to "Total EPA",
-                "passing_cpoe" to "Pass CPOE"
+                "passing_epa" to "Passing EPA",
+                "passing_cpoe" to "Pass CPOE",
+                "pacr" to "PACR",
+                "passing_air_yards" to "Air Yards"
             )
 
             qbStats.forEach { (key, label) ->
@@ -1037,36 +1040,57 @@ private fun PlayerStatsComparisonJson(
                         rightWeight = FontWeight.Bold
                     )
 
-                    // RB rushing EPA
-                    val awayRushingEPA = awayRB.getObject("rushing_epa")
-                    val homeRushingEPA = homeRB.getObject("rushing_epa")
+                    // RB Stats
+                    val rbStats = listOf(
+                        "rushing_epa" to "Rush EPA",
+                        "rushing_first_downs" to "Rush 1st Dn",
+                        "carries" to "Carries",
+                        "receiving_epa" to "Rec EPA",
+                        "targets" to "Targets",
+                        "target_share" to "Target Share"
+                    )
 
-                    if (awayRushingEPA != null && homeRushingEPA != null) {
-                        val awayValue = awayRushingEPA.getDouble("value")
-                        val awayRank = awayRushingEPA.getInt("rank")
-                        val homeValue = homeRushingEPA.getDouble("value")
-                        val homeRank = homeRushingEPA.getInt("rank")
+                    rbStats.forEach { (key, label) ->
+                        val awayStatObj = awayRB.getObject(key)
+                        val homeStatObj = homeRB.getObject(key)
 
-                        val advantage = if (awayValue != null && homeValue != null) {
-                            when {
-                                awayValue > homeValue -> -1
-                                awayValue < homeValue -> 1
-                                else -> 0
+                        if (awayStatObj != null && homeStatObj != null) {
+                            val awayValue = awayStatObj.getDouble("value")
+                            val awayRank = awayStatObj.getInt("rank")
+                            val homeValue = homeStatObj.getDouble("value")
+                            val homeRank = homeStatObj.getInt("rank")
+
+                            val advantage = if (awayValue != null && homeValue != null) {
+                                when {
+                                    awayValue > homeValue -> -1
+                                    awayValue < homeValue -> 1
+                                    else -> 0
+                                }
+                            } else 0
+
+                            // Format based on stat type
+                            val decimals = when (key) {
+                                "carries", "targets", "rushing_first_downs" -> 0
+                                "target_share" -> 1
+                                else -> 2
                             }
-                        } else 0
+                            val awayText = awayValue?.let {
+                                if (decimals == 0) it.toInt().toString() else it.format(decimals)
+                            } ?: "-"
+                            val homeText = homeValue?.let {
+                                if (decimals == 0) it.toInt().toString() else it.format(decimals)
+                            } ?: "-"
 
-                        val awayText = awayValue?.format(2) ?: "-"
-                        val homeText = homeValue?.format(2) ?: "-"
-
-                        FiveColumnRowWithRanks(
-                            leftValue = awayText,
-                            leftRank = awayRank,
-                            centerText = "Rush EPA",
-                            rightValue = homeText,
-                            rightRank = homeRank,
-                            advantage = advantage,
-                            usePlayerRankColors = true // RB stats use 64-rank scale
-                        )
+                            FiveColumnRowWithRanks(
+                                leftValue = awayText,
+                                leftRank = awayRank,
+                                centerText = label,
+                                rightValue = homeText,
+                                rightRank = homeRank,
+                                advantage = advantage,
+                                usePlayerRankColors = true
+                            )
+                        }
                     }
 
                     Spacer(modifier = Modifier.height(4.dp))
@@ -1098,36 +1122,51 @@ private fun PlayerStatsComparisonJson(
                         rightWeight = FontWeight.Bold
                     )
 
-                    // WR receiving EPA
-                    val awayReceivingEPA = awayWR.getObject("receiving_epa")
-                    val homeReceivingEPA = homeWR.getObject("receiving_epa")
+                    // Receiver Stats
+                    val receiverStats = listOf(
+                        "wopr" to "WOPR",
+                        "receiving_epa" to "Rec EPA",
+                        "racr" to "RACR",
+                        "target_share" to "Target Share",
+                        "air_yards_share" to "Air Yards %"
+                    )
 
-                    if (awayReceivingEPA != null && homeReceivingEPA != null) {
-                        val awayValue = awayReceivingEPA.getDouble("value")
-                        val awayRank = awayReceivingEPA.getInt("rank")
-                        val homeValue = homeReceivingEPA.getDouble("value")
-                        val homeRank = homeReceivingEPA.getInt("rank")
+                    receiverStats.forEach { (key, label) ->
+                        val awayStatObj = awayWR.getObject(key)
+                        val homeStatObj = homeWR.getObject(key)
 
-                        val advantage = if (awayValue != null && homeValue != null) {
-                            when {
-                                awayValue > homeValue -> -1
-                                awayValue < homeValue -> 1
-                                else -> 0
+                        if (awayStatObj != null && homeStatObj != null) {
+                            val awayValue = awayStatObj.getDouble("value")
+                            val awayRank = awayStatObj.getInt("rank")
+                            val homeValue = homeStatObj.getDouble("value")
+                            val homeRank = homeStatObj.getInt("rank")
+
+                            val advantage = if (awayValue != null && homeValue != null) {
+                                when {
+                                    awayValue > homeValue -> -1
+                                    awayValue < homeValue -> 1
+                                    else -> 0
+                                }
+                            } else 0
+
+                            // Format based on stat type
+                            val decimals = when (key) {
+                                "target_share", "air_yards_share" -> 1
+                                else -> 2
                             }
-                        } else 0
+                            val awayText = awayValue?.format(decimals) ?: "-"
+                            val homeText = homeValue?.format(decimals) ?: "-"
 
-                        val awayText = awayValue?.format(2) ?: "-"
-                        val homeText = homeValue?.format(2) ?: "-"
-
-                        FiveColumnRowWithRanks(
-                            leftValue = awayText,
-                            leftRank = awayRank,
-                            centerText = "Rec EPA",
-                            rightValue = homeText,
-                            rightRank = homeRank,
-                            advantage = advantage,
-                            usePlayerRankColors = true // WR/TE stats use 64-rank scale
-                        )
+                            FiveColumnRowWithRanks(
+                                leftValue = awayText,
+                                leftRank = awayRank,
+                                centerText = label,
+                                rightValue = homeText,
+                                rightRank = homeRank,
+                                advantage = advantage,
+                                usePlayerRankColors = true
+                            )
+                        }
                     }
 
                     Spacer(modifier = Modifier.height(4.dp))
@@ -1615,3 +1654,4 @@ private fun WeekRangeBadge(
         )
     }
 }
+

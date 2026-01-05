@@ -169,6 +169,14 @@ private val MonospaceTypography = Typography(
     )
 )
 
+/**
+ * Platform-specific system UI configuration (status bar, navigation bar).
+ * On Android, this sets the status bar icon colors to match the theme.
+ * On iOS, this is a no-op as iOS handles this automatically.
+ */
+@Composable
+expect fun ConfigureSystemUi(themeMode: ThemeMode)
+
 @Composable
 fun AppTheme(
     themeMode: ThemeMode = ThemeMode.LIGHT,
@@ -178,6 +186,9 @@ fun AppTheme(
         ThemeMode.LIGHT -> LightColorScheme
         ThemeMode.DARK -> DarkColorScheme
     }
+
+    // Configure system UI (status bar, navigation bar) based on theme
+    ConfigureSystemUi(themeMode)
 
     MaterialTheme(
         colorScheme = colorScheme,

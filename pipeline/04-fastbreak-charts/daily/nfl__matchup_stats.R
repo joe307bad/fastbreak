@@ -269,36 +269,268 @@ schedules <- tryCatch({
 
 cat("Loaded", nrow(schedules), "games from schedule\n")
 
-# Get current week (upcoming games)
-current_week_games <- schedules %>%
-  filter(
-    week == max(week[game_type == "REG" & is.na(result)], na.rm = TRUE),
-    game_type == "REG",
-    is.na(result)
-  )
+# Helper function to add random delay between API calls (3-5 seconds)
+add_api_delay <- function() {
+  delay <- runif(1, 3, 5)
+  cat(sprintf("Waiting %.2f seconds to avoid rate limiting...\n", delay))
+  Sys.sleep(delay)
+}
 
-if (nrow(current_week_games) == 0) {
-  cat("No upcoming games found, using most recent week\n")
+# Helper function to determine current week and season type
+get_current_week_info <- function(schedules_df) {
+  # Get scoreboard to determine current week
+  add_api_delay()
+  resp <- GET("https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard")
+  scoreboard <- content(resp, as = "parsed")
+
+  if (!is.null(scoreboard$week)) {
+    espn_week <- scoreboard$week$number
+    espn_season_type <- scoreboard$season$type
+
+    cat(sprintf("ESPN current week: %d, Season type: %d (%s)\n",
+                espn_week, espn_season_type,
+                ifelse(espn_season_type == 2, "Regular", ifelse(espn_season_type == 3, "Playoffs", "Other"))))
+
+    # Check if we should advance to next week based on schedule
+    # Strategy: Look for the first week with upcoming games (no results yet)
+    # but allow Tuesday rollover by checking if all games in current week are complete
+
+    current_day_of_week <- as.POSIXlt(Sys.Date())$wday  # 0=Sunday, 2=Tuesday, etc.
+
+    # For regular season
+    if (espn_season_type == 2) {
+      # Find the first upcoming week (has games but no results yet)
+      upcoming_weeks <- schedules_df %>%
+        filter(game_type == "REG", is.na(result)) %>%
+        pull(week) %>%
+        unique() %>%
+        sort()
+
+      # Check if ESPN's current week has all games completed
+      espn_week_games <- schedules_df %>%
+        filter(game_type == "REG", week == espn_week)
+
+      espn_week_all_complete <- nrow(espn_week_games) > 0 &&
+                                all(!is.na(espn_week_games$result))
+
+      # If it's Tuesday (2) or later and ESPN's current week is complete,
+      # advance to the next week
+      if (current_day_of_week >= 2 && espn_week_all_complete) {
+        if (length(upcoming_weeks) > 0) {
+          target_week <- upcoming_weeks[1]
+          cat(sprintf("Tuesday rollover: Advancing from week %d to week %d\n",
+                      espn_week, target_week))
+          return(list(week = target_week, season_type = 2))
+        } else {
+          # No more regular season games - regular season is over
+          # Check if nflreadr has playoff data
+          playoff_games <- schedules_df %>% filter(game_type == "POST")
+          if (nrow(playoff_games) > 0) {
+            cat("Regular season complete, advancing to playoffs (week 1)\n")
+            return(list(week = 1, season_type = 3))
+          } else {
+            # No playoff data in nflreadr yet, but regular season is done
+            # Wait for ESPN to update to playoffs, or stay on last week
+            cat("Regular season complete but no playoff data available yet\n")
+            cat("Staying on week", espn_week, "until playoffs begin\n")
+            return(list(week = espn_week, season_type = 2))
+          }
+        }
+      }
+
+      # Otherwise use ESPN's week if there are upcoming games
+      if (espn_week %in% upcoming_weeks) {
+        return(list(week = espn_week, season_type = espn_season_type))
+      } else if (length(upcoming_weeks) > 0) {
+        return(list(week = upcoming_weeks[1], season_type = 2))
+      } else {
+        # Use ESPN's week as fallback
+        return(list(week = espn_week, season_type = espn_season_type))
+      }
+    }
+
+    # For playoffs
+    if (espn_season_type == 3) {
+      # Find upcoming playoff games
+      upcoming_playoff_weeks <- schedules_df %>%
+        filter(game_type == "POST", is.na(result)) %>%
+        pull(week) %>%
+        unique() %>%
+        sort()
+
+      # If it's Tuesday or later and we have upcoming playoff games
+      if (current_day_of_week >= 2 && length(upcoming_playoff_weeks) > 0) {
+        target_week <- upcoming_playoff_weeks[1]
+        cat(sprintf("Tuesday rollover (playoffs): Advancing to playoff week %d\n", target_week))
+        return(list(week = target_week, season_type = 3))
+      }
+
+      # Use ESPN's week if valid
+      if (espn_week %in% upcoming_playoff_weeks) {
+        return(list(week = espn_week, season_type = espn_season_type))
+      } else if (length(upcoming_playoff_weeks) > 0) {
+        return(list(week = upcoming_playoff_weeks[1], season_type = 3))
+      }
+    }
+
+    # Fallback to ESPN's values
+    return(list(week = espn_week, season_type = espn_season_type))
+  }
+
+  # Fallback to regular season week 1 if we can't determine
+  return(list(week = 1, season_type = 2))
+}
+
+# Get current week info (pass schedules for Tuesday rollover logic)
+week_info <- get_current_week_info(schedules)
+current_week <- week_info$week
+season_type <- week_info$season_type
+
+# Determine if we're in playoffs (season_type 3) or regular season (season_type 2)
+is_playoffs <- (season_type == 3)
+
+# Fetch all games for the current week from ESPN API
+# This ensures we get ALL games regardless of their completion status
+cat(sprintf("\nFetching games for week %d from ESPN API (%s)...\n",
+            current_week, ifelse(is_playoffs, "playoffs", "regular season")))
+
+add_api_delay()
+events_url <- sprintf(
+  "https://sports.core.api.espn.com/v2/sports/football/leagues/nfl/seasons/%d/types/%d/weeks/%d/events?limit=50",
+  CURRENT_SEASON, season_type, current_week
+)
+
+events_resp <- tryCatch({
+  GET(events_url)
+}, error = function(e) {
+  cat("Error fetching events:", e$message, "\n")
+  stop(e)
+})
+
+events_data <- content(events_resp, as = "parsed")
+
+if (is.null(events_data$items) || length(events_data$items) == 0) {
+  cat("No games found for current week, using nflreadr schedules as fallback\n")
   current_week_games <- schedules %>%
-    filter(week == max(week), game_type == "REG")
+    filter(
+      week == max(week[game_type == "REG" & is.na(result)], na.rm = TRUE),
+      game_type == "REG",
+      is.na(result)
+    )
+
+  if (nrow(current_week_games) == 0) {
+    current_week_games <- schedules %>%
+      filter(week == max(week), game_type == "REG")
+  }
+} else {
+  # Extract event IDs from the ESPN API response
+  event_ids <- sapply(events_data$items, function(item) {
+    # Extract event ID from the $ref URL
+    ref_url <- item$`$ref`
+    id <- sub(".*events/([0-9]+)\\?.*", "\\1", ref_url)
+    return(id)
+  })
+
+  cat(sprintf("Found %d event IDs from ESPN API\n", length(event_ids)))
+
+  # Match these events with our schedule data
+  current_week_games <- schedules %>%
+    filter(
+      game_id %in% event_ids |
+      (week == current_week & game_type == ifelse(is_playoffs, "POST", "REG"))
+    )
+
+  # If we don't get matches, fall back to week-based filtering
+  if (nrow(current_week_games) == 0) {
+    cat("No matches found by event ID, falling back to week filtering\n")
+    current_week_games <- schedules %>%
+      filter(
+        week == current_week,
+        game_type == ifelse(is_playoffs, "POST", "REG")
+      )
+  }
 }
 
 cat("Found", nrow(current_week_games), "games for current week\n")
 
+# Store event IDs for odds fetching
+espn_event_ids <- if (exists("event_ids")) event_ids else c()
+
+# Build a mapping from team matchups to ESPN event IDs
+# Use the scoreboard endpoint which includes teams and event IDs in one call
+cat("Building team-to-event mapping for odds lookup...\n")
+team_to_event_map <- list()
+
+add_api_delay()
+scoreboard_url <- sprintf(
+  "https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?seasontype=%d&week=%d",
+  season_type, current_week
+)
+
+scoreboard_resp <- tryCatch({
+  resp <- GET(scoreboard_url)
+  if (status_code(resp) == 200) {
+    content(resp, as = "parsed")
+  } else {
+    NULL
+  }
+}, error = function(e) {
+  cat("Warning: Could not fetch scoreboard for mapping\n")
+  NULL
+})
+
+if (!is.null(scoreboard_resp) && !is.null(scoreboard_resp$events)) {
+  for (event in scoreboard_resp$events) {
+    event_id <- event$id
+
+    if (!is.null(event$competitions) && length(event$competitions) > 0) {
+      comp <- event$competitions[[1]]
+
+      if (!is.null(comp$competitors) && length(comp$competitors) >= 2) {
+        home_abbr <- NULL
+        away_abbr <- NULL
+
+        for (competitor in comp$competitors) {
+          abbr <- competitor$team$abbreviation
+          home_away <- competitor$homeAway
+
+          if (home_away == "home") {
+            home_abbr <- abbr
+          } else if (home_away == "away") {
+            away_abbr <- abbr
+          }
+        }
+
+        if (!is.null(home_abbr) && !is.null(away_abbr)) {
+          # Normalize team abbreviations (ESPN -> nflreadr format)
+          home_abbr_norm <- case_when(
+            home_abbr == "WSH" ~ "WAS",
+            home_abbr == "LAR" ~ "LA",
+            TRUE ~ home_abbr
+          )
+          away_abbr_norm <- case_when(
+            away_abbr == "WSH" ~ "WAS",
+            away_abbr == "LAR" ~ "LA",
+            TRUE ~ away_abbr
+          )
+
+          matchup_key <- paste(away_abbr_norm, home_abbr_norm, sep = "-")
+          team_to_event_map[[matchup_key]] <- event_id
+          cat(sprintf("  Mapped %s to event %s\n", matchup_key, event_id))
+        }
+      }
+    }
+  }
+}
+
+cat(sprintf("Built mapping for %d matchups\n", length(team_to_event_map)))
+
 # Process all matchups
 
 # ============================================================================
-# STEP 9: Fetch odds from ESPN API
+# STEP 9: Fetch odds from ESPN API using dedicated odds endpoint
 # ============================================================================
 cat("\n9. Fetching odds from ESPN API...\n")
-
-odds_data <- tryCatch({
-  resp <- GET("https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard")
-  content(resp, as = "parsed")
-}, error = function(e) {
-  cat("Warning: Could not fetch odds:", e$message, "\n")
-  list(events = list())
-})
 
 # Helper function to normalize team abbreviations for ESPN API
 normalize_team_abbr <- function(abbr) {
@@ -312,8 +544,43 @@ normalize_team_abbr <- function(abbr) {
   )
 }
 
-# Helper function to extract odds for a game
-get_odds_for_game <- function(home_team, away_team) {
+# Cache odds data by event ID to avoid redundant API calls
+odds_cache <- list()
+
+# Helper function to fetch odds for a specific event ID
+# This uses the ESPN core API which provides odds even after games start/complete
+fetch_event_odds <- function(event_id) {
+  # Check cache first
+  if (!is.null(odds_cache[[event_id]])) {
+    return(odds_cache[[event_id]])
+  }
+
+  add_api_delay()
+
+  odds_url <- sprintf(
+    "http://sports.core.api.espn.com/v2/sports/football/leagues/nfl/events/%s/competitions/%s/odds?lang=en&region=us",
+    event_id, event_id
+  )
+
+  odds_resp <- tryCatch({
+    resp <- GET(odds_url)
+    if (status_code(resp) == 200) {
+      content(resp, as = "parsed")
+    } else {
+      NULL
+    }
+  }, error = function(e) {
+    cat("Warning: Could not fetch odds for event", event_id, ":", e$message, "\n")
+    NULL
+  })
+
+  # Cache the result
+  odds_cache[[event_id]] <<- odds_resp
+  return(odds_resp)
+}
+
+# Helper function to extract odds from ESPN odds API response
+extract_odds_from_response <- function(odds_response) {
   default_odds <- list(
     home_spread = NULL,
     home_moneyline = NULL,
@@ -322,60 +589,105 @@ get_odds_for_game <- function(home_team, away_team) {
     over_under = NULL
   )
 
-  if (is.null(odds_data$events)) return(default_odds)
+  if (is.null(odds_response) || is.null(odds_response$items) || length(odds_response$items) == 0) {
+    return(default_odds)
+  }
 
-  # Normalize team abbreviations for ESPN API comparison
-  home_team_normalized <- normalize_team_abbr(home_team)
-  away_team_normalized <- normalize_team_abbr(away_team)
+  # Get the first odds provider (usually DraftKings with priority 1)
+  odds_item <- odds_response$items[[1]]
 
-  for (event in odds_data$events) {
-    if (is.null(event$competitions)) next
-    comp <- event$competitions[[1]]
-    if (is.null(comp$competitors)) next
+  # Extract spread and over/under from top level
+  over_under <- odds_item$overUnder
+  spread <- odds_item$spread
 
-    teams <- sapply(comp$competitors, function(x) x$team$abbreviation)
-    if (home_team_normalized %in% teams && away_team_normalized %in% teams) {
-      if (!is.null(comp$odds) && length(comp$odds) > 0) {
-        odds <- comp$odds[[1]]
+  # Extract away team odds
+  away_spread <- NULL
+  away_moneyline <- NULL
+  if (!is.null(odds_item$awayTeamOdds)) {
+    away_odds <- odds_item$awayTeamOdds
 
-        # Extract home team spread from pointSpread
-        home_spread <- NULL
-        if (!is.null(odds$pointSpread) && !is.null(odds$pointSpread$home) &&
-            !is.null(odds$pointSpread$home$close) && !is.null(odds$pointSpread$home$close$line)) {
-          home_spread <- odds$pointSpread$home$close$line
-        }
+    # Try current first, then close, then open
+    if (!is.null(away_odds$current) && !is.null(away_odds$current$pointSpread)) {
+      away_spread <- as.numeric(sub("\\+", "", away_odds$current$pointSpread$american))
+    } else if (!is.null(away_odds$close) && !is.null(away_odds$close$pointSpread)) {
+      away_spread <- as.numeric(sub("\\+", "", away_odds$close$pointSpread$american))
+    } else if (!is.null(away_odds$open) && !is.null(away_odds$open$pointSpread)) {
+      away_spread <- as.numeric(sub("\\+", "", away_odds$open$pointSpread$american))
+    }
 
-        # Extract away team spread from pointSpread
-        away_spread <- NULL
-        if (!is.null(odds$pointSpread) && !is.null(odds$pointSpread$away) &&
-            !is.null(odds$pointSpread$away$close) && !is.null(odds$pointSpread$away$close$line)) {
-          away_spread <- odds$pointSpread$away$close$line
-        }
-
-        # Extract home team moneyline
-        home_moneyline <- NULL
-        if (!is.null(odds$moneyline) && !is.null(odds$moneyline$home) &&
-            !is.null(odds$moneyline$home$close) && !is.null(odds$moneyline$home$close$odds)) {
-          home_moneyline <- odds$moneyline$home$close$odds
-        }
-
-        # Extract away team moneyline
-        away_moneyline <- NULL
-        if (!is.null(odds$moneyline) && !is.null(odds$moneyline$away) &&
-            !is.null(odds$moneyline$away$close) && !is.null(odds$moneyline$away$close$odds)) {
-          away_moneyline <- odds$moneyline$away$close$odds
-        }
-
-        return(list(
-          home_spread = home_spread,
-          home_moneyline = home_moneyline,
-          away_spread = away_spread,
-          away_moneyline = away_moneyline,
-          over_under = if (!is.null(odds$overUnder)) odds$overUnder else NULL
-        ))
-      }
+    # Get moneyline
+    if (!is.null(away_odds$current) && !is.null(away_odds$current$moneyLine)) {
+      away_moneyline <- away_odds$current$moneyLine$american
+    } else if (!is.null(away_odds$close) && !is.null(away_odds$close$moneyLine)) {
+      away_moneyline <- away_odds$close$moneyLine$american
+    } else if (!is.null(away_odds$open) && !is.null(away_odds$open$moneyLine)) {
+      away_moneyline <- away_odds$open$moneyLine$american
+    } else if (!is.null(away_odds$moneyLine)) {
+      away_moneyline <- away_odds$moneyLine
     }
   }
+
+  # Extract home team odds
+  home_spread <- NULL
+  home_moneyline <- NULL
+  if (!is.null(odds_item$homeTeamOdds)) {
+    home_odds <- odds_item$homeTeamOdds
+
+    # Try current first, then close, then open
+    if (!is.null(home_odds$current) && !is.null(home_odds$current$pointSpread)) {
+      home_spread <- as.numeric(sub("\\+", "", home_odds$current$pointSpread$american))
+    } else if (!is.null(home_odds$close) && !is.null(home_odds$close$pointSpread)) {
+      home_spread <- as.numeric(sub("\\+", "", home_odds$close$pointSpread$american))
+    } else if (!is.null(home_odds$open) && !is.null(home_odds$open$pointSpread)) {
+      home_spread <- as.numeric(sub("\\+", "", home_odds$open$pointSpread$american))
+    }
+
+    # Get moneyline
+    if (!is.null(home_odds$current) && !is.null(home_odds$current$moneyLine)) {
+      home_moneyline <- home_odds$current$moneyLine$american
+    } else if (!is.null(home_odds$close) && !is.null(home_odds$close$moneyLine)) {
+      home_moneyline <- home_odds$close$moneyLine$american
+    } else if (!is.null(home_odds$open) && !is.null(home_odds$open$moneyLine)) {
+      home_moneyline <- home_odds$open$moneyLine$american
+    } else if (!is.null(home_odds$moneyLine)) {
+      home_moneyline <- home_odds$moneyLine
+    }
+  }
+
+  return(list(
+    home_spread = home_spread,
+    home_moneyline = home_moneyline,
+    away_spread = away_spread,
+    away_moneyline = away_moneyline,
+    over_under = over_under
+  ))
+}
+
+# Helper function to extract odds for a game by finding its event ID
+get_odds_for_game <- function(home_team, away_team, game_id = NULL) {
+  default_odds <- list(
+    home_spread = NULL,
+    home_moneyline = NULL,
+    away_spread = NULL,
+    away_moneyline = NULL,
+    over_under = NULL
+  )
+
+  # Create matchup key
+  matchup_key <- paste(away_team, home_team, sep = "-")
+
+  # Look up event ID from our team mapping
+  event_id <- team_to_event_map[[matchup_key]]
+
+  if (!is.null(event_id)) {
+    odds_response <- fetch_event_odds(event_id)
+    if (!is.null(odds_response)) {
+      return(extract_odds_from_response(odds_response))
+    }
+  } else {
+    cat("Warning: No event ID found for matchup", matchup_key, "\n")
+  }
+
   return(default_odds)
 }
 
@@ -643,12 +955,13 @@ for (i in 1:nrow(current_week_games)) {
   game <- current_week_games[i, ]
   home_team <- game$home_team
   away_team <- game$away_team
+  game_id <- game$game_id
   matchup_key <- paste(tolower(away_team), tolower(home_team), sep = "-")
 
   cat("Processing matchup:", matchup_key, "\n")
 
-  # Get odds
-  odds <- get_odds_for_game(home_team, away_team)
+  # Get odds (pass game_id to use ESPN odds API)
+  odds <- get_odds_for_game(home_team, away_team, game_id)
 
   # Get head-to-head record (from home team's perspective)
   h2h <- get_h2h_record(home_team, away_team, schedules)
@@ -679,10 +992,25 @@ cat("\n11. Writing output and uploading to S3...\n")
 
 # Wrap matchups in metadata structure
 current_week <- current_week_games$week[1]
+
+# Determine title based on season type
+title_text <- if (is_playoffs) {
+  week_label <- case_when(
+    current_week == 1 ~ "Wild Card",
+    current_week == 2 ~ "Divisional Round",
+    current_week == 3 ~ "Conference Championships",
+    current_week == 4 ~ "Super Bowl",
+    TRUE ~ paste0("Playoff Week ", current_week)
+  )
+  paste0(week_label, " Matchup Worksheets")
+} else {
+  paste0("Week ", current_week, " Matchup Worksheets")
+}
+
 output_data <- list(
   sport = "NFL",
   visualizationType = "MATCHUP_V2",
-  title = paste0("Week ", current_week, " Matchup Worksheets"),
+  title = title_text,
   subtitle = "Comprehensive statistical analysis for all matchups",
   description = "Detailed matchup statistics including team performance metrics, player stats, head-to-head records, and common opponent results.\n\nQUARTERBACK STATS:\n\n • Total EPA: Expected Points Added - total offensive value generated across all plays\n\n • Passing EPA: Expected Points Added on passing plays only\n\n • Pass CPOE: Completion Percentage Over Expected - accuracy beyond what's expected based on throw difficulty\n\n • PACR: Pass Air Conversion Ratio - measures QB efficiency converting air yards to actual yards\n\n • Air Yards: Total passing yards in the air before the catch\n\nRUNNING BACK STATS:\n\n • Rush EPA: Expected Points Added on rushing plays\n\n • Rush 1st Downs: First downs gained on rushing attempts\n\n • Carries: Total rushing attempts\n\n • Rec EPA: Expected Points Added on receptions\n\n • Targets: Total times targeted by the QB\n\n • Target Share: Percentage of team's total targets\n\nRECEIVER STATS:\n\n • WOPR: Weighted Opportunity Rating - combines targets and air yards to measure receiving opportunity\n\n • Rec EPA: Expected Points Added on receptions\n\n • RACR: Receiver Air Conversion Ratio - receiving yards per air yard (measures efficiency converting targets to yards)\n\n • Target Share: Percentage of team's total targets\n\n • Air Yards %: Percentage of team's total air yards\n\nAll EPA stats are per play through the current week.",
   lastUpdated = format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC"),
@@ -716,7 +1044,7 @@ if (nzchar(s3_bucket)) {
   # Update DynamoDB with metadata
   dynamodb_table <- Sys.getenv("AWS_DYNAMODB_TABLE", "fastbreak-file-timestamps")
   utc_timestamp <- format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC")
-  chart_title <- paste0("NFL Matchup Worksheets - Week ", current_week_games$week[1])
+  chart_title <- paste0("NFL Matchup Worksheets - ", title_text)
   chart_interval <- "daily"
 
   dynamodb_item <- sprintf(

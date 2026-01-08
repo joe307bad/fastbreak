@@ -18,6 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.joebad.fastbreak.data.model.*
@@ -30,88 +31,109 @@ private val Team1Color = Color(0xFF2196F3) // Blue (away team)
 private val Team2Color = Color(0xFFFF5722) // Deep Orange (home team)
 
 /**
- * Helper function to get rank background color for team/QB stats (1-32 scale)
- * Ranks 1-10: Dark green shades
- * Ranks 11-22: Green to orange transition
- * Ranks 23-32: Red shades
- * Ranks >32: Same as rank 32 (dark red)
+ * Pre-computed rank colors for team/QB stats (1-32 scale, with 32+ clamped to darkest red)
+ * Computed once at initialization to eliminate calculation overhead during scrolling
+ * Color gradient: Green (ranks 1-10, top third) -> Yellow/Orange (ranks 11-20, middle third) -> Red (ranks 21-32, bottom third)
  */
-private fun getTeamRankColor(rank: Int?): Color {
-    if (rank == null || rank < 1) return Color.Transparent
+private val teamRankColors: Map<Int, Color> = buildMap {
+    put(0, Color.Transparent) // For null ranks
 
-    // Clamp rank to 32 for color calculation
-    val clampedRank = if (rank > 32) 32 else rank
+    // Darkest red color for rank 32 (will be used for all ranks > 32)
+    val darkestRed = Color(139, 0, 0)
 
-    return when {
-        clampedRank <= 10 -> {
-            // Ranks 1-10: Dark green to medium green
-            val ratio = (clampedRank - 1) / 9f
-            val red = (0 + ratio * 34).toInt()
-            val green = (100 + ratio * 39).toInt()
-            val blue = (0 + ratio * 34).toInt()
-            Color(red, green, blue)
+    for (rank in 1..32) {
+        val color = when {
+            rank <= 10 -> {
+                // Green gradient (ranks 1-10): Top third - bright green to yellow-green
+                val ratio = (rank - 1) / 9f
+                val red = (0 + ratio * 140).toInt()
+                val green = (120 + ratio * 40).toInt()
+                val blue = 0
+                Color(red, green, blue)
+            }
+            rank <= 20 -> {
+                // Yellow-orange gradient (ranks 11-20): Middle third - yellow to orange
+                val ratio = (rank - 11) / 9f
+                val red = (140 + ratio * 75).toInt()
+                val green = (160 - ratio * 100).toInt()
+                val blue = 0
+                Color(red, green, blue)
+            }
+            else -> {
+                // Red gradient (ranks 21-32): Bottom third - orange-red to darkest red
+                val ratio = (rank - 21) / 11f
+                val red = (215 - ratio * 76).toInt()
+                val green = (60 - ratio * 60).toInt()
+                val blue = 0
+                Color(red, green, blue)
+            }
         }
-        clampedRank <= 22 -> {
-            // Ranks 11-22: Light green to orange transition
-            val ratio = (clampedRank - 11) / 11f
-            val red = (140 + ratio * 75).toInt()
-            val green = (160 - ratio * 60).toInt()
-            val blue = (120 - ratio * 40).toInt()
-            Color(red, green, blue)
-        }
-        else -> {
-            // Ranks 23-32: Medium red to dark red
-            val ratio = (clampedRank - 23) / 9f
-            val red = (205 - ratio * 66).toInt()
-            val green = (92 - ratio * 92).toInt()
-            val blue = (92 - ratio * 92).toInt()
-            Color(red, green, blue)
-        }
+        put(rank, color)
+    }
+
+    // Add explicit mapping for ranks > 32 to use the darkest red
+    for (rank in 33..50) {
+        put(rank, darkestRed)
     }
 }
 
 /**
- * Helper function to get rank background color for player stats (1-64 scale)
- * Ranks 1-21: Green shades (dark to medium green)
- * Ranks 22-43: Orange shades (green-orange to red-orange transition)
- * Ranks 44-64: Red shades (medium to dark red)
- * Ranks >64: Same as rank 64 (dark red)
+ * Pre-computed rank colors for player stats (1-80 scale, with 80+ clamped to darkest red)
+ * Computed once at initialization to eliminate calculation overhead during scrolling
+ */
+private val playerRankColors: Map<Int, Color> = buildMap {
+    put(0, Color.Transparent) // For null ranks
+
+    // Darkest red color for rank 80 (will be used for all ranks > 80)
+    val darkestRed = Color(139, 0, 0)
+
+    for (rank in 1..80) {
+        val clampedRank = if (rank > 64) 64 else rank
+        val color = when {
+            clampedRank <= 21 -> {
+                val ratio = (clampedRank - 1) / 20f
+                val red = (0 + ratio * 50).toInt()
+                val green = (100 + ratio * 105).toInt()
+                val blue = (0 + ratio * 50).toInt()
+                Color(red, green, blue)
+            }
+            clampedRank <= 43 -> {
+                val ratio = (clampedRank - 22) / 21f
+                val red = (180 + ratio * 75).toInt()
+                val green = (140 - ratio * 41).toInt()
+                val blue = (50 - ratio * 21).toInt()
+                Color(red, green, blue)
+            }
+            else -> {
+                val ratio = (clampedRank - 44) / 20f
+                val red = (205 - ratio * 66).toInt()
+                val green = (92 - ratio * 92).toInt()
+                val blue = (92 - ratio * 92).toInt()
+                Color(red, green, blue)
+            }
+        }
+        put(rank, color)
+    }
+
+    // Add explicit mapping for ranks > 80 to use the darkest red
+    // Extend to 300 to cover all possible player ranks
+    for (rank in 81..300) {
+        put(rank, darkestRed)
+    }
+}
+
+/**
+ * Fast O(1) lookup for team rank colors - eliminates per-frame color calculations
+ */
+private fun getTeamRankColor(rank: Int?): Color {
+    return teamRankColors[rank ?: 0] ?: Color.Transparent
+}
+
+/**
+ * Fast O(1) lookup for player rank colors - eliminates per-frame color calculations
  */
 private fun getPlayerRankColor(rank: Int?): Color {
-    if (rank == null || rank < 1) return Color.Transparent
-
-    // Clamp rank to 64 for color calculation
-    val clampedRank = if (rank > 64) 64 else rank
-
-    return when {
-        clampedRank <= 21 -> {
-            // Ranks 1-21: Dark green to medium green
-            // Rank 1: #006400 (dark green), Rank 21: #32CD32 (lime green)
-            val ratio = (clampedRank - 1) / 20f
-            val red = (0 + ratio * 50).toInt()
-            val green = (100 + ratio * 105).toInt()
-            val blue = (0 + ratio * 50).toInt()
-            Color(red, green, blue)
-        }
-        clampedRank <= 43 -> {
-            // Ranks 22-43: Green-orange to red-orange transition
-            // Rank 22: #FFA500 (orange), Rank 43: #FF6347 (tomato)
-            val ratio = (clampedRank - 22) / 21f
-            val red = (180 + ratio * 75).toInt()
-            val green = (140 - ratio * 41).toInt()
-            val blue = (50 - ratio * 21).toInt()
-            Color(red, green, blue)
-        }
-        else -> {
-            // Ranks 44-64+: Medium red to dark red
-            // Rank 44: #CD5C5C (indian red), Rank 64: #8B0000 (dark red)
-            val ratio = (clampedRank - 44) / 20f
-            val red = (205 - ratio * 66).toInt()
-            val green = (92 - ratio * 92).toInt()
-            val blue = (92 - ratio * 92).toInt()
-            Color(red, green, blue)
-        }
-    }
+    return playerRankColors[rank ?: 0] ?: Color.Transparent
 }
 
 /**
@@ -172,7 +194,8 @@ private fun ThreeColumnRow(
     rightColor: Color = MaterialTheme.colorScheme.onSurface,
     advantage: Int = 0, // -1 for left (away team), 0 for even, 1 for right (home team)
     centerMaxLines: Int = Int.MAX_VALUE,
-    centerOverflow: androidx.compose.ui.text.style.TextOverflow = androidx.compose.ui.text.style.TextOverflow.Clip
+    centerOverflow: androidx.compose.ui.text.style.TextOverflow = androidx.compose.ui.text.style.TextOverflow.Clip,
+    centerSoftWrap: Boolean = false
 ) {
     Row(
         modifier = modifier
@@ -213,7 +236,7 @@ private fun ThreeColumnRow(
             color = centerColor,
             maxLines = centerMaxLines,
             overflow = centerOverflow,
-            softWrap = false
+            softWrap = centerSoftWrap
         )
 
         Row(
@@ -285,7 +308,7 @@ private fun FiveColumnRowWithRanks(
 
         Spacer(modifier = Modifier.width(4.dp))
 
-        // Left rank box (uniform padding)
+        // Left rank box
         Box(
             modifier = Modifier
                 .width(28.dp)
@@ -321,7 +344,7 @@ private fun FiveColumnRowWithRanks(
 
         Spacer(modifier = Modifier.width(8.dp))
 
-        // Right rank box (uniform padding)
+        // Right rank box
         Box(
             modifier = Modifier
                 .width(28.dp)
@@ -621,6 +644,39 @@ fun MatchupWorksheet(
     }
 }
 
+/**
+ * Sealed class representing different row types for virtualized LazyColumn
+ * This enables proper virtualization by making each row a separate LazyColumn item
+ */
+private sealed class RowData(val key: String) {
+    data class Spacer(val k: String, val height: Dp) : RowData(k)
+    data class SectionHeader(val k: String, val text: String) : RowData(k)
+    data class SubsectionHeader(val k: String, val text: String) : RowData(k)
+    data class ThreeColumn(
+        val k: String,
+        val leftText: String,
+        val centerText: String,
+        val rightText: String,
+        val advantage: Int = 0,
+        val leftWeight: FontWeight = FontWeight.Medium,
+        val centerWeight: FontWeight = FontWeight.Normal,
+        val rightWeight: FontWeight = FontWeight.Medium,
+        val centerMaxLines: Int = Int.MAX_VALUE,
+        val centerOverflow: androidx.compose.ui.text.style.TextOverflow = androidx.compose.ui.text.style.TextOverflow.Clip,
+        val centerSoftWrap: Boolean = false
+    ) : RowData(k)
+    data class FiveColumn(
+        val k: String,
+        val leftValue: String,
+        val leftRank: Int?,
+        val centerText: String,
+        val rightValue: String,
+        val rightRank: Int?,
+        val advantage: Int,
+        val usePlayerRankColors: Boolean
+    ) : RowData(k)
+}
+
 @Composable
 private fun StatsTab(
     awayTeam: String,
@@ -629,9 +685,9 @@ private fun StatsTab(
 ) {
     val listState = rememberLazyListState()
 
-    // Extract team data from JSON
-    val awayTeamData = matchup.getObject(awayTeam.lowercase())
-    val homeTeamData = matchup.getObject(homeTeam.lowercase())
+    // Extract team data from teams map
+    val awayTeamData = matchup.teams[awayTeam.lowercase()]
+    val homeTeamData = matchup.teams[homeTeam.lowercase()]
 
     if (awayTeamData == null || homeTeamData == null) {
         Box(
@@ -643,11 +699,404 @@ private fun StatsTab(
         return
     }
 
-    // Extract team stats from JSON structure
-    val awayTeamStats = awayTeamData.getObject("team_stats")
-    val homeTeamStats = homeTeamData.getObject("team_stats")
-    val awayCurrentStats = awayTeamStats?.getObject("current")
-    val homeCurrentStats = homeTeamStats?.getObject("current")
+    // Extract team stats from structured data
+    val awayTeamStats = awayTeamData.team_stats
+    val homeTeamStats = homeTeamData.team_stats
+
+    // Pre-compute odds display data to avoid string manipulation during scrolling
+    data class OddsDisplayData(
+        val awaySpread: String,
+        val homeSpread: String,
+        val awayMoneyline: String?,
+        val homeMoneyline: String?,
+        val overUnder: String?,
+        val overUnderLeftText: String,
+        val overUnderRightText: String
+    )
+
+    val oddsDisplay = remember(matchup.odds) {
+        matchup.odds?.let { odds ->
+            // Calculate away spread from home spread
+            val (awaySpread, homeSpread) = odds.home_spread?.let { homeSpread ->
+                val awaySpread = if (homeSpread.startsWith("-")) {
+                    "+" + homeSpread.substring(1)
+                } else if (homeSpread.startsWith("+")) {
+                    "-" + homeSpread.substring(1)
+                } else {
+                    homeSpread
+                }
+                awaySpread to homeSpread
+            } ?: ("" to "")
+
+            // Determine which team is favored for O/U placement
+            val homeFavored = odds.home_spread?.startsWith("-") == true ||
+                            odds.home_moneyline?.startsWith("-") == true
+            val awayFavored = odds.away_moneyline?.startsWith("-") == true
+
+            val (ouLeftText, ouRightText) = odds.over_under?.let { ou ->
+                if (awayFavored) ou to "" else "" to if (homeFavored) ou else ""
+            } ?: ("" to "")
+
+            OddsDisplayData(
+                awaySpread = awaySpread,
+                homeSpread = homeSpread,
+                awayMoneyline = odds.away_moneyline,
+                homeMoneyline = odds.home_moneyline,
+                overUnder = odds.over_under,
+                overUnderLeftText = ouLeftText,
+                overUnderRightText = ouRightText
+            )
+        }
+    }
+
+    // Pre-compute ALL rows for virtualization - CRITICAL for performance
+    val allRowsData = remember(matchup, awayTeam, homeTeam, awayTeamStats, homeTeamStats, awayTeamData, homeTeamData) {
+        buildList {
+            // Spacer
+            add(RowData.Spacer("top_spacer", 8.dp))
+
+            // Odds rows
+            oddsDisplay?.let { odds ->
+                val hasData = odds.homeSpread.isNotEmpty() || odds.homeMoneyline != null ||
+                            odds.awayMoneyline != null || odds.overUnder != null
+                if (hasData) {
+                    add(RowData.SectionHeader("odds_header", "Betting Odds"))
+                    if (odds.homeSpread.isNotEmpty()) {
+                        add(RowData.ThreeColumn("odds_spread", odds.awaySpread, "Spread", odds.homeSpread))
+                    }
+                    if (odds.awayMoneyline != null && odds.homeMoneyline != null) {
+                        add(RowData.ThreeColumn("odds_moneyline", odds.awayMoneyline, "Moneyline", odds.homeMoneyline))
+                    }
+                    if (odds.overUnder != null) {
+                        add(RowData.ThreeColumn("odds_ou", odds.overUnderLeftText, "O/U", odds.overUnderRightText))
+                    }
+                    add(RowData.Spacer("odds_spacer", 12.dp))
+                }
+            }
+
+            // Team Stats - compute rows upfront
+            val offensiveStatLabels = mapOf(
+                "off_epa" to "Offensive EPA",
+                "yards_per_game" to "Yards/Game",
+                "pass_yards_per_game" to "Pass Yds/Game",
+                "rush_yards_per_game" to "Rush Yds/Game",
+                "points_per_game" to "Points/Game",
+                "yards_per_play" to "Yards/Play",
+                "third_down_pct" to "3rd Down %",
+                "rushing_epa" to "Rushing EPA",
+                "receiving_epa" to "Receiving EPA",
+                "pacr" to "PACR",
+                "passing_first_downs" to "Pass 1st Downs",
+                "sacks_suffered" to "Sacks Suffered",
+                "touchdowns" to "Touchdowns",
+                "interceptions_thrown" to "Interceptions",
+                "fumbles_lost" to "Fumbles Lost"
+            )
+
+            add(RowData.SectionHeader("team_stats_header", "Team Stats"))
+            add(RowData.SubsectionHeader("offensive_stats_header", "Offensive Stats"))
+
+            offensiveStatLabels.forEach { (key, label) ->
+                val awayStat = awayTeamStats.current.offense[key]
+                val homeStat = homeTeamStats.current.offense[key]
+                if (awayStat != null && homeStat != null) {
+                    val awayValue = awayStat.value
+                    val awayRank = awayStat.rank
+                    val homeValue = homeStat.value
+                    val homeRank = homeStat.rank
+
+                    val lowerIsBetter = key.contains("sacks_suffered") ||
+                                      key.contains("interceptions_thrown") ||
+                                      key.contains("fumbles_lost")
+                    val advantage = if (awayValue != null && homeValue != null) {
+                        if (lowerIsBetter) {
+                            when {
+                                awayValue < homeValue -> -1
+                                awayValue > homeValue -> 1
+                                else -> 0
+                            }
+                        } else {
+                            when {
+                                awayValue > homeValue -> -1
+                                awayValue < homeValue -> 1
+                                else -> 0
+                            }
+                        }
+                    } else 0
+
+                    val decimals = if (key.contains("pct") || key.contains("per_game") || key.contains("per_play")) 1 else 2
+                    val awayText = awayValue?.format(decimals) ?: "-"
+                    val homeText = homeValue?.format(decimals) ?: "-"
+
+                    add(RowData.FiveColumn("team_off_$key", awayText, awayRank, label, homeText, homeRank, advantage, false))
+                }
+            }
+
+            add(RowData.Spacer("offensive_spacer", 8.dp))
+            add(RowData.SubsectionHeader("defensive_stats_header", "Defensive Stats"))
+
+            val defensiveStatLabels = mapOf(
+                "def_epa" to "Defensive EPA",
+                "yards_allowed_per_game" to "Yds Allowed/Game",
+                "pass_yards_allowed_per_game" to "Pass Yds Allowed/Game",
+                "rush_yards_allowed_per_game" to "Rush Yds Allowed/Game",
+                "points_allowed_per_game" to "Pts Allowed/Game",
+                "third_down_pct_def" to "3rd Down % Allowed",
+                "sacks_made" to "Sacks",
+                "interceptions_made" to "Interceptions",
+                "fumbles_forced" to "Fumbles Forced",
+                "touchdowns_allowed" to "TDs Allowed",
+                "turnover_differential" to "Turnover Diff"
+            )
+
+            defensiveStatLabels.forEach { (key, label) ->
+                val awayStat = awayTeamStats.current.defense[key]
+                val homeStat = homeTeamStats.current.defense[key]
+                if (awayStat != null && homeStat != null) {
+                    val awayValue = awayStat.value
+                    val awayRank = awayStat.rank
+                    val homeValue = homeStat.value
+                    val homeRank = homeStat.rank
+
+                    val higherIsBetter = key == "sacks_made" || key == "interceptions_made" ||
+                                       key == "fumbles_forced" || key == "turnover_differential"
+                    val advantage = if (awayValue != null && homeValue != null) {
+                        if (higherIsBetter) {
+                            when {
+                                awayValue > homeValue -> -1
+                                awayValue < homeValue -> 1
+                                else -> 0
+                            }
+                        } else {
+                            when {
+                                awayValue < homeValue -> -1
+                                awayValue > homeValue -> 1
+                                else -> 0
+                            }
+                        }
+                    } else 0
+
+                    val decimals = if (key.contains("pct") || key.contains("per_game")) 1
+                                 else if (key == "turnover_differential") 0
+                                 else 2
+                    val awayText = awayValue?.format(decimals) ?: "-"
+                    val homeText = homeValue?.format(decimals) ?: "-"
+
+                    add(RowData.FiveColumn("team_def_$key", awayText, awayRank, label, homeText, homeRank, advantage, false))
+                }
+            }
+
+            add(RowData.Spacer("team_stats_spacer", 12.dp))
+
+            // Player Stats - pre-compute all player comparison rows
+            add(RowData.SectionHeader("player_stats_header", "Key Players"))
+
+            // QB Comparison
+            val awayQB = awayTeamData.players.qb
+            val homeQB = homeTeamData.players.qb
+            if (awayQB != null && homeQB != null) {
+                add(RowData.ThreeColumn("qb_header", awayQB.name, "QB", homeQB.name, 0, FontWeight.Bold, FontWeight.Bold, FontWeight.Bold))
+
+                val qbStatsConfig = listOf(
+                    Triple({ qb: QBPlayerStats -> qb.total_epa }, "Total EPA", 2),
+                    Triple({ qb: QBPlayerStats -> qb.passing_yards }, "Pass Yds", 0),
+                    Triple({ qb: QBPlayerStats -> qb.passing_tds }, "Pass TDs", 0),
+                    Triple({ qb: QBPlayerStats -> qb.completion_pct }, "Completion %", 1),
+                    Triple({ qb: QBPlayerStats -> qb.passing_cpoe }, "Pass CPOE", 2),
+                    Triple({ qb: QBPlayerStats -> qb.pacr }, "PACR", 2),
+                    Triple({ qb: QBPlayerStats -> qb.passing_yards_per_game }, "Pass Yds/Game", 1),
+                    Triple({ qb: QBPlayerStats -> qb.interceptions }, "INTs", 0)
+                )
+
+                qbStatsConfig.forEach { (accessor, label, decimals) ->
+                    val awayStat = accessor(awayQB)
+                    val homeStat = accessor(homeQB)
+                    val awayValue = awayStat.value
+                    val awayRank = awayStat.rank
+                    val homeValue = homeStat.value
+                    val homeRank = homeStat.rank
+                    val lowerIsBetter = label == "INTs"
+                    val advantage = if (awayValue != null && homeValue != null) {
+                        if (lowerIsBetter) when {
+                            awayValue < homeValue -> -1
+                            awayValue > homeValue -> 1
+                            else -> 0
+                        } else when {
+                            awayValue > homeValue -> -1
+                            awayValue < homeValue -> 1
+                            else -> 0
+                        }
+                    } else 0
+                    val awayText = awayValue?.format(decimals) ?: "-"
+                    val homeText = homeValue?.format(decimals) ?: "-"
+                    add(RowData.FiveColumn("qb_$label", awayText, awayRank, label, homeText, homeRank, advantage, false))
+                }
+                add(RowData.Spacer("qb_spacer", 4.dp))
+            }
+
+            // RB Comparisons
+            val awayRBs = awayTeamData.players.rbs
+            val homeRBs = homeTeamData.players.rbs
+            val rbCount = minOf(awayRBs.size, homeRBs.size)
+
+            val rbStatsConfig = listOf(
+                Triple({ rb: RBPlayerStats -> rb.rushing_epa }, "Rush EPA", 2),
+                Triple({ rb: RBPlayerStats -> rb.rushing_yards }, "Rush Yds", 0),
+                Triple({ rb: RBPlayerStats -> rb.rushing_tds }, "Rush TDs", 0),
+                Triple({ rb: RBPlayerStats -> rb.yards_per_carry }, "Yds/Carry", 1),
+                Triple({ rb: RBPlayerStats -> rb.rushing_yards_per_game }, "Rush Yds/Game", 1),
+                Triple({ rb: RBPlayerStats -> rb.receptions }, "Receptions", 0),
+                Triple({ rb: RBPlayerStats -> rb.receiving_yards }, "Rec Yds", 0),
+                Triple({ rb: RBPlayerStats -> rb.receiving_tds }, "Rec TDs", 0),
+                Triple({ rb: RBPlayerStats -> rb.receiving_yards_per_game }, "Rec Yds/Game", 1),
+                Triple({ rb: RBPlayerStats -> rb.target_share }, "Target Share", 3)
+            )
+
+            for (i in 0 until rbCount) {
+                val awayRB = awayRBs[i]
+                val homeRB = homeRBs[i]
+                add(RowData.ThreeColumn("rb${i}_header", awayRB.name, "RB", homeRB.name, 0, FontWeight.Bold, FontWeight.Bold, FontWeight.Bold))
+
+                rbStatsConfig.forEach { (accessor, label, decimals) ->
+                    val awayStat = accessor(awayRB)
+                    val homeStat = accessor(homeRB)
+                    val awayValue = awayStat.value
+                    val awayRank = awayStat.rank
+                    val homeValue = homeStat.value
+                    val homeRank = homeStat.rank
+                    val advantage = if (awayValue != null && homeValue != null) when {
+                        awayValue > homeValue -> -1
+                        awayValue < homeValue -> 1
+                        else -> 0
+                    } else 0
+                    val awayText = awayValue?.let { if (decimals == 0) it.toInt().toString() else it.format(decimals) } ?: "-"
+                    val homeText = homeValue?.let { if (decimals == 0) it.toInt().toString() else it.format(decimals) } ?: "-"
+                    add(RowData.FiveColumn("rb${i}_$label", awayText, awayRank, label, homeText, homeRank, advantage, true))
+                }
+                add(RowData.Spacer("rb${i}_spacer", 4.dp))
+            }
+
+            // Receiver Comparisons
+            val awayWRs = awayTeamData.players.receivers
+            val homeWRs = homeTeamData.players.receivers
+            val wrCount = minOf(awayWRs.size, homeWRs.size)
+
+            val receiverStatsConfig = listOf(
+                Triple({ rec: ReceiverPlayerStats -> rec.receiving_epa }, "Rec EPA", 2),
+                Triple({ rec: ReceiverPlayerStats -> rec.receiving_yards }, "Rec Yds", 0),
+                Triple({ rec: ReceiverPlayerStats -> rec.receiving_tds }, "Rec TDs", 0),
+                Triple({ rec: ReceiverPlayerStats -> rec.receptions }, "Receptions", 0),
+                Triple({ rec: ReceiverPlayerStats -> rec.yards_per_reception }, "Yds/Rec", 1),
+                Triple({ rec: ReceiverPlayerStats -> rec.receiving_yards_per_game }, "Rec Yds/Game", 1),
+                Triple({ rec: ReceiverPlayerStats -> rec.catch_pct }, "Catch %", 1),
+                Triple({ rec: ReceiverPlayerStats -> rec.wopr }, "WOPR", 2),
+                Triple({ rec: ReceiverPlayerStats -> rec.racr }, "RACR", 2),
+                Triple({ rec: ReceiverPlayerStats -> rec.target_share }, "Target Share", 3),
+                Triple({ rec: ReceiverPlayerStats -> rec.air_yards_share }, "Air Yards %", 1)
+            )
+
+            for (i in 0 until wrCount) {
+                val awayWR = awayWRs[i]
+                val homeWR = homeWRs[i]
+                add(RowData.ThreeColumn("wr${i}_header", awayWR.name, "WR", homeWR.name, 0, FontWeight.Bold, FontWeight.Bold, FontWeight.Bold))
+
+                receiverStatsConfig.forEach { (accessor, label, decimals) ->
+                    val awayStat = accessor(awayWR)
+                    val homeStat = accessor(homeWR)
+                    val awayValue = awayStat.value
+                    val awayRank = awayStat.rank
+                    val homeValue = homeStat.value
+                    val homeRank = homeStat.rank
+                    val advantage = if (awayValue != null && homeValue != null) when {
+                        awayValue > homeValue -> -1
+                        awayValue < homeValue -> 1
+                        else -> 0
+                    } else 0
+                    val awayText = awayValue?.let { if (decimals == 0) it.toInt().toString() else it.format(decimals) } ?: "-"
+                    val homeText = homeValue?.let { if (decimals == 0) it.toInt().toString() else it.format(decimals) } ?: "-"
+                    add(RowData.FiveColumn("wr${i}_$label", awayText, awayRank, label, homeText, homeRank, advantage, true))
+                }
+                add(RowData.Spacer("wr${i}_spacer", 4.dp))
+            }
+
+            add(RowData.Spacer("player_stats_spacer", 12.dp))
+
+            // H2H Record
+            if (matchup.h2h_record.isNotEmpty()) {
+                add(RowData.SectionHeader("h2h_header", "Head-to-Head"))
+                matchup.h2h_record.forEachIndexed { idx, h2hGame ->
+                    val advantage = when (h2hGame.winner.uppercase()) {
+                        awayTeam -> -1
+                        homeTeam -> 1
+                        else -> 0
+                    }
+                    val leftText = if (h2hGame.winner == awayTeam) "W" else if (h2hGame.winner == homeTeam) "L" else "T"
+                    val centerText = "W${h2hGame.week}: ${h2hGame.finalScore}"
+                    val rightText = if (h2hGame.winner == homeTeam) "W" else if (h2hGame.winner == awayTeam) "L" else "T"
+                    add(RowData.ThreeColumn(
+                        k = "h2h_$idx",
+                        leftText = leftText,
+                        centerText = centerText,
+                        rightText = rightText,
+                        advantage = advantage,
+                        centerMaxLines = 2,
+                        centerOverflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                        centerSoftWrap = true
+                    ))
+                }
+                add(RowData.Spacer("h2h_spacer", 12.dp))
+            }
+
+            // Common Opponents
+            matchup.common_opponents?.let { commonOpps ->
+                if (commonOpps.isNotEmpty()) {
+                    add(RowData.SectionHeader("common_opp_header", "Common Opponents"))
+                    commonOpps.forEach { (opponentCode, opponentData) ->
+                        val awayGames = opponentData[awayTeam.lowercase()] ?: emptyList()
+                        val homeGames = opponentData[homeTeam.lowercase()] ?: emptyList()
+
+                        if (awayGames.isNotEmpty() || homeGames.isNotEmpty()) {
+                            // Opponent header
+                            add(RowData.ThreeColumn("opp_${opponentCode}_header", "", opponentCode.uppercase(), "", 0, FontWeight.Medium, FontWeight.Bold, FontWeight.Medium))
+
+                            // Game rows
+                            val maxGames = maxOf(awayGames.size, homeGames.size)
+                            for (i in 0 until maxGames) {
+                                val awayGame = awayGames.getOrNull(i)
+                                val homeGame = homeGames.getOrNull(i)
+
+                                val awayResult = awayGame?.result ?: ""
+                                val awayScore = awayGame?.score ?: ""
+                                val awayWeek = awayGame?.week
+
+                                val homeResult = homeGame?.result ?: ""
+                                val homeScore = homeGame?.score ?: ""
+                                val homeWeek = homeGame?.week
+
+                                val leftText = if (awayGame != null) "$awayResult $awayScore (W$awayWeek)" else ""
+                                val rightText = if (homeGame != null) "$homeResult $homeScore (W$homeWeek)" else ""
+
+                                val advantage = when {
+                                    awayResult == "W" && homeResult == "L" -> -1
+                                    awayResult == "L" && homeResult == "W" -> 1
+                                    awayResult == "W" && homeResult == "W" -> 0
+                                    awayResult == "L" && homeResult == "L" -> 0
+                                    awayResult == "T" && homeResult != "" -> 0
+                                    homeResult == "T" && awayResult != "" -> 0
+                                    awayResult == "W" && homeResult == "" -> -1
+                                    awayResult == "" && homeResult == "W" -> 1
+                                    else -> 0
+                                }
+
+                                add(RowData.ThreeColumn("opp_${opponentCode}_game_$i", leftText, "", rightText, advantage))
+                            }
+                            add(RowData.Spacer("opp_${opponentCode}_spacer", 4.dp))
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     Box(modifier = Modifier
         .fillMaxSize()
@@ -663,178 +1112,47 @@ private fun StatsTab(
                     .fillMaxSize()
                     .padding(top = 30.dp, bottom = 8.dp)
             ) {
-                item {
-                    Spacer(modifier = Modifier.height(8.dp))
-                }
-
-                // Odds section
-                matchup.getObject("odds")?.let { oddsJson ->
-                    item {
-                        val homeSpread = oddsJson.getString("home_spread")
-                        val awaySpread = oddsJson.getString("away_spread")
-                        val homeMoneyline = oddsJson.getString("home_moneyline")
-                        val awayMoneyline = oddsJson.getString("away_moneyline")
-                        val overUnder = oddsJson.getDouble("over_under")
-
-                        if (homeSpread != null || awaySpread != null || homeMoneyline != null || awayMoneyline != null || overUnder != null) {
-                            Column {
-                                Text(
-                    text = "Betting Odds",
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 11.sp,
-                    modifier = Modifier.padding(bottom = 4.dp)
-                )
-
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    // Spread row - show both teams
-                    if (awaySpread != null && homeSpread != null) {
-                        ThreeColumnRow(
-                            leftText = awaySpread,
-                            centerText = "Spread",
-                            rightText = homeSpread
+                // Render all pre-computed rows as individual items for virtualization
+                items(allRowsData.size, key = { allRowsData[it].key }) { index ->
+                    when (val row = allRowsData[index]) {
+                        is RowData.Spacer -> Spacer(modifier = Modifier.height(row.height))
+                        is RowData.SectionHeader -> Text(
+                            text = row.text,
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 11.sp,
+                            modifier = Modifier.padding(bottom = 4.dp)
+                        )
+                        is RowData.SubsectionHeader -> Text(
+                            text = row.text,
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 11.sp
+                        )
+                        is RowData.ThreeColumn -> ThreeColumnRow(
+                            leftText = row.leftText,
+                            centerText = row.centerText,
+                            rightText = row.rightText,
+                            advantage = row.advantage,
+                            leftWeight = row.leftWeight,
+                            centerWeight = row.centerWeight,
+                            rightWeight = row.rightWeight,
+                            centerMaxLines = row.centerMaxLines,
+                            centerOverflow = row.centerOverflow,
+                            centerSoftWrap = row.centerSoftWrap
+                        )
+                        is RowData.FiveColumn -> FiveColumnRowWithRanks(
+                            leftValue = row.leftValue,
+                            leftRank = row.leftRank,
+                            centerText = row.centerText,
+                            rightValue = row.rightValue,
+                            rightRank = row.rightRank,
+                            advantage = row.advantage,
+                            usePlayerRankColors = row.usePlayerRankColors
                         )
                     }
-
-                    // Moneyline row - show both teams
-                    if (awayMoneyline != null && homeMoneyline != null) {
-                        ThreeColumnRow(
-                            leftText = awayMoneyline,
-                            centerText = "Moneyline",
-                            rightText = homeMoneyline
-                        )
-                    }
-
-                    // Over/Under - show under the favored team (negative spread/moneyline)
-                    overUnder?.let { ou ->
-                        // Determine which team is favored (has negative spread or moneyline starting with "-")
-                        val homeFavored = homeSpread?.startsWith("-") == true || homeMoneyline?.startsWith("-") == true
-                        val awayFavored = awaySpread?.startsWith("-") == true || awayMoneyline?.startsWith("-") == true
-
-                        val leftText = if (awayFavored) ou.format(1) else ""
-                        val rightText = if (homeFavored) ou.format(1) else ""
-
-                        ThreeColumnRow(
-                            leftText = leftText,
-                            centerText = "O/U",
-                            rightText = rightText
-                                    )
-                                }
-                            }
-                            Spacer(modifier = Modifier.height(12.dp))
-                        }
-                    }
-                }
-            }
-
-                // Team Stats Section
-                if (awayCurrentStats != null && homeCurrentStats != null) {
-                    item {
-                        Column {
-                            Text(
-                text = "Team Stats",
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.Bold,
-                fontSize = 11.sp,
-                modifier = Modifier.padding(bottom = 4.dp)
-            )
-
-                            TeamStatsComparisonJson(
-                                awayTeam = awayTeam,
-                                homeTeam = homeTeam,
-                                awayStats = awayCurrentStats,
-                                homeStats = homeCurrentStats
-                            )
-                        }
-                    }
                 }
 
-                item {
-                    Spacer(modifier = Modifier.height(12.dp))
-                }
-
-                // Player Stats Section
-                val awayPlayers = awayTeamData.getObject("players")
-                val homePlayers = homeTeamData.getObject("players")
-
-                if (awayPlayers != null && homePlayers != null) {
-                    item {
-                        Column {
-                            Text(
-                                text = "Key Players",
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 11.sp,
-                                modifier = Modifier.padding(bottom = 4.dp)
-                            )
-
-                            PlayerStatsComparisonJson(
-                                awayTeam = awayTeam,
-                                homeTeam = homeTeam,
-                                awayPlayerStats = awayPlayers,
-                                homePlayerStats = homePlayers
-                            )
-                        }
-                    }
-                }
-
-                item {
-                    Spacer(modifier = Modifier.height(12.dp))
-                }
-
-                // H2H Record
-                matchup.get("h2h_record")?.let { h2hElement ->
-                    // Check if it's an array before trying to access as jsonArray
-                    if (h2hElement is kotlinx.serialization.json.JsonArray && h2hElement.isNotEmpty()) {
-                        item {
-                            Column {
-                                Text(
-                                    text = "Head-to-Head",
-                                    style = MaterialTheme.typography.titleSmall,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 11.sp,
-                                    modifier = Modifier.padding(bottom = 4.dp)
-                                )
-
-                                HeadToHeadComparison(
-                                    awayTeam = awayTeam,
-                                    homeTeam = homeTeam,
-                                    h2hMatchups = h2hElement
-                                )
-                            }
-                        }
-                    }
-                }
-
-                item {
-                    Spacer(modifier = Modifier.height(12.dp))
-                }
-
-                // Common Opponents Section
-                matchup.getObject("common_opponents")?.let { commonOpponents ->
-                    if (commonOpponents.isNotEmpty()) {
-                        item {
-                            Column {
-                                Text(
-                                    text = "Common Opponents",
-                                    style = MaterialTheme.typography.titleSmall,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 11.sp,
-                                    modifier = Modifier.padding(bottom = 4.dp)
-                                )
-
-                                CommonOpponentsComparison(
-                                    awayTeam = awayTeam,
-                                    homeTeam = homeTeam,
-                                    commonOpponents = commonOpponents
-                                )
-                            }
-                        }
-                    }
-                }
             }
         }
 
@@ -910,44 +1228,134 @@ private fun TeamHeader(
     )
 }
 
+private data class StatRow(
+    val label: String,
+    val awayText: String,
+    val awayRank: Int?,
+    val homeText: String,
+    val homeRank: Int?,
+    val advantage: Int
+)
+
 @Composable
-private fun TeamStatsComparisonJson(
+private fun TeamStatsComparison(
     awayTeam: String,
     homeTeam: String,
-    awayStats: JsonObject,
-    homeStats: JsonObject
+    awayStats: CurrentTeamStats,
+    homeStats: CurrentTeamStats
 ) {
-    val offensiveStatLabels = mapOf(
-        "off_epa" to "Offensive EPA",
-        "yards_per_game" to "Yards/Game",
-        "pass_yards_per_game" to "Pass Yds/Game",
-        "rush_yards_per_game" to "Rush Yds/Game",
-        "points_per_game" to "Points/Game",
-        "yards_per_play" to "Yards/Play",
-        "third_down_pct" to "3rd Down %",
-        "rushing_epa" to "Rushing EPA",
-        "receiving_epa" to "Receiving EPA",
-        "pacr" to "PACR",
-        "passing_first_downs" to "Pass 1st Downs",
-        "sacks_suffered" to "Sacks Suffered",
-        "touchdowns" to "Touchdowns",
-        "interceptions_thrown" to "Interceptions",
-        "fumbles_lost" to "Fumbles Lost"
-    )
+    val offensiveStatLabels = remember {
+        mapOf(
+            "off_epa" to "Offensive EPA",
+            "yards_per_game" to "Yards/Game",
+            "pass_yards_per_game" to "Pass Yds/Game",
+            "rush_yards_per_game" to "Rush Yds/Game",
+            "points_per_game" to "Points/Game",
+            "yards_per_play" to "Yards/Play",
+            "third_down_pct" to "3rd Down %",
+            "rushing_epa" to "Rushing EPA",
+            "receiving_epa" to "Receiving EPA",
+            "pacr" to "PACR",
+            "passing_first_downs" to "Pass 1st Downs",
+            "sacks_suffered" to "Sacks Suffered",
+            "touchdowns" to "Touchdowns",
+            "interceptions_thrown" to "Interceptions",
+            "fumbles_lost" to "Fumbles Lost"
+        )
+    }
 
-    val defensiveStatLabels = mapOf(
-        "def_epa" to "Defensive EPA",
-        "yards_allowed_per_game" to "Yds Allowed/Game",
-        "pass_yards_allowed_per_game" to "Pass Yds Allowed/Game",
-        "rush_yards_allowed_per_game" to "Rush Yds Allowed/Game",
-        "points_allowed_per_game" to "Pts Allowed/Game",
-        "third_down_pct_def" to "3rd Down % Allowed",
-        "sacks_made" to "Sacks",
-        "interceptions_made" to "Interceptions",
-        "fumbles_forced" to "Fumbles Forced",
-        "touchdowns_allowed" to "TDs Allowed",
-        "turnover_differential" to "Turnover Diff"
-    )
+    val defensiveStatLabels = remember {
+        mapOf(
+            "def_epa" to "Defensive EPA",
+            "yards_allowed_per_game" to "Yds Allowed/Game",
+            "pass_yards_allowed_per_game" to "Pass Yds Allowed/Game",
+            "rush_yards_allowed_per_game" to "Rush Yds Allowed/Game",
+            "points_allowed_per_game" to "Pts Allowed/Game",
+            "third_down_pct_def" to "3rd Down % Allowed",
+            "sacks_made" to "Sacks",
+            "interceptions_made" to "Interceptions",
+            "fumbles_forced" to "Fumbles Forced",
+            "touchdowns_allowed" to "TDs Allowed",
+            "turnover_differential" to "Turnover Diff"
+        )
+    }
+
+    // Extract and cache all offensive stats
+    val offensiveRows = remember(awayStats, homeStats) {
+        offensiveStatLabels.mapNotNull { (key, label) ->
+            val awayStat = awayStats.offense[key] ?: return@mapNotNull null
+            val homeStat = homeStats.offense[key] ?: return@mapNotNull null
+
+            val awayValue = awayStat.value
+            val awayRank = awayStat.rank
+            val homeValue = homeStat.value
+            val homeRank = homeStat.rank
+
+            val lowerIsBetter = key.contains("sacks_suffered") ||
+                              key.contains("interceptions_thrown") ||
+                              key.contains("fumbles_lost")
+            val advantage = if (awayValue != null && homeValue != null) {
+                if (lowerIsBetter) {
+                    when {
+                        awayValue < homeValue -> -1
+                        awayValue > homeValue -> 1
+                        else -> 0
+                    }
+                } else {
+                    when {
+                        awayValue > homeValue -> -1
+                        awayValue < homeValue -> 1
+                        else -> 0
+                    }
+                }
+            } else 0
+
+            val decimals = if (key.contains("pct") || key.contains("per_game") || key.contains("per_play")) 1 else 2
+            val awayText = awayValue?.format(decimals) ?: "-"
+            val homeText = homeValue?.format(decimals) ?: "-"
+
+            StatRow(label, awayText, awayRank, homeText, homeRank, advantage)
+        }
+    }
+
+    // Extract and cache all defensive stats
+    val defensiveRows = remember(awayStats, homeStats) {
+        defensiveStatLabels.mapNotNull { (key, label) ->
+            val awayStat = awayStats.defense[key] ?: return@mapNotNull null
+            val homeStat = homeStats.defense[key] ?: return@mapNotNull null
+
+            val awayValue = awayStat.value
+            val awayRank = awayStat.rank
+            val homeValue = homeStat.value
+            val homeRank = homeStat.rank
+
+            val higherIsBetter = key == "sacks_made" || key == "interceptions_made" ||
+                               key == "fumbles_forced" || key == "turnover_differential"
+            val advantage = if (awayValue != null && homeValue != null) {
+                if (higherIsBetter) {
+                    when {
+                        awayValue > homeValue -> -1
+                        awayValue < homeValue -> 1
+                        else -> 0
+                    }
+                } else {
+                    when {
+                        awayValue < homeValue -> -1
+                        awayValue > homeValue -> 1
+                        else -> 0
+                    }
+                }
+            } else 0
+
+            val decimals = if (key.contains("pct") || key.contains("per_game")) 1
+                         else if (key == "turnover_differential") 0
+                         else 2
+            val awayText = awayValue?.format(decimals) ?: "-"
+            val homeText = homeValue?.format(decimals) ?: "-"
+
+            StatRow(label, awayText, awayRank, homeText, homeRank, advantage)
+        }
+    }
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         // Offensive Stats Section
@@ -958,53 +1366,17 @@ private fun TeamStatsComparisonJson(
             fontSize = 11.sp
         )
 
-        val awayOffense = awayStats.getObject("offense")
-        val homeOffense = homeStats.getObject("offense")
-
-        if (awayOffense != null && homeOffense != null) {
+        if (offensiveRows.isNotEmpty()) {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                offensiveStatLabels.forEach { (key, label) ->
-                    val awayStatObj = awayOffense.getObject(key)
-                    val homeStatObj = homeOffense.getObject(key)
-
-                    if (awayStatObj != null && homeStatObj != null) {
-                        val awayValue = awayStatObj.getDouble("value")
-                        val awayRank = awayStatObj.getInt("rank")
-                        val homeValue = homeStatObj.getDouble("value")
-                        val homeRank = homeStatObj.getInt("rank")
-
-                        // Determine advantage (lower is better for sacks, interceptions, fumbles)
-                        val lowerIsBetter = key.contains("sacks_suffered") || key.contains("interceptions_thrown") || key.contains("fumbles_lost")
-                        val advantage = if (awayValue != null && homeValue != null) {
-                            if (lowerIsBetter) {
-                                when {
-                                    awayValue < homeValue -> -1
-                                    awayValue > homeValue -> 1
-                                    else -> 0
-                                }
-                            } else {
-                                when {
-                                    awayValue > homeValue -> -1
-                                    awayValue < homeValue -> 1
-                                    else -> 0
-                                }
-                            }
-                        } else 0
-
-                        // Format values
-                        val decimals = if (key.contains("pct") || key.contains("per_game") || key.contains("per_play")) 1 else 2
-                        val awayText = awayValue?.format(decimals) ?: "-"
-                        val homeText = homeValue?.format(decimals) ?: "-"
-
-                        FiveColumnRowWithRanks(
-                            leftValue = awayText,
-                            leftRank = awayRank,
-                            centerText = label,
-                            rightValue = homeText,
-                            rightRank = homeRank,
-                            advantage = advantage
-                        )
-                    }
+                offensiveRows.forEach { row ->
+                    FiveColumnRowWithRanks(
+                        leftValue = row.awayText,
+                        leftRank = row.awayRank,
+                        centerText = row.label,
+                        rightValue = row.homeText,
+                        rightRank = row.homeRank,
+                        advantage = row.advantage
+                    )
                 }
             }
         }
@@ -1019,317 +1391,247 @@ private fun TeamStatsComparisonJson(
             fontSize = 11.sp
         )
 
-        val awayDefense = awayStats.getObject("defense")
-        val homeDefense = homeStats.getObject("defense")
-
-        if (awayDefense != null && homeDefense != null) {
+        if (defensiveRows.isNotEmpty()) {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                defensiveStatLabels.forEach { (key, label) ->
-                    val awayStatObj = awayDefense.getObject(key)
-                    val homeStatObj = homeDefense.getObject(key)
-
-                    if (awayStatObj != null && homeStatObj != null) {
-                        val awayValue = awayStatObj.getDouble("value")
-                        val awayRank = awayStatObj.getInt("rank")
-                        val homeValue = homeStatObj.getDouble("value")
-                        val homeRank = homeStatObj.getInt("rank")
-
-                        // Determine advantage (lower is better for all defensive stats except sacks, interceptions, fumbles forced, turnover diff)
-                        val higherIsBetter = key == "sacks_made" || key == "interceptions_made" || key == "fumbles_forced" || key == "turnover_differential"
-                        val advantage = if (awayValue != null && homeValue != null) {
-                            if (higherIsBetter) {
-                                when {
-                                    awayValue > homeValue -> -1
-                                    awayValue < homeValue -> 1
-                                    else -> 0
-                                }
-                            } else {
-                                when {
-                                    awayValue < homeValue -> -1
-                                    awayValue > homeValue -> 1
-                                    else -> 0
-                                }
-                            }
-                        } else 0
-
-                        // Format values
-                        val decimals = if (key.contains("pct") || key.contains("per_game")) 1 else if (key == "turnover_differential") 0 else 2
-                        val awayText = awayValue?.format(decimals) ?: "-"
-                        val homeText = homeValue?.format(decimals) ?: "-"
-
-                        FiveColumnRowWithRanks(
-                            leftValue = awayText,
-                            leftRank = awayRank,
-                            centerText = label,
-                            rightValue = homeText,
-                            rightRank = homeRank,
-                            advantage = advantage
-                        )
-                    }
+                defensiveRows.forEach { row ->
+                    FiveColumnRowWithRanks(
+                        leftValue = row.awayText,
+                        leftRank = row.awayRank,
+                        centerText = row.label,
+                        rightValue = row.homeText,
+                        rightRank = row.homeRank,
+                        advantage = row.advantage
+                    )
                 }
             }
         }
     }
 }
 
+private data class PlayerComparison(
+    val awayName: String,
+    val homeName: String,
+    val position: String,
+    val stats: List<StatRow>
+)
+
 @Composable
-private fun PlayerStatsComparisonJson(
+private fun PlayerStatsComparison(
     awayTeam: String,
     homeTeam: String,
-    awayPlayerStats: JsonObject,
-    homePlayerStats: JsonObject
+    awayPlayers: TeamPlayers,
+    homePlayers: TeamPlayers
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    // Extract and cache all player data upfront
+    val playerData = remember(awayPlayers, homePlayers) {
+        data class AllPlayerData(
+            val qb: PlayerComparison?,
+            val rbs: List<PlayerComparison>,
+            val receivers: List<PlayerComparison>
+        )
+
         // QB Comparison
-        val awayQB = awayPlayerStats.getObject("qb")
-        val homeQB = homePlayerStats.getObject("qb")
+        val qbComparison = run {
+            val awayQB = awayPlayers.qb
+            val homeQB = homePlayers.qb
+            if (awayQB == null || homeQB == null) return@run null
 
-        if (awayQB != null && homeQB != null) {
-            // QB Names
-            val awayQBName = awayQB.getString("name") ?: "-"
-            val homeQBName = homeQB.getString("name") ?: "-"
+            val awayQBName = awayQB.name
+            val homeQBName = homeQB.name
 
+            val qbStatsConfig = listOf(
+                Triple({ qb: QBPlayerStats -> qb.total_epa }, "Total EPA", 2),
+                Triple({ qb: QBPlayerStats -> qb.passing_yards }, "Pass Yds", 0),
+                Triple({ qb: QBPlayerStats -> qb.passing_tds }, "Pass TDs", 0),
+                Triple({ qb: QBPlayerStats -> qb.completion_pct }, "Completion %", 1),
+                Triple({ qb: QBPlayerStats -> qb.passing_cpoe }, "Pass CPOE", 2),
+                Triple({ qb: QBPlayerStats -> qb.pacr }, "PACR", 2),
+                Triple({ qb: QBPlayerStats -> qb.passing_yards_per_game }, "Pass Yds/Game", 1),
+                Triple({ qb: QBPlayerStats -> qb.interceptions }, "INTs", 0)
+            )
+
+            val stats = qbStatsConfig.mapNotNull { (accessor, label, decimals) ->
+                val awayStat = accessor(awayQB)
+                val homeStat = accessor(homeQB)
+                val awayValue = awayStat.value
+                val awayRank = awayStat.rank
+                val homeValue = homeStat.value
+                val homeRank = homeStat.rank
+                val lowerIsBetter = label == "INTs"
+                val advantage = if (awayValue != null && homeValue != null) {
+                    if (lowerIsBetter) when {
+                        awayValue < homeValue -> -1
+                        awayValue > homeValue -> 1
+                        else -> 0
+                    } else when {
+                        awayValue > homeValue -> -1
+                        awayValue < homeValue -> 1
+                        else -> 0
+                    }
+                } else 0
+                StatRow(label, awayValue?.format(decimals) ?: "-", awayRank,
+                       homeValue?.format(decimals) ?: "-", homeRank, advantage)
+            }
+            PlayerComparison(awayQBName, homeQBName, "QB", stats)
+        }
+
+        // RB Comparisons
+        val rbComparisons = run {
+            val awayRBs = awayPlayers.rbs
+            val homeRBs = homePlayers.rbs
+
+            val rbStatsConfig = listOf(
+                Triple({ rb: RBPlayerStats -> rb.rushing_epa }, "Rush EPA", 2),
+                Triple({ rb: RBPlayerStats -> rb.rushing_yards }, "Rush Yds", 0),
+                Triple({ rb: RBPlayerStats -> rb.rushing_tds }, "Rush TDs", 0),
+                Triple({ rb: RBPlayerStats -> rb.yards_per_carry }, "Yds/Carry", 1),
+                Triple({ rb: RBPlayerStats -> rb.rushing_yards_per_game }, "Rush Yds/Game", 1),
+                Triple({ rb: RBPlayerStats -> rb.receptions }, "Receptions", 0),
+                Triple({ rb: RBPlayerStats -> rb.receiving_yards }, "Rec Yds", 0),
+                Triple({ rb: RBPlayerStats -> rb.receiving_tds }, "Rec TDs", 0),
+                Triple({ rb: RBPlayerStats -> rb.receiving_yards_per_game }, "Rec Yds/Game", 1),
+                Triple({ rb: RBPlayerStats -> rb.target_share }, "Target Share", 3)
+            )
+
+            (0 until minOf(awayRBs.size, homeRBs.size)).map { i ->
+                val awayRB = awayRBs[i]
+                val homeRB = homeRBs[i]
+                val stats = rbStatsConfig.map { (accessor, label, decimals) ->
+                    val awayStat = accessor(awayRB)
+                    val homeStat = accessor(homeRB)
+                    val awayValue = awayStat.value
+                    val awayRank = awayStat.rank
+                    val homeValue = homeStat.value
+                    val homeRank = homeStat.rank
+                    val advantage = if (awayValue != null && homeValue != null) when {
+                        awayValue > homeValue -> -1
+                        awayValue < homeValue -> 1
+                        else -> 0
+                    } else 0
+                    val awayText = awayValue?.let { if (decimals == 0) it.toInt().toString() else it.format(decimals) } ?: "-"
+                    val homeText = homeValue?.let { if (decimals == 0) it.toInt().toString() else it.format(decimals) } ?: "-"
+                    StatRow(label, awayText, awayRank, homeText, homeRank, advantage)
+                }
+                PlayerComparison(awayRB.name, homeRB.name, "RB", stats)
+            }
+        }
+
+        // Receiver Comparisons
+        val receiverComparisons = run {
+            val awayWRs = awayPlayers.receivers
+            val homeWRs = homePlayers.receivers
+
+            val receiverStatsConfig = listOf(
+                Triple({ rec: ReceiverPlayerStats -> rec.receiving_epa }, "Rec EPA", 2),
+                Triple({ rec: ReceiverPlayerStats -> rec.receiving_yards }, "Rec Yds", 0),
+                Triple({ rec: ReceiverPlayerStats -> rec.receiving_tds }, "Rec TDs", 0),
+                Triple({ rec: ReceiverPlayerStats -> rec.receptions }, "Receptions", 0),
+                Triple({ rec: ReceiverPlayerStats -> rec.yards_per_reception }, "Yds/Rec", 1),
+                Triple({ rec: ReceiverPlayerStats -> rec.receiving_yards_per_game }, "Rec Yds/Game", 1),
+                Triple({ rec: ReceiverPlayerStats -> rec.catch_pct }, "Catch %", 1),
+                Triple({ rec: ReceiverPlayerStats -> rec.wopr }, "WOPR", 2),
+                Triple({ rec: ReceiverPlayerStats -> rec.racr }, "RACR", 2),
+                Triple({ rec: ReceiverPlayerStats -> rec.target_share }, "Target Share", 3),
+                Triple({ rec: ReceiverPlayerStats -> rec.air_yards_share }, "Air Yards %", 1)
+            )
+
+            (0 until minOf(awayWRs.size, homeWRs.size)).map { i ->
+                val awayWR = awayWRs[i]
+                val homeWR = homeWRs[i]
+                val stats = receiverStatsConfig.map { (accessor, label, decimals) ->
+                    val awayStat = accessor(awayWR)
+                    val homeStat = accessor(homeWR)
+                    val awayValue = awayStat.value
+                    val awayRank = awayStat.rank
+                    val homeValue = homeStat.value
+                    val homeRank = homeStat.rank
+                    val advantage = if (awayValue != null && homeValue != null) when {
+                        awayValue > homeValue -> -1
+                        awayValue < homeValue -> 1
+                        else -> 0
+                    } else 0
+                    val awayText = awayValue?.let { if (decimals == 0) it.toInt().toString() else it.format(decimals) } ?: "-"
+                    val homeText = homeValue?.let { if (decimals == 0) it.toInt().toString() else it.format(decimals) } ?: "-"
+                    StatRow(label, awayText, awayRank, homeText, homeRank, advantage)
+                }
+                PlayerComparison(awayWR.name, homeWR.name, "WR", stats)
+            }
+        }
+
+        AllPlayerData(qbComparison, rbComparisons, receiverComparisons)
+    }
+
+    // Now just render the cached data
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        // QB
+        playerData.qb?.let { qb ->
             ThreeColumnRow(
-                leftText = awayQBName,
-                centerText = "QB",
-                rightText = homeQBName,
+                leftText = qb.awayName,
+                centerText = qb.position,
+                rightText = qb.homeName,
                 leftWeight = FontWeight.Bold,
                 centerWeight = FontWeight.Bold,
                 rightWeight = FontWeight.Bold
             )
-
-            // QB Stats
-            val qbStats = listOf(
-                "total_epa" to "Total EPA",
-                "passing_yards" to "Pass Yds",
-                "passing_tds" to "Pass TDs",
-                "completion_pct" to "Completion %",
-                "passing_cpoe" to "Pass CPOE",
-                "pacr" to "PACR",
-                "passing_yards_per_game" to "Pass Yds/Game",
-                "interceptions" to "INTs"
-            )
-
-            qbStats.forEach { (key, label) ->
-                val awayStatObj = awayQB.getObject(key)
-                val homeStatObj = homeQB.getObject(key)
-
-                if (awayStatObj != null && homeStatObj != null) {
-                    val awayValue = awayStatObj.getDouble("value")
-                    val awayRank = awayStatObj.getInt("rank")
-                    val homeValue = homeStatObj.getDouble("value")
-                    val homeRank = homeStatObj.getInt("rank")
-
-                    // Lower is better for interceptions
-                    val lowerIsBetter = key == "interceptions"
-                    val advantage = if (awayValue != null && homeValue != null) {
-                        if (lowerIsBetter) {
-                            when {
-                                awayValue < homeValue -> -1
-                                awayValue > homeValue -> 1
-                                else -> 0
-                            }
-                        } else {
-                            when {
-                                awayValue > homeValue -> -1
-                                awayValue < homeValue -> 1
-                                else -> 0
-                            }
-                        }
-                    } else 0
-
-                    val decimals = if (key.contains("pct") || key.contains("per_game")) 1 else if (key.contains("tds") || key.contains("yards") || key.contains("interceptions")) 0 else 2
-                    val awayText = awayValue?.format(decimals) ?: "-"
-                    val homeText = homeValue?.format(decimals) ?: "-"
-
-                    FiveColumnRowWithRanks(
-                        leftValue = awayText,
-                        leftRank = awayRank,
-                        centerText = label,
-                        rightValue = homeText,
-                        rightRank = homeRank,
-                        advantage = advantage
-                    )
-                }
+            qb.stats.forEach { stat ->
+                FiveColumnRowWithRanks(
+                    leftValue = stat.awayText,
+                    leftRank = stat.awayRank,
+                    centerText = stat.label,
+                    rightValue = stat.homeText,
+                    rightRank = stat.homeRank,
+                    advantage = stat.advantage
+                )
             }
-
             Spacer(modifier = Modifier.height(4.dp))
         }
 
-        // RB Comparison
-        val awayRBs = awayPlayerStats.get("rbs")?.jsonArray
-        val homeRBs = homePlayerStats.get("rbs")?.jsonArray
-
-        if (awayRBs != null && homeRBs != null && awayRBs.isNotEmpty() && homeRBs.isNotEmpty()) {
-            val maxRBs = minOf(awayRBs.size, homeRBs.size) // Show all RBs from JSON
-
-            for (i in 0 until maxRBs) {
-                val awayRB = awayRBs.getOrNull(i)?.jsonObject
-                val homeRB = homeRBs.getOrNull(i)?.jsonObject
-
-                if (awayRB != null && homeRB != null) {
-                    val awayRBName = awayRB.getString("name") ?: "-"
-                    val homeRBName = homeRB.getString("name") ?: "-"
-
-                    ThreeColumnRow(
-                        leftText = awayRBName,
-                        centerText = "RB",
-                        rightText = homeRBName,
-                        leftWeight = FontWeight.Bold,
-                        centerWeight = FontWeight.Bold,
-                        rightWeight = FontWeight.Bold
-                    )
-
-                    // RB Stats
-                    val rbStats = listOf(
-                        "rushing_epa" to "Rush EPA",
-                        "rushing_yards" to "Rush Yds",
-                        "rushing_tds" to "Rush TDs",
-                        "yards_per_carry" to "Yds/Carry",
-                        "rushing_yards_per_game" to "Rush Yds/Game",
-                        "receptions" to "Receptions",
-                        "receiving_yards" to "Rec Yds",
-                        "receiving_tds" to "Rec TDs",
-                        "receiving_yards_per_game" to "Rec Yds/Game",
-                        "target_share" to "Target Share"
-                    )
-
-                    rbStats.forEach { (key, label) ->
-                        val awayStatObj = awayRB.getObject(key)
-                        val homeStatObj = homeRB.getObject(key)
-
-                        if (awayStatObj != null && homeStatObj != null) {
-                            val awayValue = awayStatObj.getDouble("value")
-                            val awayRank = awayStatObj.getInt("rank")
-                            val homeValue = homeStatObj.getDouble("value")
-                            val homeRank = homeStatObj.getInt("rank")
-
-                            val advantage = if (awayValue != null && homeValue != null) {
-                                when {
-                                    awayValue > homeValue -> -1
-                                    awayValue < homeValue -> 1
-                                    else -> 0
-                                }
-                            } else 0
-
-                            // Format based on stat type
-                            val decimals = when (key) {
-                                "rushing_yards", "rushing_tds", "receptions", "receiving_yards", "receiving_tds" -> 0
-                                "yards_per_carry", "rushing_yards_per_game", "receiving_yards_per_game" -> 1
-                                "target_share" -> 3
-                                else -> 2
-                            }
-                            val awayText = awayValue?.let {
-                                if (decimals == 0) it.toInt().toString() else it.format(decimals)
-                            } ?: "-"
-                            val homeText = homeValue?.let {
-                                if (decimals == 0) it.toInt().toString() else it.format(decimals)
-                            } ?: "-"
-
-                            FiveColumnRowWithRanks(
-                                leftValue = awayText,
-                                leftRank = awayRank,
-                                centerText = label,
-                                rightValue = homeText,
-                                rightRank = homeRank,
-                                advantage = advantage,
-                                usePlayerRankColors = true
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(4.dp))
-                }
+        // RBs
+        playerData.rbs.forEach { rb ->
+            ThreeColumnRow(
+                leftText = rb.awayName,
+                centerText = rb.position,
+                rightText = rb.homeName,
+                leftWeight = FontWeight.Bold,
+                centerWeight = FontWeight.Bold,
+                rightWeight = FontWeight.Bold
+            )
+            rb.stats.forEach { stat ->
+                FiveColumnRowWithRanks(
+                    leftValue = stat.awayText,
+                    leftRank = stat.awayRank,
+                    centerText = stat.label,
+                    rightValue = stat.homeText,
+                    rightRank = stat.homeRank,
+                    advantage = stat.advantage,
+                    usePlayerRankColors = true
+                )
             }
+            Spacer(modifier = Modifier.height(4.dp))
         }
 
-        // WR Comparison
-        val awayWRs = awayPlayerStats.get("receivers")?.jsonArray
-        val homeWRs = homePlayerStats.get("receivers")?.jsonArray
-
-        if (awayWRs != null && homeWRs != null && awayWRs.isNotEmpty() && homeWRs.isNotEmpty()) {
-            val maxWRs = minOf(awayWRs.size, homeWRs.size) // Show all receivers from JSON
-
-            for (i in 0 until maxWRs) {
-                val awayWR = awayWRs.getOrNull(i)?.jsonObject
-                val homeWR = homeWRs.getOrNull(i)?.jsonObject
-
-                if (awayWR != null && homeWR != null) {
-                    val awayWRName = awayWR.getString("name") ?: "-"
-                    val homeWRName = homeWR.getString("name") ?: "-"
-
-                    ThreeColumnRow(
-                        leftText = awayWRName,
-                        centerText = "WR",
-                        rightText = homeWRName,
-                        leftWeight = FontWeight.Bold,
-                        centerWeight = FontWeight.Bold,
-                        rightWeight = FontWeight.Bold
-                    )
-
-                    // Receiver Stats
-                    val receiverStats = listOf(
-                        "receiving_epa" to "Rec EPA",
-                        "receiving_yards" to "Rec Yds",
-                        "receiving_tds" to "Rec TDs",
-                        "receptions" to "Receptions",
-                        "yards_per_reception" to "Yds/Rec",
-                        "receiving_yards_per_game" to "Rec Yds/Game",
-                        "catch_pct" to "Catch %",
-                        "wopr" to "WOPR",
-                        "racr" to "RACR",
-                        "target_share" to "Target Share",
-                        "air_yards_share" to "Air Yards %"
-                    )
-
-                    receiverStats.forEach { (key, label) ->
-                        val awayStatObj = awayWR.getObject(key)
-                        val homeStatObj = homeWR.getObject(key)
-
-                        if (awayStatObj != null && homeStatObj != null) {
-                            val awayValue = awayStatObj.getDouble("value")
-                            val awayRank = awayStatObj.getInt("rank")
-                            val homeValue = homeStatObj.getDouble("value")
-                            val homeRank = homeStatObj.getInt("rank")
-
-                            val advantage = if (awayValue != null && homeValue != null) {
-                                when {
-                                    awayValue > homeValue -> -1
-                                    awayValue < homeValue -> 1
-                                    else -> 0
-                                }
-                            } else 0
-
-                            // Format based on stat type
-                            val decimals = when (key) {
-                                "receiving_yards", "receiving_tds", "receptions" -> 0
-                                "catch_pct", "receiving_yards_per_game", "air_yards_share" -> 1
-                                "yards_per_reception" -> 1
-                                "target_share" -> 3
-                                else -> 2
-                            }
-                            val awayText = awayValue?.let {
-                                if (decimals == 0) it.toInt().toString() else it.format(decimals)
-                            } ?: "-"
-                            val homeText = homeValue?.let {
-                                if (decimals == 0) it.toInt().toString() else it.format(decimals)
-                            } ?: "-"
-
-                            FiveColumnRowWithRanks(
-                                leftValue = awayText,
-                                leftRank = awayRank,
-                                centerText = label,
-                                rightValue = homeText,
-                                rightRank = homeRank,
-                                advantage = advantage,
-                                usePlayerRankColors = true
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(4.dp))
-                }
+        // Receivers
+        playerData.receivers.forEach { receiver ->
+            ThreeColumnRow(
+                leftText = receiver.awayName,
+                centerText = receiver.position,
+                rightText = receiver.homeName,
+                leftWeight = FontWeight.Bold,
+                centerWeight = FontWeight.Bold,
+                rightWeight = FontWeight.Bold
+            )
+            receiver.stats.forEach { stat ->
+                FiveColumnRowWithRanks(
+                    leftValue = stat.awayText,
+                    leftRank = stat.awayRank,
+                    centerText = stat.label,
+                    rightValue = stat.homeText,
+                    rightRank = stat.homeRank,
+                    advantage = stat.advantage,
+                    usePlayerRankColors = true
+                )
             }
+            Spacer(modifier = Modifier.height(4.dp))
         }
     }
 }
@@ -1338,32 +1640,44 @@ private fun PlayerStatsComparisonJson(
 private fun HeadToHeadComparison(
     awayTeam: String,
     homeTeam: String,
-    h2hMatchups: kotlinx.serialization.json.JsonArray
+    h2hMatchups: List<H2HGame>
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        h2hMatchups.forEach { matchupElement ->
-            val matchupObj = matchupElement.jsonObject
-            val week = matchupObj.getInt("week")
-            val finalScore = matchupObj.getString("finalScore")
-            val winner = matchupObj.getString("winner")
+    // Pre-compute all H2H row data to avoid string operations during composition
+    data class H2HRowData(
+        val leftText: String,
+        val centerText: String,
+        val rightText: String,
+        val advantage: Int
+    )
 
-            if (week != null && finalScore != null && winner != null) {
-                // Determine advantage based on winner
-                val advantage = when (winner.uppercase()) {
-                    awayTeam -> -1
-                    homeTeam -> 1
-                    else -> 0 // TIE or unknown
-                }
-
-                ThreeColumnRow(
-                    leftText = if (winner == awayTeam) "W" else if (winner == homeTeam) "L" else "T",
-                    centerText = "W$week: $finalScore",
-                    rightText = if (winner == homeTeam) "W" else if (winner == awayTeam) "L" else "T",
-                    advantage = advantage,
-                    centerMaxLines = 1,
-                    centerOverflow = androidx.compose.ui.text.style.TextOverflow.Visible
-                )
+    val h2hRows = remember(h2hMatchups, awayTeam, homeTeam) {
+        h2hMatchups.map { matchup ->
+            // Determine advantage based on winner
+            val advantage = when (matchup.winner.uppercase()) {
+                awayTeam -> -1
+                homeTeam -> 1
+                else -> 0 // TIE or unknown
             }
+
+            H2HRowData(
+                leftText = if (matchup.winner == awayTeam) "W" else if (matchup.winner == homeTeam) "L" else "T",
+                centerText = "W${matchup.week}: ${matchup.finalScore}",
+                rightText = if (matchup.winner == homeTeam) "W" else if (matchup.winner == awayTeam) "L" else "T",
+                advantage = advantage
+            )
+        }
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        h2hRows.forEach { row ->
+            ThreeColumnRow(
+                leftText = row.leftText,
+                centerText = row.centerText,
+                rightText = row.rightText,
+                advantage = row.advantage,
+                centerMaxLines = 1,
+                centerOverflow = androidx.compose.ui.text.style.TextOverflow.Visible
+            )
         }
     }
 }
@@ -1372,79 +1686,110 @@ private fun HeadToHeadComparison(
 private fun CommonOpponentsComparison(
     awayTeam: String,
     homeTeam: String,
-    commonOpponents: JsonObject
+    commonOpponents: CommonOpponents
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        // Iterate through each common opponent
-        commonOpponents.keys.forEach { opponentCode ->
-            val opponentData = commonOpponents.getObject(opponentCode)
-            if (opponentData != null) {
-                val awayGames = opponentData.get(awayTeam.lowercase())?.jsonArray
-                val homeGames = opponentData.get(homeTeam.lowercase())?.jsonArray
+    // Pre-compute all common opponent row data to avoid string operations during composition
+    data class CommonOpponentRowData(
+        val leftText: String,
+        val centerText: String,
+        val rightText: String,
+        val advantage: Int = 0,
+        val centerWeight: FontWeight = FontWeight.Normal,
+        val isHeader: Boolean = false
+    )
 
-                if (awayGames != null && homeGames != null) {
-                    // Opponent header
-                    ThreeColumnRow(
-                        leftText = "",
-                        centerText = opponentCode.uppercase(),
-                        rightText = "",
-                        centerWeight = FontWeight.Bold
-                    )
+    data class OpponentSection(
+        val header: CommonOpponentRowData,
+        val rows: List<CommonOpponentRowData>
+    )
 
-                    // Get max number of games
-                    val maxGames = maxOf(awayGames.size, homeGames.size)
+    val opponentSections = remember(commonOpponents, awayTeam, homeTeam) {
+        commonOpponents.mapNotNull { (opponentCode, opponentData) ->
+            val awayGames = opponentData[awayTeam.lowercase()] ?: emptyList()
+            val homeGames = opponentData[homeTeam.lowercase()] ?: emptyList()
 
-                    // Display all games for both teams
-                    for (i in 0 until maxGames) {
-                        val awayGame = awayGames.getOrNull(i)?.jsonObject
-                        val homeGame = homeGames.getOrNull(i)?.jsonObject
+            if (awayGames.isEmpty() && homeGames.isEmpty()) return@mapNotNull null
 
-                        val awayResult = awayGame?.getString("result") ?: ""
-                        val awayScore = awayGame?.getString("score") ?: ""
-                        val awayWeek = awayGame?.getInt("week")
+            // Create header row
+            val header = CommonOpponentRowData(
+                leftText = "",
+                centerText = opponentCode.uppercase(),
+                rightText = "",
+                advantage = 0,
+                centerWeight = FontWeight.Bold,
+                isHeader = true
+            )
 
-                        val homeResult = homeGame?.getString("result") ?: ""
-                        val homeScore = homeGame?.getString("score") ?: ""
-                        val homeWeek = homeGame?.getInt("week")
+            // Get max number of games
+            val maxGames = maxOf(awayGames.size, homeGames.size)
 
-                        // Format left side (away team)
-                        val leftText = if (awayGame != null) {
-                            "$awayResult $awayScore (W$awayWeek)"
-                        } else ""
+            // Create game rows
+            val rows = (0 until maxGames).map { i ->
+                val awayGame = awayGames.getOrNull(i)
+                val homeGame = homeGames.getOrNull(i)
 
-                        // Format right side (home team)
-                        val rightText = if (homeGame != null) {
-                            "$homeResult $homeScore (W$homeWeek)"
-                        } else ""
+                val awayResult = awayGame?.result ?: ""
+                val awayScore = awayGame?.score ?: ""
+                val awayWeek = awayGame?.week
 
-                        // Determine advantage based on result
-                        // Only show advantage when both teams played the opponent
-                        val advantage = when {
-                            // Both teams played - compare results
-                            awayResult == "W" && homeResult == "L" -> -1
-                            awayResult == "L" && homeResult == "W" -> 1
-                            awayResult == "W" && homeResult == "W" -> 0
-                            awayResult == "L" && homeResult == "L" -> 0
-                            awayResult == "T" && homeResult != "" -> 0
-                            homeResult == "T" && awayResult != "" -> 0
-                            // One team played, one didn't - only show advantage for W, not for non-play
-                            awayResult == "W" && homeResult == "" -> -1
-                            awayResult == "" && homeResult == "W" -> 1
-                            // Don't show advantage when comparing loss to non-play
-                            else -> 0
-                        }
+                val homeResult = homeGame?.result ?: ""
+                val homeScore = homeGame?.score ?: ""
+                val homeWeek = homeGame?.week
 
-                        ThreeColumnRow(
-                            leftText = leftText,
-                            centerText = "",
-                            rightText = rightText,
-                            advantage = advantage
-                        )
-                    }
+                // Format left side (away team)
+                val leftText = if (awayGame != null) {
+                    "$awayResult $awayScore (W$awayWeek)"
+                } else ""
 
-                    Spacer(modifier = Modifier.height(4.dp))
+                // Format right side (home team)
+                val rightText = if (homeGame != null) {
+                    "$homeResult $homeScore (W$homeWeek)"
+                } else ""
+
+                // Determine advantage based on result
+                val advantage = when {
+                    // Both teams played - compare results
+                    awayResult == "W" && homeResult == "L" -> -1
+                    awayResult == "L" && homeResult == "W" -> 1
+                    awayResult == "W" && homeResult == "W" -> 0
+                    awayResult == "L" && homeResult == "L" -> 0
+                    awayResult == "T" && homeResult != "" -> 0
+                    homeResult == "T" && awayResult != "" -> 0
+                    // One team played, one didn't - only show advantage for W, not for non-play
+                    awayResult == "W" && homeResult == "" -> -1
+                    awayResult == "" && homeResult == "W" -> 1
+                    // Don't show advantage when comparing loss to non-play
+                    else -> 0
                 }
+
+                CommonOpponentRowData(leftText, "", rightText, advantage)
             }
+
+            OpponentSection(header, rows)
+        }
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        opponentSections.forEach { section ->
+            // Opponent header
+            ThreeColumnRow(
+                leftText = section.header.leftText,
+                centerText = section.header.centerText,
+                rightText = section.header.rightText,
+                centerWeight = section.header.centerWeight
+            )
+
+            // Game rows
+            section.rows.forEach { row ->
+                ThreeColumnRow(
+                    leftText = row.leftText,
+                    centerText = row.centerText,
+                    rightText = row.rightText,
+                    advantage = row.advantage
+                )
+            }
+
+            Spacer(modifier = Modifier.height(4.dp))
         }
     }
 }
@@ -1457,9 +1802,9 @@ private fun ChartsTab(
 ) {
     val scrollState = rememberScrollState()
 
-    // Extract team data from JSON
-    val awayTeamData = matchup.getObject(awayTeam.lowercase())
-    val homeTeamData = matchup.getObject(homeTeam.lowercase())
+    // Extract team data from teams map
+    val awayTeamData = matchup.teams[awayTeam.lowercase()]
+    val homeTeamData = matchup.teams[homeTeam.lowercase()]
 
     if (awayTeamData == null || homeTeamData == null) {
         Box(
@@ -1471,45 +1816,404 @@ private fun ChartsTab(
         return
     }
 
-    // Extract team stats
-    val awayTeamStats = awayTeamData.getObject("team_stats")
-    val homeTeamStats = homeTeamData.getObject("team_stats")
-
-    if (awayTeamStats == null || homeTeamStats == null) {
-        Box(
-            modifier = Modifier.fillMaxSize(),
-            contentAlignment = Alignment.Center
-        ) {
-            Text("Chart data not available")
-        }
-        return
-    }
-
     Column(
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(scrollState)
-            .padding(vertical = 8.dp)
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(24.dp)
     ) {
         // Cumulative EPA Chart
-        CumulativeEPAChartV2(
+        CumulativeEPAChart(
             awayTeam = awayTeam,
             homeTeam = homeTeam,
-            awayTeamStats = awayTeamStats,
-            homeTeamStats = homeTeamStats
+            awayTeamData = awayTeamData,
+            homeTeamData = homeTeamData
         )
 
-        Spacer(modifier = Modifier.height(24.dp))
-
-        // Weekly EPA Scatter Plot
-        WeeklyEPAScatterPlotV2(
+        // Weekly EPA Scatter Plot (Offensive vs Defensive EPA)
+        WeeklyEPAScatterPlot(
             awayTeam = awayTeam,
             homeTeam = homeTeam,
-            awayTeamStats = awayTeamStats,
-            homeTeamStats = homeTeamStats
+            awayTeamData = awayTeamData,
+            homeTeamData = homeTeamData
         )
+    }
+}
 
-        Spacer(modifier = Modifier.height(16.dp))
+@Composable
+private fun CumulativeEPAChart(
+    awayTeam: String,
+    homeTeam: String,
+    awayTeamData: TeamData,
+    homeTeamData: TeamData
+) {
+    Text(
+        text = "Cumulative EPA Over Season",
+        style = MaterialTheme.typography.titleSmall,
+        fontWeight = FontWeight.Bold,
+        modifier = Modifier.padding(bottom = 8.dp)
+    )
+
+    val awayCumEPA = awayTeamData.team_stats.cum_epa_by_week
+    val homeCumEPA = homeTeamData.team_stats.cum_epa_by_week
+
+    if (awayCumEPA.isEmpty() || homeCumEPA.isEmpty()) {
+        Text(
+            text = "Cumulative EPA data not available",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        return
+    }
+
+    // Parse data points for line chart
+    val awayDataPoints = awayCumEPA.entries.mapNotNull { (weekKey, epaValue) ->
+        val weekNum = weekKey.removePrefix("week-").toIntOrNull()
+        if (weekNum != null) {
+            LineChartDataPoint(x = weekNum.toDouble(), y = epaValue)
+        } else null
+    }.sortedBy { it.x }
+
+    val homeDataPoints = homeCumEPA.entries.mapNotNull { (weekKey, epaValue) ->
+        val weekNum = weekKey.removePrefix("week-").toIntOrNull()
+        if (weekNum != null) {
+            LineChartDataPoint(x = weekNum.toDouble(), y = epaValue)
+        } else null
+    }.sortedBy { it.x }
+
+    // Create series with team colors
+    val series = listOf(
+        LineChartSeries(
+            label = awayTeam,
+            dataPoints = awayDataPoints,
+            color = "#2196F3" // Blue for away team
+        ),
+        LineChartSeries(
+            label = homeTeam,
+            dataPoints = homeDataPoints,
+            color = "#FF5722" // Deep Orange for home team
+        )
+    )
+
+    LineChartComponent(
+        series = series,
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(250.dp),
+        yAxisTitle = "Cumulative EPA"
+    )
+
+    // Add legend for team colors
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 8.dp),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(12.dp)
+                    .background(Team1Color, CircleShape)
+            )
+            Text(
+                text = awayTeam,
+                style = MaterialTheme.typography.bodySmall,
+                fontWeight = FontWeight.Medium
+            )
+        }
+
+        Spacer(modifier = Modifier.width(16.dp))
+
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(12.dp)
+                    .background(Team2Color, CircleShape)
+            )
+            Text(
+                text = homeTeam,
+                style = MaterialTheme.typography.bodySmall,
+                fontWeight = FontWeight.Medium
+            )
+        }
+    }
+}
+
+@Composable
+private fun EPAByWeekChart(
+    awayTeam: String,
+    homeTeam: String,
+    awayTeamData: TeamData,
+    homeTeamData: TeamData
+) {
+    Text(
+        text = "EPA Per Play by Week",
+        style = MaterialTheme.typography.titleSmall,
+        fontWeight = FontWeight.Bold,
+        modifier = Modifier.padding(bottom = 8.dp)
+    )
+
+    val awayEPAByWeek = awayTeamData.team_stats.epa_by_week
+    val homeEPAByWeek = homeTeamData.team_stats.epa_by_week
+
+    if (awayEPAByWeek.isEmpty() || homeEPAByWeek.isEmpty()) {
+        Text(
+            text = "EPA by week data not available",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        return
+    }
+
+    // Parse offensive EPA data points
+    val awayOffDataPoints = awayEPAByWeek.entries.mapNotNull { (weekKey, epa) ->
+        val weekNum = weekKey.removePrefix("week-").toIntOrNull()
+        val offEPA = epa.off
+        if (weekNum != null && offEPA != null) {
+            LineChartDataPoint(x = weekNum.toDouble(), y = offEPA)
+        } else null
+    }.sortedBy { it.x }
+
+    val homeOffDataPoints = homeEPAByWeek.entries.mapNotNull { (weekKey, epa) ->
+        val weekNum = weekKey.removePrefix("week-").toIntOrNull()
+        val offEPA = epa.off
+        if (weekNum != null && offEPA != null) {
+            LineChartDataPoint(x = weekNum.toDouble(), y = offEPA)
+        } else null
+    }.sortedBy { it.x }
+
+    // Parse defensive EPA data points (negate for better visualization - lower is better)
+    val awayDefDataPoints = awayEPAByWeek.entries.mapNotNull { (weekKey, epa) ->
+        val weekNum = weekKey.removePrefix("week-").toIntOrNull()
+        val defEPA = epa.def
+        if (weekNum != null && defEPA != null) {
+            LineChartDataPoint(x = weekNum.toDouble(), y = -defEPA) // Negate defensive EPA
+        } else null
+    }.sortedBy { it.x }
+
+    val homeDefDataPoints = homeEPAByWeek.entries.mapNotNull { (weekKey, epa) ->
+        val weekNum = weekKey.removePrefix("week-").toIntOrNull()
+        val defEPA = epa.def
+        if (weekNum != null && defEPA != null) {
+            LineChartDataPoint(x = weekNum.toDouble(), y = -defEPA) // Negate defensive EPA
+        } else null
+    }.sortedBy { it.x }
+
+    // Create series for both offense and defense
+    val series = listOf(
+        LineChartSeries(
+            label = "$awayTeam Offense",
+            dataPoints = awayOffDataPoints,
+            color = "#2196F3" // Blue for away team offense
+        ),
+        LineChartSeries(
+            label = "$homeTeam Offense",
+            dataPoints = homeOffDataPoints,
+            color = "#FF5722" // Deep Orange for home team offense
+        ),
+        LineChartSeries(
+            label = "$awayTeam Defense",
+            dataPoints = awayDefDataPoints,
+            color = "#64B5F6" // Light Blue for away team defense
+        ),
+        LineChartSeries(
+            label = "$homeTeam Defense",
+            dataPoints = homeDefDataPoints,
+            color = "#FF8A65" // Light Orange for home team defense
+        )
+    )
+
+    LineChartComponent(
+        series = series,
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(250.dp),
+        yAxisTitle = "EPA Per Play"
+    )
+
+    // Add note about defensive EPA
+    Text(
+        text = "Note: Defensive EPA is inverted (higher is better)",
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(top = 4.dp)
+    )
+}
+
+@Composable
+private fun WeeklyEPAScatterPlot(
+    awayTeam: String,
+    homeTeam: String,
+    awayTeamData: TeamData,
+    homeTeamData: TeamData
+) {
+    // State for selected week range
+    var selectedWeekRange by remember { mutableStateOf<IntRange?>(null) }
+
+    Text(
+        text = "Weekly Offensive vs Defensive EPA",
+        style = MaterialTheme.typography.titleSmall,
+        fontWeight = FontWeight.Bold,
+        modifier = Modifier.padding(bottom = 8.dp)
+    )
+
+    // Week range filter badges - horizontally scrollable
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState())
+            .padding(bottom = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        WeekRangeBadge(
+            label = "All Weeks",
+            isSelected = selectedWeekRange == null,
+            onClick = { selectedWeekRange = null }
+        )
+        WeekRangeBadge(
+            label = "Weeks 1-6",
+            isSelected = selectedWeekRange == 1..6,
+            onClick = { selectedWeekRange = 1..6 }
+        )
+        WeekRangeBadge(
+            label = "Weeks 7-12",
+            isSelected = selectedWeekRange == 7..12,
+            onClick = { selectedWeekRange = 7..12 }
+        )
+        WeekRangeBadge(
+            label = "Weeks 13-18",
+            isSelected = selectedWeekRange == 13..18,
+            onClick = { selectedWeekRange = 13..18 }
+        )
+    }
+
+    val awayEPAByWeek = awayTeamData.team_stats.epa_by_week
+    val homeEPAByWeek = homeTeamData.team_stats.epa_by_week
+
+    if (awayEPAByWeek.isEmpty() || homeEPAByWeek.isEmpty()) {
+        Text(
+            text = "Weekly EPA data not available",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        return
+    }
+
+    // Parse scatter plot data points
+    val awayPoints = awayEPAByWeek.entries.mapNotNull { (weekKey, epa) ->
+        val weekNum = weekKey.removePrefix("week-").toIntOrNull()
+        val offEPA = epa.off
+        val defEPA = epa.def
+
+        if (weekNum != null && offEPA != null && defEPA != null) {
+            ScatterPlotDataPoint(
+                label = "$awayTeam W$weekNum",
+                x = offEPA,
+                y = defEPA,
+                sum = offEPA + defEPA,
+                teamCode = awayTeam,
+                color = "#2196F3" // Blue for away team
+            )
+        } else null
+    }
+
+    val homePoints = homeEPAByWeek.entries.mapNotNull { (weekKey, epa) ->
+        val weekNum = weekKey.removePrefix("week-").toIntOrNull()
+        val offEPA = epa.off
+        val defEPA = epa.def
+
+        if (weekNum != null && offEPA != null && defEPA != null) {
+            ScatterPlotDataPoint(
+                label = "$homeTeam W$weekNum",
+                x = offEPA,
+                y = defEPA,
+                sum = offEPA + defEPA,
+                teamCode = homeTeam,
+                color = "#FF5722" // Deep Orange for home team
+            )
+        } else null
+    }
+
+    // Build highlighted labels set based on selected week range
+    val weekRange = selectedWeekRange
+    val highlightedLabels = if (weekRange != null) {
+        (awayPoints + homePoints)
+            .filter { point ->
+                val weekMatch = "W(\\d+)".toRegex().find(point.label)
+                weekMatch?.groupValues?.get(1)?.toIntOrNull()?.let { week ->
+                    week in weekRange
+                } ?: false
+            }
+            .map { it.label }
+            .toSet()
+    } else {
+        emptySet()
+    }
+
+    QuadrantScatterPlot(
+        data = awayPoints + homePoints,
+        modifier = Modifier.fillMaxWidth(),
+        title = "",
+        xAxisLabel = "Offensive EPA",
+        yAxisLabel = "Defensive EPA",
+        invertYAxis = false,
+        highlightedPlayerLabels = highlightedLabels,
+        quadrantTopRight = QuadrantConfig(label = "Elite", color = "#4CAF50", lightModeColor = "#4CAF50"),
+        quadrantTopLeft = QuadrantConfig(label = "Good Defense", color = "#FFEB3B", lightModeColor = "#FFEB3B"),
+        quadrantBottomLeft = QuadrantConfig(label = "Poor", color = "#F44336", lightModeColor = "#F44336"),
+        quadrantBottomRight = QuadrantConfig(label = "Good Offense", color = "#FF9800", lightModeColor = "#FF9800")
+    )
+
+    // Add legend for team colors
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 8.dp),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(12.dp)
+                    .background(Team1Color, CircleShape)
+            )
+            Text(
+                text = awayTeam,
+                style = MaterialTheme.typography.bodySmall,
+                fontWeight = FontWeight.Medium
+            )
+        }
+
+        Spacer(modifier = Modifier.width(16.dp))
+
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(12.dp)
+                    .background(Team2Color, CircleShape)
+            )
+            Text(
+                text = homeTeam,
+                style = MaterialTheme.typography.bodySmall,
+                fontWeight = FontWeight.Medium
+            )
+        }
     }
 }
 

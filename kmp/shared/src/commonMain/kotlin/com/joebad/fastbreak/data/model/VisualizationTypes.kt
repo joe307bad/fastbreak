@@ -265,14 +265,127 @@ data class GameOddsV2(
 )
 
 @Serializable
+data class H2HGame(
+    val week: Int,
+    val winner: String,  // Team abbreviation of the winner
+    val finalScore: String  // e.g., "27-19"
+)
+
+@Serializable
 data class CommonOpponentGame(
     val week: Int,
     val result: String, // "W" or "L"
     val score: String   // e.g., "27-19"
 )
 
-// Using JsonObject to handle dynamic team properties
-typealias MatchupV2 = kotlinx.serialization.json.JsonObject
+@Serializable
+data class StatValue(
+    val value: Double? = null,
+    val rank: Int? = null
+)
+
+@Serializable
+data class CurrentTeamStats(
+    val offense: Map<String, StatValue>,
+    val defense: Map<String, StatValue>
+)
+
+@Serializable
+data class TeamStats(
+    val cum_epa_by_week: Map<String, Double> = emptyMap(), // e.g., "week-1" -> 0.5
+    val epa_by_week: Map<String, EPAByWeek> = emptyMap(),  // e.g., "week-1" -> { off: 0.1, def: -0.2 }
+    val current: CurrentTeamStats
+)
+
+@Serializable
+data class PlayerStatValue(
+    val value: Double? = null,
+    val rank: Int? = null
+)
+
+@Serializable
+data class QBPlayerStats(
+    val name: String,
+    val total_epa: PlayerStatValue,
+    val passing_yards: PlayerStatValue,
+    val passing_tds: PlayerStatValue,
+    val completion_pct: PlayerStatValue,
+    val passing_cpoe: PlayerStatValue,
+    val pacr: PlayerStatValue,
+    val passing_yards_per_game: PlayerStatValue,
+    val interceptions: PlayerStatValue
+)
+
+@Serializable
+data class RBPlayerStats(
+    val name: String,
+    val rushing_epa: PlayerStatValue,
+    val rushing_yards: PlayerStatValue,
+    val rushing_tds: PlayerStatValue,
+    val yards_per_carry: PlayerStatValue,
+    val rushing_yards_per_game: PlayerStatValue,
+    val receptions: PlayerStatValue,
+    val receiving_yards: PlayerStatValue,
+    val receiving_tds: PlayerStatValue,
+    val receiving_yards_per_game: PlayerStatValue,
+    val target_share: PlayerStatValue
+)
+
+@Serializable
+data class ReceiverPlayerStats(
+    val name: String,
+    val receiving_epa: PlayerStatValue,
+    val receiving_yards: PlayerStatValue,
+    val receiving_tds: PlayerStatValue,
+    val receptions: PlayerStatValue,
+    val yards_per_reception: PlayerStatValue,
+    val receiving_yards_per_game: PlayerStatValue,
+    val catch_pct: PlayerStatValue,
+    val wopr: PlayerStatValue,
+    val racr: PlayerStatValue,
+    val target_share: PlayerStatValue,
+    val air_yards_share: PlayerStatValue
+)
+
+@Serializable
+data class TeamPlayers(
+    val qb: QBPlayerStats? = null,
+    val rbs: List<RBPlayerStats> = emptyList(),
+    val receivers: List<ReceiverPlayerStats> = emptyList()
+)
+
+@Serializable
+data class TeamData(
+    val team_stats: TeamStats,
+    val players: TeamPlayers
+)
+
+@Serializable
+data class OddsData(
+    val home_spread: String? = null,
+    val home_moneyline: String? = null,
+    val away_moneyline: String? = null,
+    val over_under: String? = null
+)
+
+@Serializable
+data class TeamGameResult(
+    val week: Int,
+    val result: String,  // "W", "L", or "T"
+    val score: String    // e.g., "27-24"
+)
+
+// Common opponents are structured as: Map<opponent_code, Map<team_code, List<TeamGameResult>>>
+// For example: { "KC": { "buf": [{week:1, result:"W", score:"31-10"}], "mia": [{week:3, result:"L", score:"21-24"}] } }
+typealias CommonOpponents = Map<String, Map<String, List<TeamGameResult>>>
+
+@Serializable
+data class MatchupV2(
+    val odds: OddsData? = null,
+    val h2h_record: List<H2HGame> = emptyList(),
+    val common_opponents: CommonOpponents? = null,
+    val teams: Map<String, TeamData>
+)
 
 @Serializable
 data class MatchupV2Visualization(

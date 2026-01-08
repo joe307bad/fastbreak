@@ -85,7 +85,8 @@ player_stats_weekly <- tryCatch({
       passing_first_downs = sum(passing_first_downs, na.rm = TRUE),
       sacks_suffered = sum(sacks_suffered, na.rm = TRUE),
       .groups = "drop"
-    )
+    ) %>%
+    mutate(team = ifelse(team == "LA", "LAR", team))
 }, error = function(e) {
   cat("Error loading team stats:", e$message, "\n")
   stop(e)
@@ -332,7 +333,8 @@ player_stats_filtered <- player_stats %>%
     (position == "QB" & games >= MIN_GAMES_QB) |
     (position == "RB" & games >= MIN_GAMES_RB) |
     (position %in% c("WR", "TE") & games >= MIN_GAMES_WR)
-  )
+  ) %>%
+  mutate(team = ifelse(team == "LA", "LAR", team))
 
 cat("Filtered to", nrow(player_stats_filtered), "players meeting snap thresholds\n")
 
@@ -683,12 +685,12 @@ if (!is.null(scoreboard_resp) && !is.null(scoreboard_resp$events)) {
           # Normalize team abbreviations (ESPN -> nflreadr format)
           home_abbr_norm <- case_when(
             home_abbr == "WSH" ~ "WAS",
-            home_abbr == "LAR" ~ "LA",
+            home_abbr == "LAR" ~ "LAR",  # Keep as LAR to match our data processing
             TRUE ~ home_abbr
           )
           away_abbr_norm <- case_when(
             away_abbr == "WSH" ~ "WAS",
-            away_abbr == "LAR" ~ "LA",
+            away_abbr == "LAR" ~ "LAR",  # Keep as LAR to match our data processing
             TRUE ~ away_abbr
           )
 
@@ -855,12 +857,30 @@ extract_odds_from_response <- function(odds_response) {
     }
   }
 
+  # Format all odds as strings for JSON serialization
+  # Format spreads with proper sign (e.g., "-3.5", "+3.5")
+  format_spread <- function(x) {
+    if (is.null(x) || is.na(x)) return(NULL)
+    val <- as.numeric(x)
+    if (val > 0) {
+      sprintf("+%.1f", val)
+    } else {
+      sprintf("%.1f", val)
+    }
+  }
+
+  # Format moneylines and over/under as strings
+  format_odds <- function(x) {
+    if (is.null(x) || is.na(x)) return(NULL)
+    as.character(x)
+  }
+
   return(list(
-    home_spread = home_spread,
-    home_moneyline = home_moneyline,
-    away_spread = away_spread,
-    away_moneyline = away_moneyline,
-    over_under = over_under
+    home_spread = format_spread(home_spread),
+    home_moneyline = format_odds(home_moneyline),
+    away_spread = format_spread(away_spread),
+    away_moneyline = format_odds(away_moneyline),
+    over_under = format_odds(over_under)
   ))
 }
 
@@ -894,14 +914,22 @@ get_odds_for_game <- function(home_team, away_team, game_id = NULL) {
 
 # Helper function to calculate head-to-head record
 get_h2h_record <- function(team1, team2, schedules_df) {
+  # Normalize team abbreviations for schedules data (reverse the LA->LAR normalization)
+  normalize_for_schedule <- function(team) {
+    ifelse(team == "LAR", "LA", team)
+  }
+
+  team1_sched <- normalize_for_schedule(team1)
+  team2_sched <- normalize_for_schedule(team2)
+
   # Find completed games between these two teams
   h2h_games <- schedules_df %>%
     filter(
       game_type == "REG",
       !is.na(home_score),
       !is.na(away_score),
-      (home_team == team1 & away_team == team2) |
-      (home_team == team2 & away_team == team1)
+      (home_team == team1_sched & away_team == team2_sched) |
+      (home_team == team2_sched & away_team == team1_sched)
     )
 
   if (nrow(h2h_games) == 0) {
@@ -939,41 +967,60 @@ get_h2h_record <- function(team1, team2, schedules_df) {
 
 # Helper function to find common opponents
 get_common_opponents <- function(team1, team2, schedules_df) {
+  # Normalize team abbreviations for schedules data (reverse the LA->LAR normalization)
+  # The schedules data uses "LA" while our processed data uses "LAR"
+  normalize_for_schedule <- function(team) {
+    ifelse(team == "LAR", "LA", team)
+  }
+
+  team1_sched <- normalize_for_schedule(team1)
+  team2_sched <- normalize_for_schedule(team2)
+
   # Get completed games only
   completed <- schedules_df %>%
     filter(game_type == "REG", !is.na(home_score), !is.na(away_score))
 
+  # Return empty list if no completed games
+  if (nrow(completed) == 0) {
+    return(list())
+  }
+
   # Find all opponents for team1 (excluding team2)
   team1_games <- completed %>%
-    filter(home_team == team1 | away_team == team1) %>%
+    filter(home_team == team1_sched | away_team == team1_sched) %>%
     mutate(
-      opponent = ifelse(home_team == team1, away_team, home_team),
-      team1_score = ifelse(home_team == team1, home_score, away_score),
-      opp_score = ifelse(home_team == team1, away_score, home_score),
+      opponent = ifelse(home_team == team1_sched, away_team, home_team),
+      team1_score = ifelse(home_team == team1_sched, home_score, away_score),
+      opp_score = ifelse(home_team == team1_sched, away_score, home_score),
       result = case_when(
         team1_score > opp_score ~ "W",
         team1_score < opp_score ~ "L",
         TRUE ~ "T"
       )
     ) %>%
-    filter(opponent != team2) %>%
+    filter(opponent != team2_sched) %>%
     select(week, opponent, result, team1_score, opp_score)
 
   # Find all opponents for team2 (excluding team1)
   team2_games <- completed %>%
-    filter(home_team == team2 | away_team == team2) %>%
+    filter(home_team == team2_sched | away_team == team2_sched) %>%
     mutate(
-      opponent = ifelse(home_team == team2, away_team, home_team),
-      team2_score = ifelse(home_team == team2, home_score, away_score),
-      opp_score = ifelse(home_team == team2, away_score, home_score),
+      opponent = ifelse(home_team == team2_sched, away_team, home_team),
+      team2_score = ifelse(home_team == team2_sched, home_score, away_score),
+      opp_score = ifelse(home_team == team2_sched, away_score, home_score),
       result = case_when(
         team2_score > opp_score ~ "W",
         team2_score < opp_score ~ "L",
         TRUE ~ "T"
       )
     ) %>%
-    filter(opponent != team1) %>%
+    filter(opponent != team1_sched) %>%
     select(week, opponent, result, team2_score, opp_score)
+
+  # Return empty list if either team has no games
+  if (nrow(team1_games) == 0 || nrow(team2_games) == 0) {
+    return(list())
+  }
 
   # Find common opponents (allow many-to-many for division games)
   common_opps <- inner_join(
@@ -1046,31 +1093,42 @@ build_team_json <- function(team_abbr, cum_epa_df, season_totals, top_players_df
     filter(team == team_abbr) %>%
     select(week, cum_epa)
 
-  cum_epa_list <- setNames(
-    as.list(round(team_cum_epa$cum_epa, 2)),
-    paste0("week-", team_cum_epa$week)
-  )
+  # Handle case where there's no cumulative EPA data (e.g., playoffs with only regular season data)
+  cum_epa_list <- if (nrow(team_cum_epa) > 0) {
+    setNames(
+      as.list(round(team_cum_epa$cum_epa, 2)),
+      paste0("week-", team_cum_epa$week)
+    )
+  } else {
+    list()  # Empty list if no data available
+  }
 
   # Get EPA per play by week (off and def for each week)
   team_weekly <- weekly_stats %>%
     filter(team == team_abbr)
 
-  epa_by_week_list <- lapply(1:nrow(team_weekly), function(i) {
-    # Calculate EPA per play
-    off_epa_per_play <- if (!is.na(team_weekly$off_epa_total[i]) && !is.na(team_weekly$off_plays[i]) && team_weekly$off_plays[i] > 0) {
-      round(team_weekly$off_epa_total[i] / team_weekly$off_plays[i], 4)
-    } else NULL
+  # Handle case where there's no weekly EPA data
+  epa_by_week_list <- if (nrow(team_weekly) > 0) {
+    epa_list <- lapply(1:nrow(team_weekly), function(i) {
+      # Calculate EPA per play
+      off_epa_per_play <- if (!is.na(team_weekly$off_epa_total[i]) && !is.na(team_weekly$off_plays[i]) && team_weekly$off_plays[i] > 0) {
+        round(team_weekly$off_epa_total[i] / team_weekly$off_plays[i], 4)
+      } else NULL
 
-    def_epa_per_play <- if (!is.na(team_weekly$def_epa_total[i]) && !is.na(team_weekly$def_plays[i]) && team_weekly$def_plays[i] > 0) {
-      round(team_weekly$def_epa_total[i] / team_weekly$def_plays[i], 4)
-    } else NULL
+      def_epa_per_play <- if (!is.na(team_weekly$def_epa_total[i]) && !is.na(team_weekly$def_plays[i]) && team_weekly$def_plays[i] > 0) {
+        round(team_weekly$def_epa_total[i] / team_weekly$def_plays[i], 4)
+      } else NULL
 
-    list(
-      off = off_epa_per_play,
-      def = def_epa_per_play
-    )
-  })
-  names(epa_by_week_list) <- paste0("week-", team_weekly$week)
+      list(
+        off = off_epa_per_play,
+        def = def_epa_per_play
+      )
+    })
+    names(epa_list) <- paste0("week-", team_weekly$week)
+    epa_list
+  } else {
+    list()  # Empty list if no data available
+  }
 
   # Get current season stats
   team_totals <- season_totals %>%
@@ -1212,10 +1270,11 @@ for (i in 1:nrow(current_week_games)) {
   matchup <- list(
     odds = odds,
     h2h_record = I(h2h),  # Use I() to prevent auto_unbox from converting empty list to null
-    common_opponents = common_opps
+    common_opponents = common_opps,
+    teams = list()
   )
-  matchup[[tolower(home_team)]] <- home_json
-  matchup[[tolower(away_team)]] <- away_json
+  matchup$teams[[tolower(home_team)]] <- home_json
+  matchup$teams[[tolower(away_team)]] <- away_json
 
   matchups_json[[matchup_key]] <- matchup
 }

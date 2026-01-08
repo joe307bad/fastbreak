@@ -31,14 +31,37 @@ pbp_data <- tryCatch({
 
 cat("Loaded", nrow(pbp_data), "plays from play-by-play data\n")
 
-# Calculate offensive EPA by week from play-by-play data
-# Filter to only pass and run plays (standard EPA calculation)
-offense_epa_weekly <- pbp_data %>%
-  filter(!is.na(epa), !is.na(posteam), play_type %in% c("pass", "run")) %>%
+# Calculate comprehensive offensive stats by week from play-by-play data
+offense_weekly <- pbp_data %>%
+  filter(!is.na(posteam)) %>%
   group_by(posteam, week) %>%
   summarise(
-    off_epa_total = sum(epa, na.rm = TRUE),
-    off_plays = n(),
+    # EPA stats (only pass and run plays)
+    off_epa_total = sum(epa[play_type %in% c("pass", "run")], na.rm = TRUE),
+    off_plays = sum(play_type %in% c("pass", "run"), na.rm = TRUE),
+
+    # Yards stats
+    total_yards = sum(yards_gained, na.rm = TRUE),
+    pass_yards = sum(yards_gained[play_type == "pass"], na.rm = TRUE),
+    rush_yards = sum(yards_gained[play_type == "run"], na.rm = TRUE),
+
+    # Scoring stats
+    points_scored = sum(posteam_score_post - posteam_score, na.rm = TRUE),
+    touchdowns = sum(touchdown == 1, na.rm = TRUE),
+
+    # Play counts
+    total_plays = n(),
+    pass_plays = sum(play_type == "pass", na.rm = TRUE),
+    rush_plays = sum(play_type == "run", na.rm = TRUE),
+
+    # Efficiency stats
+    third_down_conversions = sum(third_down_converted == 1, na.rm = TRUE),
+    third_down_attempts = sum(!is.na(third_down_converted), na.rm = TRUE),
+
+    # Turnover stats
+    interceptions_thrown = sum(interception == 1, na.rm = TRUE),
+    fumbles_lost = sum(fumble_lost == 1, na.rm = TRUE),
+
     .groups = "drop"
   ) %>%
   rename(team = posteam) %>%
@@ -68,14 +91,34 @@ player_stats_weekly <- tryCatch({
   stop(e)
 })
 
-# Calculate defensive EPA per play by week from play-by-play data
-# Filter to only pass and run plays (standard EPA calculation)
-defense_epa_weekly <- pbp_data %>%
-  filter(!is.na(epa), !is.na(defteam), play_type %in% c("pass", "run")) %>%
+# Calculate comprehensive defensive stats by week from play-by-play data
+defense_weekly <- pbp_data %>%
+  filter(!is.na(defteam)) %>%
   group_by(defteam, week) %>%
   summarise(
-    def_epa_total = sum(epa, na.rm = TRUE),
-    def_plays = n(),
+    # EPA stats (only pass and run plays)
+    def_epa_total = sum(epa[play_type %in% c("pass", "run")], na.rm = TRUE),
+    def_plays = sum(play_type %in% c("pass", "run"), na.rm = TRUE),
+
+    # Yards allowed stats
+    total_yards_allowed = sum(yards_gained, na.rm = TRUE),
+    pass_yards_allowed = sum(yards_gained[play_type == "pass"], na.rm = TRUE),
+    rush_yards_allowed = sum(yards_gained[play_type == "run"], na.rm = TRUE),
+
+    # Scoring defense stats
+    points_allowed = sum(posteam_score_post - posteam_score, na.rm = TRUE),
+    touchdowns_allowed = sum(touchdown == 1, na.rm = TRUE),
+
+    # Defensive playmaking
+    sacks_made = sum(sack == 1, na.rm = TRUE),
+    interceptions_made = sum(interception == 1, na.rm = TRUE),
+    fumbles_forced = sum(fumble == 1, na.rm = TRUE),
+    fumbles_recovered = sum(fumble_lost == 1, na.rm = TRUE),
+
+    # Efficiency defense
+    third_down_conversions_allowed = sum(third_down_converted == 1, na.rm = TRUE),
+    third_down_attempts_def = sum(!is.na(third_down_converted), na.rm = TRUE),
+
     .groups = "drop"
   ) %>%
   rename(team = defteam) %>%
@@ -83,8 +126,8 @@ defense_epa_weekly <- pbp_data %>%
 
 # Join all stats together
 team_stats_weekly <- player_stats_weekly %>%
-  left_join(offense_epa_weekly, by = c("team", "week")) %>%
-  left_join(defense_epa_weekly, by = c("team", "week"))
+  left_join(offense_weekly, by = c("team", "week")) %>%
+  left_join(defense_weekly, by = c("team", "week"))
 
 cat("Loaded weekly team stats:", nrow(team_stats_weekly), "rows\n")
 
@@ -92,6 +135,7 @@ cat("Loaded weekly team stats:", nrow(team_stats_weekly), "rows\n")
 team_season_totals <- team_stats_weekly %>%
   group_by(team) %>%
   summarise(
+    # Player-level aggregates
     passing_epa_total = sum(passing_epa_total, na.rm = TRUE),
     passing_attempts = sum(passing_attempts, na.rm = TRUE),
     rushing_epa_total = sum(rushing_epa_total, na.rm = TRUE),
@@ -102,29 +146,93 @@ team_season_totals <- team_stats_weekly %>%
     pacr = mean(pacr, na.rm = TRUE),
     passing_first_downs = sum(passing_first_downs, na.rm = TRUE),
     sacks_suffered = sum(sacks_suffered, na.rm = TRUE),
+
+    # Offensive totals
     off_epa_total = sum(off_epa_total, na.rm = TRUE),
     off_plays = sum(off_plays, na.rm = TRUE),
+    total_yards = sum(total_yards, na.rm = TRUE),
+    pass_yards = sum(pass_yards, na.rm = TRUE),
+    rush_yards = sum(rush_yards, na.rm = TRUE),
+    points_scored = sum(points_scored, na.rm = TRUE),
+    touchdowns = sum(touchdowns, na.rm = TRUE),
+    total_plays = sum(total_plays, na.rm = TRUE),
+    third_down_conversions = sum(third_down_conversions, na.rm = TRUE),
+    third_down_attempts = sum(third_down_attempts, na.rm = TRUE),
+    interceptions_thrown = sum(interceptions_thrown, na.rm = TRUE),
+    fumbles_lost = sum(fumbles_lost, na.rm = TRUE),
+
+    # Defensive totals
     def_epa_total = sum(def_epa_total, na.rm = TRUE),
     def_plays = sum(def_plays, na.rm = TRUE),
+    total_yards_allowed = sum(total_yards_allowed, na.rm = TRUE),
+    pass_yards_allowed = sum(pass_yards_allowed, na.rm = TRUE),
+    rush_yards_allowed = sum(rush_yards_allowed, na.rm = TRUE),
+    points_allowed = sum(points_allowed, na.rm = TRUE),
+    touchdowns_allowed = sum(touchdowns_allowed, na.rm = TRUE),
+    sacks_made = sum(sacks_made, na.rm = TRUE),
+    interceptions_made = sum(interceptions_made, na.rm = TRUE),
+    fumbles_forced = sum(fumbles_forced, na.rm = TRUE),
+    third_down_conversions_allowed = sum(third_down_conversions_allowed, na.rm = TRUE),
+    third_down_attempts_def = sum(third_down_attempts_def, na.rm = TRUE),
+
+    # Number of games played for per-game calculations
+    games_played = n_distinct(week),
+
     .groups = "drop"
   ) %>%
   mutate(
-    # Calculate EPA per play for offense and defense
+    # Offensive per-play/per-game stats
     off_epa = if_else(off_plays > 0, off_epa_total / off_plays, NA_real_),
+    yards_per_game = if_else(games_played > 0, total_yards / games_played, NA_real_),
+    pass_yards_per_game = if_else(games_played > 0, pass_yards / games_played, NA_real_),
+    rush_yards_per_game = if_else(games_played > 0, rush_yards / games_played, NA_real_),
+    points_per_game = if_else(games_played > 0, points_scored / games_played, NA_real_),
+    yards_per_play = if_else(total_plays > 0, total_yards / total_plays, NA_real_),
+    third_down_pct = if_else(third_down_attempts > 0, third_down_conversions / third_down_attempts * 100, NA_real_),
+    turnover_differential = (interceptions_made + fumbles_forced) - (interceptions_thrown + fumbles_lost),
+
+    # Defensive per-play/per-game stats
     def_epa = if_else(def_plays > 0, def_epa_total / def_plays, NA_real_),
-    # Calculate EPA per attempt/carry/target for passing/rushing/receiving
-    passing_epa = if_else(passing_attempts > 0, passing_epa_total / passing_attempts, NA_real_),
+    yards_allowed_per_game = if_else(games_played > 0, total_yards_allowed / games_played, NA_real_),
+    pass_yards_allowed_per_game = if_else(games_played > 0, pass_yards_allowed / games_played, NA_real_),
+    rush_yards_allowed_per_game = if_else(games_played > 0, rush_yards_allowed / games_played, NA_real_),
+    points_allowed_per_game = if_else(games_played > 0, points_allowed / games_played, NA_real_),
+    third_down_pct_def = if_else(third_down_attempts_def > 0, third_down_conversions_allowed / third_down_attempts_def * 100, NA_real_),
+
+    # EPA-based stats for player metrics
     rushing_epa = if_else(rushing_carries > 0, rushing_epa_total / rushing_carries, NA_real_),
     receiving_epa = if_else(receiving_targets > 0, receiving_epa_total / receiving_targets, NA_real_),
-    passing_epa_rank = rank(-passing_epa),
+
+    # Offensive ranks
+    off_epa_rank = rank(-off_epa),
+    yards_per_game_rank = rank(-yards_per_game),
+    pass_yards_per_game_rank = rank(-pass_yards_per_game),
+    rush_yards_per_game_rank = rank(-rush_yards_per_game),
+    points_per_game_rank = rank(-points_per_game),
+    yards_per_play_rank = rank(-yards_per_play),
+    third_down_pct_rank = rank(-third_down_pct),
     rushing_epa_rank = rank(-rushing_epa),
     receiving_epa_rank = rank(-receiving_epa),
-    passing_cpoe_rank = rank(-passing_cpoe),
     pacr_rank = rank(-pacr),
     passing_first_downs_rank = rank(-passing_first_downs),
     sacks_suffered_rank = rank(sacks_suffered),
-    off_epa_rank = rank(-off_epa),
-    def_epa_rank = rank(def_epa)  # Lower defensive EPA is better
+    touchdowns_rank = rank(-touchdowns),
+    interceptions_thrown_rank = rank(interceptions_thrown),
+    fumbles_lost_rank = rank(fumbles_lost),
+    turnovers_rank = rank(interceptions_thrown + fumbles_lost),
+
+    # Defensive ranks (lower is better)
+    def_epa_rank = rank(def_epa),
+    yards_allowed_per_game_rank = rank(yards_allowed_per_game),
+    pass_yards_allowed_per_game_rank = rank(pass_yards_allowed_per_game),
+    rush_yards_allowed_per_game_rank = rank(rush_yards_allowed_per_game),
+    points_allowed_per_game_rank = rank(points_allowed_per_game),
+    third_down_pct_def_rank = rank(third_down_pct_def),
+    sacks_made_rank = rank(-sacks_made),
+    interceptions_made_rank = rank(-interceptions_made),
+    fumbles_forced_rank = rank(-fumbles_forced),
+    touchdowns_allowed_rank = rank(touchdowns_allowed),
+    turnover_differential_rank = rank(-turnover_differential)
   )
 
 cat("Calculated season totals for", nrow(team_season_totals), "teams\n")
@@ -164,19 +272,31 @@ player_stats_filtered <- player_stats %>%
   group_by(player_id, player_name, team, position) %>%
   summarise(
     games = n_distinct(week),
-    # QB stats (EPA per attempt/carry - includes passing and rushing)
+
+    # QB stats - comprehensive passing stats
     passing_epa_total = sum(passing_epa, na.rm = TRUE),
     passing_attempts = sum(attempts, na.rm = TRUE),
+    completions = sum(completions, na.rm = TRUE),
+    passing_yards = sum(passing_yards, na.rm = TRUE),
+    passing_tds = sum(passing_tds, na.rm = TRUE),
+    interceptions = sum(passing_interceptions, na.rm = TRUE),
     passing_cpoe = mean(passing_cpoe, na.rm = TRUE),
     pacr = mean(pacr, na.rm = TRUE),
     passing_air_yards = sum(passing_air_yards, na.rm = TRUE),
-    # RB stats (EPA per carry/target)
+
+    # RB stats - comprehensive rushing and receiving stats
     rushing_epa_total = sum(rushing_epa, na.rm = TRUE),
+    rushing_yards = sum(rushing_yards, na.rm = TRUE),
+    rushing_tds = sum(rushing_tds, na.rm = TRUE),
     rushing_first_downs = sum(rushing_first_downs, na.rm = TRUE),
     carries = sum(carries, na.rm = TRUE),
     receiving_epa_total = sum(receiving_epa, na.rm = TRUE),
+    receptions = sum(receptions, na.rm = TRUE),
+    receiving_yards = sum(receiving_yards, na.rm = TRUE),
+    receiving_tds = sum(receiving_tds, na.rm = TRUE),
     targets = sum(targets, na.rm = TRUE),
-    # WR/TE stats
+
+    # WR/TE stats - comprehensive receiving stats
     wopr = mean(wopr, na.rm = TRUE),
     racr = mean(racr, na.rm = TRUE),
     air_yards_share = mean(air_yards_share, na.rm = TRUE),
@@ -187,6 +307,22 @@ player_stats_filtered <- player_stats %>%
     passing_epa = if_else(passing_attempts > 0, passing_epa_total / passing_attempts, NA_real_),
     rushing_epa = if_else(carries > 0, rushing_epa_total / carries, NA_real_),
     receiving_epa = if_else(targets > 0, receiving_epa_total / targets, NA_real_),
+
+    # QB per-game and efficiency stats
+    completion_pct = if_else(passing_attempts > 0, completions / passing_attempts * 100, NA_real_),
+    passing_yards_per_game = if_else(games > 0, passing_yards / games, NA_real_),
+    passing_tds_per_game = if_else(games > 0, passing_tds / games, NA_real_),
+
+    # RB per-game and efficiency stats
+    rushing_yards_per_carry = if_else(carries > 0, rushing_yards / carries, NA_real_),
+    rushing_yards_per_game = if_else(games > 0, rushing_yards / games, NA_real_),
+    rushing_tds_per_game = if_else(games > 0, rushing_tds / games, NA_real_),
+    receiving_yards_per_game = if_else(games > 0, receiving_yards / games, NA_real_),
+
+    # WR/TE per-game and efficiency stats
+    receiving_yards_per_reception = if_else(receptions > 0, receiving_yards / receptions, NA_real_),
+    catch_pct = if_else(targets > 0, receptions / targets * 100, NA_real_),
+
     # For QBs: total EPA per play (passing + rushing combined)
     qb_total_plays = if_else(position == "QB", passing_attempts + carries, NA_real_),
     qb_total_epa = if_else(position == "QB", passing_epa_total + rushing_epa_total, NA_real_),
@@ -204,20 +340,38 @@ cat("Filtered to", nrow(player_stats_filtered), "players meeting snap thresholds
 player_stats_ranked <- player_stats_filtered %>%
   group_by(position) %>%
   mutate(
-    # QB ranks
+    # QB ranks - comprehensive stats
     qb_epa_per_play_rank = if_else(position == "QB", rank(-qb_epa_per_play), NA_real_),
     passing_epa_rank = if_else(position == "QB", rank(-passing_epa), NA_real_),
     passing_cpoe_rank = if_else(position == "QB", rank(-passing_cpoe), NA_real_),
     pacr_rank = if_else(position == "QB", rank(-pacr), NA_real_),
-    passing_air_yards_rank = if_else(position == "QB", rank(-passing_air_yards), NA_real_),
-    # RB ranks
+    passing_yards_rank = if_else(position == "QB", rank(-passing_yards), NA_real_),
+    passing_tds_rank = if_else(position == "QB", rank(-passing_tds), NA_real_),
+    completion_pct_rank = if_else(position == "QB", rank(-completion_pct), NA_real_),
+    passing_yards_per_game_rank = if_else(position == "QB", rank(-passing_yards_per_game), NA_real_),
+    interceptions_rank = if_else(position == "QB", rank(interceptions), NA_real_),
+
+    # RB ranks - comprehensive rushing and receiving stats
     rushing_epa_rank = if_else(position == "RB", rank(-rushing_epa), NA_real_),
-    rushing_first_downs_rank = if_else(position == "RB", rank(-rushing_first_downs), NA_real_),
+    rushing_yards_rank = if_else(position == "RB", rank(-rushing_yards), NA_real_),
+    rushing_tds_rank = if_else(position == "RB", rank(-rushing_tds), NA_real_),
+    rushing_yards_per_carry_rank = if_else(position == "RB", rank(-rushing_yards_per_carry), NA_real_),
+    rushing_yards_per_game_rank = if_else(position == "RB", rank(-rushing_yards_per_game), NA_real_),
     carries_rank = if_else(position == "RB", rank(-carries), NA_real_),
     rb_receiving_epa_rank = if_else(position == "RB", rank(-receiving_epa), NA_real_),
-    targets_rank = if_else(position == "RB", rank(-targets), NA_real_),
-    # WR/TE ranks
+    rb_receiving_yards_rank = if_else(position == "RB", rank(-receiving_yards), NA_real_),
+    rb_receiving_tds_rank = if_else(position == "RB", rank(-receiving_tds), NA_real_),
+    rb_receptions_rank = if_else(position == "RB", rank(-receptions), NA_real_),
+    rb_receiving_yards_per_game_rank = if_else(position == "RB", rank(-receiving_yards_per_game), NA_real_),
+
+    # WR/TE ranks - comprehensive receiving stats
     receiving_epa_rank = if_else(position %in% c("WR", "TE"), rank(-receiving_epa), NA_real_),
+    receiving_yards_rank = if_else(position %in% c("WR", "TE"), rank(-receiving_yards), NA_real_),
+    receiving_tds_rank = if_else(position %in% c("WR", "TE"), rank(-receiving_tds), NA_real_),
+    receptions_rank = if_else(position %in% c("WR", "TE"), rank(-receptions), NA_real_),
+    receiving_yards_per_reception_rank = if_else(position %in% c("WR", "TE"), rank(-receiving_yards_per_reception), NA_real_),
+    receiving_yards_per_game_rank = if_else(position %in% c("WR", "TE"), rank(-receiving_yards_per_game), NA_real_),
+    catch_pct_rank = if_else(position %in% c("WR", "TE"), rank(-catch_pct), NA_real_),
     wopr_rank = if_else(position %in% c("WR", "TE"), rank(-wopr), NA_real_),
     racr_rank = if_else(position %in% c("WR", "TE"), rank(-racr), NA_real_),
     air_yards_share_rank = if_else(position %in% c("WR", "TE"), rank(-air_yards_share), NA_real_)
@@ -928,15 +1082,36 @@ build_team_json <- function(team_abbr, cum_epa_df, season_totals, top_players_df
   }
 
   current_stats <- list(
-    def_epa = list(value = round(team_totals$def_epa[1], 3), rank = as.integer(team_totals$def_epa_rank[1])),
-    off_epa = list(value = round(team_totals$off_epa[1], 3), rank = as.integer(team_totals$off_epa_rank[1])),
-    passing_epa = list(value = round(team_totals$passing_epa[1], 3), rank = as.integer(team_totals$passing_epa_rank[1])),
-    rushing_epa = list(value = round(team_totals$rushing_epa[1], 3), rank = as.integer(team_totals$rushing_epa_rank[1])),
-    passing_cpoe = list(value = round(team_totals$passing_cpoe[1], 3), rank = as.integer(team_totals$passing_cpoe_rank[1])),
-    receiving_epa = list(value = round(team_totals$receiving_epa[1], 3), rank = as.integer(team_totals$receiving_epa_rank[1])),
-    pacr = list(value = round(team_totals$pacr[1], 2), rank = as.integer(team_totals$pacr_rank[1])),
-    passing_first_downs = list(value = as.integer(team_totals$passing_first_downs[1]), rank = as.integer(team_totals$passing_first_downs_rank[1])),
-    sacks_suffered = list(value = as.integer(team_totals$sacks_suffered[1]), rank = as.integer(team_totals$sacks_suffered_rank[1]))
+    offense = list(
+      off_epa = list(value = round(team_totals$off_epa[1], 3), rank = as.integer(team_totals$off_epa_rank[1])),
+      yards_per_game = list(value = round(team_totals$yards_per_game[1], 1), rank = as.integer(team_totals$yards_per_game_rank[1])),
+      pass_yards_per_game = list(value = round(team_totals$pass_yards_per_game[1], 1), rank = as.integer(team_totals$pass_yards_per_game_rank[1])),
+      rush_yards_per_game = list(value = round(team_totals$rush_yards_per_game[1], 1), rank = as.integer(team_totals$rush_yards_per_game_rank[1])),
+      points_per_game = list(value = round(team_totals$points_per_game[1], 1), rank = as.integer(team_totals$points_per_game_rank[1])),
+      yards_per_play = list(value = round(team_totals$yards_per_play[1], 2), rank = as.integer(team_totals$yards_per_play_rank[1])),
+      third_down_pct = list(value = round(team_totals$third_down_pct[1], 1), rank = as.integer(team_totals$third_down_pct_rank[1])),
+      rushing_epa = list(value = round(team_totals$rushing_epa[1], 3), rank = as.integer(team_totals$rushing_epa_rank[1])),
+      receiving_epa = list(value = round(team_totals$receiving_epa[1], 3), rank = as.integer(team_totals$receiving_epa_rank[1])),
+      pacr = list(value = round(team_totals$pacr[1], 2), rank = as.integer(team_totals$pacr_rank[1])),
+      passing_first_downs = list(value = as.integer(team_totals$passing_first_downs[1]), rank = as.integer(team_totals$passing_first_downs_rank[1])),
+      sacks_suffered = list(value = as.integer(team_totals$sacks_suffered[1]), rank = as.integer(team_totals$sacks_suffered_rank[1])),
+      touchdowns = list(value = as.integer(team_totals$touchdowns[1]), rank = as.integer(team_totals$touchdowns_rank[1])),
+      interceptions_thrown = list(value = as.integer(team_totals$interceptions_thrown[1]), rank = as.integer(team_totals$interceptions_thrown_rank[1])),
+      fumbles_lost = list(value = as.integer(team_totals$fumbles_lost[1]), rank = as.integer(team_totals$fumbles_lost_rank[1]))
+    ),
+    defense = list(
+      def_epa = list(value = round(team_totals$def_epa[1], 3), rank = as.integer(team_totals$def_epa_rank[1])),
+      yards_allowed_per_game = list(value = round(team_totals$yards_allowed_per_game[1], 1), rank = as.integer(team_totals$yards_allowed_per_game_rank[1])),
+      pass_yards_allowed_per_game = list(value = round(team_totals$pass_yards_allowed_per_game[1], 1), rank = as.integer(team_totals$pass_yards_allowed_per_game_rank[1])),
+      rush_yards_allowed_per_game = list(value = round(team_totals$rush_yards_allowed_per_game[1], 1), rank = as.integer(team_totals$rush_yards_allowed_per_game_rank[1])),
+      points_allowed_per_game = list(value = round(team_totals$points_allowed_per_game[1], 1), rank = as.integer(team_totals$points_allowed_per_game_rank[1])),
+      third_down_pct_def = list(value = round(team_totals$third_down_pct_def[1], 1), rank = as.integer(team_totals$third_down_pct_def_rank[1])),
+      sacks_made = list(value = as.integer(team_totals$sacks_made[1]), rank = as.integer(team_totals$sacks_made_rank[1])),
+      interceptions_made = list(value = as.integer(team_totals$interceptions_made[1]), rank = as.integer(team_totals$interceptions_made_rank[1])),
+      fumbles_forced = list(value = as.integer(team_totals$fumbles_forced[1]), rank = as.integer(team_totals$fumbles_forced_rank[1])),
+      touchdowns_allowed = list(value = as.integer(team_totals$touchdowns_allowed[1]), rank = as.integer(team_totals$touchdowns_allowed_rank[1])),
+      turnover_differential = list(value = as.integer(team_totals$turnover_differential[1]), rank = as.integer(team_totals$turnover_differential_rank[1]))
+    )
   )
 
   # Get top players
@@ -951,10 +1126,13 @@ build_team_json <- function(team_abbr, cum_epa_df, season_totals, top_players_df
     list(
       name = qb$player_name[1],
       total_epa = list(value = na_to_null(round(qb$qb_epa_per_play[1], 2)), rank = na_to_null(as.integer(qb$qb_epa_per_play_rank[1]))),
-      passing_epa = list(value = na_to_null(round(qb$passing_epa[1], 2)), rank = na_to_null(as.integer(qb$passing_epa_rank[1]))),
+      passing_yards = list(value = na_to_null(as.integer(qb$passing_yards[1])), rank = na_to_null(as.integer(qb$passing_yards_rank[1]))),
+      passing_tds = list(value = na_to_null(as.integer(qb$passing_tds[1])), rank = na_to_null(as.integer(qb$passing_tds_rank[1]))),
+      completion_pct = list(value = na_to_null(round(qb$completion_pct[1], 1)), rank = na_to_null(as.integer(qb$completion_pct_rank[1]))),
       passing_cpoe = list(value = na_to_null(round(qb$passing_cpoe[1], 3)), rank = na_to_null(as.integer(qb$passing_cpoe_rank[1]))),
       pacr = list(value = na_to_null(round(qb$pacr[1], 2)), rank = na_to_null(as.integer(qb$pacr_rank[1]))),
-      passing_air_yards = list(value = na_to_null(as.integer(qb$passing_air_yards[1])), rank = na_to_null(as.integer(qb$passing_air_yards_rank[1])))
+      passing_yards_per_game = list(value = na_to_null(round(qb$passing_yards_per_game[1], 1)), rank = na_to_null(as.integer(qb$passing_yards_per_game_rank[1]))),
+      interceptions = list(value = na_to_null(as.integer(qb$interceptions[1])), rank = na_to_null(as.integer(qb$interceptions_rank[1])))
     )
   } else NULL
 
@@ -962,10 +1140,14 @@ build_team_json <- function(team_abbr, cum_epa_df, season_totals, top_players_df
     list(
       name = rbs$player_name[i],
       rushing_epa = list(value = na_to_null(round(rbs$rushing_epa[i], 2)), rank = na_to_null(as.integer(rbs$rushing_epa_rank[i]))),
-      rushing_first_downs = list(value = na_to_null(as.integer(rbs$rushing_first_downs[i])), rank = na_to_null(as.integer(rbs$rushing_first_downs_rank[i]))),
-      carries = list(value = na_to_null(as.integer(rbs$carries[i])), rank = na_to_null(as.integer(rbs$carries_rank[i]))),
-      receiving_epa = list(value = na_to_null(round(rbs$receiving_epa[i], 2)), rank = na_to_null(as.integer(rbs$rb_receiving_epa_rank[i]))),
-      targets = list(value = na_to_null(as.integer(rbs$targets[i])), rank = na_to_null(as.integer(rbs$targets_rank[i]))),
+      rushing_yards = list(value = na_to_null(as.integer(rbs$rushing_yards[i])), rank = na_to_null(as.integer(rbs$rushing_yards_rank[i]))),
+      rushing_tds = list(value = na_to_null(as.integer(rbs$rushing_tds[i])), rank = na_to_null(as.integer(rbs$rushing_tds_rank[i]))),
+      yards_per_carry = list(value = na_to_null(round(rbs$rushing_yards_per_carry[i], 2)), rank = na_to_null(as.integer(rbs$rushing_yards_per_carry_rank[i]))),
+      rushing_yards_per_game = list(value = na_to_null(round(rbs$rushing_yards_per_game[i], 1)), rank = na_to_null(as.integer(rbs$rushing_yards_per_game_rank[i]))),
+      receptions = list(value = na_to_null(as.integer(rbs$receptions[i])), rank = na_to_null(as.integer(rbs$rb_receptions_rank[i]))),
+      receiving_yards = list(value = na_to_null(as.integer(rbs$receiving_yards[i])), rank = na_to_null(as.integer(rbs$rb_receiving_yards_rank[i]))),
+      receiving_tds = list(value = na_to_null(as.integer(rbs$receiving_tds[i])), rank = na_to_null(as.integer(rbs$rb_receiving_tds_rank[i]))),
+      receiving_yards_per_game = list(value = na_to_null(round(rbs$receiving_yards_per_game[i], 1)), rank = na_to_null(as.integer(rbs$rb_receiving_yards_per_game_rank[i]))),
       target_share = list(value = na_to_null(round(rbs$target_share[i], 3)), rank = na_to_null(as.integer(rbs$target_share_rank[i])))
     )
   })
@@ -973,8 +1155,14 @@ build_team_json <- function(team_abbr, cum_epa_df, season_totals, top_players_df
   receivers_json <- lapply(1:nrow(receivers), function(i) {
     list(
       name = receivers$player_name[i],
-      wopr = list(value = na_to_null(round(receivers$wopr[i], 2)), rank = na_to_null(as.integer(receivers$wopr_rank[i]))),
       receiving_epa = list(value = na_to_null(round(receivers$receiving_epa[i], 2)), rank = na_to_null(as.integer(receivers$receiving_epa_rank[i]))),
+      receiving_yards = list(value = na_to_null(as.integer(receivers$receiving_yards[i])), rank = na_to_null(as.integer(receivers$receiving_yards_rank[i]))),
+      receiving_tds = list(value = na_to_null(as.integer(receivers$receiving_tds[i])), rank = na_to_null(as.integer(receivers$receiving_tds_rank[i]))),
+      receptions = list(value = na_to_null(as.integer(receivers$receptions[i])), rank = na_to_null(as.integer(receivers$receptions_rank[i]))),
+      yards_per_reception = list(value = na_to_null(round(receivers$receiving_yards_per_reception[i], 2)), rank = na_to_null(as.integer(receivers$receiving_yards_per_reception_rank[i]))),
+      receiving_yards_per_game = list(value = na_to_null(round(receivers$receiving_yards_per_game[i], 1)), rank = na_to_null(as.integer(receivers$receiving_yards_per_game_rank[i]))),
+      catch_pct = list(value = na_to_null(round(receivers$catch_pct[i], 1)), rank = na_to_null(as.integer(receivers$catch_pct_rank[i]))),
+      wopr = list(value = na_to_null(round(receivers$wopr[i], 2)), rank = na_to_null(as.integer(receivers$wopr_rank[i]))),
       racr = list(value = na_to_null(round(receivers$racr[i], 2)), rank = na_to_null(as.integer(receivers$racr_rank[i]))),
       target_share = list(value = na_to_null(round(receivers$target_share[i], 3)), rank = na_to_null(as.integer(receivers$target_share_rank[i]))),
       air_yards_share = list(value = na_to_null(round(receivers$air_yards_share[i], 2)), rank = na_to_null(as.integer(receivers$air_yards_share_rank[i])))
@@ -1059,7 +1247,7 @@ output_data <- list(
   visualizationType = "MATCHUP_V2",
   title = title_text,
   subtitle = "Comprehensive statistical analysis for all matchups",
-  description = "Detailed matchup statistics including team performance metrics, player stats, head-to-head records, and common opponent results.\n\nQUARTERBACK STATS:\n\n • Total EPA: Expected Points Added - total offensive value generated across all plays\n\n • Passing EPA: Expected Points Added on passing plays only\n\n • Pass CPOE: Completion Percentage Over Expected - accuracy beyond what's expected based on throw difficulty\n\n • PACR: Pass Air Conversion Ratio - measures QB efficiency converting air yards to actual yards\n\n • Air Yards: Total passing yards in the air before the catch\n\nRUNNING BACK STATS:\n\n • Rush EPA: Expected Points Added on rushing plays\n\n • Rush 1st Downs: First downs gained on rushing attempts\n\n • Carries: Total rushing attempts\n\n • Rec EPA: Expected Points Added on receptions\n\n • Targets: Total times targeted by the QB\n\n • Target Share: Percentage of team's total targets\n\nRECEIVER STATS:\n\n • WOPR: Weighted Opportunity Rating - combines targets and air yards to measure receiving opportunity\n\n • Rec EPA: Expected Points Added on receptions\n\n • RACR: Receiver Air Conversion Ratio - receiving yards per air yard (measures efficiency converting targets to yards)\n\n • Target Share: Percentage of team's total targets\n\n • Air Yards %: Percentage of team's total air yards\n\nAll EPA stats are per play through the current week.",
+  description = "Detailed matchup statistics including team performance metrics, player stats, head-to-head records, and common opponent results.\n\nQUARTERBACK STATS:\n\n • Total EPA: Expected Points Added - total offensive value generated across all plays\n\n • Passing Yards: Total passing yards thrown\n\n • Passing TDs: Total touchdown passes thrown\n\n • Completion %: Completion percentage (completions / attempts × 100)\n\n • Pass CPOE: Completion Percentage Over Expected - accuracy beyond what's expected based on throw difficulty\n\n • PACR: Pass Air Conversion Ratio - measures QB efficiency converting air yards to actual yards (Formula: Passing Yards / Air Yards). Higher PACR indicates more yards after catch.\n\n • Yards/Game: Average passing yards per game\n\n • Interceptions: Total interceptions thrown\n\nRUNNING BACK STATS:\n\n • Rush EPA: Expected Points Added on rushing plays\n\n • Rushing Yards: Total rushing yards gained\n\n • Rushing TDs: Total rushing touchdowns\n\n • Yards/Carry: Average yards per rushing attempt\n\n • Rush Yards/Game: Average rushing yards per game\n\n • Receptions: Total receptions\n\n • Receiving Yards: Total receiving yards\n\n • Receiving TDs: Total receiving touchdowns\n\n • Rec Yards/Game: Average receiving yards per game\n\n • Target Share: Percentage of team's total targets\n\nRECEIVER STATS:\n\n • Rec EPA: Expected Points Added on receptions\n\n • Receiving Yards: Total receiving yards gained\n\n • Receiving TDs: Total receiving touchdowns\n\n • Receptions: Total receptions\n\n • Yards/Reception: Average yards per reception\n\n • Rec Yards/Game: Average receiving yards per game\n\n • Catch %: Catch percentage (receptions / targets × 100)\n\n • WOPR: Weighted Opportunity Rating - combines targets and air yards to measure receiving opportunity\n\n • RACR: Receiver Air Conversion Ratio - receiving yards per air yard (measures efficiency converting targets to yards)\n\n • Target Share: Percentage of team's total targets\n\n • Air Yards %: Percentage of team's total air yards\n\nAll EPA stats are per play through the current week.",
   lastUpdated = format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC"),
   source = "nflfastR / nflreadr / ESPN",
   week = as.integer(current_week),

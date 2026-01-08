@@ -1260,13 +1260,19 @@ private fun CommonOpponentsComparison(
                         } else ""
 
                         // Determine advantage based on result
+                        // Only show advantage when both teams played the opponent
                         val advantage = when {
+                            // Both teams played - compare results
                             awayResult == "W" && homeResult == "L" -> -1
                             awayResult == "L" && homeResult == "W" -> 1
+                            awayResult == "W" && homeResult == "W" -> 0
+                            awayResult == "L" && homeResult == "L" -> 0
+                            awayResult == "T" && homeResult != "" -> 0
+                            homeResult == "T" && awayResult != "" -> 0
+                            // One team played, one didn't - only show advantage for W, not for non-play
                             awayResult == "W" && homeResult == "" -> -1
                             awayResult == "" && homeResult == "W" -> 1
-                            awayResult == "L" && homeResult == "" -> 1
-                            awayResult == "" && homeResult == "L" -> -1
+                            // Don't show advantage when comparing loss to non-play
                             else -> 0
                         }
 

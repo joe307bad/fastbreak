@@ -453,6 +453,26 @@ if (is.null(events_data$items) || length(events_data$items) == 0) {
 
 cat("Found", nrow(current_week_games), "games for current week\n")
 
+# Safety check: if we have no games, we need to create placeholder games from ESPN data
+if (nrow(current_week_games) == 0 && exists("event_ids") && length(event_ids) > 0) {
+  cat("WARNING: nflreadr has no game data for this week, but ESPN has events\n")
+  cat("This likely means playoff data isn't available in nflreadr yet\n")
+  cat("Creating placeholder game records from ESPN event IDs...\n")
+
+  # We'll fetch the team info from the scoreboard and create minimal game records
+  # This will be done in the team mapping section below
+}
+
+# Check if we have any games at all - if not, exit gracefully
+if (nrow(current_week_games) == 0 && (!exists("event_ids") || length(event_ids) == 0)) {
+  cat("\nERROR: No games found for current week from either nflreadr or ESPN\n")
+  cat("This likely means:\n")
+  cat("  - The season is over, or\n")
+  cat("  - There's a data availability issue\n")
+  cat("Exiting without generating output.\n")
+  quit(status = 1)
+}
+
 # Store event IDs for odds fetching
 espn_event_ids <- if (exists("event_ids")) event_ids else c()
 
@@ -480,6 +500,10 @@ scoreboard_resp <- tryCatch({
 })
 
 if (!is.null(scoreboard_resp) && !is.null(scoreboard_resp$events)) {
+  # If we have no games from nflreadr, we'll build them from ESPN data
+  needs_placeholder_games <- nrow(current_week_games) == 0
+  placeholder_games_list <- list()
+
   for (event in scoreboard_resp$events) {
     event_id <- event$id
 
@@ -517,13 +541,36 @@ if (!is.null(scoreboard_resp) && !is.null(scoreboard_resp$events)) {
           matchup_key <- paste(away_abbr_norm, home_abbr_norm, sep = "-")
           team_to_event_map[[matchup_key]] <- event_id
           cat(sprintf("  Mapped %s to event %s\n", matchup_key, event_id))
+
+          # If we need placeholder games, create them
+          if (needs_placeholder_games) {
+            placeholder_game <- data.frame(
+              game_id = event_id,
+              week = current_week,
+              game_type = ifelse(is_playoffs, "POST", "REG"),
+              home_team = home_abbr_norm,
+              away_team = away_abbr_norm,
+              result = NA_real_,
+              home_score = NA_real_,
+              away_score = NA_real_,
+              stringsAsFactors = FALSE
+            )
+            placeholder_games_list[[length(placeholder_games_list) + 1]] <- placeholder_game
+          }
         }
       }
     }
   }
+
+  # If we created placeholder games, combine them into current_week_games
+  if (needs_placeholder_games && length(placeholder_games_list) > 0) {
+    current_week_games <- do.call(rbind, placeholder_games_list)
+    cat(sprintf("Created %d placeholder games from ESPN data\n", nrow(current_week_games)))
+  }
 }
 
 cat(sprintf("Built mapping for %d matchups\n", length(team_to_event_map)))
+cat(sprintf("Final game count: %d games to process\n", nrow(current_week_games)))
 
 # Process all matchups
 

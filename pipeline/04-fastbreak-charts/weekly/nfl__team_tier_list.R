@@ -2,9 +2,31 @@ library(nflreadr)
 library(dplyr)
 library(jsonlite)
 
-# Get current season and most recent week
-current_season <- as.numeric(format(Sys.Date(), "%Y"))
-pbp <- nflreadr::load_pbp(current_season)
+# Get the most recent available season
+# nflreadr's most_recent_season() returns the latest season with data
+current_season <- tryCatch({
+  nflreadr::most_recent_season()
+}, error = function(e) {
+  # Fallback: If most_recent_season() fails, calculate based on current date
+  # NFL season starts in September, so before September use previous year
+  current_year <- as.numeric(format(Sys.Date(), "%Y"))
+  current_month <- as.numeric(format(Sys.Date(), "%m"))
+  if (current_month < 9) {
+    current_year - 1
+  } else {
+    current_year
+  }
+})
+
+cat("Loading data for NFL season:", current_season, "\n")
+
+pbp <- tryCatch({
+  nflreadr::load_pbp(current_season)
+}, error = function(e) {
+  cat("Error loading play-by-play data for season", current_season, ":", e$message, "\n")
+  cat("This may occur during the off-season when no data is available.\n")
+  stop("Cannot proceed without play-by-play data")
+})
 
 # Load team info for division and conference data
 teams_info <- nflreadr::load_teams() %>%

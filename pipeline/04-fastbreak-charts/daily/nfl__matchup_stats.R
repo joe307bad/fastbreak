@@ -14,6 +14,33 @@ MIN_GAMES_RB <- 6
 MIN_GAMES_WR <- 6
 CURRENT_SEASON <- 2025
 
+# Helper function to create tied ranks
+# Returns a list with two components:
+#   - rank: numeric rank for color coding (e.g., 1, 2, 2, 4)
+#   - rankDisplay: string with "T" prefix for ties (e.g., "1", "T2", "T2", "4")
+tied_rank <- function(x) {
+  # Get numeric ranks using min rank (ties get same rank)
+  numeric_ranks <- rank(x, ties.method = "min", na.last = "keep")
+
+  # Count how many times each rank appears
+  rank_counts <- table(numeric_ranks[!is.na(numeric_ranks)])
+
+  # Create display strings with "T" prefix for ties
+  display_ranks <- sapply(numeric_ranks, function(r) {
+    if (is.na(r)) {
+      return(NA_character_)
+    }
+    # If this rank appears more than once, it's a tie
+    if (rank_counts[as.character(r)] > 1) {
+      paste0("T", r)
+    } else {
+      as.character(r)
+    }
+  })
+
+  return(list(rank = numeric_ranks, rankDisplay = display_ranks))
+}
+
 cat("=== Loading NFL data for", CURRENT_SEASON, "season ===\n")
 
 # ============================================================================
@@ -202,38 +229,101 @@ team_season_totals <- team_stats_weekly %>%
 
     # EPA-based stats for player metrics
     rushing_epa = if_else(rushing_carries > 0, rushing_epa_total / rushing_carries, NA_real_),
-    receiving_epa = if_else(receiving_targets > 0, receiving_epa_total / receiving_targets, NA_real_),
+    receiving_epa = if_else(receiving_targets > 0, receiving_epa_total / receiving_targets, NA_real_)
+  )
 
+# Add ranks with tie handling (separate step to handle list return from tied_rank)
+# Offensive ranks
+off_epa_ranks <- tied_rank(-team_season_totals$off_epa)
+yards_per_game_ranks <- tied_rank(-team_season_totals$yards_per_game)
+pass_yards_per_game_ranks <- tied_rank(-team_season_totals$pass_yards_per_game)
+rush_yards_per_game_ranks <- tied_rank(-team_season_totals$rush_yards_per_game)
+points_per_game_ranks <- tied_rank(-team_season_totals$points_per_game)
+yards_per_play_ranks <- tied_rank(-team_season_totals$yards_per_play)
+third_down_pct_ranks <- tied_rank(-team_season_totals$third_down_pct)
+rushing_epa_ranks <- tied_rank(-team_season_totals$rushing_epa)
+receiving_epa_ranks <- tied_rank(-team_season_totals$receiving_epa)
+pacr_ranks <- tied_rank(-team_season_totals$pacr)
+passing_first_downs_ranks <- tied_rank(-team_season_totals$passing_first_downs)
+sacks_suffered_ranks <- tied_rank(team_season_totals$sacks_suffered)
+touchdowns_ranks <- tied_rank(-team_season_totals$touchdowns)
+interceptions_thrown_ranks <- tied_rank(team_season_totals$interceptions_thrown)
+fumbles_lost_ranks <- tied_rank(team_season_totals$fumbles_lost)
+turnovers_ranks <- tied_rank(team_season_totals$interceptions_thrown + team_season_totals$fumbles_lost)
+
+# Defensive ranks
+def_epa_ranks <- tied_rank(team_season_totals$def_epa)
+yards_allowed_per_game_ranks <- tied_rank(team_season_totals$yards_allowed_per_game)
+pass_yards_allowed_per_game_ranks <- tied_rank(team_season_totals$pass_yards_allowed_per_game)
+rush_yards_allowed_per_game_ranks <- tied_rank(team_season_totals$rush_yards_allowed_per_game)
+points_allowed_per_game_ranks <- tied_rank(team_season_totals$points_allowed_per_game)
+third_down_pct_def_ranks <- tied_rank(team_season_totals$third_down_pct_def)
+sacks_made_ranks <- tied_rank(-team_season_totals$sacks_made)
+interceptions_made_ranks <- tied_rank(-team_season_totals$interceptions_made)
+fumbles_forced_ranks <- tied_rank(-team_season_totals$fumbles_forced)
+touchdowns_allowed_ranks <- tied_rank(team_season_totals$touchdowns_allowed)
+turnover_differential_ranks <- tied_rank(-team_season_totals$turnover_differential)
+
+# Add rank columns to data frame
+team_season_totals <- team_season_totals %>%
+  mutate(
     # Offensive ranks
-    off_epa_rank = rank(-off_epa),
-    yards_per_game_rank = rank(-yards_per_game),
-    pass_yards_per_game_rank = rank(-pass_yards_per_game),
-    rush_yards_per_game_rank = rank(-rush_yards_per_game),
-    points_per_game_rank = rank(-points_per_game),
-    yards_per_play_rank = rank(-yards_per_play),
-    third_down_pct_rank = rank(-third_down_pct),
-    rushing_epa_rank = rank(-rushing_epa),
-    receiving_epa_rank = rank(-receiving_epa),
-    pacr_rank = rank(-pacr),
-    passing_first_downs_rank = rank(-passing_first_downs),
-    sacks_suffered_rank = rank(sacks_suffered),
-    touchdowns_rank = rank(-touchdowns),
-    interceptions_thrown_rank = rank(interceptions_thrown),
-    fumbles_lost_rank = rank(fumbles_lost),
-    turnovers_rank = rank(interceptions_thrown + fumbles_lost),
+    off_epa_rank = off_epa_ranks$rank,
+    off_epa_rankDisplay = off_epa_ranks$rankDisplay,
+    yards_per_game_rank = yards_per_game_ranks$rank,
+    yards_per_game_rankDisplay = yards_per_game_ranks$rankDisplay,
+    pass_yards_per_game_rank = pass_yards_per_game_ranks$rank,
+    pass_yards_per_game_rankDisplay = pass_yards_per_game_ranks$rankDisplay,
+    rush_yards_per_game_rank = rush_yards_per_game_ranks$rank,
+    rush_yards_per_game_rankDisplay = rush_yards_per_game_ranks$rankDisplay,
+    points_per_game_rank = points_per_game_ranks$rank,
+    points_per_game_rankDisplay = points_per_game_ranks$rankDisplay,
+    yards_per_play_rank = yards_per_play_ranks$rank,
+    yards_per_play_rankDisplay = yards_per_play_ranks$rankDisplay,
+    third_down_pct_rank = third_down_pct_ranks$rank,
+    third_down_pct_rankDisplay = third_down_pct_ranks$rankDisplay,
+    rushing_epa_rank = rushing_epa_ranks$rank,
+    rushing_epa_rankDisplay = rushing_epa_ranks$rankDisplay,
+    receiving_epa_rank = receiving_epa_ranks$rank,
+    receiving_epa_rankDisplay = receiving_epa_ranks$rankDisplay,
+    pacr_rank = pacr_ranks$rank,
+    pacr_rankDisplay = pacr_ranks$rankDisplay,
+    passing_first_downs_rank = passing_first_downs_ranks$rank,
+    passing_first_downs_rankDisplay = passing_first_downs_ranks$rankDisplay,
+    sacks_suffered_rank = sacks_suffered_ranks$rank,
+    sacks_suffered_rankDisplay = sacks_suffered_ranks$rankDisplay,
+    touchdowns_rank = touchdowns_ranks$rank,
+    touchdowns_rankDisplay = touchdowns_ranks$rankDisplay,
+    interceptions_thrown_rank = interceptions_thrown_ranks$rank,
+    interceptions_thrown_rankDisplay = interceptions_thrown_ranks$rankDisplay,
+    fumbles_lost_rank = fumbles_lost_ranks$rank,
+    fumbles_lost_rankDisplay = fumbles_lost_ranks$rankDisplay,
+    turnovers_rank = turnovers_ranks$rank,
+    turnovers_rankDisplay = turnovers_ranks$rankDisplay,
 
-    # Defensive ranks (lower is better)
-    def_epa_rank = rank(def_epa),
-    yards_allowed_per_game_rank = rank(yards_allowed_per_game),
-    pass_yards_allowed_per_game_rank = rank(pass_yards_allowed_per_game),
-    rush_yards_allowed_per_game_rank = rank(rush_yards_allowed_per_game),
-    points_allowed_per_game_rank = rank(points_allowed_per_game),
-    third_down_pct_def_rank = rank(third_down_pct_def),
-    sacks_made_rank = rank(-sacks_made),
-    interceptions_made_rank = rank(-interceptions_made),
-    fumbles_forced_rank = rank(-fumbles_forced),
-    touchdowns_allowed_rank = rank(touchdowns_allowed),
-    turnover_differential_rank = rank(-turnover_differential)
+    # Defensive ranks
+    def_epa_rank = def_epa_ranks$rank,
+    def_epa_rankDisplay = def_epa_ranks$rankDisplay,
+    yards_allowed_per_game_rank = yards_allowed_per_game_ranks$rank,
+    yards_allowed_per_game_rankDisplay = yards_allowed_per_game_ranks$rankDisplay,
+    pass_yards_allowed_per_game_rank = pass_yards_allowed_per_game_ranks$rank,
+    pass_yards_allowed_per_game_rankDisplay = pass_yards_allowed_per_game_ranks$rankDisplay,
+    rush_yards_allowed_per_game_rank = rush_yards_allowed_per_game_ranks$rank,
+    rush_yards_allowed_per_game_rankDisplay = rush_yards_allowed_per_game_ranks$rankDisplay,
+    points_allowed_per_game_rank = points_allowed_per_game_ranks$rank,
+    points_allowed_per_game_rankDisplay = points_allowed_per_game_ranks$rankDisplay,
+    third_down_pct_def_rank = third_down_pct_def_ranks$rank,
+    third_down_pct_def_rankDisplay = third_down_pct_def_ranks$rankDisplay,
+    sacks_made_rank = sacks_made_ranks$rank,
+    sacks_made_rankDisplay = sacks_made_ranks$rankDisplay,
+    interceptions_made_rank = interceptions_made_ranks$rank,
+    interceptions_made_rankDisplay = interceptions_made_ranks$rankDisplay,
+    fumbles_forced_rank = fumbles_forced_ranks$rank,
+    fumbles_forced_rankDisplay = fumbles_forced_ranks$rankDisplay,
+    touchdowns_allowed_rank = touchdowns_allowed_ranks$rank,
+    touchdowns_allowed_rankDisplay = touchdowns_allowed_ranks$rankDisplay,
+    turnover_differential_rank = turnover_differential_ranks$rank,
+    turnover_differential_rankDisplay = turnover_differential_ranks$rankDisplay
   )
 
 cat("Calculated season totals for", nrow(team_season_totals), "teams\n")
@@ -338,49 +428,134 @@ player_stats_filtered <- player_stats %>%
 
 cat("Filtered to", nrow(player_stats_filtered), "players meeting snap thresholds\n")
 
-# Rank players by position for each stat
-player_stats_ranked <- player_stats_filtered %>%
-  group_by(position) %>%
-  mutate(
-    # QB ranks - comprehensive stats
-    qb_epa_per_play_rank = if_else(position == "QB", rank(-qb_epa_per_play), NA_real_),
-    passing_epa_rank = if_else(position == "QB", rank(-passing_epa), NA_real_),
-    passing_cpoe_rank = if_else(position == "QB", rank(-passing_cpoe), NA_real_),
-    pacr_rank = if_else(position == "QB", rank(-pacr), NA_real_),
-    passing_yards_rank = if_else(position == "QB", rank(-passing_yards), NA_real_),
-    passing_tds_rank = if_else(position == "QB", rank(-passing_tds), NA_real_),
-    completion_pct_rank = if_else(position == "QB", rank(-completion_pct), NA_real_),
-    passing_yards_per_game_rank = if_else(position == "QB", rank(-passing_yards_per_game), NA_real_),
-    interceptions_rank = if_else(position == "QB", rank(interceptions), NA_real_),
+# Rank players by position for each stat (with tie handling)
+# Process each position separately to properly handle tied_rank() list return
+player_stats_ranked <- player_stats_filtered
 
-    # RB ranks - comprehensive rushing and receiving stats
-    rushing_epa_rank = if_else(position == "RB", rank(-rushing_epa), NA_real_),
-    rushing_yards_rank = if_else(position == "RB", rank(-rushing_yards), NA_real_),
-    rushing_tds_rank = if_else(position == "RB", rank(-rushing_tds), NA_real_),
-    rushing_yards_per_carry_rank = if_else(position == "RB", rank(-rushing_yards_per_carry), NA_real_),
-    rushing_yards_per_game_rank = if_else(position == "RB", rank(-rushing_yards_per_game), NA_real_),
-    carries_rank = if_else(position == "RB", rank(-carries), NA_real_),
-    rb_receiving_epa_rank = if_else(position == "RB", rank(-receiving_epa), NA_real_),
-    rb_receiving_yards_rank = if_else(position == "RB", rank(-receiving_yards), NA_real_),
-    rb_receiving_tds_rank = if_else(position == "RB", rank(-receiving_tds), NA_real_),
-    rb_receptions_rank = if_else(position == "RB", rank(-receptions), NA_real_),
-    rb_receiving_yards_per_game_rank = if_else(position == "RB", rank(-receiving_yards_per_game), NA_real_),
+# QB ranks
+qb_players <- player_stats_ranked %>% filter(position == "QB")
+if (nrow(qb_players) > 0) {
+  qb_ranks <- list(
+    qb_epa_per_play = tied_rank(-qb_players$qb_epa_per_play),
+    passing_epa = tied_rank(-qb_players$passing_epa),
+    passing_cpoe = tied_rank(-qb_players$passing_cpoe),
+    pacr = tied_rank(-qb_players$pacr),
+    passing_yards = tied_rank(-qb_players$passing_yards),
+    passing_tds = tied_rank(-qb_players$passing_tds),
+    completion_pct = tied_rank(-qb_players$completion_pct),
+    passing_yards_per_game = tied_rank(-qb_players$passing_yards_per_game),
+    interceptions = tied_rank(qb_players$interceptions)
+  )
 
-    # WR/TE ranks - comprehensive receiving stats
-    receiving_epa_rank = if_else(position %in% c("WR", "TE"), rank(-receiving_epa), NA_real_),
-    receiving_yards_rank = if_else(position %in% c("WR", "TE"), rank(-receiving_yards), NA_real_),
-    receiving_tds_rank = if_else(position %in% c("WR", "TE"), rank(-receiving_tds), NA_real_),
-    receptions_rank = if_else(position %in% c("WR", "TE"), rank(-receptions), NA_real_),
-    receiving_yards_per_reception_rank = if_else(position %in% c("WR", "TE"), rank(-receiving_yards_per_reception), NA_real_),
-    receiving_yards_per_game_rank = if_else(position %in% c("WR", "TE"), rank(-receiving_yards_per_game), NA_real_),
-    catch_pct_rank = if_else(position %in% c("WR", "TE"), rank(-catch_pct), NA_real_),
-    wopr_rank = if_else(position %in% c("WR", "TE"), rank(-wopr), NA_real_),
-    racr_rank = if_else(position %in% c("WR", "TE"), rank(-racr), NA_real_),
-    air_yards_share_rank = if_else(position %in% c("WR", "TE"), rank(-air_yards_share), NA_real_)
-  ) %>%
-  ungroup()
+  qb_players <- qb_players %>% mutate(
+    qb_epa_per_play_rank = qb_ranks$qb_epa_per_play$rank,
+    qb_epa_per_play_rankDisplay = qb_ranks$qb_epa_per_play$rankDisplay,
+    passing_epa_rank = qb_ranks$passing_epa$rank,
+    passing_epa_rankDisplay = qb_ranks$passing_epa$rankDisplay,
+    passing_cpoe_rank = qb_ranks$passing_cpoe$rank,
+    passing_cpoe_rankDisplay = qb_ranks$passing_cpoe$rankDisplay,
+    pacr_rank = qb_ranks$pacr$rank,
+    pacr_rankDisplay = qb_ranks$pacr$rankDisplay,
+    passing_yards_rank = qb_ranks$passing_yards$rank,
+    passing_yards_rankDisplay = qb_ranks$passing_yards$rankDisplay,
+    passing_tds_rank = qb_ranks$passing_tds$rank,
+    passing_tds_rankDisplay = qb_ranks$passing_tds$rankDisplay,
+    completion_pct_rank = qb_ranks$completion_pct$rank,
+    completion_pct_rankDisplay = qb_ranks$completion_pct$rankDisplay,
+    passing_yards_per_game_rank = qb_ranks$passing_yards_per_game$rank,
+    passing_yards_per_game_rankDisplay = qb_ranks$passing_yards_per_game$rankDisplay,
+    interceptions_rank = qb_ranks$interceptions$rank,
+    interceptions_rankDisplay = qb_ranks$interceptions$rankDisplay
+  )
+}
 
-# Calculate target share per team
+# RB ranks
+rb_players <- player_stats_ranked %>% filter(position == "RB")
+if (nrow(rb_players) > 0) {
+  rb_ranks <- list(
+    rushing_epa = tied_rank(-rb_players$rushing_epa),
+    rushing_yards = tied_rank(-rb_players$rushing_yards),
+    rushing_tds = tied_rank(-rb_players$rushing_tds),
+    rushing_yards_per_carry = tied_rank(-rb_players$rushing_yards_per_carry),
+    rushing_yards_per_game = tied_rank(-rb_players$rushing_yards_per_game),
+    carries = tied_rank(-rb_players$carries),
+    receiving_epa = tied_rank(-rb_players$receiving_epa),
+    receiving_yards = tied_rank(-rb_players$receiving_yards),
+    receiving_tds = tied_rank(-rb_players$receiving_tds),
+    receptions = tied_rank(-rb_players$receptions),
+    receiving_yards_per_game = tied_rank(-rb_players$receiving_yards_per_game)
+  )
+
+  rb_players <- rb_players %>% mutate(
+    rushing_epa_rank = rb_ranks$rushing_epa$rank,
+    rushing_epa_rankDisplay = rb_ranks$rushing_epa$rankDisplay,
+    rushing_yards_rank = rb_ranks$rushing_yards$rank,
+    rushing_yards_rankDisplay = rb_ranks$rushing_yards$rankDisplay,
+    rushing_tds_rank = rb_ranks$rushing_tds$rank,
+    rushing_tds_rankDisplay = rb_ranks$rushing_tds$rankDisplay,
+    rushing_yards_per_carry_rank = rb_ranks$rushing_yards_per_carry$rank,
+    rushing_yards_per_carry_rankDisplay = rb_ranks$rushing_yards_per_carry$rankDisplay,
+    rushing_yards_per_game_rank = rb_ranks$rushing_yards_per_game$rank,
+    rushing_yards_per_game_rankDisplay = rb_ranks$rushing_yards_per_game$rankDisplay,
+    carries_rank = rb_ranks$carries$rank,
+    carries_rankDisplay = rb_ranks$carries$rankDisplay,
+    rb_receiving_epa_rank = rb_ranks$receiving_epa$rank,
+    rb_receiving_epa_rankDisplay = rb_ranks$receiving_epa$rankDisplay,
+    rb_receiving_yards_rank = rb_ranks$receiving_yards$rank,
+    rb_receiving_yards_rankDisplay = rb_ranks$receiving_yards$rankDisplay,
+    rb_receiving_tds_rank = rb_ranks$receiving_tds$rank,
+    rb_receiving_tds_rankDisplay = rb_ranks$receiving_tds$rankDisplay,
+    rb_receptions_rank = rb_ranks$receptions$rank,
+    rb_receptions_rankDisplay = rb_ranks$receptions$rankDisplay,
+    rb_receiving_yards_per_game_rank = rb_ranks$receiving_yards_per_game$rank,
+    rb_receiving_yards_per_game_rankDisplay = rb_ranks$receiving_yards_per_game$rankDisplay
+  )
+}
+
+# WR/TE ranks
+wr_players <- player_stats_ranked %>% filter(position %in% c("WR", "TE"))
+if (nrow(wr_players) > 0) {
+  wr_ranks <- list(
+    receiving_epa = tied_rank(-wr_players$receiving_epa),
+    receiving_yards = tied_rank(-wr_players$receiving_yards),
+    receiving_tds = tied_rank(-wr_players$receiving_tds),
+    receptions = tied_rank(-wr_players$receptions),
+    receiving_yards_per_reception = tied_rank(-wr_players$receiving_yards_per_reception),
+    receiving_yards_per_game = tied_rank(-wr_players$receiving_yards_per_game),
+    catch_pct = tied_rank(-wr_players$catch_pct),
+    wopr = tied_rank(-wr_players$wopr),
+    racr = tied_rank(-wr_players$racr),
+    air_yards_share = tied_rank(-wr_players$air_yards_share)
+  )
+
+  wr_players <- wr_players %>% mutate(
+    receiving_epa_rank = wr_ranks$receiving_epa$rank,
+    receiving_epa_rankDisplay = wr_ranks$receiving_epa$rankDisplay,
+    receiving_yards_rank = wr_ranks$receiving_yards$rank,
+    receiving_yards_rankDisplay = wr_ranks$receiving_yards$rankDisplay,
+    receiving_tds_rank = wr_ranks$receiving_tds$rank,
+    receiving_tds_rankDisplay = wr_ranks$receiving_tds$rankDisplay,
+    receptions_rank = wr_ranks$receptions$rank,
+    receptions_rankDisplay = wr_ranks$receptions$rankDisplay,
+    receiving_yards_per_reception_rank = wr_ranks$receiving_yards_per_reception$rank,
+    receiving_yards_per_reception_rankDisplay = wr_ranks$receiving_yards_per_reception$rankDisplay,
+    receiving_yards_per_game_rank = wr_ranks$receiving_yards_per_game$rank,
+    receiving_yards_per_game_rankDisplay = wr_ranks$receiving_yards_per_game$rankDisplay,
+    catch_pct_rank = wr_ranks$catch_pct$rank,
+    catch_pct_rankDisplay = wr_ranks$catch_pct$rankDisplay,
+    wopr_rank = wr_ranks$wopr$rank,
+    wopr_rankDisplay = wr_ranks$wopr$rankDisplay,
+    racr_rank = wr_ranks$racr$rank,
+    racr_rankDisplay = wr_ranks$racr$rankDisplay,
+    air_yards_share_rank = wr_ranks$air_yards_share$rank,
+    air_yards_share_rankDisplay = wr_ranks$air_yards_share$rankDisplay
+  )
+}
+
+# Combine all position-specific rankings
+player_stats_ranked <- bind_rows(qb_players, rb_players, wr_players)
+
+# Calculate target share per team (with tie handling)
 player_stats_ranked <- player_stats_ranked %>%
   group_by(team) %>%
   mutate(
@@ -388,8 +563,15 @@ player_stats_ranked <- player_stats_ranked %>%
   ) %>%
   ungroup() %>%
   mutate(
-    target_share = if_else(team_targets > 0, targets / team_targets, 0),
-    target_share_rank = rank(-target_share)
+    target_share = if_else(team_targets > 0, targets / team_targets, 0)
+  )
+
+# Add target share ranks
+target_share_ranks <- tied_rank(-player_stats_ranked$target_share)
+player_stats_ranked <- player_stats_ranked %>%
+  mutate(
+    target_share_rank = target_share_ranks$rank,
+    target_share_rankDisplay = target_share_ranks$rankDisplay
   )
 
 # Select top players per team
@@ -700,12 +882,40 @@ if (!is.null(scoreboard_resp) && !is.null(scoreboard_resp$events)) {
 
           # If we need placeholder games, create them
           if (needs_placeholder_games) {
+            # Extract game date and time from ESPN event
+            # event$date is in ISO 8601 format (e.g., "2026-01-10T21:30Z")
+            gameday <- NA
+            gametime <- NA
+
+            if (!is.null(event$date) && nchar(event$date) > 0) {
+              # Parse the ISO 8601 datetime
+              event_datetime <- tryCatch({
+                # Remove 'Z' and parse as UTC
+                date_str <- sub("Z$", "", event$date)
+                as.POSIXct(date_str, format = "%Y-%m-%dT%H:%M", tz = "UTC")
+              }, error = function(e) {
+                cat(sprintf("Error parsing date '%s': %s\n", event$date, e$message))
+                NULL
+              })
+
+              if (!is.null(event_datetime) && !is.na(event_datetime)) {
+                # Convert to Eastern Time
+                event_datetime_et <- as.POSIXct(format(event_datetime, tz = "America/New_York"), tz = "America/New_York")
+                # Extract date and time
+                gameday <- format(event_datetime_et, "%Y-%m-%d")
+                gametime <- format(event_datetime_et, "%H:%M")
+                cat(sprintf("    Game time: %s %s ET\n", gameday, gametime))
+              }
+            }
+
             placeholder_game <- data.frame(
               game_id = event_id,
               week = current_week,
               game_type = ifelse(is_playoffs, "POST", "REG"),
               home_team = home_abbr_norm,
               away_team = away_abbr_norm,
+              gameday = gameday,
+              gametime = gametime,
               result = NA_real_,
               home_score = NA_real_,
               away_score = NA_real_,
@@ -1141,34 +1351,34 @@ build_team_json <- function(team_abbr, cum_epa_df, season_totals, top_players_df
 
   current_stats <- list(
     offense = list(
-      off_epa = list(value = round(team_totals$off_epa[1], 3), rank = as.integer(team_totals$off_epa_rank[1])),
-      yards_per_game = list(value = round(team_totals$yards_per_game[1], 1), rank = as.integer(team_totals$yards_per_game_rank[1])),
-      pass_yards_per_game = list(value = round(team_totals$pass_yards_per_game[1], 1), rank = as.integer(team_totals$pass_yards_per_game_rank[1])),
-      rush_yards_per_game = list(value = round(team_totals$rush_yards_per_game[1], 1), rank = as.integer(team_totals$rush_yards_per_game_rank[1])),
-      points_per_game = list(value = round(team_totals$points_per_game[1], 1), rank = as.integer(team_totals$points_per_game_rank[1])),
-      yards_per_play = list(value = round(team_totals$yards_per_play[1], 2), rank = as.integer(team_totals$yards_per_play_rank[1])),
-      third_down_pct = list(value = round(team_totals$third_down_pct[1], 1), rank = as.integer(team_totals$third_down_pct_rank[1])),
-      rushing_epa = list(value = round(team_totals$rushing_epa[1], 3), rank = as.integer(team_totals$rushing_epa_rank[1])),
-      receiving_epa = list(value = round(team_totals$receiving_epa[1], 3), rank = as.integer(team_totals$receiving_epa_rank[1])),
-      pacr = list(value = round(team_totals$pacr[1], 2), rank = as.integer(team_totals$pacr_rank[1])),
-      passing_first_downs = list(value = as.integer(team_totals$passing_first_downs[1]), rank = as.integer(team_totals$passing_first_downs_rank[1])),
-      sacks_suffered = list(value = as.integer(team_totals$sacks_suffered[1]), rank = as.integer(team_totals$sacks_suffered_rank[1])),
-      touchdowns = list(value = as.integer(team_totals$touchdowns[1]), rank = as.integer(team_totals$touchdowns_rank[1])),
-      interceptions_thrown = list(value = as.integer(team_totals$interceptions_thrown[1]), rank = as.integer(team_totals$interceptions_thrown_rank[1])),
-      fumbles_lost = list(value = as.integer(team_totals$fumbles_lost[1]), rank = as.integer(team_totals$fumbles_lost_rank[1]))
+      off_epa = list(value = round(team_totals$off_epa[1], 3), rank = as.integer(team_totals$off_epa_rank[1]), rankDisplay = team_totals$off_epa_rankDisplay[1]),
+      yards_per_game = list(value = round(team_totals$yards_per_game[1], 1), rank = as.integer(team_totals$yards_per_game_rank[1]), rankDisplay = team_totals$yards_per_game_rankDisplay[1]),
+      pass_yards_per_game = list(value = round(team_totals$pass_yards_per_game[1], 1), rank = as.integer(team_totals$pass_yards_per_game_rank[1]), rankDisplay = team_totals$pass_yards_per_game_rankDisplay[1]),
+      rush_yards_per_game = list(value = round(team_totals$rush_yards_per_game[1], 1), rank = as.integer(team_totals$rush_yards_per_game_rank[1]), rankDisplay = team_totals$rush_yards_per_game_rankDisplay[1]),
+      points_per_game = list(value = round(team_totals$points_per_game[1], 1), rank = as.integer(team_totals$points_per_game_rank[1]), rankDisplay = team_totals$points_per_game_rankDisplay[1]),
+      yards_per_play = list(value = round(team_totals$yards_per_play[1], 2), rank = as.integer(team_totals$yards_per_play_rank[1]), rankDisplay = team_totals$yards_per_play_rankDisplay[1]),
+      third_down_pct = list(value = round(team_totals$third_down_pct[1], 1), rank = as.integer(team_totals$third_down_pct_rank[1]), rankDisplay = team_totals$third_down_pct_rankDisplay[1]),
+      rushing_epa = list(value = round(team_totals$rushing_epa[1], 3), rank = as.integer(team_totals$rushing_epa_rank[1]), rankDisplay = team_totals$rushing_epa_rankDisplay[1]),
+      receiving_epa = list(value = round(team_totals$receiving_epa[1], 3), rank = as.integer(team_totals$receiving_epa_rank[1]), rankDisplay = team_totals$receiving_epa_rankDisplay[1]),
+      pacr = list(value = round(team_totals$pacr[1], 2), rank = as.integer(team_totals$pacr_rank[1]), rankDisplay = team_totals$pacr_rankDisplay[1]),
+      passing_first_downs = list(value = as.integer(team_totals$passing_first_downs[1]), rank = as.integer(team_totals$passing_first_downs_rank[1]), rankDisplay = team_totals$passing_first_downs_rankDisplay[1]),
+      sacks_suffered = list(value = as.integer(team_totals$sacks_suffered[1]), rank = as.integer(team_totals$sacks_suffered_rank[1]), rankDisplay = team_totals$sacks_suffered_rankDisplay[1]),
+      touchdowns = list(value = as.integer(team_totals$touchdowns[1]), rank = as.integer(team_totals$touchdowns_rank[1]), rankDisplay = team_totals$touchdowns_rankDisplay[1]),
+      interceptions_thrown = list(value = as.integer(team_totals$interceptions_thrown[1]), rank = as.integer(team_totals$interceptions_thrown_rank[1]), rankDisplay = team_totals$interceptions_thrown_rankDisplay[1]),
+      fumbles_lost = list(value = as.integer(team_totals$fumbles_lost[1]), rank = as.integer(team_totals$fumbles_lost_rank[1]), rankDisplay = team_totals$fumbles_lost_rankDisplay[1])
     ),
     defense = list(
-      def_epa = list(value = round(team_totals$def_epa[1], 3), rank = as.integer(team_totals$def_epa_rank[1])),
-      yards_allowed_per_game = list(value = round(team_totals$yards_allowed_per_game[1], 1), rank = as.integer(team_totals$yards_allowed_per_game_rank[1])),
-      pass_yards_allowed_per_game = list(value = round(team_totals$pass_yards_allowed_per_game[1], 1), rank = as.integer(team_totals$pass_yards_allowed_per_game_rank[1])),
-      rush_yards_allowed_per_game = list(value = round(team_totals$rush_yards_allowed_per_game[1], 1), rank = as.integer(team_totals$rush_yards_allowed_per_game_rank[1])),
-      points_allowed_per_game = list(value = round(team_totals$points_allowed_per_game[1], 1), rank = as.integer(team_totals$points_allowed_per_game_rank[1])),
-      third_down_pct_def = list(value = round(team_totals$third_down_pct_def[1], 1), rank = as.integer(team_totals$third_down_pct_def_rank[1])),
-      sacks_made = list(value = as.integer(team_totals$sacks_made[1]), rank = as.integer(team_totals$sacks_made_rank[1])),
-      interceptions_made = list(value = as.integer(team_totals$interceptions_made[1]), rank = as.integer(team_totals$interceptions_made_rank[1])),
-      fumbles_forced = list(value = as.integer(team_totals$fumbles_forced[1]), rank = as.integer(team_totals$fumbles_forced_rank[1])),
-      touchdowns_allowed = list(value = as.integer(team_totals$touchdowns_allowed[1]), rank = as.integer(team_totals$touchdowns_allowed_rank[1])),
-      turnover_differential = list(value = as.integer(team_totals$turnover_differential[1]), rank = as.integer(team_totals$turnover_differential_rank[1]))
+      def_epa = list(value = round(team_totals$def_epa[1], 3), rank = as.integer(team_totals$def_epa_rank[1]), rankDisplay = team_totals$def_epa_rankDisplay[1]),
+      yards_allowed_per_game = list(value = round(team_totals$yards_allowed_per_game[1], 1), rank = as.integer(team_totals$yards_allowed_per_game_rank[1]), rankDisplay = team_totals$yards_allowed_per_game_rankDisplay[1]),
+      pass_yards_allowed_per_game = list(value = round(team_totals$pass_yards_allowed_per_game[1], 1), rank = as.integer(team_totals$pass_yards_allowed_per_game_rank[1]), rankDisplay = team_totals$pass_yards_allowed_per_game_rankDisplay[1]),
+      rush_yards_allowed_per_game = list(value = round(team_totals$rush_yards_allowed_per_game[1], 1), rank = as.integer(team_totals$rush_yards_allowed_per_game_rank[1]), rankDisplay = team_totals$rush_yards_allowed_per_game_rankDisplay[1]),
+      points_allowed_per_game = list(value = round(team_totals$points_allowed_per_game[1], 1), rank = as.integer(team_totals$points_allowed_per_game_rank[1]), rankDisplay = team_totals$points_allowed_per_game_rankDisplay[1]),
+      third_down_pct_def = list(value = round(team_totals$third_down_pct_def[1], 1), rank = as.integer(team_totals$third_down_pct_def_rank[1]), rankDisplay = team_totals$third_down_pct_def_rankDisplay[1]),
+      sacks_made = list(value = as.integer(team_totals$sacks_made[1]), rank = as.integer(team_totals$sacks_made_rank[1]), rankDisplay = team_totals$sacks_made_rankDisplay[1]),
+      interceptions_made = list(value = as.integer(team_totals$interceptions_made[1]), rank = as.integer(team_totals$interceptions_made_rank[1]), rankDisplay = team_totals$interceptions_made_rankDisplay[1]),
+      fumbles_forced = list(value = as.integer(team_totals$fumbles_forced[1]), rank = as.integer(team_totals$fumbles_forced_rank[1]), rankDisplay = team_totals$fumbles_forced_rankDisplay[1]),
+      touchdowns_allowed = list(value = as.integer(team_totals$touchdowns_allowed[1]), rank = as.integer(team_totals$touchdowns_allowed_rank[1]), rankDisplay = team_totals$touchdowns_allowed_rankDisplay[1]),
+      turnover_differential = list(value = as.integer(team_totals$turnover_differential[1]), rank = as.integer(team_totals$turnover_differential_rank[1]), rankDisplay = team_totals$turnover_differential_rankDisplay[1])
     )
   )
 
@@ -1183,47 +1393,47 @@ build_team_json <- function(team_abbr, cum_epa_df, season_totals, top_players_df
   qb_json <- if (nrow(qb) > 0) {
     list(
       name = qb$player_name[1],
-      total_epa = list(value = na_to_null(round(qb$qb_epa_per_play[1], 2)), rank = na_to_null(as.integer(qb$qb_epa_per_play_rank[1]))),
-      passing_yards = list(value = na_to_null(as.integer(qb$passing_yards[1])), rank = na_to_null(as.integer(qb$passing_yards_rank[1]))),
-      passing_tds = list(value = na_to_null(as.integer(qb$passing_tds[1])), rank = na_to_null(as.integer(qb$passing_tds_rank[1]))),
-      completion_pct = list(value = na_to_null(round(qb$completion_pct[1], 1)), rank = na_to_null(as.integer(qb$completion_pct_rank[1]))),
-      passing_cpoe = list(value = na_to_null(round(qb$passing_cpoe[1], 3)), rank = na_to_null(as.integer(qb$passing_cpoe_rank[1]))),
-      pacr = list(value = na_to_null(round(qb$pacr[1], 2)), rank = na_to_null(as.integer(qb$pacr_rank[1]))),
-      passing_yards_per_game = list(value = na_to_null(round(qb$passing_yards_per_game[1], 1)), rank = na_to_null(as.integer(qb$passing_yards_per_game_rank[1]))),
-      interceptions = list(value = na_to_null(as.integer(qb$interceptions[1])), rank = na_to_null(as.integer(qb$interceptions_rank[1])))
+      total_epa = list(value = na_to_null(round(qb$qb_epa_per_play[1], 2)), rank = na_to_null(as.integer(qb$qb_epa_per_play_rank[1])), rankDisplay = na_to_null(qb$qb_epa_per_play_rankDisplay[1])),
+      passing_yards = list(value = na_to_null(as.integer(qb$passing_yards[1])), rank = na_to_null(as.integer(qb$passing_yards_rank[1])), rankDisplay = na_to_null(qb$passing_yards_rankDisplay[1])),
+      passing_tds = list(value = na_to_null(as.integer(qb$passing_tds[1])), rank = na_to_null(as.integer(qb$passing_tds_rank[1])), rankDisplay = na_to_null(qb$passing_tds_rankDisplay[1])),
+      completion_pct = list(value = na_to_null(round(qb$completion_pct[1], 1)), rank = na_to_null(as.integer(qb$completion_pct_rank[1])), rankDisplay = na_to_null(qb$completion_pct_rankDisplay[1])),
+      passing_cpoe = list(value = na_to_null(round(qb$passing_cpoe[1], 3)), rank = na_to_null(as.integer(qb$passing_cpoe_rank[1])), rankDisplay = na_to_null(qb$passing_cpoe_rankDisplay[1])),
+      pacr = list(value = na_to_null(round(qb$pacr[1], 2)), rank = na_to_null(as.integer(qb$pacr_rank[1])), rankDisplay = na_to_null(qb$pacr_rankDisplay[1])),
+      passing_yards_per_game = list(value = na_to_null(round(qb$passing_yards_per_game[1], 1)), rank = na_to_null(as.integer(qb$passing_yards_per_game_rank[1])), rankDisplay = na_to_null(qb$passing_yards_per_game_rankDisplay[1])),
+      interceptions = list(value = na_to_null(as.integer(qb$interceptions[1])), rank = na_to_null(as.integer(qb$interceptions_rank[1])), rankDisplay = na_to_null(qb$interceptions_rankDisplay[1]))
     )
   } else NULL
 
   rbs_json <- lapply(1:nrow(rbs), function(i) {
     list(
       name = rbs$player_name[i],
-      rushing_epa = list(value = na_to_null(round(rbs$rushing_epa[i], 2)), rank = na_to_null(as.integer(rbs$rushing_epa_rank[i]))),
-      rushing_yards = list(value = na_to_null(as.integer(rbs$rushing_yards[i])), rank = na_to_null(as.integer(rbs$rushing_yards_rank[i]))),
-      rushing_tds = list(value = na_to_null(as.integer(rbs$rushing_tds[i])), rank = na_to_null(as.integer(rbs$rushing_tds_rank[i]))),
-      yards_per_carry = list(value = na_to_null(round(rbs$rushing_yards_per_carry[i], 2)), rank = na_to_null(as.integer(rbs$rushing_yards_per_carry_rank[i]))),
-      rushing_yards_per_game = list(value = na_to_null(round(rbs$rushing_yards_per_game[i], 1)), rank = na_to_null(as.integer(rbs$rushing_yards_per_game_rank[i]))),
-      receptions = list(value = na_to_null(as.integer(rbs$receptions[i])), rank = na_to_null(as.integer(rbs$rb_receptions_rank[i]))),
-      receiving_yards = list(value = na_to_null(as.integer(rbs$receiving_yards[i])), rank = na_to_null(as.integer(rbs$rb_receiving_yards_rank[i]))),
-      receiving_tds = list(value = na_to_null(as.integer(rbs$receiving_tds[i])), rank = na_to_null(as.integer(rbs$rb_receiving_tds_rank[i]))),
-      receiving_yards_per_game = list(value = na_to_null(round(rbs$receiving_yards_per_game[i], 1)), rank = na_to_null(as.integer(rbs$rb_receiving_yards_per_game_rank[i]))),
-      target_share = list(value = na_to_null(round(rbs$target_share[i], 3)), rank = na_to_null(as.integer(rbs$target_share_rank[i])))
+      rushing_epa = list(value = na_to_null(round(rbs$rushing_epa[i], 2)), rank = na_to_null(as.integer(rbs$rushing_epa_rank[i])), rankDisplay = na_to_null(rbs$rushing_epa_rankDisplay[i])),
+      rushing_yards = list(value = na_to_null(as.integer(rbs$rushing_yards[i])), rank = na_to_null(as.integer(rbs$rushing_yards_rank[i])), rankDisplay = na_to_null(rbs$rushing_yards_rankDisplay[i])),
+      rushing_tds = list(value = na_to_null(as.integer(rbs$rushing_tds[i])), rank = na_to_null(as.integer(rbs$rushing_tds_rank[i])), rankDisplay = na_to_null(rbs$rushing_tds_rankDisplay[i])),
+      yards_per_carry = list(value = na_to_null(round(rbs$rushing_yards_per_carry[i], 2)), rank = na_to_null(as.integer(rbs$rushing_yards_per_carry_rank[i])), rankDisplay = na_to_null(rbs$rushing_yards_per_carry_rankDisplay[i])),
+      rushing_yards_per_game = list(value = na_to_null(round(rbs$rushing_yards_per_game[i], 1)), rank = na_to_null(as.integer(rbs$rushing_yards_per_game_rank[i])), rankDisplay = na_to_null(rbs$rushing_yards_per_game_rankDisplay[i])),
+      receptions = list(value = na_to_null(as.integer(rbs$receptions[i])), rank = na_to_null(as.integer(rbs$rb_receptions_rank[i])), rankDisplay = na_to_null(rbs$rb_receptions_rankDisplay[i])),
+      receiving_yards = list(value = na_to_null(as.integer(rbs$receiving_yards[i])), rank = na_to_null(as.integer(rbs$rb_receiving_yards_rank[i])), rankDisplay = na_to_null(rbs$rb_receiving_yards_rankDisplay[i])),
+      receiving_tds = list(value = na_to_null(as.integer(rbs$receiving_tds[i])), rank = na_to_null(as.integer(rbs$rb_receiving_tds_rank[i])), rankDisplay = na_to_null(rbs$rb_receiving_tds_rankDisplay[i])),
+      receiving_yards_per_game = list(value = na_to_null(round(rbs$receiving_yards_per_game[i], 1)), rank = na_to_null(as.integer(rbs$rb_receiving_yards_per_game_rank[i])), rankDisplay = na_to_null(rbs$rb_receiving_yards_per_game_rankDisplay[i])),
+      target_share = list(value = na_to_null(round(rbs$target_share[i], 3)), rank = na_to_null(as.integer(rbs$target_share_rank[i])), rankDisplay = na_to_null(rbs$target_share_rankDisplay[i]))
     )
   })
 
   receivers_json <- lapply(1:nrow(receivers), function(i) {
     list(
       name = receivers$player_name[i],
-      receiving_epa = list(value = na_to_null(round(receivers$receiving_epa[i], 2)), rank = na_to_null(as.integer(receivers$receiving_epa_rank[i]))),
-      receiving_yards = list(value = na_to_null(as.integer(receivers$receiving_yards[i])), rank = na_to_null(as.integer(receivers$receiving_yards_rank[i]))),
-      receiving_tds = list(value = na_to_null(as.integer(receivers$receiving_tds[i])), rank = na_to_null(as.integer(receivers$receiving_tds_rank[i]))),
-      receptions = list(value = na_to_null(as.integer(receivers$receptions[i])), rank = na_to_null(as.integer(receivers$receptions_rank[i]))),
-      yards_per_reception = list(value = na_to_null(round(receivers$receiving_yards_per_reception[i], 2)), rank = na_to_null(as.integer(receivers$receiving_yards_per_reception_rank[i]))),
-      receiving_yards_per_game = list(value = na_to_null(round(receivers$receiving_yards_per_game[i], 1)), rank = na_to_null(as.integer(receivers$receiving_yards_per_game_rank[i]))),
-      catch_pct = list(value = na_to_null(round(receivers$catch_pct[i], 1)), rank = na_to_null(as.integer(receivers$catch_pct_rank[i]))),
-      wopr = list(value = na_to_null(round(receivers$wopr[i], 2)), rank = na_to_null(as.integer(receivers$wopr_rank[i]))),
-      racr = list(value = na_to_null(round(receivers$racr[i], 2)), rank = na_to_null(as.integer(receivers$racr_rank[i]))),
-      target_share = list(value = na_to_null(round(receivers$target_share[i], 3)), rank = na_to_null(as.integer(receivers$target_share_rank[i]))),
-      air_yards_share = list(value = na_to_null(round(receivers$air_yards_share[i], 2)), rank = na_to_null(as.integer(receivers$air_yards_share_rank[i])))
+      receiving_epa = list(value = na_to_null(round(receivers$receiving_epa[i], 2)), rank = na_to_null(as.integer(receivers$receiving_epa_rank[i])), rankDisplay = na_to_null(receivers$receiving_epa_rankDisplay[i])),
+      receiving_yards = list(value = na_to_null(as.integer(receivers$receiving_yards[i])), rank = na_to_null(as.integer(receivers$receiving_yards_rank[i])), rankDisplay = na_to_null(receivers$receiving_yards_rankDisplay[i])),
+      receiving_tds = list(value = na_to_null(as.integer(receivers$receiving_tds[i])), rank = na_to_null(as.integer(receivers$receiving_tds_rank[i])), rankDisplay = na_to_null(receivers$receiving_tds_rankDisplay[i])),
+      receptions = list(value = na_to_null(as.integer(receivers$receptions[i])), rank = na_to_null(as.integer(receivers$receptions_rank[i])), rankDisplay = na_to_null(receivers$receptions_rankDisplay[i])),
+      yards_per_reception = list(value = na_to_null(round(receivers$receiving_yards_per_reception[i], 2)), rank = na_to_null(as.integer(receivers$receiving_yards_per_reception_rank[i])), rankDisplay = na_to_null(receivers$receiving_yards_per_reception_rankDisplay[i])),
+      receiving_yards_per_game = list(value = na_to_null(round(receivers$receiving_yards_per_game[i], 1)), rank = na_to_null(as.integer(receivers$receiving_yards_per_game_rank[i])), rankDisplay = na_to_null(receivers$receiving_yards_per_game_rankDisplay[i])),
+      catch_pct = list(value = na_to_null(round(receivers$catch_pct[i], 1)), rank = na_to_null(as.integer(receivers$catch_pct_rank[i])), rankDisplay = na_to_null(receivers$catch_pct_rankDisplay[i])),
+      wopr = list(value = na_to_null(round(receivers$wopr[i], 2)), rank = na_to_null(as.integer(receivers$wopr_rank[i])), rankDisplay = na_to_null(receivers$wopr_rankDisplay[i])),
+      racr = list(value = na_to_null(round(receivers$racr[i], 2)), rank = na_to_null(as.integer(receivers$racr_rank[i])), rankDisplay = na_to_null(receivers$racr_rankDisplay[i])),
+      target_share = list(value = na_to_null(round(receivers$target_share[i], 3)), rank = na_to_null(as.integer(receivers$target_share_rank[i])), rankDisplay = na_to_null(receivers$target_share_rankDisplay[i])),
+      air_yards_share = list(value = na_to_null(round(receivers$air_yards_share[i], 2)), rank = na_to_null(as.integer(receivers$air_yards_share_rank[i])), rankDisplay = na_to_null(receivers$air_yards_share_rankDisplay[i]))
     )
   })
 
@@ -1266,8 +1476,20 @@ for (i in 1:nrow(current_week_games)) {
   home_json <- build_team_json(home_team, cum_epa_by_team, team_season_totals, top_players, team_stats_weekly)
   away_json <- build_team_json(away_team, cum_epa_by_team, team_season_totals, top_players, team_stats_weekly)
 
+  # Get game date and time
+  # Format: "2025-09-07T13:00:00Z" (ISO 8601 format in UTC)
+  game_datetime <- NULL
+  if (!is.null(game$gameday) && !is.na(game$gameday) &&
+      !is.null(game$gametime) && !is.na(game$gametime)) {
+    # Combine gameday and gametime
+    # gametime is in format "HH:MM" (Eastern Time)
+    # Convert to ISO 8601 format (we'll assume Eastern Time and add offset)
+    game_datetime <- paste0(game$gameday, "T", game$gametime, ":00-05:00")
+  }
+
   # Build matchup JSON
   matchup <- list(
+    game_datetime = game_datetime,
     odds = odds,
     h2h_record = I(h2h),  # Use I() to prevent auto_unbox from converting empty list to null
     common_opponents = common_opps,

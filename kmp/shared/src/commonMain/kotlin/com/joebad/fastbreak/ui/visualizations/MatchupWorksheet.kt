@@ -131,22 +131,139 @@ private fun getTeamRankColor(rank: Int?): Color {
 
 /**
  * Fast O(1) lookup for player rank colors - eliminates per-frame color calculations
+ * For ranks > 300, returns darkest red as fallback
  */
 private fun getPlayerRankColor(rank: Int?): Color {
-    return playerRankColors[rank ?: 0] ?: Color.Transparent
+    if (rank == null || rank == 0) return Color.Transparent
+    // Return darkest red for any rank not in the map (should cover ranks > 300)
+    return playerRankColors[rank] ?: Color(139, 0, 0)
 }
 
 /**
- * Helper function to format a Double to a specific number of decimal places
+ * Helper function to format a Double to display with appropriate precision
+ * Shows up to 3 decimal places (thousandths) when values have that precision
  */
 private fun Double.format(decimals: Int): String {
-    val multiplier = when (decimals) {
-        1 -> 10.0
-        2 -> 100.0
-        3 -> 1000.0
-        else -> 1.0
+    // Always format to 3 decimal places to preserve precision from JSON
+    val multiplier = 1000.0
+    val rounded = kotlin.math.round(this * multiplier) / multiplier
+    val formatted = rounded.toString()
+
+    // If the string already has the right format, return it
+    // Otherwise ensure we have up to 3 decimal places
+    return if (formatted.contains('.')) {
+        val parts = formatted.split('.')
+        val decimalPart = parts[1].padEnd(3, '0').take(3)
+        val result = "${parts[0]}.$decimalPart"
+        // Remove trailing zeros
+        result.trimEnd('0').trimEnd('.')
+    } else {
+        formatted
     }
-    return (round(this * multiplier) / multiplier).toString()
+}
+
+/**
+ * Format game datetime string to display format
+ * Input: "2026-01-10T16:30:00-05:00"
+ * Output: "Friday January 10, 2026 @ 4:30pm ET"
+ */
+private fun formatGameDateTime(datetime: String): String {
+    return try {
+        // Parse the ISO 8601 datetime string
+        // Format: "2026-01-10T16:30:00-05:00"
+        val parts = datetime.split("T")
+        if (parts.size != 2) return datetime
+
+        val datePart = parts[0]
+        val timePart = parts[1].substringBefore("-").substringBefore("+")
+
+        // Parse date components
+        val dateComponents = datePart.split("-")
+        if (dateComponents.size != 3) return datetime
+
+        val year = dateComponents[0].toIntOrNull() ?: return datetime
+        val month = dateComponents[1].toIntOrNull() ?: return datetime
+        val day = dateComponents[2].toIntOrNull() ?: return datetime
+
+        // Parse time components
+        val timeComponents = timePart.split(":")
+        if (timeComponents.size < 2) return datetime
+
+        val hour = timeComponents[0].toIntOrNull() ?: return datetime
+        val minute = timeComponents[1].toIntOrNull() ?: return datetime
+
+        // Format day of week (simple calculation - not perfectly accurate but close enough)
+        val dayOfWeek = getDayOfWeek(year, month, day)
+
+        // Format month name
+        val monthName = getMonthName(month)
+
+        // Format time (12-hour with am/pm)
+        val (hour12, ampm) = if (hour == 0) {
+            Pair(12, "am")
+        } else if (hour < 12) {
+            Pair(hour, "am")
+        } else if (hour == 12) {
+            Pair(12, "pm")
+        } else {
+            Pair(hour - 12, "pm")
+        }
+
+        val minuteStr = if (minute == 0) "" else ":${minute.toString().padStart(2, '0')}"
+
+        "$dayOfWeek $monthName $day, $year @ $hour12$minuteStr$ampm ET"
+    } catch (e: Exception) {
+        datetime
+    }
+}
+
+/**
+ * Get day of week name from date components
+ */
+private fun getDayOfWeek(year: Int, month: Int, day: Int): String {
+    // Zeller's congruence algorithm
+    val adjustedMonth = if (month < 3) month + 12 else month
+    val adjustedYear = if (month < 3) year - 1 else year
+
+    val q = day
+    val m = adjustedMonth
+    val k = adjustedYear % 100
+    val j = adjustedYear / 100
+
+    val h = (q + ((13 * (m + 1)) / 5) + k + (k / 4) + (j / 4) - (2 * j)) % 7
+
+    // Zeller's congruence returns: 0=Saturday, 1=Sunday, 2=Monday, etc.
+    return when (h % 7) {
+        0 -> "Saturday"
+        1 -> "Sunday"
+        2 -> "Monday"
+        3 -> "Tuesday"
+        4 -> "Wednesday"
+        5 -> "Thursday"
+        6 -> "Friday"
+        else -> ""
+    }
+}
+
+/**
+ * Get month name from month number
+ */
+private fun getMonthName(month: Int): String {
+    return when (month) {
+        1 -> "January"
+        2 -> "February"
+        3 -> "March"
+        4 -> "April"
+        5 -> "May"
+        6 -> "June"
+        7 -> "July"
+        8 -> "August"
+        9 -> "September"
+        10 -> "October"
+        11 -> "November"
+        12 -> "December"
+        else -> ""
+    }
 }
 
 /**
@@ -270,10 +387,12 @@ private fun ThreeColumnRow(
 @Composable
 private fun FiveColumnRowWithRanks(
     leftValue: String,
-    leftRank: Int?,
+    leftRank: Int?,  // Numeric rank for color coding
+    leftRankDisplay: String?,  // Display string with "T" prefix for ties
     centerText: String,
     rightValue: String,
-    rightRank: Int?,
+    rightRank: Int?,  // Numeric rank for color coding
+    rightRankDisplay: String?,  // Display string with "T" prefix for ties
     advantage: Int = 0,
     usePlayerRankColors: Boolean = false // true for player stats (64 scale), false for team stats (32 scale)
 ) {
@@ -311,7 +430,7 @@ private fun FiveColumnRowWithRanks(
         // Left rank box
         Box(
             modifier = Modifier
-                .width(28.dp)
+                .width(32.dp)
                 .background(
                     if (usePlayerRankColors) getPlayerRankColor(leftRank) else getTeamRankColor(leftRank),
                     RoundedCornerShape(4.dp)
@@ -320,11 +439,12 @@ private fun FiveColumnRowWithRanks(
             contentAlignment = Alignment.Center
         ) {
             Text(
-                text = leftRank?.toString() ?: "-",
+                text = leftRankDisplay ?: "-",
                 style = MaterialTheme.typography.bodySmall,
-                fontSize = 10.sp,
+                fontSize = 9.sp,
                 fontWeight = FontWeight.Bold,
-                color = Color.White
+                color = Color.White,
+                maxLines = 1
             )
         }
 
@@ -347,7 +467,7 @@ private fun FiveColumnRowWithRanks(
         // Right rank box
         Box(
             modifier = Modifier
-                .width(28.dp)
+                .width(32.dp)
                 .background(
                     if (usePlayerRankColors) getPlayerRankColor(rightRank) else getTeamRankColor(rightRank),
                     RoundedCornerShape(4.dp)
@@ -356,11 +476,12 @@ private fun FiveColumnRowWithRanks(
             contentAlignment = Alignment.Center
         ) {
             Text(
-                text = rightRank?.toString() ?: "-",
+                text = rightRankDisplay ?: "-",
                 style = MaterialTheme.typography.bodySmall,
-                fontSize = 10.sp,
+                fontSize = 9.sp,
                 fontWeight = FontWeight.Bold,
-                color = Color.White
+                color = Color.White,
+                maxLines = 1
             )
         }
 
@@ -503,23 +624,28 @@ fun MatchupWorksheet(
     modifier: Modifier = Modifier,
     highlightedTeamCodes: Set<String> = emptySet()
 ) {
-    // Reorder matchups to put highlighted team matchups first
+    // Reorder matchups to put highlighted team matchups first, but sort by game time within each group
     val matchups = remember(visualization.dataPoints, highlightedTeamCodes) {
-        val allMatchups = visualization.dataPoints.toList()
+        // First, sort all matchups by game time (earliest first)
+        val sortedByTime = visualization.dataPoints.toList().sortedBy { (_, matchup) ->
+            // Parse the ISO 8601 datetime string for sorting
+            // If null or invalid, put at the end
+            matchup.game_datetime ?: "9999-12-31T23:59:59Z"
+        }
 
         if (highlightedTeamCodes.isEmpty()) {
-            allMatchups
+            sortedByTime
         } else {
             // Partition matchups into those with highlighted teams and those without
             // Matchup keys are in format "away-home" (e.g., "buf-kc")
             // Search for the 3-letter team code (case-insensitive) in the key
-            val (pinnedMatchups, otherMatchups) = allMatchups.partition { (key, _) ->
+            val (pinnedMatchups, otherMatchups) = sortedByTime.partition { (key, _) ->
                 val teams = key.split("-")
                 highlightedTeamCodes.any { code ->
                     teams.any { team -> team.equals(code, ignoreCase = true) }
                 }
             }
-            // Put pinned matchups first, followed by others
+            // Put pinned matchups first (already sorted by time), followed by others (also sorted by time)
             pinnedMatchups + otherMatchups
         }
     }
@@ -668,13 +794,16 @@ private sealed class RowData(val key: String) {
     data class FiveColumn(
         val k: String,
         val leftValue: String,
-        val leftRank: Int?,
+        val leftRank: Int?,  // Numeric rank for color coding
+        val leftRankDisplay: String?,  // Display string with "T" prefix
         val centerText: String,
         val rightValue: String,
-        val rightRank: Int?,
+        val rightRank: Int?,  // Numeric rank for color coding
+        val rightRankDisplay: String?,  // Display string with "T" prefix
         val advantage: Int,
         val usePlayerRankColors: Boolean
     ) : RowData(k)
+    data class DateText(val k: String, val text: String) : RowData(k)
 }
 
 @Composable
@@ -755,6 +884,12 @@ private fun StatsTab(
             // Spacer
             add(RowData.Spacer("top_spacer", 8.dp))
 
+            // Game date/time
+            matchup.game_datetime?.let { datetime ->
+                add(RowData.DateText("game_date", formatGameDateTime(datetime)))
+                add(RowData.Spacer("date_spacer", 8.dp))
+            }
+
             // Odds rows
             oddsDisplay?.let { odds ->
                 val hasData = odds.homeSpread.isNotEmpty() || odds.homeMoneyline != null ||
@@ -802,8 +937,10 @@ private fun StatsTab(
                 if (awayStat != null && homeStat != null) {
                     val awayValue = awayStat.value
                     val awayRank = awayStat.rank
+                    val awayRankDisplay = awayStat.rankDisplay
                     val homeValue = homeStat.value
                     val homeRank = homeStat.rank
+                    val homeRankDisplay = homeStat.rankDisplay
 
                     val lowerIsBetter = key.contains("sacks_suffered") ||
                                       key.contains("interceptions_thrown") ||
@@ -828,7 +965,7 @@ private fun StatsTab(
                     val awayText = awayValue?.format(decimals) ?: "-"
                     val homeText = homeValue?.format(decimals) ?: "-"
 
-                    add(RowData.FiveColumn("team_off_$key", awayText, awayRank, label, homeText, homeRank, advantage, false))
+                    add(RowData.FiveColumn("team_off_$key", awayText, awayRank, awayRankDisplay, label, homeText, homeRank, homeRankDisplay, advantage, false))
                 }
             }
 
@@ -855,8 +992,10 @@ private fun StatsTab(
                 if (awayStat != null && homeStat != null) {
                     val awayValue = awayStat.value
                     val awayRank = awayStat.rank
+                    val awayRankDisplay = awayStat.rankDisplay
                     val homeValue = homeStat.value
                     val homeRank = homeStat.rank
+                    val homeRankDisplay = homeStat.rankDisplay
 
                     val higherIsBetter = key == "sacks_made" || key == "interceptions_made" ||
                                        key == "fumbles_forced" || key == "turnover_differential"
@@ -882,7 +1021,7 @@ private fun StatsTab(
                     val awayText = awayValue?.format(decimals) ?: "-"
                     val homeText = homeValue?.format(decimals) ?: "-"
 
-                    add(RowData.FiveColumn("team_def_$key", awayText, awayRank, label, homeText, homeRank, advantage, false))
+                    add(RowData.FiveColumn("team_def_$key", awayText, awayRank, awayRankDisplay, label, homeText, homeRank, homeRankDisplay, advantage, false))
                 }
             }
 
@@ -913,8 +1052,10 @@ private fun StatsTab(
                     val homeStat = accessor(homeQB)
                     val awayValue = awayStat.value
                     val awayRank = awayStat.rank
+                    val awayRankDisplay = awayStat.rankDisplay
                     val homeValue = homeStat.value
                     val homeRank = homeStat.rank
+                    val homeRankDisplay = homeStat.rankDisplay
                     val lowerIsBetter = label == "INTs"
                     val advantage = if (awayValue != null && homeValue != null) {
                         if (lowerIsBetter) when {
@@ -929,7 +1070,7 @@ private fun StatsTab(
                     } else 0
                     val awayText = awayValue?.format(decimals) ?: "-"
                     val homeText = homeValue?.format(decimals) ?: "-"
-                    add(RowData.FiveColumn("qb_$label", awayText, awayRank, label, homeText, homeRank, advantage, false))
+                    add(RowData.FiveColumn("qb_$label", awayText, awayRank, awayRankDisplay, label, homeText, homeRank, homeRankDisplay, advantage, false))
                 }
                 add(RowData.Spacer("qb_spacer", 4.dp))
             }
@@ -962,8 +1103,10 @@ private fun StatsTab(
                     val homeStat = accessor(homeRB)
                     val awayValue = awayStat.value
                     val awayRank = awayStat.rank
+                    val awayRankDisplay = awayStat.rankDisplay
                     val homeValue = homeStat.value
                     val homeRank = homeStat.rank
+                    val homeRankDisplay = homeStat.rankDisplay
                     val advantage = if (awayValue != null && homeValue != null) when {
                         awayValue > homeValue -> -1
                         awayValue < homeValue -> 1
@@ -971,7 +1114,7 @@ private fun StatsTab(
                     } else 0
                     val awayText = awayValue?.let { if (decimals == 0) it.toInt().toString() else it.format(decimals) } ?: "-"
                     val homeText = homeValue?.let { if (decimals == 0) it.toInt().toString() else it.format(decimals) } ?: "-"
-                    add(RowData.FiveColumn("rb${i}_$label", awayText, awayRank, label, homeText, homeRank, advantage, true))
+                    add(RowData.FiveColumn("rb${i}_$label", awayText, awayRank, awayRankDisplay, label, homeText, homeRank, homeRankDisplay, advantage, true))
                 }
                 add(RowData.Spacer("rb${i}_spacer", 4.dp))
             }
@@ -1005,8 +1148,10 @@ private fun StatsTab(
                     val homeStat = accessor(homeWR)
                     val awayValue = awayStat.value
                     val awayRank = awayStat.rank
+                    val awayRankDisplay = awayStat.rankDisplay
                     val homeValue = homeStat.value
                     val homeRank = homeStat.rank
+                    val homeRankDisplay = homeStat.rankDisplay
                     val advantage = if (awayValue != null && homeValue != null) when {
                         awayValue > homeValue -> -1
                         awayValue < homeValue -> 1
@@ -1014,7 +1159,7 @@ private fun StatsTab(
                     } else 0
                     val awayText = awayValue?.let { if (decimals == 0) it.toInt().toString() else it.format(decimals) } ?: "-"
                     val homeText = homeValue?.let { if (decimals == 0) it.toInt().toString() else it.format(decimals) } ?: "-"
-                    add(RowData.FiveColumn("wr${i}_$label", awayText, awayRank, label, homeText, homeRank, advantage, true))
+                    add(RowData.FiveColumn("wr${i}_$label", awayText, awayRank, awayRankDisplay, label, homeText, homeRank, homeRankDisplay, advantage, true))
                 }
                 add(RowData.Spacer("wr${i}_spacer", 4.dp))
             }
@@ -1144,11 +1289,22 @@ private fun StatsTab(
                         is RowData.FiveColumn -> FiveColumnRowWithRanks(
                             leftValue = row.leftValue,
                             leftRank = row.leftRank,
+                            leftRankDisplay = row.leftRankDisplay,
                             centerText = row.centerText,
                             rightValue = row.rightValue,
                             rightRank = row.rightRank,
+                            rightRankDisplay = row.rightRankDisplay,
                             advantage = row.advantage,
                             usePlayerRankColors = row.usePlayerRankColors
+                        )
+                        is RowData.DateText -> Text(
+                            text = row.text,
+                            style = MaterialTheme.typography.bodySmall,
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(start = 8.dp, end = 8.dp)
                         )
                     }
                 }
@@ -1231,9 +1387,11 @@ private fun TeamHeader(
 private data class StatRow(
     val label: String,
     val awayText: String,
-    val awayRank: Int?,
+    val awayRank: Int?,  // Numeric rank for color coding
+    val awayRankDisplay: String?,  // Display string with "T" prefix
     val homeText: String,
-    val homeRank: Int?,
+    val homeRank: Int?,  // Numeric rank for color coding
+    val homeRankDisplay: String?,  // Display string with "T" prefix
     val advantage: Int
 )
 
@@ -1288,8 +1446,10 @@ private fun TeamStatsComparison(
 
             val awayValue = awayStat.value
             val awayRank = awayStat.rank
+            val awayRankDisplay = awayStat.rankDisplay
             val homeValue = homeStat.value
             val homeRank = homeStat.rank
+            val homeRankDisplay = homeStat.rankDisplay
 
             val lowerIsBetter = key.contains("sacks_suffered") ||
                               key.contains("interceptions_thrown") ||
@@ -1314,7 +1474,7 @@ private fun TeamStatsComparison(
             val awayText = awayValue?.format(decimals) ?: "-"
             val homeText = homeValue?.format(decimals) ?: "-"
 
-            StatRow(label, awayText, awayRank, homeText, homeRank, advantage)
+            StatRow(label, awayText, awayRank, awayRankDisplay, homeText, homeRank, homeRankDisplay, advantage)
         }
     }
 
@@ -1326,8 +1486,10 @@ private fun TeamStatsComparison(
 
             val awayValue = awayStat.value
             val awayRank = awayStat.rank
+            val awayRankDisplay = awayStat.rankDisplay
             val homeValue = homeStat.value
             val homeRank = homeStat.rank
+            val homeRankDisplay = homeStat.rankDisplay
 
             val higherIsBetter = key == "sacks_made" || key == "interceptions_made" ||
                                key == "fumbles_forced" || key == "turnover_differential"
@@ -1353,7 +1515,7 @@ private fun TeamStatsComparison(
             val awayText = awayValue?.format(decimals) ?: "-"
             val homeText = homeValue?.format(decimals) ?: "-"
 
-            StatRow(label, awayText, awayRank, homeText, homeRank, advantage)
+            StatRow(label, awayText, awayRank, awayRankDisplay, homeText, homeRank, homeRankDisplay, advantage)
         }
     }
 
@@ -1372,9 +1534,11 @@ private fun TeamStatsComparison(
                     FiveColumnRowWithRanks(
                         leftValue = row.awayText,
                         leftRank = row.awayRank,
+                        leftRankDisplay = row.awayRankDisplay,
                         centerText = row.label,
                         rightValue = row.homeText,
                         rightRank = row.homeRank,
+                        rightRankDisplay = row.homeRankDisplay,
                         advantage = row.advantage
                     )
                 }
@@ -1397,9 +1561,11 @@ private fun TeamStatsComparison(
                     FiveColumnRowWithRanks(
                         leftValue = row.awayText,
                         leftRank = row.awayRank,
+                        leftRankDisplay = row.awayRankDisplay,
                         centerText = row.label,
                         rightValue = row.homeText,
                         rightRank = row.homeRank,
+                        rightRankDisplay = row.homeRankDisplay,
                         advantage = row.advantage
                     )
                 }
@@ -1455,8 +1621,10 @@ private fun PlayerStatsComparison(
                 val homeStat = accessor(homeQB)
                 val awayValue = awayStat.value
                 val awayRank = awayStat.rank
+                val awayRankDisplay = awayStat.rankDisplay
                 val homeValue = homeStat.value
                 val homeRank = homeStat.rank
+                val homeRankDisplay = homeStat.rankDisplay
                 val lowerIsBetter = label == "INTs"
                 val advantage = if (awayValue != null && homeValue != null) {
                     if (lowerIsBetter) when {
@@ -1469,8 +1637,8 @@ private fun PlayerStatsComparison(
                         else -> 0
                     }
                 } else 0
-                StatRow(label, awayValue?.format(decimals) ?: "-", awayRank,
-                       homeValue?.format(decimals) ?: "-", homeRank, advantage)
+                StatRow(label, awayValue?.format(decimals) ?: "-", awayRank, awayRankDisplay,
+                       homeValue?.format(decimals) ?: "-", homeRank, homeRankDisplay, advantage)
             }
             PlayerComparison(awayQBName, homeQBName, "QB", stats)
         }
@@ -1501,8 +1669,10 @@ private fun PlayerStatsComparison(
                     val homeStat = accessor(homeRB)
                     val awayValue = awayStat.value
                     val awayRank = awayStat.rank
+                    val awayRankDisplay = awayStat.rankDisplay
                     val homeValue = homeStat.value
                     val homeRank = homeStat.rank
+                    val homeRankDisplay = homeStat.rankDisplay
                     val advantage = if (awayValue != null && homeValue != null) when {
                         awayValue > homeValue -> -1
                         awayValue < homeValue -> 1
@@ -1510,7 +1680,7 @@ private fun PlayerStatsComparison(
                     } else 0
                     val awayText = awayValue?.let { if (decimals == 0) it.toInt().toString() else it.format(decimals) } ?: "-"
                     val homeText = homeValue?.let { if (decimals == 0) it.toInt().toString() else it.format(decimals) } ?: "-"
-                    StatRow(label, awayText, awayRank, homeText, homeRank, advantage)
+                    StatRow(label, awayText, awayRank, awayRankDisplay, homeText, homeRank, homeRankDisplay, advantage)
                 }
                 PlayerComparison(awayRB.name, homeRB.name, "RB", stats)
             }
@@ -1543,8 +1713,10 @@ private fun PlayerStatsComparison(
                     val homeStat = accessor(homeWR)
                     val awayValue = awayStat.value
                     val awayRank = awayStat.rank
+                    val awayRankDisplay = awayStat.rankDisplay
                     val homeValue = homeStat.value
                     val homeRank = homeStat.rank
+                    val homeRankDisplay = homeStat.rankDisplay
                     val advantage = if (awayValue != null && homeValue != null) when {
                         awayValue > homeValue -> -1
                         awayValue < homeValue -> 1
@@ -1552,7 +1724,7 @@ private fun PlayerStatsComparison(
                     } else 0
                     val awayText = awayValue?.let { if (decimals == 0) it.toInt().toString() else it.format(decimals) } ?: "-"
                     val homeText = homeValue?.let { if (decimals == 0) it.toInt().toString() else it.format(decimals) } ?: "-"
-                    StatRow(label, awayText, awayRank, homeText, homeRank, advantage)
+                    StatRow(label, awayText, awayRank, awayRankDisplay, homeText, homeRank, homeRankDisplay, advantage)
                 }
                 PlayerComparison(awayWR.name, homeWR.name, "WR", stats)
             }
@@ -1577,9 +1749,11 @@ private fun PlayerStatsComparison(
                 FiveColumnRowWithRanks(
                     leftValue = stat.awayText,
                     leftRank = stat.awayRank,
+                    leftRankDisplay = stat.awayRankDisplay,
                     centerText = stat.label,
                     rightValue = stat.homeText,
                     rightRank = stat.homeRank,
+                    rightRankDisplay = stat.homeRankDisplay,
                     advantage = stat.advantage
                 )
             }
@@ -1600,9 +1774,11 @@ private fun PlayerStatsComparison(
                 FiveColumnRowWithRanks(
                     leftValue = stat.awayText,
                     leftRank = stat.awayRank,
+                    leftRankDisplay = stat.awayRankDisplay,
                     centerText = stat.label,
                     rightValue = stat.homeText,
                     rightRank = stat.homeRank,
+                    rightRankDisplay = stat.homeRankDisplay,
                     advantage = stat.advantage,
                     usePlayerRankColors = true
                 )
@@ -1624,9 +1800,11 @@ private fun PlayerStatsComparison(
                 FiveColumnRowWithRanks(
                     leftValue = stat.awayText,
                     leftRank = stat.awayRank,
+                    leftRankDisplay = stat.awayRankDisplay,
                     centerText = stat.label,
                     rightValue = stat.homeText,
                     rightRank = stat.homeRank,
+                    rightRankDisplay = stat.homeRankDisplay,
                     advantage = stat.advantage,
                     usePlayerRankColors = true
                 )

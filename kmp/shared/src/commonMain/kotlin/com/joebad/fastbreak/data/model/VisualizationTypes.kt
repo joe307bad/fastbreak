@@ -199,7 +199,7 @@ data class MatchupVisualization(
 @Serializable
 data class StatWithRank(
     val value: Double?,
-    val rank: Int?
+    val rank: String?  // Changed to String to support tied ranks like "T2"
 )
 
 @Serializable
@@ -281,7 +281,8 @@ data class CommonOpponentGame(
 @Serializable
 data class StatValue(
     val value: Double? = null,
-    val rank: Int? = null
+    val rank: Int? = null,  // Numeric rank for color coding (e.g., 1, 2, 2, 4)
+    val rankDisplay: String? = null  // Display string with "T" prefix for ties (e.g., "1", "T2", "T2", "4")
 )
 
 @Serializable
@@ -300,7 +301,8 @@ data class TeamStats(
 @Serializable
 data class PlayerStatValue(
     val value: Double? = null,
-    val rank: Int? = null
+    val rank: Int? = null,  // Numeric rank for color coding (e.g., 1, 2, 2, 4)
+    val rankDisplay: String? = null  // Display string with "T" prefix for ties (e.g., "1", "T2", "T2", "4")
 )
 
 @Serializable
@@ -381,6 +383,7 @@ typealias CommonOpponents = Map<String, Map<String, List<TeamGameResult>>>
 
 @Serializable
 data class MatchupV2(
+    val game_datetime: String? = null,
     val odds: OddsData? = null,
     val h2h_record: List<H2HGame> = emptyList(),
     val common_opponents: CommonOpponents? = null,

@@ -186,7 +186,7 @@ fun LineChartComponent(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(400.dp)
-                .padding(start = 4.dp, end = 4.dp, top = 16.dp, bottom = 4.dp)
+                .padding(start = 4.dp, end = 4.dp, top = 8.dp, bottom = 4.dp)
         ) {
             series.forEachIndexed { seriesIndex, lineSeries ->
                 if (lineSeries.dataPoints.size < 2) return@forEachIndexed

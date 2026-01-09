@@ -1998,8 +1998,8 @@ private fun ChartsTab(
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(scrollState)
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(24.dp)
+            .padding(top = 16.dp, bottom = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         // Cumulative EPA Chart
         CumulativeEPAChart(
@@ -2030,7 +2030,7 @@ private fun CumulativeEPAChart(
         text = "Cumulative EPA Over Season",
         style = MaterialTheme.typography.titleSmall,
         fontWeight = FontWeight.Bold,
-        modifier = Modifier.padding(bottom = 8.dp)
+        modifier = Modifier.padding(bottom = 4.dp)
     )
 
     val awayCumEPA = awayTeamData.team_stats.cum_epa_by_week
@@ -2086,7 +2086,7 @@ private fun CumulativeEPAChart(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(top = 8.dp),
+            .padding(top = 4.dp),
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -2241,7 +2241,7 @@ private fun WeeklyEPAScatterPlot(
         text = "Weekly Offensive vs Defensive EPA",
         style = MaterialTheme.typography.titleSmall,
         fontWeight = FontWeight.Bold,
-        modifier = Modifier.padding(bottom = 8.dp)
+        modifier = Modifier.padding(bottom = 4.dp)
     )
 
     // Week range filter badges - horizontally scrollable
@@ -2249,7 +2249,7 @@ private fun WeeklyEPAScatterPlot(
         modifier = Modifier
             .fillMaxWidth()
             .horizontalScroll(rememberScrollState())
-            .padding(bottom = 8.dp),
+            .padding(bottom = 4.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         WeekRangeBadge(
@@ -2355,7 +2355,7 @@ private fun WeeklyEPAScatterPlot(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(top = 8.dp),
+            .padding(top = 4.dp),
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -2406,7 +2406,7 @@ private fun CumulativeEPAChartV2(
         text = "Cumulative EPA Over Season",
         style = MaterialTheme.typography.titleSmall,
         fontWeight = FontWeight.Bold,
-        modifier = Modifier.padding(bottom = 8.dp)
+        modifier = Modifier.padding(bottom = 4.dp)
     )
 
     // Extract cum_epa_by_week data
@@ -2465,7 +2465,7 @@ private fun CumulativeEPAChartV2(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(top = 8.dp),
+            .padding(top = 4.dp),
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -2519,7 +2519,7 @@ private fun WeeklyEPAScatterPlotV2(
         text = "Weekly Offensive vs Defensive EPA",
         style = MaterialTheme.typography.titleSmall,
         fontWeight = FontWeight.Bold,
-        modifier = Modifier.padding(bottom = 8.dp)
+        modifier = Modifier.padding(bottom = 4.dp)
     )
 
     // Week range filter badges - horizontally scrollable
@@ -2527,7 +2527,7 @@ private fun WeeklyEPAScatterPlotV2(
         modifier = Modifier
             .fillMaxWidth()
             .horizontalScroll(rememberScrollState())
-            .padding(bottom = 8.dp),
+            .padding(bottom = 4.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         WeekRangeBadge(
@@ -2636,7 +2636,7 @@ private fun WeeklyEPAScatterPlotV2(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(top = 8.dp),
+            .padding(top = 4.dp),
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically
     ) {

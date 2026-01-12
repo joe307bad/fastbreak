@@ -147,9 +147,11 @@ fun BarChartComponent(
 
         val labelPositions = mutableMapOf<Int, Float>()
 
-        // Positive bars: line descends from max to 0 as we go left to right
+        // Positive bars: line descends from max value (with small buffer) to 0 as we go left to right
         if (positiveIndices.isNotEmpty()) {
-            val startY = paddedMaxValue
+            // Start at max value with a small buffer for label visibility (5% of range)
+            val buffer = (maxValue - minValue) * 0.05f
+            val startY = maxValue + buffer
             val endY = 0f
             positiveIndices.forEachIndexed { idx, dataIndex ->
                 // Linear interpolation based on bar index
@@ -159,12 +161,11 @@ fun BarChartComponent(
             }
         }
 
-        // Negative bars: line descends from 0 to min as we go left to right
-        // First negative bar (closest to 0) should have label near 0
-        // Last negative bar (most negative) should have label near paddedMinValue
+        // Negative bars: line descends from 0 to min value (with small buffer) as we go left to right
         if (negativeIndices.isNotEmpty()) {
+            val buffer = (maxValue - minValue) * 0.05f
             val startY = 0f
-            val endY = paddedMinValue
+            val endY = minValue - buffer
             negativeIndices.forEachIndexed { idx, dataIndex ->
                 // Linear interpolation based on position in negative bar sequence
                 val t = idx.toFloat() / negativeIndices.size.coerceAtLeast(1).toFloat()
@@ -173,24 +174,22 @@ fun BarChartComponent(
             }
         }
 
-        val result = coloredBars.mapIndexed { index, (point, color) ->
+        coloredBars.mapIndexed { index, (point, color) ->
             BarWithLayout(point, color, labelPositions[index] ?: 0f)
         }
-        println("BarChart: barsWithLayout created with ${result.size} bars:")
-        result.forEachIndexed { idx, bar ->
-            println("  Bar $idx: label=${bar.dataPoint.label}, value=${bar.dataPoint.value}, color=${bar.color}")
-        }
-        result
     }
 
     // Create axis models - use FloatLinearAxisModel for both to enable zoom/pan
     val xAxisModel = remember(data) {
-        val range = 0f..(data.size - 1).toFloat()
-        val rangeSize = range.endInclusive - range.start
+        val dataRange = 0f..(data.size - 1).toFloat()
+        val rangeSize = dataRange.endInclusive - dataRange.start
+        // Add padding to show labels at edges (10% on each side)
+        val padding = rangeSize * 0.1f
+        val paddedRange = (dataRange.start - padding)..(dataRange.endInclusive + padding)
         FloatLinearAxisModel(
-            range = range,
+            range = paddedRange,
             minViewExtent = rangeSize * 0.1f, // Allow zooming in to 10% of full range
-            maxViewExtent = rangeSize // Full range when zoomed out
+            maxViewExtent = paddedRange.endInclusive - paddedRange.start // Full padded range when zoomed out
         )
     }
 
@@ -285,9 +284,7 @@ fun BarChartComponent(
                 },
                 barWidth = 0.7f,
                 bar = { seriesIndex, groupIndex, barEntry ->
-                    val barInfo = barsWithLayout.getOrNull(seriesIndex)
-                    val barColor = barInfo?.color ?: Color.Magenta
-                    println("BarChart: bar lambda called - seriesIndex=$seriesIndex, groupIndex=$groupIndex, barInfo exists=${barInfo != null}, barColor=$barColor, label=${barInfo?.dataPoint?.label}")
+                    val barColor = barsWithLayout.getOrNull(seriesIndex)?.color ?: Color.Magenta
                     verticalSolidBar<Float, Float>(color = barColor)(this, seriesIndex, groupIndex, barEntry)
                 }
             )

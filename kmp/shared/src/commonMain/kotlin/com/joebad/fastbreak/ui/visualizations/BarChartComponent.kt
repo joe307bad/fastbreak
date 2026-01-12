@@ -22,8 +22,8 @@ import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.joebad.fastbreak.data.model.BarGraphDataPoint
-import io.github.koalaplot.core.bar.DefaultBar
 import io.github.koalaplot.core.bar.VerticalBarPlot
+import io.github.koalaplot.core.bar.verticalSolidBar
 import io.github.koalaplot.core.gestures.GestureConfig
 import io.github.koalaplot.core.line.LinePlot
 import io.github.koalaplot.core.style.LineStyle
@@ -173,9 +173,14 @@ fun BarChartComponent(
             }
         }
 
-        coloredBars.mapIndexed { index, (point, color) ->
+        val result = coloredBars.mapIndexed { index, (point, color) ->
             BarWithLayout(point, color, labelPositions[index] ?: 0f)
         }
+        println("BarChart: barsWithLayout created with ${result.size} bars:")
+        result.forEachIndexed { idx, bar ->
+            println("  Bar $idx: label=${bar.dataPoint.label}, value=${bar.dataPoint.value}, color=${bar.color}")
+        }
+        result
     }
 
     // Create axis models - use FloatLinearAxisModel for both to enable zoom/pan
@@ -279,11 +284,11 @@ fun BarChartComponent(
                     }
                 },
                 barWidth = 0.7f,
-                bar = { seriesIndex, groupIndex, entry ->
-                    val barInfo = barsWithLayout[groupIndex]
-                    val barColor = barInfo.color
-
-                    DefaultBar(brush = SolidColor(barColor))
+                bar = { seriesIndex, groupIndex, barEntry ->
+                    val barInfo = barsWithLayout.getOrNull(seriesIndex)
+                    val barColor = barInfo?.color ?: Color.Magenta
+                    println("BarChart: bar lambda called - seriesIndex=$seriesIndex, groupIndex=$groupIndex, barInfo exists=${barInfo != null}, barColor=$barColor, label=${barInfo?.dataPoint?.label}")
+                    verticalSolidBar<Float, Float>(color = barColor)(this, seriesIndex, groupIndex, barEntry)
                 }
             )
 

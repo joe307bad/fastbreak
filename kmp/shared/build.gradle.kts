@@ -30,9 +30,9 @@ val generateAppConfig = tasks.register("generateAppConfig") {
 kotlin {
     androidTarget {
         compilations.all {
-            kotlinOptions {
-                jvmTarget = "17"
-                freeCompilerArgs += listOf("-opt-in=androidx.compose.material3.ExperimentalMaterial3Api")
+            compilerOptions.configure {
+                jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
+                freeCompilerArgs.add("-opt-in=androidx.compose.material3.ExperimentalMaterial3Api")
             }
         }
     }

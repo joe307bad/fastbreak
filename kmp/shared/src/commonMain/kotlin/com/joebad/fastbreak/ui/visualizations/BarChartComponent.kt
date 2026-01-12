@@ -22,8 +22,9 @@ import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.joebad.fastbreak.data.model.BarGraphDataPoint
-import io.github.koalaplot.core.bar.DefaultVerticalBar
+import io.github.koalaplot.core.bar.DefaultBar
 import io.github.koalaplot.core.bar.VerticalBarPlot
+import io.github.koalaplot.core.gestures.GestureConfig
 import io.github.koalaplot.core.line.LinePlot
 import io.github.koalaplot.core.style.LineStyle
 import io.github.koalaplot.core.util.ExperimentalKoalaPlotApi
@@ -56,7 +57,13 @@ private fun formatToTenth(value: Float): String {
 /**
  * Reusable bar chart component using Koala Plot.
  * Supports both positive and negative values with pan and zoom.
- * Follows the same conventions as ScatterPlot.kt for consistency.
+ *
+ * Features:
+ * - Pan and zoom support via pinch/drag gestures
+ * - Labels and connector lines move with the chart during zoom/pan
+ * - Alternating colors for positive/negative values
+ * - Team highlighting support
+ * - Diagonal label positioning to minimize overlaps
  */
 @OptIn(ExperimentalKoalaPlotApi::class)
 @Composable
@@ -88,7 +95,7 @@ fun BarChartComponent(
     val maxValue = (data.maxOfOrNull { it.value } ?: 1.0).toFloat()
 
     // Add padding to Y range for better visualization and to ensure labels at edges are visible
-    val yPadding = (maxValue - minValue) * 0.25f  // Increased to 0.25f to ensure extreme end labels are fully visible
+    val yPadding = (maxValue - minValue) * 0.35f  // 35% padding to ensure extreme end labels are fully visible
     val paddedMinValue = minValue - yPadding
     val paddedMaxValue = maxValue + yPadding
 
@@ -171,19 +178,23 @@ fun BarChartComponent(
         }
     }
 
-    // Create axis models
+    // Create axis models - use FloatLinearAxisModel for both to enable zoom/pan
     val xAxisModel = remember(data) {
-        CategoryAxisModel(
-            categories = data.map { it.label },
-            firstCategoryIsZero = false
+        val range = 0f..(data.size - 1).toFloat()
+        val rangeSize = range.endInclusive - range.start
+        FloatLinearAxisModel(
+            range = range,
+            minViewExtent = rangeSize * 0.1f, // Allow zooming in to 10% of full range
+            maxViewExtent = rangeSize // Full range when zoomed out
         )
     }
 
     val yAxisModel = remember(paddedMinValue, paddedMaxValue) {
+        val rangeSize = paddedMaxValue - paddedMinValue
         FloatLinearAxisModel(
-            paddedMinValue..paddedMaxValue,
-            allowZooming = false,
-            allowPanning = false
+            range = paddedMinValue..paddedMaxValue,
+            minViewExtent = rangeSize * 0.1f, // Allow zooming in to 10% of full range
+            maxViewExtent = rangeSize // Full range when zoomed out
         )
     }
 
@@ -200,6 +211,12 @@ fun BarChartComponent(
             XYGraph(
             xAxisModel = xAxisModel,
             yAxisModel = yAxisModel,
+            gestureConfig = GestureConfig(
+                panXEnabled = true,
+                panYEnabled = true,
+                zoomXEnabled = true,
+                zoomYEnabled = true
+            ),
             xAxisStyle = rememberAxisStyle(
                 color = MaterialTheme.colorScheme.onSurface,
                 tickPosition = TickPosition.Outside,
@@ -210,16 +227,27 @@ fun BarChartComponent(
                 tickPosition = TickPosition.Outside,
                 labelRotation = 0
             ),
-            xAxisLabels = {}, // Remove x-axis labels
-            xAxisTitle = {},
-            yAxisLabels = { value: Float ->
+            xAxisLabels = @Composable { value: Float ->
+                // Show custom labels for integer values that correspond to bar indices
+                val index = value.toInt()
+                if (value == index.toFloat() && index in data.indices) {
+                    Text(
+                        text = data[index].label,
+                        fontSize = 10.sp,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.rotateVertically(VerticalRotation.COUNTER_CLOCKWISE)
+                    )
+                }
+            },
+            xAxisTitle = @Composable {},
+            yAxisLabels = @Composable { value: Float ->
                 Text(
                     text = formatToTenth(value),
                     fontSize = 10.sp,
                     color = MaterialTheme.colorScheme.onSurface
                 )
             },
-            yAxisTitle = {},
+            yAxisTitle = @Composable {},
             horizontalMajorGridLineStyle = LineStyle(
                 brush = SolidColor(MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)),
                 strokeWidth = 1.dp
@@ -230,17 +258,16 @@ fun BarChartComponent(
                 strokeWidth = 1.dp
             ),
             verticalMinorGridLineStyle = null,
-            panZoomEnabled = false,
             modifier = Modifier
                 .semantics { contentDescription = "bar chart" }
                 .fillMaxWidth()
                 .fillMaxHeight()
                 .padding(start = 4.dp, end = 4.dp, top = 8.dp, bottom = 4.dp)
         ) {
-            // Create bar plot with labels
+            // Create bar plot with numeric x-axis indices for zoom support
             // Replace zero values with tiny positive values to ensure bars render
             VerticalBarPlot(
-                xData = data.map { it.label },
+                xData = data.indices.map { it.toFloat() },
                 yData = data.map {
                     val value = it.value.toFloat()
                     // Use 0.1% of the range as minimum to ensure zero bars render with enough space
@@ -252,26 +279,26 @@ fun BarChartComponent(
                     }
                 },
                 barWidth = 0.7f,
-                bar = { index: Int ->
-                    val barInfo = barsWithLayout[index]
+                bar = { seriesIndex, groupIndex, entry ->
+                    val barInfo = barsWithLayout[groupIndex]
                     val barColor = barInfo.color
 
-                    DefaultVerticalBar(brush = SolidColor(barColor))
+                    DefaultBar(brush = SolidColor(barColor))
                 }
             )
 
-            // Draw connector lines from label to bar
+            // Draw connector lines from label to bar using numeric indices
             data.forEachIndexed { index, point ->
                 val barInfo = barsWithLayout[index]
                 val barColor = barInfo.color
                 val barValue = point.value.toFloat()
                 val labelYValue = barInfo.labelYPosition
 
-                // Draw connector line
+                // Draw connector line using numeric index for x-coordinate
                 LinePlot(
                     data = listOf(
-                        Point(point.label, labelYValue),
-                        Point(point.label, barValue)
+                        Point(index.toFloat(), labelYValue),
+                        Point(index.toFloat(), barValue)
                     ),
                     lineStyle = LineStyle(
                         brush = SolidColor(barColor.copy(alpha = 0.5f)),
@@ -281,6 +308,10 @@ fun BarChartComponent(
             }
 
             // Draw labels positioned along diagonal lines
+            // Access current viewport ranges to make labels move with zoom/pan
+            val currentXRange = xAxisModel.viewRange.value
+            val currentYRange = yAxisModel.viewRange.value
+
             Canvas(modifier = Modifier.fillMaxSize()) {
                 data.forEachIndexed { index, point ->
                     val barInfo = barsWithLayout[index]
@@ -289,13 +320,23 @@ fun BarChartComponent(
                     val barLabel = point.label
                     val labelYValue = barInfo.labelYPosition
 
-                    // Calculate pixel position from data coordinates
-                    val barCount = data.size
-                    val xFraction = (index.toFloat() + 0.5f) / barCount.toFloat()
-                    val labelX = size.width * xFraction
+                    // Check if this bar is within the current visible x-range
+                    val barXValue = index.toFloat()
+                    if (barXValue < currentXRange.start || barXValue > currentXRange.endInclusive) {
+                        return@forEachIndexed  // Skip labels outside visible area
+                    }
 
-                    val yRange = paddedMaxValue - paddedMinValue
-                    val yNormalized = (labelYValue - paddedMinValue) / yRange
+                    // Calculate pixel position from data coordinates using current viewport
+                    val xDataRange = currentXRange.endInclusive - currentXRange.start
+                    val xNormalized = if (xDataRange > 0) {
+                        (barXValue - currentXRange.start) / xDataRange
+                    } else 0.5f
+                    val labelX = size.width * xNormalized
+
+                    val yDataRange = currentYRange.endInclusive - currentYRange.start
+                    val yNormalized = if (yDataRange > 0) {
+                        (labelYValue - currentYRange.start) / yDataRange
+                    } else 0.5f
                     val labelY = size.height * (1f - yNormalized)
 
                     // Prepare and draw text with background
@@ -333,5 +374,12 @@ fun BarChartComponent(
         }
         }
 
+        // Interaction hint
+        Text(
+            text = "Pinch to zoom • Drag to pan",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 4.dp)
+        )
     }
 }

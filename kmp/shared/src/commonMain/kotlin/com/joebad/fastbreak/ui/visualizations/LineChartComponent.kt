@@ -18,6 +18,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlin.math.ceil
 import com.joebad.fastbreak.data.model.LineChartSeries
+import io.github.koalaplot.core.gestures.GestureConfig
 import io.github.koalaplot.core.line.LinePlot
 import io.github.koalaplot.core.style.LineStyle
 import io.github.koalaplot.core.util.ExperimentalKoalaPlotApi
@@ -124,16 +125,37 @@ fun LineChartComponent(
         }
     }
 
+    // Create axis models with zoom/pan support
+    val xAxisModel = remember(bounds) {
+        val rangeSize = bounds.xMax - bounds.xMin
+        FloatLinearAxisModel(
+            range = bounds.xMin..bounds.xMax,
+            minViewExtent = rangeSize * 0.1f, // Allow zooming in to 10% of full range
+            maxViewExtent = rangeSize // Full range when zoomed out
+        )
+    }
+
+    val yAxisModel = remember(bounds) {
+        val rangeSize = bounds.yMax - bounds.yMin
+        FloatLinearAxisModel(
+            range = bounds.yMin..bounds.yMax,
+            minViewExtent = rangeSize * 0.1f, // Allow zooming in to 10% of full range
+            maxViewExtent = rangeSize // Full range when zoomed out
+        )
+    }
+
     Column(
         modifier = modifier,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         XYGraph(
-            xAxisModel = FloatLinearAxisModel(
-                range = bounds.xMin..bounds.xMax
-            ),
-            yAxisModel = FloatLinearAxisModel(
-                range = bounds.yMin..bounds.yMax
+            xAxisModel = xAxisModel,
+            yAxisModel = yAxisModel,
+            gestureConfig = GestureConfig(
+                panXEnabled = true,
+                panYEnabled = true,
+                zoomXEnabled = true,
+                zoomYEnabled = true
             ),
             xAxisStyle = rememberAxisStyle(
                 color = MaterialTheme.colorScheme.onSurface

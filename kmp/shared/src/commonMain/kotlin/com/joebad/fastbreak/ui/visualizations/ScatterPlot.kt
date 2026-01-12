@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.sp
 import com.joebad.fastbreak.data.model.QuadrantConfig
 import com.joebad.fastbreak.data.model.ScatterPlotDataPoint
 import io.github.koalaplot.core.Symbol
+import io.github.koalaplot.core.gestures.GestureConfig
 import io.github.koalaplot.core.line.LinePlot
 import io.github.koalaplot.core.style.LineStyle
 import io.github.koalaplot.core.util.ExperimentalKoalaPlotApi
@@ -447,20 +448,22 @@ fun QuadrantScatterPlot(
     val initialXRange = remember(xMin, xMax) { xMax - xMin }
     val initialYRange = remember(yMin, yMax) { yMax - yMin }
 
-    // Create axis models
+    // Create axis models with zoom/pan support
     val xAxisModel = remember(xMin, xMax) {
+        val rangeSize = xMax - xMin
         FloatLinearAxisModel(
-            xMin..xMax,
-            allowZooming = true,
-            allowPanning = true
+            range = xMin..xMax,
+            minViewExtent = rangeSize * 0.1f, // Allow zooming in to 10% of full range
+            maxViewExtent = rangeSize // Full range when zoomed out
         )
     }
 
     val yAxisModel = remember(yMin, yMax) {
+        val rangeSize = yMax - yMin
         FloatLinearAxisModel(
-            yMin..yMax,
-            allowZooming = true,
-            allowPanning = true
+            range = yMin..yMax,
+            minViewExtent = rangeSize * 0.1f, // Allow zooming in to 10% of full range
+            maxViewExtent = rangeSize // Full range when zoomed out
         )
     }
 
@@ -485,6 +488,12 @@ fun QuadrantScatterPlot(
         XYGraph(
             xAxisModel = xAxisModel,
             yAxisModel = yAxisModel,
+            gestureConfig = GestureConfig(
+                panXEnabled = true,
+                panYEnabled = true,
+                zoomXEnabled = true,
+                zoomYEnabled = true
+            ),
             xAxisStyle = rememberAxisStyle(
                 color = MaterialTheme.colorScheme.onSurface,
                 tickPosition = TickPosition.Outside,
@@ -495,14 +504,14 @@ fun QuadrantScatterPlot(
                 tickPosition = TickPosition.Outside,
                 labelRotation = 0
             ),
-            xAxisLabels = { value ->
+            xAxisLabels = @Composable { value: Float ->
                 Text(
                     text = formatToTenth(value),
                     fontSize = 10.sp,
                     color = MaterialTheme.colorScheme.onSurface
                 )
             },
-            yAxisLabels = { value ->
+            yAxisLabels = @Composable { value: Float ->
                 // When invertYAxis is true, display the original (non-inverted) values
                 val displayValue = if (invertYAxis) value * -1f else value
                 Text(
@@ -511,7 +520,7 @@ fun QuadrantScatterPlot(
                     color = MaterialTheme.colorScheme.onSurface
                 )
             },
-            xAxisTitle = {
+            xAxisTitle = @Composable {
                 Text(
                     text = xAxisLabel,
                     fontSize = 11.sp,
@@ -519,7 +528,7 @@ fun QuadrantScatterPlot(
                     modifier = Modifier.padding(top = 4.dp)
                 )
             },
-            yAxisTitle = {
+            yAxisTitle = @Composable {
                 Text(
                     text = yAxisLabel,
                     fontSize = 11.sp,
@@ -539,7 +548,6 @@ fun QuadrantScatterPlot(
                 strokeWidth = 1.dp
             ),
             verticalMinorGridLineStyle = null,
-            panZoomEnabled = true,
             modifier = Modifier
                 .semantics { contentDescription = "chart" }
                 .fillMaxWidth()

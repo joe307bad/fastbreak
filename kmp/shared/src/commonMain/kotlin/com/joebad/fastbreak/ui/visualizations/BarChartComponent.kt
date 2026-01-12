@@ -7,18 +7,18 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.text.TextMeasurer
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.drawText
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.joebad.fastbreak.data.model.BarGraphDataPoint
@@ -67,6 +67,9 @@ fun BarChartComponent(
 ) {
     if (data.isEmpty()) return
 
+    val textMeasurer = rememberTextMeasurer()
+    val labelBackgroundColor = MaterialTheme.colorScheme.surface
+
     // Define alternating colors for positive and negative values
     val positiveColors = listOf(
         Color(0xFF2196F3), // Blue
@@ -84,22 +87,24 @@ fun BarChartComponent(
     val minValue = (data.minOfOrNull { it.value } ?: 0.0).toFloat()
     val maxValue = (data.maxOfOrNull { it.value } ?: 1.0).toFloat()
 
-    // Add padding to Y range for better visualization
-    val yPadding = (maxValue - minValue) * 0.1f
+    // Add padding to Y range for better visualization and to ensure labels at edges are visible
+    val yPadding = (maxValue - minValue) * 0.25f  // Increased to 0.25f to ensure extreme end labels are fully visible
     val paddedMinValue = minValue - yPadding
     val paddedMaxValue = maxValue + yPadding
 
-    // Prepare bar data with colors
-    data class ColoredBar(
+    // Prepare bar data with colors and label positions
+    data class BarWithLayout(
         val dataPoint: BarGraphDataPoint,
-        val color: Color
+        val color: Color,
+        val labelYPosition: Float  // Y position along the diagonal line (in data coordinates)
     )
 
-    val coloredBars = remember(data, isHighlighting, highlightedTeamCodes) {
+    val barsWithLayout = remember(data, isHighlighting, highlightedTeamCodes, paddedMaxValue, paddedMinValue) {
         var positiveIndex = 0
         var negativeIndex = 0
 
-        data.map { point ->
+        // First pass: assign colors
+        val coloredBars = data.map { point ->
             // Check if this bar should be highlighted
             val isHighlighted = isHighlighting && highlightedTeamCodes.any { code ->
                 point.label.contains(code, ignoreCase = true)
@@ -122,20 +127,63 @@ fun BarChartComponent(
                 baseColor
             }
 
-            ColoredBar(point, color)
+            point to color
+        }
+
+        // Second pass: calculate label Y positions along diagonal line
+        // For each bar, the label's Y position is determined by its X position (index)
+        // Positive bars: diagonal line from paddedMaxValue (leftmost) to 0 (rightmost)
+        // Negative bars: diagonal line from paddedMinValue (leftmost) to 0 (rightmost)
+
+        val positiveIndices = data.indices.filter { data[it].value >= 0 }
+        val negativeIndices = data.indices.filter { data[it].value < 0 }
+
+        val labelPositions = mutableMapOf<Int, Float>()
+
+        // Positive bars: line descends from max to 0 as we go left to right
+        if (positiveIndices.isNotEmpty()) {
+            val startY = paddedMaxValue
+            val endY = 0f
+            positiveIndices.forEachIndexed { idx, dataIndex ->
+                // Linear interpolation based on bar index
+                val t = idx.toFloat() / positiveIndices.size.coerceAtLeast(1).toFloat()
+                val yValue = startY + (endY - startY) * t
+                labelPositions[dataIndex] = yValue
+            }
+        }
+
+        // Negative bars: line descends from 0 to min as we go left to right
+        // First negative bar (closest to 0) should have label near 0
+        // Last negative bar (most negative) should have label near paddedMinValue
+        if (negativeIndices.isNotEmpty()) {
+            val startY = 0f
+            val endY = paddedMinValue
+            negativeIndices.forEachIndexed { idx, dataIndex ->
+                // Linear interpolation based on position in negative bar sequence
+                val t = idx.toFloat() / negativeIndices.size.coerceAtLeast(1).toFloat()
+                val yValue = startY + (endY - startY) * t
+                labelPositions[dataIndex] = yValue
+            }
+        }
+
+        coloredBars.mapIndexed { index, (point, color) ->
+            BarWithLayout(point, color, labelPositions[index] ?: 0f)
         }
     }
 
     // Create axis models
     val xAxisModel = remember(data) {
-        CategoryAxisModel(data.map { it.label })
+        CategoryAxisModel(
+            categories = data.map { it.label },
+            firstCategoryIsZero = false
+        )
     }
 
     val yAxisModel = remember(paddedMinValue, paddedMaxValue) {
         FloatLinearAxisModel(
             paddedMinValue..paddedMaxValue,
-            allowZooming = true,
-            allowPanning = true
+            allowZooming = false,
+            allowPanning = false
         )
     }
 
@@ -143,8 +191,13 @@ fun BarChartComponent(
         modifier = modifier,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Chart
-        XYGraph(
+        // Chart with label overlay
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(400.dp)
+        ) {
+            XYGraph(
             xAxisModel = xAxisModel,
             yAxisModel = yAxisModel,
             xAxisStyle = rememberAxisStyle(
@@ -157,34 +210,7 @@ fun BarChartComponent(
                 tickPosition = TickPosition.Outside,
                 labelRotation = 0
             ),
-            xAxisLabels = { label: String ->
-                val index = data.indexOfFirst { it.label == label }
-                val point = data[index]
-
-                // Determine which color this bar uses
-                val positiveIndex = data.take(index + 1).count { it.value >= 0 } - 1
-                val negativeIndex = data.take(index + 1).count { it.value < 0 } - 1
-
-                val labelColor = if (point.value < 0) {
-                    negativeColors[negativeIndex % negativeColors.size]
-                } else {
-                    positiveColors[positiveIndex % positiveColors.size]
-                }
-
-                // Stagger labels with padding
-                val topPadding = if (index % 2 == 1) 12.dp else 0.dp
-
-                Text(
-                    text = label,
-                    fontSize = 9.sp,
-                    color = labelColor,
-                    letterSpacing = 0.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Visible,
-                    softWrap = false,
-                    modifier = Modifier.padding(top = topPadding)
-                )
-            },
+            xAxisLabels = {}, // Remove x-axis labels
             xAxisTitle = {},
             yAxisLabels = { value: Float ->
                 Text(
@@ -204,14 +230,14 @@ fun BarChartComponent(
                 strokeWidth = 1.dp
             ),
             verticalMinorGridLineStyle = null,
-            panZoomEnabled = true,
+            panZoomEnabled = false,
             modifier = Modifier
                 .semantics { contentDescription = "bar chart" }
                 .fillMaxWidth()
-                .height(400.dp)
+                .fillMaxHeight()
                 .padding(start = 4.dp, end = 4.dp, top = 8.dp, bottom = 4.dp)
         ) {
-            // Create bar plot with separate x and y data
+            // Create bar plot with labels
             // Replace zero values with tiny positive values to ensure bars render
             VerticalBarPlot(
                 xData = data.map { it.label },
@@ -226,89 +252,86 @@ fun BarChartComponent(
                     }
                 },
                 barWidth = 0.7f,
-                bar = @Composable { index: Int ->
-                    val barColor = coloredBars[index].color
-                    val barValue = data[index].value.toFloat() // Original value
+                bar = { index: Int ->
+                    val barInfo = barsWithLayout[index]
+                    val barColor = barInfo.color
 
-                    Box(modifier = Modifier
-                        .fillMaxSize()
-                        .drawBehind {
-                            val barCenterX = size.width / 2f
+                    DefaultVerticalBar(brush = SolidColor(barColor))
+                }
+            )
 
-                            if (barValue == 0f) {
-                                // Special handling for zero values
-                                // Use same logic as positive bars but with estimated pixels
-                                val yRange = paddedMaxValue - paddedMinValue
-                                val spaceBelow = if (paddedMinValue < 0) kotlin.math.abs(paddedMinValue) else 0f
+            // Draw connector lines from label to bar
+            data.forEachIndexed { index, point ->
+                val barInfo = barsWithLayout[index]
+                val barColor = barInfo.color
+                val barValue = point.value.toFloat()
+                val labelYValue = barInfo.labelYPosition
 
-                                // Estimate pixel conversion for the full chart
-                                val estimatedChartHeight = 315f  // Actual plot area is smaller than 400dp total
-                                val estimatedPixelsPerUnit = estimatedChartHeight / yRange
-                                val extensionDistance = (spaceBelow * estimatedPixelsPerUnit) + 335f
+                // Draw connector line
+                LinePlot(
+                    data = listOf(
+                        Point(point.label, labelYValue),
+                        Point(point.label, barValue)
+                    ),
+                    lineStyle = LineStyle(
+                        brush = SolidColor(barColor.copy(alpha = 0.5f)),
+                        strokeWidth = 1.dp
+                    )
+                )
+            }
 
-                                // For zero bars, bottom of bar = x-axis, just like positive bars
-                                // size.height is the bottom of the bar
-                                drawLine(
-                                    color = barColor,
-                                    start = Offset(barCenterX, size.height),  // Bottom of bar = x-axis
-                                    end = Offset(barCenterX, size.height + extensionDistance),
-                                    strokeWidth = 1.dp.toPx(),
-                                    pathEffect = PathEffect.dashPathEffect(floatArrayOf(4f, 4f), 0f)
-                                )
-                            } else {
-                                // For positive bars: start at bottom (x-axis is at bottom of bar)
-                                // For negative bars: start at top (x-axis is at top of bar)
-                                val startY = if (barValue > 0) {
-                                    size.height  // Bottom of positive bar (at x-axis)
-                                } else {
-                                    0f  // Top of negative bar (at x-axis)
-                                }
+            // Draw labels positioned along diagonal lines
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                data.forEachIndexed { index, point ->
+                    val barInfo = barsWithLayout[index]
+                    val barColor = barInfo.color
+                    val barValue = point.value.toFloat()
+                    val barLabel = point.label
+                    val labelYValue = barInfo.labelYPosition
 
-                                // Calculate the distance to extend beyond the bar
-                                val yRange = paddedMaxValue - paddedMinValue
-                                val barValueRange = kotlin.math.abs(barValue)
+                    // Calculate pixel position from data coordinates
+                    val barCount = data.size
+                    val xFraction = (index.toFloat() + 0.5f) / barCount.toFloat()
+                    val labelX = size.width * xFraction
 
-                                // Calculate how much space is below the x-axis in the chart
-                                val spaceBelow = if (paddedMinValue < 0) {
-                                    kotlin.math.abs(paddedMinValue)
-                                } else {
-                                    0f
-                                }
+                    val yRange = paddedMaxValue - paddedMinValue
+                    val yNormalized = (labelYValue - paddedMinValue) / yRange
+                    val labelY = size.height * (1f - yNormalized)
 
-                                // Extension should cover the full space below the x-axis plus label area
-                                val pixelsPerUnit = size.height / barValueRange
-                                val extensionDistance = (spaceBelow * pixelsPerUnit) + 150f
+                    // Prepare and draw text with background
+                    val textStyle = TextStyle(
+                        color = barColor,
+                        fontSize = 9.sp
+                    )
+                    val textLayoutResult = textMeasurer.measure(barLabel, textStyle)
+                    val rotationAngle = if (barValue >= 0) -25f else -45f
+                    val backgroundPadding = 2.dp.toPx()
 
-                                // Draw line from the x-axis down to label area
-                                drawLine(
-                                    color = barColor,
-                                    start = Offset(barCenterX, startY),
-                                    end = Offset(barCenterX, startY + extensionDistance),
-                                    strokeWidth = 1.dp.toPx(),
-                                    pathEffect = PathEffect.dashPathEffect(floatArrayOf(4f, 4f), 0f)
-                                )
-                            }
-                        }
-                    ) {
-                        // Draw the actual bar
-                        // Make zero-value bars transparent so only the connector line shows
-                        DefaultVerticalBar(
-                            brush = SolidColor(
-                                if (barValue == 0f) Color.Transparent
-                                else barColor
+                    rotate(degrees = rotationAngle, pivot = Offset(labelX, labelY)) {
+                        val bgWidth = textLayoutResult.size.width + backgroundPadding * 2
+                        val bgHeight = textLayoutResult.size.height + backgroundPadding * 2
+                        val bgLeft = labelX - bgWidth / 2f
+                        val bgTop = labelY - bgHeight / 2f
+
+                        drawRoundRect(
+                            color = labelBackgroundColor,
+                            topLeft = Offset(bgLeft, bgTop),
+                            size = androidx.compose.ui.geometry.Size(bgWidth, bgHeight),
+                            cornerRadius = CornerRadius(2.dp.toPx(), 2.dp.toPx())
+                        )
+
+                        drawText(
+                            textLayoutResult = textLayoutResult,
+                            topLeft = Offset(
+                                labelX - textLayoutResult.size.width / 2f,
+                                labelY - textLayoutResult.size.height / 2f
                             )
                         )
                     }
                 }
-            )
+            }
+        }
         }
 
-        // Interaction hint
-        Text(
-            text = "Pinch to zoom • Drag to pan",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = 4.dp)
-        )
     }
 }

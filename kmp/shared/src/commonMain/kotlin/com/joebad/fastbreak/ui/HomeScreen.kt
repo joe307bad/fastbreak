@@ -25,6 +25,8 @@ import androidx.compose.ui.unit.sp
 import com.arkivanov.decompose.extensions.compose.subscribeAsState
 import com.joebad.fastbreak.data.model.Sport
 import com.joebad.fastbreak.navigation.HomeComponent
+import com.joebad.fastbreak.ui.components.TagBadge
+import com.joebad.fastbreak.ui.components.TagFilterBar
 import com.joebad.fastbreak.ui.container.RegistryState
 import kotlin.time.Clock
 import kotlin.time.Instant
@@ -43,6 +45,7 @@ fun HomeScreen(
     onMarkChartAsViewed: (String) -> Unit = {}
 ) {
     val selectedSport by component.selectedSport.subscribeAsState()
+    val selectedTags by component.selectedTags.subscribeAsState()
 
     // Clear any stale completed sync progress when screen first appears
     // Only load registry if it hasn't been loaded yet
@@ -235,6 +238,39 @@ fun HomeScreen(
                 ?.sortedBy { it.title }
                 ?: emptyList()
 
+            // Collect all unique tags from charts for the selected sport
+            val availableTags = remember(chartsForSport) {
+                chartsForSport
+                    .flatMap { it.tags ?: emptyList() }
+                    .distinct()
+                    .sorted()
+            }
+
+            // Filter charts by selected tags (if any tags are selected)
+            val filteredCharts = remember(chartsForSport, selectedTags) {
+                if (selectedTags.isEmpty()) {
+                    chartsForSport
+                } else {
+                    chartsForSport.filter { chart ->
+                        val chartTags = chart.tags ?: emptyList()
+                        // Show chart if it has ALL selected tags
+                        selectedTags.all { selectedTag -> selectedTag in chartTags }
+                    }
+                }
+            }
+
+            // Show tag filter bar if there are tags available
+            if (availableTags.isNotEmpty()) {
+                TagFilterBar(
+                    availableTags = availableTags,
+                    selectedTags = selectedTags,
+                    onTagToggle = { tag -> component.toggleTag(tag) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                )
+            }
+
             // Check if entire registry is empty
             val registryIsEmpty = registryState.registry?.charts?.isEmpty() == true
 
@@ -305,14 +341,19 @@ fun HomeScreen(
                         }
                     }
                 }
-                chartsForSport.isEmpty() && registryState.registry != null -> {
-                    // No charts for this specific sport (but registry has charts)
+                filteredCharts.isEmpty() && registryState.registry != null -> {
+                    // No charts for this specific sport/tag combination (but registry has charts)
                     Box(
                         modifier = Modifier.fillMaxSize(),
                         contentAlignment = Alignment.Center
                     ) {
+                        val message = if (selectedTags.isNotEmpty()) {
+                            "no charts match selected filters"
+                        } else {
+                            "no ${selectedSport.displayName} charts available"
+                        }
                         Text(
-                            text = "no ${selectedSport.displayName} charts available",
+                            text = message,
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             fontFamily = FontFamily.Monospace
@@ -356,7 +397,7 @@ fun HomeScreen(
                         //     }
                         // }
 
-                        items(chartsForSport) { chart ->
+                        items(filteredCharts) { chart ->
                             // Determine chart sync state
                             val isSyncing = registryState.syncProgress?.isChartSyncing(chart.id) == true
                             // If syncProgress is null, all charts are ready (sync complete)
@@ -371,6 +412,7 @@ fun HomeScreen(
                                 viewed = chart.viewed,
                                 isSyncing = isSyncing,
                                 isReady = isReady,
+                                tags = chart.tags ?: emptyList(),
                                 onClick = {
                                     // Only navigate if chart is ready
                                     if (isReady) {
@@ -397,6 +439,7 @@ private fun VisualizationItem(
     viewed: Boolean,
     isSyncing: Boolean,
     isReady: Boolean,
+    tags: List<String>,
     onClick: () -> Unit
 ) {
     val alpha = if (isReady) 1f else 0.5f
@@ -457,6 +500,18 @@ private fun VisualizationItem(
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.primary.copy(alpha = alpha)
                     )
+                }
+                // Show tags if available
+                if (tags.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        tags.forEach { tag ->
+                            TagBadge(tag = tag)
+                        }
+                    }
                 }
             }
 

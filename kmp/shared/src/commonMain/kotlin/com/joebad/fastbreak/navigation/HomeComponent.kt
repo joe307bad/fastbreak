@@ -14,7 +14,25 @@ class HomeComponent(
     private val _selectedSport = MutableValue(Sport.NFL)
     val selectedSport: Value<Sport> = _selectedSport
 
+    private val _selectedTags = MutableValue<Set<String>>(emptySet())
+    val selectedTags: Value<Set<String>> = _selectedTags
+
     fun selectSport(sport: Sport) {
         _selectedSport.value = sport
+        // Clear tag filters when switching sports
+        _selectedTags.value = emptySet()
+    }
+
+    fun toggleTag(tag: String) {
+        val currentTags = _selectedTags.value
+        _selectedTags.value = if (tag in currentTags) {
+            currentTags - tag
+        } else {
+            currentTags + tag
+        }
+    }
+
+    fun clearTagFilters() {
+        _selectedTags.value = emptySet()
     }
 }

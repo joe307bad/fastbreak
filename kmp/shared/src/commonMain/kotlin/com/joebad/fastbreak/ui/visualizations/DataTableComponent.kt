@@ -88,9 +88,6 @@ fun DataTableComponent(
             is MatchupV2Visualization -> {
                 // MatchupV2 doesn't need a data table - it's handled by MatchupWorksheet
             }
-            is PlayoffBracketVisualization -> {
-                // Playoff brackets don't need a data table
-            }
         }
     }
 }

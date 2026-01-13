@@ -97,6 +97,7 @@ output_data <- list(
   ),
   source = "nflfastR / nflreadr",
   subject = "TEAM",
+  tags = c("regular season", "team"),
   dataPoints = data_points
 )
 

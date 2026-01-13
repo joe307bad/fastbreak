@@ -1526,6 +1526,13 @@ title_text <- if (is_playoffs) {
   paste0("Week ", current_week, " Matchup Worksheets")
 }
 
+# Determine tags based on season type - matchups show both team and player stats
+chart_tags <- if (is_playoffs) {
+  c("post season", "team", "player")
+} else {
+  c("regular season", "team", "player")
+}
+
 output_data <- list(
   sport = "NFL",
   visualizationType = "MATCHUP_V2",
@@ -1534,6 +1541,7 @@ output_data <- list(
   description = "Detailed matchup statistics including team performance metrics, player stats, head-to-head records, and common opponent results.\n\nCUMULATIVE EPA CHART:\n\nThe cumulative EPA chart displays Net EPA over the season for each team. Net EPA combines both offensive and defensive performance:\n\n • Net EPA = Offensive EPA - Defensive EPA Allowed\n\n • Offensive EPA: Total Expected Points Added by the offense (higher is better)\n\n • Defensive EPA Allowed: Total Expected Points Added by opposing offenses (lower is better for the defense)\n\n • Higher Net EPA indicates better overall team performance, accounting for both sides of the ball\n\n • The cumulative view shows how teams have performed throughout the season, with steeper upward slopes indicating elite play\n\nQUARTERBACK STATS:\n\n • Total EPA: Expected Points Added - total offensive value generated across all plays\n\n • Passing Yards: Total passing yards thrown\n\n • Passing TDs: Total touchdown passes thrown\n\n • Completion %: Completion percentage (completions / attempts × 100)\n\n • Pass CPOE: Completion Percentage Over Expected - accuracy beyond what's expected based on throw difficulty\n\n • PACR: Pass Air Conversion Ratio - measures QB efficiency converting air yards to actual yards (Formula: Passing Yards / Air Yards). Higher PACR indicates more yards after catch.\n\n • Yards/Game: Average passing yards per game\n\n • Interceptions: Total interceptions thrown\n\nRUNNING BACK STATS:\n\n • Rush EPA: Expected Points Added on rushing plays\n\n • Rushing Yards: Total rushing yards gained\n\n • Rushing TDs: Total rushing touchdowns\n\n • Yards/Carry: Average yards per rushing attempt\n\n • Rush Yards/Game: Average rushing yards per game\n\n • Receptions: Total receptions\n\n • Receiving Yards: Total receiving yards\n\n • Receiving TDs: Total receiving touchdowns\n\n • Rec Yards/Game: Average receiving yards per game\n\n • Target Share: Percentage of team's total targets\n\nRECEIVER STATS:\n\n • Rec EPA: Expected Points Added on receptions\n\n • Receiving Yards: Total receiving yards gained\n\n • Receiving TDs: Total receiving touchdowns\n\n • Receptions: Total receptions\n\n • Yards/Reception: Average yards per reception\n\n • Rec Yards/Game: Average receiving yards per game\n\n • Catch %: Catch percentage (receptions / targets × 100)\n\n • WOPR: Weighted Opportunity Rating - combines targets and air yards to measure receiving opportunity\n\n • RACR: Receiver Air Conversion Ratio - receiving yards per air yard (measures efficiency converting targets to yards)\n\n • Target Share: Percentage of team's total targets\n\n • Air Yards %: Percentage of team's total air yards\n\nAll EPA stats are per play through the current week.",
   lastUpdated = format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC"),
   source = "nflfastR / nflreadr / ESPN",
+  tags = chart_tags,
   week = as.integer(current_week),
   dataPoints = matchups_json
 )

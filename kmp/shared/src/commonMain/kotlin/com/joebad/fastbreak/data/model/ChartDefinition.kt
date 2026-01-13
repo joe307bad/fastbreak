@@ -65,5 +65,11 @@ data class ChartDefinition(
      * Whether the user has viewed this chart
      * Used to show "new" indicator on unviewed charts
      */
-    val viewed: Boolean = false
+    val viewed: Boolean = false,
+
+    /**
+     * Tags for filtering charts (e.g., "regular season", "post season", "player", "team")
+     * Extracted from the visualization data when cached
+     */
+    val tags: List<String>? = null
 )

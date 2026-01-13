@@ -92,6 +92,7 @@ output_data <- list(
   description = "Turnover differential measures a team's ability to protect the ball while taking it away from opponents. Positive values indicate a team forces more turnovers than they commit, which strongly correlates with winning. Teams at the top are winning the turnover battle, while teams at the bottom are giving the ball away more than they're taking it.",
   lastUpdated = format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC"),
   source = "nflfastR / nflreadr",
+  tags = c("regular season", "team"),
   dataPoints = data_points
 )
 

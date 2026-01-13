@@ -93,6 +93,7 @@ output_data <- list(
   quadrantBottomRight = list(color = "#FF9800", label = "High D/Low O"),
   source = "nflfastR / nflreadr",
   subject = "TEAM",
+  tags = c("regular season", "team"),
   dataPoints = data_points
 )
 

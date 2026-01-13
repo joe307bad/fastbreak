@@ -81,7 +81,6 @@ data class CachedChartData(
             VizType.TABLE -> json.decodeFromString<TableVisualization>(dataJson)
             VizType.MATCHUP -> json.decodeFromString<MatchupVisualization>(dataJson)
             VizType.MATCHUP_V2 -> json.decodeFromString<MatchupV2Visualization>(dataJson)
-            VizType.PLAYOFF_BRACKET -> json.decodeFromString<PlayoffBracketVisualization>(dataJson)
         }
         return result
     }

@@ -4,7 +4,6 @@ import com.joebad.fastbreak.data.model.BarGraphVisualization
 import com.joebad.fastbreak.data.model.LineChartVisualization
 import com.joebad.fastbreak.data.model.MatchupVisualization
 import com.joebad.fastbreak.data.model.MatchupV2Visualization
-import com.joebad.fastbreak.data.model.PlayoffBracketVisualization
 import com.joebad.fastbreak.data.model.ScatterPlotVisualization
 import com.joebad.fastbreak.data.model.TableVisualization
 import com.joebad.fastbreak.domain.registry.ChartDataSynchronizer
@@ -98,9 +97,6 @@ class ChartDataContainer(
                     }
                     com.joebad.fastbreak.data.model.VizType.MATCHUP_V2 -> {
                         json.decodeFromString<MatchupV2Visualization>(cached.dataJson)
-                    }
-                    com.joebad.fastbreak.data.model.VizType.PLAYOFF_BRACKET -> {
-                        json.decodeFromString<PlayoffBracketVisualization>(cached.dataJson)
                     }
                 }
 

@@ -267,10 +267,10 @@ fun HomeScreen(
                 TagFilterBar(
                     availableTags = availableTags,
                     selectedTags = selectedTags,
-                    onTagToggle = { tag -> component.toggleTag(tag) },
+                    onTagToggle = { tag -> component.toggleTag(tag, availableTags) },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                        .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 0.dp)
                 )
             }
 
@@ -367,7 +367,7 @@ fun HomeScreen(
                     // Display charts
                     LazyColumn(
                         modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(16.dp),
+                        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 16.dp),
                         verticalArrangement = Arrangement.spacedBy(0.dp)
                     ) {
                         // Sync progress indicator at the top

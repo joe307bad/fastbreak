@@ -4,6 +4,7 @@ import com.arkivanov.decompose.ComponentContext
 import com.arkivanov.decompose.value.MutableValue
 import com.arkivanov.decompose.value.Value
 import com.joebad.fastbreak.data.model.Sport
+import com.joebad.fastbreak.data.model.Tag
 import com.joebad.fastbreak.data.model.VizType
 
 class HomeComponent(
@@ -23,13 +24,41 @@ class HomeComponent(
         _selectedTags.value = emptySet()
     }
 
-    fun toggleTag(tag: String) {
+    /**
+     * Toggles a tag filter with radio button behavior per layout.
+     * Only one tag from each layout (left/right) can be selected at a time.
+     *
+     * @param tagLabel The label of the tag to toggle
+     * @param allAvailableTags All available tags to determine layout grouping
+     */
+    fun toggleTag(tagLabel: String, allAvailableTags: List<Tag>) {
         val currentTags = _selectedTags.value
-        _selectedTags.value = if (tag in currentTags) {
-            currentTags - tag
-        } else {
-            currentTags + tag
+
+        // Find the layout of the clicked tag
+        val clickedTag = allAvailableTags.find { it.label == tagLabel }
+        if (clickedTag == null) {
+            // Tag not found, do nothing
+            return
         }
+
+        val clickedLayout = clickedTag.layout
+
+        // If the clicked tag is already selected, deselect it
+        if (tagLabel in currentTags) {
+            _selectedTags.value = currentTags - tagLabel
+            return
+        }
+
+        // Remove any previously selected tag from the same layout
+        val tagsInSameLayout = allAvailableTags
+            .filter { it.layout == clickedLayout }
+            .map { it.label }
+            .toSet()
+
+        val tagsWithoutSameLayout = currentTags - tagsInSameLayout
+
+        // Add the new tag
+        _selectedTags.value = tagsWithoutSameLayout + tagLabel
     }
 
     fun clearTagFilters() {

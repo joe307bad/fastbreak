@@ -5,19 +5,28 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Share
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.layer.drawLayer
+import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.graphics.PathEffect
@@ -27,6 +36,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.joebad.fastbreak.data.model.QuadrantConfig
 import com.joebad.fastbreak.data.model.ScatterPlotDataPoint
+import com.joebad.fastbreak.platform.getImageExporter
+import kotlinx.coroutines.launch
 import io.github.koalaplot.core.Symbol
 import io.github.koalaplot.core.gestures.GestureConfig
 import io.github.koalaplot.core.line.LinePlot
@@ -480,12 +491,81 @@ fun QuadrantScatterPlot(
         )
     }
 
+    // Create graphics layer for capturing the chart
+    val graphicsLayer = rememberGraphicsLayer()
+    val coroutineScope = rememberCoroutineScope()
+    val imageExporter = remember { getImageExporter() }
+    var isCapturing by remember { mutableStateOf(false) }
+
     Column(
         modifier = modifier,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Chart
-        XYGraph(
+        // Title row with share button (outside of capture area)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+
+            IconButton(
+                onClick = {
+                    coroutineScope.launch {
+                        try {
+                            isCapturing = true
+                            // Capture the graphics layer to bitmap
+                            val bitmap = graphicsLayer.toImageBitmap()
+                            // Share the bitmap
+                            imageExporter.shareImage(bitmap, title)
+                        } catch (e: Exception) {
+                            e.printStackTrace()
+                        } finally {
+                            isCapturing = false
+                        }
+                    }
+                }
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Share,
+                    contentDescription = "Share chart",
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            }
+        }
+
+        // Wrap chart and legend in a Box with graphics layer for capture
+        Box(
+            modifier = Modifier
+                .background(Color.White) // White background for captured image
+                .drawWithCache {
+                    // Record the content into the graphics layer
+                    onDrawWithContent {
+                        graphicsLayer.record {
+                            // First, draw a solid white rectangle to ensure opaque background for JPEG
+                            drawRect(
+                                color = Color.White,
+                                size = size
+                            )
+                            // Then draw the content on top
+                            this@onDrawWithContent.drawContent()
+                        }
+                        // Draw the layer
+                        drawLayer(graphicsLayer)
+                    }
+                }
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                // Chart
+                XYGraph(
             xAxisModel = xAxisModel,
             yAxisModel = yAxisModel,
             gestureConfig = GestureConfig(
@@ -495,12 +575,12 @@ fun QuadrantScatterPlot(
                 zoomYEnabled = true
             ),
             xAxisStyle = rememberAxisStyle(
-                color = MaterialTheme.colorScheme.onSurface,
+                color = Color.Black, // Black for white background
                 tickPosition = TickPosition.Outside,
                 labelRotation = 0
             ),
             yAxisStyle = rememberAxisStyle(
-                color = MaterialTheme.colorScheme.onSurface,
+                color = Color.Black, // Black for white background
                 tickPosition = TickPosition.Outside,
                 labelRotation = 0
             ),
@@ -508,7 +588,7 @@ fun QuadrantScatterPlot(
                 Text(
                     text = formatToTenth(value),
                     fontSize = 10.sp,
-                    color = MaterialTheme.colorScheme.onSurface
+                    color = Color.Black // Black for white background
                 )
             },
             yAxisLabels = @Composable { value: Float ->
@@ -517,14 +597,14 @@ fun QuadrantScatterPlot(
                 Text(
                     text = formatToTenth(displayValue),
                     fontSize = 10.sp,
-                    color = MaterialTheme.colorScheme.onSurface
+                    color = Color.Black // Black for white background
                 )
             },
             xAxisTitle = @Composable {
                 Text(
                     text = xAxisLabel,
                     fontSize = 11.sp,
-                    color = MaterialTheme.colorScheme.onSurface,
+                    color = Color.Black, // Black for white background
                     modifier = Modifier.padding(top = 4.dp)
                 )
             },
@@ -532,19 +612,19 @@ fun QuadrantScatterPlot(
                 Text(
                     text = yAxisLabel,
                     fontSize = 11.sp,
-                    color = MaterialTheme.colorScheme.onSurface,
+                    color = Color.Black, // Black for white background
                     modifier = Modifier
                         .rotateVertically(VerticalRotation.COUNTER_CLOCKWISE)
                         .padding(end = 4.dp)
                 )
             },
             horizontalMajorGridLineStyle = LineStyle(
-                brush = SolidColor(MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)),
+                brush = SolidColor(Color.Gray.copy(alpha = 0.3f)), // Gray grid lines for white background
                 strokeWidth = 1.dp
             ),
             horizontalMinorGridLineStyle = null,
             verticalMajorGridLineStyle = LineStyle(
-                brush = SolidColor(MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)),
+                brush = SolidColor(Color.Gray.copy(alpha = 0.3f)), // Gray grid lines for white background
                 strokeWidth = 1.dp
             ),
             verticalMinorGridLineStyle = null,
@@ -667,30 +747,24 @@ fun QuadrantScatterPlot(
                     symbol = { QuadrantSymbol(coloredPoint.color) }
                 )
             }
-        }
+                }
 
-        // Interaction hint
-        Text(
-            text = "Pinch to zoom - Drag to pan",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = 4.dp, bottom = 2.dp)
-        )
-
-        // Quadrant legend with regression line
-        FlowRow(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 4.dp, horizontal = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterHorizontally),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
-        ) {
-            LegendItem(topRightLabel, topRightColor)
-            LegendItem(topLeftLabel, topLeftColor)
-            LegendItem(bottomLeftLabel, bottomLeftColor)
-            LegendItem(bottomRightLabel, bottomRightColor)
-            if (regression != null) {
-                LegendItem("Trend", Color(0xFF607D8B))
+                // Quadrant legend with regression line
+                FlowRow(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp, horizontal = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterHorizontally),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    LegendItem(topRightLabel, topRightColor)
+                    LegendItem(topLeftLabel, topLeftColor)
+                    LegendItem(bottomLeftLabel, bottomLeftColor)
+                    LegendItem(bottomRightLabel, bottomRightColor)
+                    if (regression != null) {
+                        LegendItem("Trend", Color(0xFF607D8B))
+                    }
+                }
             }
         }
     }
@@ -741,27 +815,20 @@ private fun XYGraphScope<Float, Float>.PointLabel(
     color: Color,
     offsetY: Float = -14f
 ) {
-    // Use MaterialTheme to detect app theme
-    val isDark = MaterialTheme.colorScheme.background == Color.Black ||
-                 MaterialTheme.colorScheme.background == Color(0xFF0A0A0A)
-
-    // Calculate label color - use darker colors for yellow/light colors in light mode
+    // Always use light mode colors since we have white background
+    // Calculate label color - use darker colors for yellow/light colors
     // Preserve the original alpha if the point is dimmed (alpha < 0.5)
-    val labelColor = if (!isDark && isColorTooLight(color)) {
+    val labelColor = if (isColorTooLight(color)) {
         Color.Black.copy(alpha = if (color.alpha < 0.5f) color.alpha else 1f)
     } else {
         // If already dimmed, keep the dim alpha, otherwise use 0.9f
         color.copy(alpha = if (color.alpha < 0.5f) color.alpha else 0.9f)
     }
 
-    // Background color for label - matches theme
+    // Background color for label - white background
     // Reduce background opacity if point is dimmed
     val backgroundAlpha = if (color.alpha < 0.5f) color.alpha * 0.5f else 0.85f
-    val labelBackgroundColor = if (isDark) {
-        Color(0xFF0A0A0A).copy(alpha = backgroundAlpha)
-    } else {
-        Color.White.copy(alpha = backgroundAlpha)
-    }
+    val labelBackgroundColor = Color.White.copy(alpha = backgroundAlpha)
 
     // Use LinePlot with a single point and custom symbol that includes text
     LinePlot(
@@ -813,6 +880,7 @@ private fun LegendItem(text: String, color: Color) {
         Text(
             text = text,
             style = MaterialTheme.typography.bodySmall,
+            color = Color.Black, // Black text for white background
             maxLines = 1
         )
     }

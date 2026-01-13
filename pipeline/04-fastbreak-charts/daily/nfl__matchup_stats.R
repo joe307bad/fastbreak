@@ -1528,9 +1528,17 @@ title_text <- if (is_playoffs) {
 
 # Determine tags based on season type - matchups show both team and player stats
 chart_tags <- if (is_playoffs) {
-  c("post season", "team", "player")
+  list(
+    list(label = "team", layout = "left", color = "#4CAF50"),
+    list(label = "player", layout = "left", color = "#2196F3"),
+    list(label = "post season", layout = "right", color = "#FF9800")
+  )
 } else {
-  c("regular season", "team", "player")
+  list(
+    list(label = "team", layout = "left", color = "#4CAF50"),
+    list(label = "player", layout = "left", color = "#2196F3"),
+    list(label = "regular season", layout = "right", color = "#9C27B0")
+  )
 }
 
 output_data <- list(
@@ -1542,6 +1550,7 @@ output_data <- list(
   lastUpdated = format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC"),
   source = "nflfastR / nflreadr / ESPN",
   tags = chart_tags,
+  sortOrder = 0,
   week = as.integer(current_week),
   dataPoints = matchups_json
 )

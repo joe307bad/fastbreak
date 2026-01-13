@@ -35,13 +35,22 @@ teams_info <- nflreadr::load_teams() %>%
   mutate(team_abbr = ifelse(team_abbr == "LA", "LAR", team_abbr))
 
 # Get the most recent week with data
-most_recent_week <- max(pbp$week, na.rm = TRUE)
+most_recent_week_available <- max(pbp$week, na.rm = TRUE)
+
+# NFL regular season is 18 weeks - cap at week 18 if we're in playoffs
+# This ensures the chart only shows regular season data
+most_recent_week <- min(most_recent_week_available, 18)
+
+if (most_recent_week_available > 18) {
+  cat("NOTE: Playoffs detected (week", most_recent_week_available, "). Using regular season data through week 18.\n")
+}
 
 cat("Processing NFL Cumulative EPA Trend for season:", current_season, "through week:", most_recent_week, "\n")
 
 # Calculate total EPA per team per week (offense - defense for net EPA)
+# Filter to only regular season weeks (1-18)
 weekly_epa <- pbp %>%
-  filter(!is.na(epa), !is.na(posteam), !is.na(defteam)) %>%
+  filter(!is.na(epa), !is.na(posteam), !is.na(defteam), week <= most_recent_week) %>%
   group_by(week, posteam) %>%
   summarise(
     offense_epa = sum(epa, na.rm = TRUE),
@@ -52,7 +61,7 @@ weekly_epa <- pbp %>%
 
 # Get defensive EPA allowed per team per week
 defensive_epa <- pbp %>%
-  filter(!is.na(epa), !is.na(defteam)) %>%
+  filter(!is.na(epa), !is.na(defteam), week <= most_recent_week) %>%
   group_by(week, defteam) %>%
   summarise(
     defense_epa_allowed = sum(epa, na.rm = TRUE),
@@ -143,7 +152,10 @@ output_data <- list(
   description = "This chart tracks the cumulative Net EPA (Expected Points Added) for the top 10 NFL teams throughout the season. Net EPA combines offensive production with defensive efficiency - positive values mean the team is outperforming expectations. Teams with steeper upward slopes are playing at an elite level, while flat or declining lines indicate struggles. The gap between lines shows the relative dominance between top teams.",
   lastUpdated = format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC"),
   source = "nflfastR / nflreadr",
-  tags = c("regular season", "team"),
+  tags = list(
+    list(label = "team", layout = "left", color = "#4CAF50"),
+    list(label = "regular season", layout = "right", color = "#9C27B0")
+  ),
   series = series_data
 )
 

@@ -3,10 +3,19 @@
 package com.joebad.fastbreak.data.model
 
 import com.joebad.fastbreak.data.serializers.InstantSerializer
+import com.joebad.fastbreak.data.serializers.TagListSerializer
 import kotlin.time.Instant
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseSerializers
 import kotlinx.serialization.json.JsonPrimitive
+
+// Tag structure for categorizing and filtering visualizations
+@Serializable
+data class Tag(
+    val label: String,
+    val layout: String, // "left" or "right"
+    val color: String   // hex color string (e.g., "#2196F3")
+)
 
 // Base interface for all visualization types
 sealed interface VisualizationType {
@@ -17,7 +26,8 @@ sealed interface VisualizationType {
     val description: String
     val lastUpdated: Instant
     val source: String?
-    val tags: List<String>?
+    val tags: List<Tag>?
+    val sortOrder: Int? // Optional sort order for controlling list position (lower values appear first)
 }
 
 // Bar Graph data structures
@@ -38,7 +48,9 @@ data class BarGraphVisualization(
     override val description: String,
     override val lastUpdated: Instant,
     override val source: String? = null,
-    override val tags: List<String>? = null,
+    @Serializable(with = TagListSerializer::class)
+    override val tags: List<Tag>? = null,
+    override val sortOrder: Int? = null,
     val dataPoints: List<BarGraphDataPoint>
 ) : VisualizationType
 
@@ -71,7 +83,9 @@ data class ScatterPlotVisualization(
     override val description: String,
     override val lastUpdated: Instant,
     override val source: String? = null,
-    override val tags: List<String>? = null,
+    @Serializable(with = TagListSerializer::class)
+    override val tags: List<Tag>? = null,
+    override val sortOrder: Int? = null,
     val xAxisLabel: String,
     val yAxisLabel: String,
     val xColumnLabel: String? = null,
@@ -114,7 +128,9 @@ data class LineChartVisualization(
     override val description: String,
     override val lastUpdated: Instant,
     override val source: String? = null,
-    override val tags: List<String>? = null,
+    @Serializable(with = TagListSerializer::class)
+    override val tags: List<Tag>? = null,
+    override val sortOrder: Int? = null,
     val series: List<LineChartSeries>
 ) : VisualizationType
 
@@ -140,7 +156,9 @@ data class TableVisualization(
     override val description: String,
     override val lastUpdated: Instant,
     override val source: String? = null,
-    override val tags: List<String>? = null,
+    @Serializable(with = TagListSerializer::class)
+    override val tags: List<Tag>? = null,
+    override val sortOrder: Int? = null,
     val dataPoints: List<TableDataPoint>
 ) : VisualizationType
 
@@ -196,7 +214,9 @@ data class MatchupVisualization(
     override val description: String,
     override val lastUpdated: Instant,
     override val source: String? = null,
-    override val tags: List<String>? = null,
+    @Serializable(with = TagListSerializer::class)
+    override val tags: List<Tag>? = null,
+    override val sortOrder: Int? = null,
     val week: Int,
     val dataPoints: List<Matchup>
 ) : VisualizationType
@@ -405,7 +425,9 @@ data class MatchupV2Visualization(
     override val description: String,
     override val lastUpdated: Instant,
     override val source: String? = null,
-    override val tags: List<String>? = null,
+    @Serializable(with = TagListSerializer::class)
+    override val tags: List<Tag>? = null,
+    override val sortOrder: Int? = null,
     val week: Int,
     val dataPoints: Map<String, MatchupV2> // matchup key (e.g., "car-tb") -> matchup data
 ) : VisualizationType

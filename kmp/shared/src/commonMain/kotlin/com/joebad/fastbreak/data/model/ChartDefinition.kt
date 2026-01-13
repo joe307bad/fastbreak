@@ -3,6 +3,7 @@
 package com.joebad.fastbreak.data.model
 
 import com.joebad.fastbreak.data.serializers.InstantSerializer
+import com.joebad.fastbreak.data.serializers.TagListSerializer
 import kotlin.time.Instant
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseSerializers
@@ -68,8 +69,15 @@ data class ChartDefinition(
     val viewed: Boolean = false,
 
     /**
-     * Tags for filtering charts (e.g., "regular season", "post season", "player", "team")
+     * Tags for filtering charts with label, layout, and color
      * Extracted from the visualization data when cached
      */
-    val tags: List<String>? = null
+    @Serializable(with = TagListSerializer::class)
+    val tags: List<Tag>? = null,
+
+    /**
+     * Optional sort order for controlling list position
+     * Lower values appear first, null values sorted after explicit values
+     */
+    val sortOrder: Int? = null
 )

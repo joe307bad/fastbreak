@@ -129,7 +129,10 @@ output_data <- list(
   quadrantBottomLeft = list(color = "#F44336", label = "Struggling"),
   quadrantBottomRight = list(color = "#FFEB3B", label = "Offense First"),
   subject = "TEAM",
-  tags = c("regular season", "team"),
+  tags = list(
+    list(label = "team", layout = "left", color = "#4CAF50"),
+    list(label = "regular season", layout = "right", color = "#9C27B0")
+  ),
   dataPoints = data_points
 )
 

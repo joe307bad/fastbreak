@@ -364,7 +364,8 @@ class ChartDataSynchronizer(
             interval = cached.interval,
             cachedAt = cached.cachedAt,
             viewed = cached.viewed,
-            tags = vizData.tags
+            tags = vizData.tags,
+            sortOrder = vizData.sortOrder
         )
     }
 

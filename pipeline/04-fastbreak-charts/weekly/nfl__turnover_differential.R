@@ -35,7 +35,15 @@ teams_info <- nflreadr::load_teams() %>%
   mutate(team_abbr = ifelse(team_abbr == "LA", "LAR", team_abbr))
 
 # Get the most recent week with data
-most_recent_week <- max(pbp$week, na.rm = TRUE)
+most_recent_week_available <- max(pbp$week, na.rm = TRUE)
+
+# NFL regular season is 18 weeks - cap at week 18 if we're in playoffs
+# This ensures the chart only shows regular season data
+most_recent_week <- min(most_recent_week_available, 18)
+
+if (most_recent_week_available > 18) {
+  cat("NOTE: Playoffs detected (week", most_recent_week_available, "). Using regular season data through week 18.\n")
+}
 
 cat("Processing NFL Turnover Differential for season:", current_season, "week:", most_recent_week, "\n")
 
@@ -92,7 +100,10 @@ output_data <- list(
   description = "Turnover differential measures a team's ability to protect the ball while taking it away from opponents. Positive values indicate a team forces more turnovers than they commit, which strongly correlates with winning. Teams at the top are winning the turnover battle, while teams at the bottom are giving the ball away more than they're taking it.",
   lastUpdated = format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC"),
   source = "nflfastR / nflreadr",
-  tags = c("regular season", "team"),
+  tags = list(
+    list(label = "team", layout = "left", color = "#4CAF50"),
+    list(label = "regular season", layout = "right", color = "#9C27B0")
+  ),
   dataPoints = data_points
 )
 

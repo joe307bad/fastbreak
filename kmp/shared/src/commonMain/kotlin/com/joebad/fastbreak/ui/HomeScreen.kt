@@ -23,6 +23,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.arkivanov.decompose.extensions.compose.subscribeAsState
+import com.joebad.fastbreak.data.model.ChartDefinition
 import com.joebad.fastbreak.data.model.Sport
 import com.joebad.fastbreak.navigation.HomeComponent
 import com.joebad.fastbreak.ui.components.TagBadge
@@ -228,22 +229,24 @@ fun HomeScreen(
                 thickness = 1.dp
             )
 
-            // Filter charts for selected sport and sort alphabetically by title
+            // Filter charts for selected sport and sort by sortOrder (nulls last), then alphabetically by title
             // Hide NFL Playoff Bracket until it's ready for production
             val chartsForSport = registryState.registry?.charts
                 ?.filter { chart ->
                     chart.sport == selectedSport &&
                     !chart.title.contains("NFL Playoff Bracket", ignoreCase = true)
                 }
-                ?.sortedBy { it.title }
+                ?.sortedWith(
+                    compareBy<ChartDefinition> { it.sortOrder ?: Int.MAX_VALUE }.thenBy { it.title }
+                )
                 ?: emptyList()
 
             // Collect all unique tags from charts for the selected sport
             val availableTags = remember(chartsForSport) {
                 chartsForSport
                     .flatMap { it.tags ?: emptyList() }
-                    .distinct()
-                    .sorted()
+                    .distinctBy { it.label }
+                    .sortedBy { it.label }
             }
 
             // Filter charts by selected tags (if any tags are selected)
@@ -252,9 +255,9 @@ fun HomeScreen(
                     chartsForSport
                 } else {
                     chartsForSport.filter { chart ->
-                        val chartTags = chart.tags ?: emptyList()
+                        val chartTagLabels = chart.tags?.map { it.label } ?: emptyList()
                         // Show chart if it has ALL selected tags
-                        selectedTags.all { selectedTag -> selectedTag in chartTags }
+                        selectedTags.all { selectedTag -> selectedTag in chartTagLabels }
                     }
                 }
             }
@@ -439,7 +442,7 @@ private fun VisualizationItem(
     viewed: Boolean,
     isSyncing: Boolean,
     isReady: Boolean,
-    tags: List<String>,
+    tags: List<com.joebad.fastbreak.data.model.Tag>,
     onClick: () -> Unit
 ) {
     val alpha = if (isReady) 1f else 0.5f

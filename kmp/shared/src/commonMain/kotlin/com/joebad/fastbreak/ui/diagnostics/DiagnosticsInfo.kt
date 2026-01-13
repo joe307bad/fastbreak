@@ -15,5 +15,6 @@ data class DiagnosticsInfo(
     val failedSyncs: Int = 0,
     val lastError: String? = null,
     val isStale: Boolean = false, // true if > 12 hours since last fetch
-    val isSyncing: Boolean = false // true while actively syncing
+    val isSyncing: Boolean = false, // true while actively syncing
+    val failedCharts: List<Pair<String, String>> = emptyList() // (chartId, errorMessage)
 )

@@ -110,16 +110,19 @@ data_points <- top_players %>%
   rowwise() %>%
   mutate(
     team_code = team,
-    team_division = unname(team_divisions[team]),
-    team_conference = unname(team_conferences[team]),
+    # Handle players who played for multiple teams (e.g., "VAN,MIN")
+    # Use first team only for division/conference lookup
+    primary_team = strsplit(team, ",")[[1]][1],
+    team_division = team_divisions[primary_team],
+    team_conference = team_conferences[primary_team],
     data_point = list(list(
       label = player,
       x = G,
       y = A,
       sum = PTS,
       teamCode = team_code,
-      division = if (!is.na(team_division)) team_division else NULL,
-      conference = if (!is.na(team_conference)) team_conference else NULL
+      division = if (!is.na(team_division) && !is.null(team_division)) as.character(team_division) else NULL,
+      conference = if (!is.na(team_conference) && !is.null(team_conference)) as.character(team_conference) else NULL
     ))
   ) %>%
   pull(data_point)

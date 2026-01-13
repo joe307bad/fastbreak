@@ -597,7 +597,8 @@ class RegistryContainer(
             failedSyncs = currentState.diagnostics.failedSyncs,
             lastError = currentState.diagnostics.lastError,
             isStale = registryManager.isRegistryStale(),
-            isSyncing = currentState.isSyncing
+            isSyncing = currentState.isSyncing,
+            failedCharts = currentState.syncProgress?.failedCharts ?: emptyList()
         )
     }
 }

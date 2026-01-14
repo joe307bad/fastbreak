@@ -138,7 +138,7 @@ actual fun addTitleToBitmap(bitmap: ImageBitmap, title: String, isDarkTheme: Boo
     val titleHeight = (titleTextSize + titlePadding * 2).toInt()
 
     // Footer dimensions
-    val footerTextSize = 36f
+    val footerTextSize = 30f
     val footerHeight = (footerTextSize + footerPadding * 2).toInt()
 
     println("📸 addTitleToBitmap - title: '$title', isDarkTheme: $isDarkTheme")

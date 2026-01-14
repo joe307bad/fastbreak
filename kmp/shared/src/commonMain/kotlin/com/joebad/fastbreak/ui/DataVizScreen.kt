@@ -3,11 +3,13 @@ package com.joebad.fastbreak.ui
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -66,6 +68,13 @@ fun DataVizScreen(
         }
     }
 
+    // State to track if we're showing a scatter plot (for FAB)
+    val isScatterPlot = state is DataVizState.Success &&
+                       (state as DataVizState.Success).data is ScatterPlotVisualization
+
+    // State to hold the share callback from scatter plot
+    var scatterPlotShareHandler by remember { mutableStateOf<(() -> Unit)?>(null) }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -114,6 +123,14 @@ fun DataVizScreen(
                     titleContentColor = MaterialTheme.colorScheme.onBackground
                 )
             )
+        },
+        floatingActionButton = {
+            // Show FAB only for scatter plots
+            if (isScatterPlot) {
+                ScatterPlotFab(
+                    onShareClick = scatterPlotShareHandler
+                )
+            }
         }
     ) { paddingValues ->
         Box(
@@ -126,7 +143,10 @@ fun DataVizScreen(
                 is DataVizState.Loading -> LoadingContent()
                 is DataVizState.Success -> SuccessContent(
                     visualization = currentState.data,
-                    pinnedTeams = pinnedTeams
+                    pinnedTeams = pinnedTeams,
+                    onScatterPlotShareHandlerChanged = { handler ->
+                        scatterPlotShareHandler = handler
+                    }
                 )
                 is DataVizState.Error -> ErrorContent(
                     message = currentState.message,
@@ -222,7 +242,8 @@ private fun LoadingContent() {
 @Composable
 private fun SuccessContent(
     visualization: VisualizationType,
-    pinnedTeams: List<PinnedTeam>
+    pinnedTeams: List<PinnedTeam>,
+    onScatterPlotShareHandlerChanged: ((() -> Unit)?) -> Unit
 ) {
     // State for filters and team highlighting
     var selectedFilters by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
@@ -327,6 +348,7 @@ private fun SuccessContent(
             visualization = displayVisualization,
             highlightedTeamCodes = allHighlightedTeamCodes,
             highlightedPlayerLabels = selectedPlayerLabels,
+            onScatterPlotShareHandlerChanged = onScatterPlotShareHandlerChanged,
             onTeamClick = { label ->
                 // For PLAYER scatter plots, highlight individual players by label
                 // For TEAM scatter plots (and others), highlight teams by extracting team code
@@ -364,6 +386,7 @@ private fun RenderVisualization(
     visualization: VisualizationType,
     highlightedTeamCodes: Set<String> = emptySet(),
     highlightedPlayerLabels: Set<String> = emptySet(),
+    onScatterPlotShareHandlerChanged: ((() -> Unit)?) -> Unit = {},
     onTeamClick: (String) -> Unit = {}
 ) {
     println("📊 RenderVisualization - highlightedPlayerLabels: $highlightedPlayerLabels")
@@ -405,6 +428,9 @@ private fun RenderVisualization(
         // For charts: use vertical scroll to show chart + data table
         val scrollState = rememberScrollState()
 
+        // Capture the callback to avoid scoping issues
+        val shareHandlerCallback = onScatterPlotShareHandlerChanged
+
         BoxWithConstraints(
             modifier = Modifier.fillMaxSize()
         ) {
@@ -433,6 +459,10 @@ private fun RenderVisualization(
                                     subject = visualization.subject,
                                     highlightedTeamCodes = highlightedTeamCodes,
                                     highlightedPlayerLabels = highlightedPlayerLabels,
+                                    showShareButton = false,
+                                    onShareClick = { handler ->
+                                        shareHandlerCallback(handler)
+                                    },
                                     modifier = Modifier.fillMaxWidth()
                                 )
                             }
@@ -760,4 +790,22 @@ private fun applyMatchupFilters(
     }
 
     return visualization.copy(dataPoints = filteredDataPoints)
+}
+
+@Composable
+private fun ScatterPlotFab(
+    onShareClick: (() -> Unit)?
+) {
+    FloatingActionButton(
+        onClick = { onShareClick?.invoke() },
+        containerColor = androidx.compose.ui.graphics.Color(0xFFFF6B6B),
+        contentColor = androidx.compose.ui.graphics.Color.White,
+        shape = CircleShape
+    ) {
+        Icon(
+            imageVector = Icons.Filled.Share,
+            contentDescription = "Share chart",
+            modifier = Modifier.size(24.dp)
+        )
+    }
 }

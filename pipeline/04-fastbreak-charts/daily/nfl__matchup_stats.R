@@ -648,15 +648,18 @@ get_current_week_info <- function(schedules_df) {
         sort()
 
       # Check if ESPN's current week has all games completed
+      # Note: We advance on Tuesday regardless of completion status because
+      # by Tuesday, all current week games (including MNF) have been played
       espn_week_games <- schedules_df %>%
         filter(game_type == "REG", week == espn_week)
 
       espn_week_all_complete <- nrow(espn_week_games) > 0 &&
                                 all(!is.na(espn_week_games$result))
 
-      # If it's Tuesday (2) or later and ESPN's current week is complete,
-      # advance to the next week
-      if (current_day_of_week >= 2 && espn_week_all_complete) {
+      # If it's Tuesday (2) or later, advance to the next week
+      # We don't require all games to be marked complete in the data
+      # because by Tuesday morning, the week's games are done (MNF finishes Monday night)
+      if (current_day_of_week >= 2 && nrow(espn_week_games) > 0) {
         if (length(upcoming_weeks) > 0) {
           target_week <- upcoming_weeks[1]
           cat(sprintf("Tuesday rollover: Advancing from week %d to week %d\n",
@@ -692,18 +695,43 @@ get_current_week_info <- function(schedules_df) {
 
     # For playoffs
     if (espn_season_type == 3) {
-      # Find upcoming playoff games
+      # Find all playoff weeks with games (not just upcoming)
+      all_playoff_weeks <- schedules_df %>%
+        filter(game_type == "POST") %>%
+        pull(week) %>%
+        unique() %>%
+        sort()
+
+      # Find upcoming playoff games (games without results)
       upcoming_playoff_weeks <- schedules_df %>%
         filter(game_type == "POST", is.na(result)) %>%
         pull(week) %>%
         unique() %>%
         sort()
 
-      # If it's Tuesday or later and we have upcoming playoff games
-      if (current_day_of_week >= 2 && length(upcoming_playoff_weeks) > 0) {
-        target_week <- upcoming_playoff_weeks[1]
-        cat(sprintf("Tuesday rollover (playoffs): Advancing to playoff week %d\n", target_week))
-        return(list(week = target_week, season_type = 3))
+      # If it's Tuesday or later during playoffs, advance to the NEXT playoff week
+      # (week after ESPN's current week) regardless of data availability
+      # This ensures we move forward even if nflreadr doesn't have playoff data yet
+      if (current_day_of_week >= 2) {
+        # If we have playoff data in nflreadr, use it to find the next week
+        if (length(all_playoff_weeks) > 0) {
+          next_playoff_weeks <- all_playoff_weeks[all_playoff_weeks > espn_week]
+          if (length(next_playoff_weeks) > 0) {
+            target_week <- next_playoff_weeks[1]
+            cat(sprintf("Tuesday rollover (playoffs): Advancing from week %d to week %d\n",
+                        espn_week, target_week))
+            return(list(week = target_week, season_type = 3))
+          }
+        } else {
+          # No playoff data in nflreadr yet, but we know playoff structure:
+          # Week 1 = Wild Card, Week 2 = Divisional, Week 3 = Conference, Week 4 = Super Bowl
+          if (espn_week < 4) {
+            target_week <- espn_week + 1
+            cat(sprintf("Tuesday rollover (playoffs, no nflreadr data): Advancing from week %d to week %d\n",
+                        espn_week, target_week))
+            return(list(week = target_week, season_type = 3))
+          }
+        }
       }
 
       # Use ESPN's week if valid

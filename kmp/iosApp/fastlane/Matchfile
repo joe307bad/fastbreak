@@ -1,4 +1,4 @@
-git_url("https://github.com/joe307bad/fb-ios-certs.git")
+git_url("git@github.com:joe307bad/fb-ios-certs.git")
 
 storage_mode("git")
 

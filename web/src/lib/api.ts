@@ -7,8 +7,7 @@ const REVALIDATE_TIME = process.env.NODE_ENV === 'development' ? 60 : 3600;
 
 export async function fetchRegistry(): Promise<Registry> {
   const res = await fetch(`${BASE_URL}/registry`, {
-    next: { revalidate: REVALIDATE_TIME },
-    cache: 'no-store' // Disable caching to always fetch fresh data
+    next: { revalidate: REVALIDATE_TIME }
   });
   if (!res.ok) throw new Error('Failed to fetch registry');
   return res.json();
@@ -16,8 +15,7 @@ export async function fetchRegistry(): Promise<Registry> {
 
 export async function fetchChartData(key: string): Promise<ChartData> {
   const res = await fetch(`${BASE_URL}/${key}`, {
-    next: { revalidate: REVALIDATE_TIME },
-    cache: 'no-store' // Disable caching to always fetch fresh data
+    next: { revalidate: REVALIDATE_TIME }
   });
   if (!res.ok) throw new Error(`Failed to fetch chart: ${key}`);
   return res.json();

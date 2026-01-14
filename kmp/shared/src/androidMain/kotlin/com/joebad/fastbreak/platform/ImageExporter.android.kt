@@ -1,5 +1,6 @@
 package com.joebad.fastbreak.platform
 
+import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
@@ -7,10 +8,12 @@ import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.Typeface
 import android.net.Uri
+import android.os.Build
+import android.os.Environment
+import android.provider.MediaStore
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.core.content.FileProvider
 import java.io.File
 import java.io.FileOutputStream
 
@@ -21,40 +24,64 @@ class AndroidImageExporter(private val context: Context) : ImageExporter {
             println("📤 Bitmap dimensions: ${bitmap.width}x${bitmap.height}")
 
             // Convert ImageBitmap to Android Bitmap
-            val androidBitmap = bitmap.asAndroidBitmap()
+            val sourceBitmap = bitmap.asAndroidBitmap()
+            // Copy to software bitmap if it's a hardware bitmap (hardware bitmaps can't be compressed)
+            val androidBitmap = if (sourceBitmap.config == Bitmap.Config.HARDWARE) {
+                sourceBitmap.copy(Bitmap.Config.ARGB_8888, false)
+            } else {
+                sourceBitmap
+            }
             println("📤 Converted to Android bitmap: ${androidBitmap.width}x${androidBitmap.height}")
 
-            // Create a temporary file in cache directory
-            val cachePath = File(context.cacheDir, "shared_images")
-            cachePath.mkdirs()
-
-            val file = File(cachePath, "scatter_plot_${System.currentTimeMillis()}.jpg")
-            println("📤 Saving to file: ${file.absolutePath}")
-
-            // Write bitmap to file as JPEG (no transparency, ensures opaque white background)
-            FileOutputStream(file).use { out ->
-                androidBitmap.compress(Bitmap.CompressFormat.JPEG, 95, out)
+            // Save to MediaStore Downloads directory - works better with Files app
+            val filename = "fastbreak_${System.currentTimeMillis()}.jpg"
+            val contentValues = ContentValues().apply {
+                put(MediaStore.Downloads.DISPLAY_NAME, filename)
+                put(MediaStore.Downloads.MIME_TYPE, "image/jpeg")
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS + "/Fastbreak")
+                    put(MediaStore.Downloads.IS_PENDING, 1)
+                }
             }
-            println("📤 File saved successfully, size: ${file.length()} bytes")
 
-            // Get content URI using FileProvider
-            val contentUri: Uri = FileProvider.getUriForFile(
-                context,
-                "${context.packageName}.fileprovider",
-                file
-            )
+            val resolver = context.contentResolver
+            val collection = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                MediaStore.Downloads.EXTERNAL_CONTENT_URI
+            } else {
+                MediaStore.Images.Media.EXTERNAL_CONTENT_URI
+            }
+
+            val imageUri = resolver.insert(collection, contentValues)
+                ?: throw Exception("Failed to create MediaStore entry")
+
+            println("📤 Saving to MediaStore Downloads: $imageUri")
+
+            // Write bitmap to MediaStore
+            resolver.openOutputStream(imageUri)?.use { out ->
+                androidBitmap.compress(Bitmap.CompressFormat.JPEG, 95, out)
+            } ?: throw Exception("Failed to open output stream")
+
+            // Mark as no longer pending (Android 10+)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                contentValues.clear()
+                contentValues.put(MediaStore.Downloads.IS_PENDING, 0)
+                resolver.update(imageUri, contentValues, null, null)
+            }
+
+            println("📤 File saved successfully to MediaStore Downloads")
 
             // Create share intent
             val shareIntent = Intent(Intent.ACTION_SEND).apply {
                 type = "image/jpeg"
-                putExtra(Intent.EXTRA_STREAM, contentUri)
+                putExtra(Intent.EXTRA_STREAM, imageUri)
                 putExtra(Intent.EXTRA_SUBJECT, title)
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }
 
             // Start share activity
-            val chooserIntent = Intent.createChooser(shareIntent, title)
-            chooserIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            val chooserIntent = Intent.createChooser(shareIntent, title).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
             context.startActivity(chooserIntent)
 
         } catch (e: Exception) {
@@ -78,11 +105,35 @@ actual fun getImageExporter(): ImageExporter {
 }
 
 actual fun addTitleToBitmap(bitmap: ImageBitmap, title: String, isDarkTheme: Boolean, textColor: Int): ImageBitmap {
-    val androidBitmap = bitmap.asAndroidBitmap()
+    val sourceBitmap = bitmap.asAndroidBitmap()
+    // Copy to software bitmap if it's a hardware bitmap (hardware bitmaps can't be used with Canvas)
+    val androidBitmap = if (sourceBitmap.config == Bitmap.Config.HARDWARE) {
+        sourceBitmap.copy(Bitmap.Config.ARGB_8888, false)
+    } else {
+        sourceBitmap
+    }
 
-    // Calculate title height based on text size - make it bigger and more visible
-    val titleTextSize = 64f  // Increased from 48f
-    val titlePadding = 48f   // Increased from 32f
+    val titlePadding = 32f
+    val maxTextWidth = androidBitmap.width - (titlePadding * 2)
+
+    // Start with a base text size and scale down if needed to fit
+    var titleTextSize = 48f
+    val textPaint = Paint().apply {
+        color = textColor
+        textSize = titleTextSize
+        typeface = Typeface.create("monospace", Typeface.NORMAL)
+        isAntiAlias = true
+        textAlign = Paint.Align.LEFT
+    }
+
+    // Measure text and scale down if it doesn't fit
+    var textWidth = textPaint.measureText(title)
+    while (textWidth > maxTextWidth && titleTextSize > 16f) {
+        titleTextSize -= 2f
+        textPaint.textSize = titleTextSize
+        textWidth = textPaint.measureText(title)
+    }
+
     val titleHeight = (titleTextSize + titlePadding * 2).toInt()
 
     println("📸 addTitleToBitmap - title: '$title', isDarkTheme: $isDarkTheme")
@@ -111,16 +162,6 @@ actual fun addTitleToBitmap(bitmap: ImageBitmap, title: String, isDarkTheme: Boo
     }
     canvas.drawRect(0f, 0f, newBitmap.width.toFloat(), newBitmap.height.toFloat(), backgroundPaint)
     println("📸 Background drawn")
-
-    // Step 2: Draw title text in the title area BEFORE drawing the chart
-    val textPaint = Paint().apply {
-        color = textColor
-        textSize = titleTextSize
-        // Use Courier (typewriter font) - normal weight, not bold
-        typeface = Typeface.create("monospace", Typeface.NORMAL)
-        isAntiAlias = true
-        textAlign = Paint.Align.LEFT
-    }
 
     // Position text with left alignment and padding
     val textY = titleHeight / 2f + titleTextSize / 3f

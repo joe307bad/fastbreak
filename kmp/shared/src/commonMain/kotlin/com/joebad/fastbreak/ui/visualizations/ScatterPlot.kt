@@ -40,6 +40,7 @@ import androidx.compose.ui.unit.sp
 import com.joebad.fastbreak.data.model.QuadrantConfig
 import com.joebad.fastbreak.data.model.ScatterPlotDataPoint
 import com.joebad.fastbreak.platform.getImageExporter
+import com.joebad.fastbreak.platform.addTitleToBitmap
 import kotlinx.coroutines.launch
 import io.github.koalaplot.core.Symbol
 import io.github.koalaplot.core.gestures.GestureConfig
@@ -232,10 +233,8 @@ fun QuadrantScatterPlot(
     val isDark = MaterialTheme.colorScheme.background == Color.Black ||
                  MaterialTheme.colorScheme.background == Color(0xFF0A0A0A)
 
-    // Always use white background for captured images (for sharing)
-    // But use theme background for display
-    val captureBackgroundColor = Color.White
-    val displayBackgroundColor = MaterialTheme.colorScheme.background
+    // Use theme background for both display and capture (no more white background for capture)
+    val backgroundColor = MaterialTheme.colorScheme.background
 
     // Create graphics layer for capturing the chart
     val graphicsLayer = rememberGraphicsLayer()
@@ -243,8 +242,8 @@ fun QuadrantScatterPlot(
     val imageExporter = remember { getImageExporter() }
     var isCapturing by remember { mutableStateOf(false) }
 
-    // Text colors: black for captures (white background), theme color for display
-    val textColor = if (isCapturing) Color.Black else MaterialTheme.colorScheme.onBackground
+    // Text colors: use theme color always
+    val textColor = MaterialTheme.colorScheme.onBackground
 
     // Debug logging for quadrant configs
     println("======================================")
@@ -516,8 +515,15 @@ fun QuadrantScatterPlot(
             coroutineScope.launch {
                 try {
                     isCapturing = true
-                    val bitmap = graphicsLayer.toImageBitmap()
-                    imageExporter.shareImage(bitmap, title)
+                    val chartBitmap = graphicsLayer.toImageBitmap()
+                    // Add title programmatically to the bitmap with theme info
+                    // Convert Compose Color to ARGB Int
+                    val textColorInt = (textColor.alpha * 255).toInt() shl 24 or
+                                      ((textColor.red * 255).toInt() shl 16) or
+                                      ((textColor.green * 255).toInt() shl 8) or
+                                      (textColor.blue * 255).toInt()
+                    val bitmapWithTitle = addTitleToBitmap(chartBitmap, title, isDark, textColorInt)
+                    imageExporter.shareImage(bitmapWithTitle, title)
                 } catch (e: Exception) {
                     e.printStackTrace()
                 } finally {
@@ -531,7 +537,7 @@ fun QuadrantScatterPlot(
         // Wrap chart and legend in a Box with graphics layer for capture
         Box(
             modifier = Modifier
-                .background(if (isCapturing) captureBackgroundColor else displayBackgroundColor)
+                .background(backgroundColor)
                 .drawWithCache {
                     // Record the content into the graphics layer
                     onDrawWithContent {
@@ -695,7 +701,7 @@ fun QuadrantScatterPlot(
                     label = labelPos.label,
                     color = labelPos.color,
                     offsetY = labelPos.offsetY,
-                    backgroundColor = if (isCapturing) Color.White else displayBackgroundColor
+                    backgroundColor = backgroundColor
                 )
             }
 
@@ -880,3 +886,4 @@ private fun LegendItem(text: String, color: Color, textColor: Color) {
         )
     }
 }
+

@@ -65,23 +65,42 @@ actual fun getImageExporter(): ImageExporter {
     return IOSImageExporter()
 }
 
-actual fun addTitleToBitmap(bitmap: ImageBitmap, title: String, isDarkTheme: Boolean, textColor: Int): ImageBitmap {
+actual fun addTitleToBitmap(bitmap: ImageBitmap, title: String, isDarkTheme: Boolean, textColor: Int, source: String): ImageBitmap {
     val skiaBitmap = bitmap.asSkiaBitmap()
 
-    // Calculate title height based on text size - make it bigger and more visible
-    val titleTextSize = 64f  // Increased from 48f
-    val titlePadding = 48f   // Increased from 32f
+    // Calculate title dimensions
+    val titlePadding = 32f
+    val maxTextWidth = skiaBitmap.width - (titlePadding * 2)
+
+    // Start with a base text size and scale down if needed to fit
+    var titleTextSize = 48f
+    val typeface = org.jetbrains.skia.FontMgr.default.matchFamilyStyle("Courier", org.jetbrains.skia.FontStyle.NORMAL)
+    var font = Font(typeface, titleTextSize)
+
+    // Measure text and scale down if it doesn't fit
+    var textLine = TextLine.make(title, font)
+    while (textLine.width > maxTextWidth && titleTextSize > 16f) {
+        titleTextSize -= 2f
+        font = Font(typeface, titleTextSize)
+        textLine = TextLine.make(title, font)
+    }
+
     val titleHeight = (titleTextSize + titlePadding * 2).toInt()
+
+    // Footer dimensions
+    val footerPadding = 16f
+    val footerTextSize = 36f
+    val footerHeight = (footerTextSize + footerPadding * 2).toInt()
 
     println("📸 ========================================")
     println("📸 addTitleToBitmap - title: '$title', isDarkTheme: $isDarkTheme")
     println("📸 Original bitmap size: ${skiaBitmap.width}x${skiaBitmap.height}")
-    println("📸 Title height: $titleHeight, text size: $titleTextSize")
+    println("📸 Title height: $titleHeight, Footer height: $footerHeight")
     println("📸 ========================================")
 
-    // Create a new surface with extra height for title
+    // Create a new surface with extra height for title and footer
     val newWidth = skiaBitmap.width
-    val newHeight = skiaBitmap.height + titleHeight
+    val newHeight = skiaBitmap.height + titleHeight + footerHeight
     val surface = Surface.makeRasterN32Premul(newWidth, newHeight)
     val canvas = surface.canvas
 
@@ -90,7 +109,7 @@ actual fun addTitleToBitmap(bitmap: ImageBitmap, title: String, isDarkTheme: Boo
 
     println("📸 Background color: ${backgroundColor.toUInt().toString(16)}, Text color: ${textColor.toUInt().toString(16)}")
 
-    // Step 1: Draw full background first (this ensures the entire image has the correct background)
+    // Step 1: Draw full background first
     val backgroundPaint = Paint().apply {
         color = backgroundColor
     }
@@ -100,41 +119,37 @@ actual fun addTitleToBitmap(bitmap: ImageBitmap, title: String, isDarkTheme: Boo
     )
     println("📸 Background drawn")
 
-    // Step 2: Draw title text in the title area BEFORE drawing the chart
-    // Create font with typewriter/courier typeface (normal weight, not bold)
-    val typeface = org.jetbrains.skia.FontMgr.default.matchFamilyStyle("Courier", org.jetbrains.skia.FontStyle.NORMAL)
-    val font = Font(typeface, titleTextSize)
-
-    // Create text paint with explicit color setting
+    // Step 2: Draw title text
     val textPaint = Paint()
     textPaint.color = textColor
     textPaint.isAntiAlias = true
 
-    println("📸 Text paint setup:")
-    println("📸   textColor value: ${textColor.toUInt().toString(16)}")
-    println("📸   textPaint.color: ${textPaint.color.toUInt().toString(16)}")
-    println("📸   Font size: $titleTextSize")
-    println("📸   Font configured: true")
-
-    // Left-align the text with padding
     val textX = titlePadding
-    val textY = titleHeight / 2f + titleTextSize / 3f  // Center vertically
+    val textY = titleHeight / 2f + titleTextSize / 3f
 
-    println("📸 Text measurements:")
-    println("📸   textX (left-aligned with padding): $textX")
-    println("📸   textY: $textY")
-    println("📸 About to draw text: '$title'")
-
-    // Use TextLine instead of drawString for proper text rendering on iOS
-    val textLine = TextLine.make(title, font)
     canvas.drawTextLine(textLine, textX, textY, textPaint)
-    println("📸 Text drawn successfully - drawTextLine called")
+    println("📸 Title drawn successfully")
 
-    // Step 3: Draw original chart bitmap BELOW the title area (so it doesn't cover the title)
-    println("📸 Drawing chart at Y offset: $titleHeight")
+    // Step 3: Draw original chart bitmap BELOW the title area
     val chartImage = org.jetbrains.skia.Image.makeFromBitmap(skiaBitmap)
     canvas.drawImage(chartImage, 0f, titleHeight.toFloat())
     println("📸 Chart drawn successfully")
+
+    // Step 4: Draw footer with source (left) and fbrk.app (right)
+    val footerFont = Font(typeface, footerTextSize)
+    val footerY = titleHeight + skiaBitmap.height + footerHeight / 2f + footerTextSize / 3f
+
+    // Draw source on the left
+    if (source.isNotEmpty()) {
+        val sourceText = TextLine.make("source: $source", footerFont)
+        canvas.drawTextLine(sourceText, footerPadding, footerY, textPaint)
+    }
+
+    // Draw fbrk.app on the right
+    val brandText = TextLine.make("fbrk.app", footerFont)
+    val brandX = newWidth - footerPadding - brandText.width
+    canvas.drawTextLine(brandText, brandX, footerY, textPaint)
+    println("📸 Footer drawn successfully")
 
     // Convert surface to ImageBitmap
     val resultImage = surface.makeImageSnapshot()

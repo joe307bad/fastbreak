@@ -227,7 +227,8 @@ fun QuadrantScatterPlot(
     highlightedTeamCodes: Set<String> = emptySet(),
     highlightedPlayerLabels: Set<String> = emptySet(),
     showShareButton: Boolean = false,
-    onShareClick: ((()-> Unit) -> Unit)? = null
+    onShareClick: ((()-> Unit) -> Unit)? = null,
+    source: String = ""
 ) {
     // Use MaterialTheme colorScheme to detect app theme (not system theme)
     val isDark = MaterialTheme.colorScheme.background == Color.Black ||
@@ -522,7 +523,7 @@ fun QuadrantScatterPlot(
                                       ((textColor.red * 255).toInt() shl 16) or
                                       ((textColor.green * 255).toInt() shl 8) or
                                       (textColor.blue * 255).toInt()
-                    val bitmapWithTitle = addTitleToBitmap(chartBitmap, title, isDark, textColorInt)
+                    val bitmapWithTitle = addTitleToBitmap(chartBitmap, title, isDark, textColorInt, source)
                     imageExporter.shareImage(bitmapWithTitle, title)
                 } catch (e: Exception) {
                     e.printStackTrace()

@@ -463,6 +463,7 @@ private fun RenderVisualization(
                                     onShareClick = { handler ->
                                         shareHandlerCallback(handler)
                                     },
+                                    source = visualization.source ?: "",
                                     modifier = Modifier.fillMaxWidth()
                                 )
                             }

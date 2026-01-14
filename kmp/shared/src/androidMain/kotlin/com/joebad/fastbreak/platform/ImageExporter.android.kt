@@ -104,7 +104,7 @@ actual fun getImageExporter(): ImageExporter {
     return AndroidImageExporter(context)
 }
 
-actual fun addTitleToBitmap(bitmap: ImageBitmap, title: String, isDarkTheme: Boolean, textColor: Int): ImageBitmap {
+actual fun addTitleToBitmap(bitmap: ImageBitmap, title: String, isDarkTheme: Boolean, textColor: Int, source: String): ImageBitmap {
     val sourceBitmap = bitmap.asAndroidBitmap()
     // Copy to software bitmap if it's a hardware bitmap (hardware bitmaps can't be used with Canvas)
     val androidBitmap = if (sourceBitmap.config == Bitmap.Config.HARDWARE) {
@@ -114,6 +114,7 @@ actual fun addTitleToBitmap(bitmap: ImageBitmap, title: String, isDarkTheme: Boo
     }
 
     val titlePadding = 32f
+    val footerPadding = 16f
     val maxTextWidth = androidBitmap.width - (titlePadding * 2)
 
     // Start with a base text size and scale down if needed to fit
@@ -136,15 +137,19 @@ actual fun addTitleToBitmap(bitmap: ImageBitmap, title: String, isDarkTheme: Boo
 
     val titleHeight = (titleTextSize + titlePadding * 2).toInt()
 
+    // Footer dimensions
+    val footerTextSize = 36f
+    val footerHeight = (footerTextSize + footerPadding * 2).toInt()
+
     println("📸 addTitleToBitmap - title: '$title', isDarkTheme: $isDarkTheme")
     println("📸 Original bitmap size: ${androidBitmap.width}x${androidBitmap.height}")
-    println("📸 New bitmap size: ${androidBitmap.width}x${androidBitmap.height + titleHeight}")
-    println("📸 Title height: $titleHeight, text size: $titleTextSize")
+    println("📸 New bitmap size: ${androidBitmap.width}x${androidBitmap.height + titleHeight + footerHeight}")
+    println("📸 Title height: $titleHeight, Footer height: $footerHeight")
 
-    // Create a new bitmap with extra height for title
+    // Create a new bitmap with extra height for title and footer
     val newBitmap = Bitmap.createBitmap(
         androidBitmap.width,
-        androidBitmap.height + titleHeight,
+        androidBitmap.height + titleHeight + footerHeight,
         Bitmap.Config.ARGB_8888
     )
 
@@ -163,25 +168,39 @@ actual fun addTitleToBitmap(bitmap: ImageBitmap, title: String, isDarkTheme: Boo
     canvas.drawRect(0f, 0f, newBitmap.width.toFloat(), newBitmap.height.toFloat(), backgroundPaint)
     println("📸 Background drawn")
 
-    // Position text with left alignment and padding
+    // Step 2: Draw title text
     val textY = titleHeight / 2f + titleTextSize / 3f
     val textX = titlePadding
-
-    println("📸 Calculating text position:")
-    println("📸   textX (left-aligned with padding): $textX")
-    println("📸   textY: $textY")
-    println("📸   Paint.textAlign = LEFT")
-    println("📸 Drawing text FIRST at: ($textX, $textY) in title area")
     canvas.drawText(title, textX, textY, textPaint)
-    println("📸 Text drawn successfully")
+    println("📸 Title drawn successfully")
 
-    // Step 3: Draw original chart bitmap BELOW the title area (so it doesn't cover the title)
-    println("📸 Drawing chart at Y offset: $titleHeight")
+    // Step 3: Draw original chart bitmap BELOW the title area
     canvas.drawBitmap(androidBitmap, 0f, titleHeight.toFloat(), null)
     println("📸 Chart drawn successfully")
 
+    // Step 4: Draw footer with source (left) and fbrk.app (right)
+    val footerPaint = Paint().apply {
+        color = textColor
+        textSize = footerTextSize
+        typeface = Typeface.create("monospace", Typeface.NORMAL)
+        isAntiAlias = true
+    }
+
+    val footerY = titleHeight + androidBitmap.height + footerHeight / 2f + footerTextSize / 3f
+
+    // Draw source on the left
+    if (source.isNotEmpty()) {
+        footerPaint.textAlign = Paint.Align.LEFT
+        canvas.drawText("source: $source", footerPadding, footerY, footerPaint)
+    }
+
+    // Draw fbrk.app on the right
+    footerPaint.textAlign = Paint.Align.RIGHT
+    canvas.drawText("fbrk.app", newBitmap.width - footerPadding, footerY, footerPaint)
+    println("📸 Footer drawn successfully")
+
     println("📸 FINAL bitmap size: ${newBitmap.width}x${newBitmap.height}")
-    println("📸 addTitleToBitmap COMPLETE - returning bitmap with title")
+    println("📸 addTitleToBitmap COMPLETE - returning bitmap with title and footer")
 
     return newBitmap.asImageBitmap()
 }

@@ -709,37 +709,57 @@ get_current_week_info <- function(schedules_df) {
         unique() %>%
         sort()
 
-      # If it's Tuesday or later during playoffs, advance to the NEXT playoff week
-      # (week after ESPN's current week) regardless of data availability
-      # This ensures we move forward even if nflreadr doesn't have playoff data yet
-      if (current_day_of_week >= 2) {
-        # If we have playoff data in nflreadr, use it to find the next week
-        if (length(all_playoff_weeks) > 0) {
-          next_playoff_weeks <- all_playoff_weeks[all_playoff_weeks > espn_week]
-          if (length(next_playoff_weeks) > 0) {
-            target_week <- next_playoff_weeks[1]
-            cat(sprintf("Tuesday rollover (playoffs): Advancing from week %d to week %d\n",
-                        espn_week, target_week))
-            return(list(week = target_week, season_type = 3))
-          }
-        } else {
-          # No playoff data in nflreadr yet, but we know playoff structure:
-          # Week 1 = Wild Card, Week 2 = Divisional, Week 3 = Conference, Week 4 = Super Bowl
-          if (espn_week < 4) {
-            target_week <- espn_week + 1
-            cat(sprintf("Tuesday rollover (playoffs, no nflreadr data): Advancing from week %d to week %d\n",
-                        espn_week, target_week))
-            return(list(week = target_week, season_type = 3))
-          }
+      # Find completed playoff weeks (all games have results)
+      completed_playoff_weeks <- schedules_df %>%
+        filter(game_type == "POST", !is.na(result)) %>%
+        pull(week) %>%
+        unique() %>%
+        sort()
+
+      cat(sprintf("Playoff data: all_weeks=%s, upcoming=%s, completed=%s\n",
+                  paste(all_playoff_weeks, collapse=","),
+                  paste(upcoming_playoff_weeks, collapse=","),
+                  paste(completed_playoff_weeks, collapse=",")))
+
+      # If nflreadr has no playoff data at all, just trust ESPN's week
+      # Don't try to do Tuesday rollover without data to verify games are complete
+      if (length(all_playoff_weeks) == 0) {
+        cat(sprintf("No playoff data in nflreadr, trusting ESPN week %d\n", espn_week))
+        return(list(week = espn_week, season_type = 3))
+      }
+
+      # Check if ESPN's current week has any unplayed games
+      espn_week_has_unplayed <- espn_week %in% upcoming_playoff_weeks
+
+      # If ESPN's current week still has unplayed games, use that week
+      # Don't advance even on Tuesday if games haven't been played yet
+      if (espn_week_has_unplayed) {
+        cat(sprintf("Using ESPN week %d (has unplayed games)\n", espn_week))
+        return(list(week = espn_week, season_type = 3))
+      }
+
+      # Check if ESPN's current week is actually complete (has results in nflreadr)
+      espn_week_is_complete <- espn_week %in% completed_playoff_weeks
+
+      # If it's Tuesday or later AND current week is verified complete, advance to the NEXT playoff week
+      if (current_day_of_week >= 2 && espn_week_is_complete) {
+        next_playoff_weeks <- all_playoff_weeks[all_playoff_weeks > espn_week]
+        if (length(next_playoff_weeks) > 0) {
+          target_week <- next_playoff_weeks[1]
+          cat(sprintf("Tuesday rollover (playoffs): Advancing from week %d to week %d\n",
+                      espn_week, target_week))
+          return(list(week = target_week, season_type = 3))
         }
       }
 
-      # Use ESPN's week if valid
-      if (espn_week %in% upcoming_playoff_weeks) {
-        return(list(week = espn_week, season_type = espn_season_type))
-      } else if (length(upcoming_playoff_weeks) > 0) {
+      # Fallback: use ESPN's week or first upcoming playoff week
+      if (length(upcoming_playoff_weeks) > 0) {
         return(list(week = upcoming_playoff_weeks[1], season_type = 3))
       }
+
+      # Final fallback: trust ESPN
+      cat(sprintf("Falling back to ESPN week %d\n", espn_week))
+      return(list(week = espn_week, season_type = 3))
     }
 
     # Fallback to ESPN's values
@@ -1482,6 +1502,314 @@ build_team_json <- function(team_abbr, cum_epa_df, season_totals, top_players_df
   )
 }
 
+# ============================================================================
+# Helper function to extract team stats for comparison views
+# ============================================================================
+get_team_stats_for_comparison <- function(team_abbr, season_totals) {
+  team_totals <- season_totals %>%
+    filter(team == team_abbr)
+
+  if (nrow(team_totals) == 0) {
+    return(NULL)
+  }
+
+  # Offensive stats
+  offense <- list(
+    off_epa = list(
+      value = round(team_totals$off_epa[1], 3),
+      rank = as.integer(team_totals$off_epa_rank[1]),
+      rankDisplay = team_totals$off_epa_rankDisplay[1],
+      label = "Off EPA/Play",
+      pairedWith = "def_epa"
+    ),
+    yards_per_game = list(
+      value = round(team_totals$yards_per_game[1], 1),
+      rank = as.integer(team_totals$yards_per_game_rank[1]),
+      rankDisplay = team_totals$yards_per_game_rankDisplay[1],
+      label = "Total Yards/Game",
+      pairedWith = "yards_allowed_per_game"
+    ),
+    pass_yards_per_game = list(
+      value = round(team_totals$pass_yards_per_game[1], 1),
+      rank = as.integer(team_totals$pass_yards_per_game_rank[1]),
+      rankDisplay = team_totals$pass_yards_per_game_rankDisplay[1],
+      label = "Pass Yards/Game",
+      pairedWith = "pass_yards_allowed_per_game"
+    ),
+    rush_yards_per_game = list(
+      value = round(team_totals$rush_yards_per_game[1], 1),
+      rank = as.integer(team_totals$rush_yards_per_game_rank[1]),
+      rankDisplay = team_totals$rush_yards_per_game_rankDisplay[1],
+      label = "Rush Yards/Game",
+      pairedWith = "rush_yards_allowed_per_game"
+    ),
+    points_per_game = list(
+      value = round(team_totals$points_per_game[1], 1),
+      rank = as.integer(team_totals$points_per_game_rank[1]),
+      rankDisplay = team_totals$points_per_game_rankDisplay[1],
+      label = "Points/Game",
+      pairedWith = "points_allowed_per_game"
+    ),
+    yards_per_play = list(
+      value = round(team_totals$yards_per_play[1], 2),
+      rank = as.integer(team_totals$yards_per_play_rank[1]),
+      rankDisplay = team_totals$yards_per_play_rankDisplay[1],
+      label = "Yards/Play",
+      pairedWith = NULL  # No defensive equivalent
+    ),
+    third_down_pct = list(
+      value = round(team_totals$third_down_pct[1], 1),
+      rank = as.integer(team_totals$third_down_pct_rank[1]),
+      rankDisplay = team_totals$third_down_pct_rankDisplay[1],
+      label = "3rd Down %",
+      pairedWith = "third_down_pct_def"
+    ),
+    rushing_epa = list(
+      value = round(team_totals$rushing_epa[1], 3),
+      rank = as.integer(team_totals$rushing_epa_rank[1]),
+      rankDisplay = team_totals$rushing_epa_rankDisplay[1],
+      label = "Rush EPA/Play",
+      pairedWith = NULL  # No defensive equivalent
+    ),
+    receiving_epa = list(
+      value = round(team_totals$receiving_epa[1], 3),
+      rank = as.integer(team_totals$receiving_epa_rank[1]),
+      rankDisplay = team_totals$receiving_epa_rankDisplay[1],
+      label = "Rec EPA/Play",
+      pairedWith = NULL  # No defensive equivalent
+    ),
+    touchdowns = list(
+      value = as.integer(team_totals$touchdowns[1]),
+      rank = as.integer(team_totals$touchdowns_rank[1]),
+      rankDisplay = team_totals$touchdowns_rankDisplay[1],
+      label = "Touchdowns",
+      pairedWith = "touchdowns_allowed"
+    ),
+    sacks_suffered = list(
+      value = as.integer(team_totals$sacks_suffered[1]),
+      rank = as.integer(team_totals$sacks_suffered_rank[1]),
+      rankDisplay = team_totals$sacks_suffered_rankDisplay[1],
+      label = "Sacks Allowed",
+      pairedWith = "sacks_made"
+    ),
+    interceptions_thrown = list(
+      value = as.integer(team_totals$interceptions_thrown[1]),
+      rank = as.integer(team_totals$interceptions_thrown_rank[1]),
+      rankDisplay = team_totals$interceptions_thrown_rankDisplay[1],
+      label = "INTs Thrown",
+      pairedWith = "interceptions_made"
+    ),
+    fumbles_lost = list(
+      value = as.integer(team_totals$fumbles_lost[1]),
+      rank = as.integer(team_totals$fumbles_lost_rank[1]),
+      rankDisplay = team_totals$fumbles_lost_rankDisplay[1],
+      label = "Fumbles Lost",
+      pairedWith = "fumbles_forced"
+    )
+  )
+
+  # Defensive stats
+  defense <- list(
+    def_epa = list(
+      value = round(team_totals$def_epa[1], 3),
+      rank = as.integer(team_totals$def_epa_rank[1]),
+      rankDisplay = team_totals$def_epa_rankDisplay[1],
+      label = "Def EPA/Play",
+      pairedWith = "off_epa"
+    ),
+    yards_allowed_per_game = list(
+      value = round(team_totals$yards_allowed_per_game[1], 1),
+      rank = as.integer(team_totals$yards_allowed_per_game_rank[1]),
+      rankDisplay = team_totals$yards_allowed_per_game_rankDisplay[1],
+      label = "Total Yards Allowed/Game",
+      pairedWith = "yards_per_game"
+    ),
+    pass_yards_allowed_per_game = list(
+      value = round(team_totals$pass_yards_allowed_per_game[1], 1),
+      rank = as.integer(team_totals$pass_yards_allowed_per_game_rank[1]),
+      rankDisplay = team_totals$pass_yards_allowed_per_game_rankDisplay[1],
+      label = "Pass Yards Allowed/Game",
+      pairedWith = "pass_yards_per_game"
+    ),
+    rush_yards_allowed_per_game = list(
+      value = round(team_totals$rush_yards_allowed_per_game[1], 1),
+      rank = as.integer(team_totals$rush_yards_allowed_per_game_rank[1]),
+      rankDisplay = team_totals$rush_yards_allowed_per_game_rankDisplay[1],
+      label = "Rush Yards Allowed/Game",
+      pairedWith = "rush_yards_per_game"
+    ),
+    points_allowed_per_game = list(
+      value = round(team_totals$points_allowed_per_game[1], 1),
+      rank = as.integer(team_totals$points_allowed_per_game_rank[1]),
+      rankDisplay = team_totals$points_allowed_per_game_rankDisplay[1],
+      label = "Points Allowed/Game",
+      pairedWith = "points_per_game"
+    ),
+    third_down_pct_def = list(
+      value = round(team_totals$third_down_pct_def[1], 1),
+      rank = as.integer(team_totals$third_down_pct_def_rank[1]),
+      rankDisplay = team_totals$third_down_pct_def_rankDisplay[1],
+      label = "3rd Down % Allowed",
+      pairedWith = "third_down_pct"
+    ),
+    sacks_made = list(
+      value = as.integer(team_totals$sacks_made[1]),
+      rank = as.integer(team_totals$sacks_made_rank[1]),
+      rankDisplay = team_totals$sacks_made_rankDisplay[1],
+      label = "Sacks Made",
+      pairedWith = "sacks_suffered"
+    ),
+    interceptions_made = list(
+      value = as.integer(team_totals$interceptions_made[1]),
+      rank = as.integer(team_totals$interceptions_made_rank[1]),
+      rankDisplay = team_totals$interceptions_made_rankDisplay[1],
+      label = "INTs Made",
+      pairedWith = "interceptions_thrown"
+    ),
+    fumbles_forced = list(
+      value = as.integer(team_totals$fumbles_forced[1]),
+      rank = as.integer(team_totals$fumbles_forced_rank[1]),
+      rankDisplay = team_totals$fumbles_forced_rankDisplay[1],
+      label = "Fumbles Forced",
+      pairedWith = "fumbles_lost"
+    ),
+    touchdowns_allowed = list(
+      value = as.integer(team_totals$touchdowns_allowed[1]),
+      rank = as.integer(team_totals$touchdowns_allowed_rank[1]),
+      rankDisplay = team_totals$touchdowns_allowed_rankDisplay[1],
+      label = "TDs Allowed",
+      pairedWith = "touchdowns"
+    ),
+    turnover_differential = list(
+      value = as.integer(team_totals$turnover_differential[1]),
+      rank = as.integer(team_totals$turnover_differential_rank[1]),
+      rankDisplay = team_totals$turnover_differential_rankDisplay[1],
+      label = "Turnover Diff",
+      pairedWith = NULL  # No offensive equivalent - this is a combined stat
+    )
+  )
+
+  return(list(offense = offense, defense = defense))
+}
+
+# ============================================================================
+# Build comparison views for a matchup
+# ============================================================================
+build_comparison_views <- function(home_stats, away_stats, home_team, away_team) {
+  # View 1: Side-by-side Off vs Off and Def vs Def
+  # These are stats where we compare like-for-like (offense to offense, defense to defense)
+
+  # Offensive comparison (all offensive stats)
+  off_comparison <- list()
+  off_stat_names <- names(home_stats$offense)
+  for (stat_name in off_stat_names) {
+    home_stat <- home_stats$offense[[stat_name]]
+    away_stat <- away_stats$offense[[stat_name]]
+    off_comparison[[stat_name]] <- list(
+      label = home_stat$label,
+      home = list(
+        value = home_stat$value,
+        rank = home_stat$rank,
+        rankDisplay = home_stat$rankDisplay
+      ),
+      away = list(
+        value = away_stat$value,
+        rank = away_stat$rank,
+        rankDisplay = away_stat$rankDisplay
+      )
+    )
+  }
+
+  # Defensive comparison (all defensive stats)
+  def_comparison <- list()
+  def_stat_names <- names(home_stats$defense)
+  for (stat_name in def_stat_names) {
+    home_stat <- home_stats$defense[[stat_name]]
+    away_stat <- away_stats$defense[[stat_name]]
+    def_comparison[[stat_name]] <- list(
+      label = home_stat$label,
+      home = list(
+        value = home_stat$value,
+        rank = home_stat$rank,
+        rankDisplay = home_stat$rankDisplay
+      ),
+      away = list(
+        value = away_stat$value,
+        rank = away_stat$rank,
+        rankDisplay = away_stat$rankDisplay
+      )
+    )
+  }
+
+  # View 2: Home Offense vs Away Defense (matchup stats)
+  # Only include stats that have a defensive counterpart
+  home_off_vs_away_def <- list()
+  for (stat_name in names(home_stats$offense)) {
+    off_stat <- home_stats$offense[[stat_name]]
+    paired_def_name <- off_stat$pairedWith
+
+    if (!is.null(paired_def_name) && paired_def_name %in% names(away_stats$defense)) {
+      def_stat <- away_stats$defense[[paired_def_name]]
+
+      home_off_vs_away_def[[stat_name]] <- list(
+        statKey = stat_name,
+        offLabel = off_stat$label,
+        defLabel = def_stat$label,
+        offense = list(
+          team = home_team,
+          value = off_stat$value,
+          rank = off_stat$rank,
+          rankDisplay = off_stat$rankDisplay
+        ),
+        defense = list(
+          team = away_team,
+          value = def_stat$value,
+          rank = def_stat$rank,
+          rankDisplay = def_stat$rankDisplay
+        )
+      )
+    }
+  }
+
+  # View 3: Away Offense vs Home Defense (matchup stats)
+  away_off_vs_home_def <- list()
+  for (stat_name in names(away_stats$offense)) {
+    off_stat <- away_stats$offense[[stat_name]]
+    paired_def_name <- off_stat$pairedWith
+
+    if (!is.null(paired_def_name) && paired_def_name %in% names(home_stats$defense)) {
+      def_stat <- home_stats$defense[[paired_def_name]]
+
+      away_off_vs_home_def[[stat_name]] <- list(
+        statKey = stat_name,
+        offLabel = off_stat$label,
+        defLabel = def_stat$label,
+        offense = list(
+          team = away_team,
+          value = off_stat$value,
+          rank = off_stat$rank,
+          rankDisplay = off_stat$rankDisplay
+        ),
+        defense = list(
+          team = home_team,
+          value = def_stat$value,
+          rank = def_stat$rank,
+          rankDisplay = def_stat$rankDisplay
+        )
+      )
+    }
+  }
+
+  return(list(
+    sideBySide = list(
+      offense = off_comparison,
+      defense = def_comparison
+    ),
+    homeOffVsAwayDef = home_off_vs_away_def,
+    awayOffVsHomeDef = away_off_vs_home_def
+  ))
+}
+
 # Build JSON for all matchups
 matchups_json <- list()
 
@@ -1507,6 +1835,16 @@ for (i in 1:nrow(current_week_games)) {
   home_json <- build_team_json(home_team, cum_epa_by_team, team_season_totals, top_players, team_stats_weekly)
   away_json <- build_team_json(away_team, cum_epa_by_team, team_season_totals, top_players, team_stats_weekly)
 
+  # Get team stats for comparison views
+  home_stats <- get_team_stats_for_comparison(home_team, team_season_totals)
+  away_stats <- get_team_stats_for_comparison(away_team, team_season_totals)
+
+  # Build the three comparison views
+  comparisons <- NULL
+  if (!is.null(home_stats) && !is.null(away_stats)) {
+    comparisons <- build_comparison_views(home_stats, away_stats, home_team, away_team)
+  }
+
   # Get game date and time
   # Format: "2025-09-07T13:00:00Z" (ISO 8601 format in UTC)
   game_datetime <- NULL
@@ -1524,6 +1862,7 @@ for (i in 1:nrow(current_week_games)) {
     odds = odds,
     h2h_record = I(h2h),  # Use I() to prevent auto_unbox from converting empty list to null
     common_opponents = common_opps,
+    comparisons = comparisons,
     teams = list()
   )
   matchup$teams[[tolower(home_team)]] <- home_json

@@ -806,6 +806,44 @@ private sealed class RowData(val key: String) {
     data class DateText(val k: String, val text: String) : RowData(k)
 }
 
+/**
+ * Compact navigation badge for Team/Versus toggle within team stats section
+ */
+@Composable
+private fun TeamStatsNavBadge(
+    text: String,
+    isSelected: Boolean,
+    onClick: () -> Unit
+) {
+    val backgroundColor = if (isSelected) {
+        MaterialTheme.colorScheme.primary
+    } else {
+        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+    }
+
+    val textColor = if (isSelected) {
+        MaterialTheme.colorScheme.onPrimary
+    } else {
+        MaterialTheme.colorScheme.onSurfaceVariant
+    }
+
+    Box(
+        modifier = Modifier
+            .background(backgroundColor, RoundedCornerShape(10.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 10.dp, vertical = 4.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelSmall,
+            fontSize = 10.sp,
+            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+            color = textColor
+        )
+    }
+}
+
 @Composable
 private fun StatsTab(
     awayTeam: String,
@@ -813,6 +851,11 @@ private fun StatsTab(
     matchup: MatchupV2
 ) {
     val listState = rememberLazyListState()
+
+    // State for Team/Versus toggle (0 = Team, 1 = Versus)
+    var teamStatsView by remember { mutableStateOf(0) }
+    // State for which versus comparison to show (0 = away off vs home def, 1 = home off vs away def)
+    var versusComparison by remember { mutableStateOf(0) }
 
     // Extract team data from teams map
     val awayTeamData = matchup.teams[awayTeam.lowercase()]
@@ -879,7 +922,8 @@ private fun StatsTab(
     }
 
     // Pre-compute ALL rows for virtualization - CRITICAL for performance
-    val allRowsData = remember(matchup, awayTeam, homeTeam, awayTeamStats, homeTeamStats, awayTeamData, homeTeamData) {
+    // Now depends on teamStatsView and versusComparison state
+    val allRowsData = remember(matchup, awayTeam, homeTeam, awayTeamStats, homeTeamStats, awayTeamData, homeTeamData, teamStatsView, versusComparison) {
         buildList {
             // Spacer
             add(RowData.Spacer("top_spacer", 8.dp))
@@ -909,33 +953,34 @@ private fun StatsTab(
                 }
             }
 
-            // Team Stats - compute rows upfront
-            val offensiveStatLabels = mapOf(
-                "off_epa" to "Offensive EPA",
-                "yards_per_game" to "Yards/Game",
-                "pass_yards_per_game" to "Pass Yds/Game",
-                "rush_yards_per_game" to "Rush Yds/Game",
-                "points_per_game" to "Points/Game",
-                "yards_per_play" to "Yards/Play",
-                "third_down_pct" to "3rd Down %",
-                "rushing_epa" to "Rushing EPA",
-                "receiving_epa" to "Receiving EPA",
-                "pacr" to "PACR",
-                "passing_first_downs" to "Pass 1st Downs",
-                "sacks_suffered" to "Sacks Suffered",
-                "touchdowns" to "Touchdowns",
-                "interceptions_thrown" to "Interceptions",
-                "fumbles_lost" to "Fumbles Lost"
-            )
+            // Team Stats section - content depends on view selection
+            if (teamStatsView == 0) {
+                // TEAM VIEW: Side-by-side offense vs offense, defense vs defense
+                val offensiveStatLabels = mapOf(
+                    "off_epa" to "Offensive EPA",
+                    "yards_per_game" to "Yards/Game",
+                    "pass_yards_per_game" to "Pass Yds/Game",
+                    "rush_yards_per_game" to "Rush Yds/Game",
+                    "points_per_game" to "Points/Game",
+                    "yards_per_play" to "Yards/Play",
+                    "third_down_pct" to "3rd Down %",
+                    "rushing_epa" to "Rushing EPA",
+                    "receiving_epa" to "Receiving EPA",
+                    "pacr" to "PACR",
+                    "passing_first_downs" to "Pass 1st Downs",
+                    "sacks_suffered" to "Sacks Suffered",
+                    "touchdowns" to "Touchdowns",
+                    "interceptions_thrown" to "Interceptions",
+                    "fumbles_lost" to "Fumbles Lost"
+                )
 
-            add(RowData.SectionHeader("team_stats_header", "Team Stats"))
-            add(RowData.SubsectionHeader("offensive_stats_header", "Offensive Stats"))
+                add(RowData.SubsectionHeader("offensive_stats_header", "Offensive Stats"))
 
-            offensiveStatLabels.forEach { (key, label) ->
-                val awayStat = awayTeamStats.current.offense[key]
-                val homeStat = homeTeamStats.current.offense[key]
-                if (awayStat != null && homeStat != null) {
-                    val awayValue = awayStat.value
+                offensiveStatLabels.forEach { (key, label) ->
+                    val awayStat = awayTeamStats.current.offense[key]
+                    val homeStat = homeTeamStats.current.offense[key]
+                    if (awayStat != null && homeStat != null) {
+                        val awayValue = awayStat.value
                     val awayRank = awayStat.rank
                     val awayRankDisplay = awayStat.rankDisplay
                     val homeValue = homeStat.value
@@ -1022,6 +1067,91 @@ private fun StatsTab(
                     val homeText = homeValue?.format(decimals) ?: "-"
 
                     add(RowData.FiveColumn("team_def_$key", awayText, awayRank, awayRankDisplay, label, homeText, homeRank, homeRankDisplay, advantage, false))
+                }
+            }
+            } else {
+                // VERSUS VIEW: Offense vs Defense matchup comparisons
+                val comparisons = matchup.comparisons
+                if (comparisons != null) {
+                    // Show the selected comparison: 0 = away off vs home def, 1 = home off vs away def
+                    val currentComparison = if (versusComparison == 0) {
+                        comparisons.awayOffVsHomeDef
+                    } else {
+                        comparisons.homeOffVsAwayDef
+                    }
+
+                    // Header showing which matchup we're viewing
+                    val headerText = if (versusComparison == 0) {
+                        "$awayTeam Offense vs $homeTeam Defense"
+                    } else {
+                        "$homeTeam Offense vs $awayTeam Defense"
+                    }
+                    add(RowData.SubsectionHeader("versus_header", headerText))
+                    add(RowData.Spacer("versus_header_spacer", 4.dp))
+
+                    // Display matchup stats with offense on left, defense on right
+                    // Order stats logically
+                    val statOrder = listOf(
+                        "off_epa", "yards_per_game", "pass_yards_per_game", "rush_yards_per_game",
+                        "points_per_game", "third_down_pct", "touchdowns",
+                        "sacks_suffered", "interceptions_thrown", "fumbles_lost"
+                    )
+
+                    statOrder.forEach { statKey ->
+                        val stat = currentComparison[statKey]
+                        if (stat != null) {
+                            val offValue = stat.offense.value
+                            val offRank = stat.offense.rank
+                            val offRankDisplay = stat.offense.rankDisplay
+                            val defValue = stat.defense.value
+                            val defRank = stat.defense.rank
+                            val defRankDisplay = stat.defense.rankDisplay
+
+                            // Determine advantage based on stat type
+                            // For yards/points gained vs allowed: offense wants more, defense wants less allowed
+                            // So if offense > defense allowed, offense has advantage
+                            val lowerOffenseIsBetter = statKey.contains("sacks_suffered") ||
+                                                       statKey.contains("interceptions_thrown") ||
+                                                       statKey.contains("fumbles_lost")
+                            val advantage = if (offValue != null && defValue != null) {
+                                if (lowerOffenseIsBetter) {
+                                    // Lower offense is better (e.g., fewer sacks suffered)
+                                    // Advantage to offense if they suffer fewer than defense forces
+                                    when {
+                                        offValue < defValue -> -1  // offense advantage
+                                        offValue > defValue -> 1   // defense advantage
+                                        else -> 0
+                                    }
+                                } else {
+                                    // Higher offense is better (e.g., more yards)
+                                    // Advantage to offense if they gain more than defense allows
+                                    when {
+                                        offValue > defValue -> -1  // offense advantage
+                                        offValue < defValue -> 1   // defense advantage
+                                        else -> 0
+                                    }
+                                }
+                            } else 0
+
+                            val decimals = if (statKey.contains("pct") || statKey.contains("per_game") || statKey.contains("per_play")) 1 else 2
+                            val offText = offValue?.format(decimals) ?: "-"
+                            val defText = defValue?.format(decimals) ?: "-"
+
+                            // Label shows both stat descriptions
+                            val label = stat.offLabel.replace("/Game", "").replace("Off ", "")
+
+                            add(RowData.FiveColumn(
+                                "versus_$statKey",
+                                offText, offRank, offRankDisplay,
+                                label,
+                                defText, defRank, defRankDisplay,
+                                advantage, false
+                            ))
+                        }
+                    }
+                } else {
+                    // Fallback if no comparisons data
+                    add(RowData.SubsectionHeader("versus_no_data", "Comparison data not available"))
                 }
             }
 
@@ -1251,11 +1381,13 @@ private fun StatsTab(
                 .fillMaxSize()
                 .background(MaterialTheme.colorScheme.surface) // Match surface background
         ) {
+            // Dynamic top padding based on header height (taller when Versus sub-nav is shown)
+            val topPadding = if (teamStatsView == 1) 52.dp else 30.dp
             LazyColumn(
                 state = listState,
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(top = 30.dp, bottom = 8.dp)
+                    .padding(top = topPadding, bottom = 8.dp)
             ) {
                 // Render all pre-computed rows as individual items for virtualization
                 items(allRowsData.size, key = { allRowsData[it].key }) { index ->
@@ -1312,60 +1444,91 @@ private fun StatsTab(
             }
         }
 
-        // Pinned team header at the top
+        // Pinned header at the top with team names and Team/Versus navigation
         Surface(
             modifier = Modifier
                 .fillMaxWidth()
                 .align(Alignment.TopCenter),
             color = MaterialTheme.colorScheme.surface
         ) {
-            Row(
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(IntrinsicSize.Min)
-                    .padding(start = 8.dp, end = 8.dp, top = 6.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                    .padding(start = 8.dp, end = 8.dp, top = 6.dp)
             ) {
-                Text(
-                    text = awayTeam,
-                    style = MaterialTheme.typography.bodySmall.copy(
-                        lineHeight = 11.sp
-                    ),
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.weight(1f),
-                    maxLines = 1
-                )
-                Text(
-                    text = "VS",
-                    style = MaterialTheme.typography.bodySmall.copy(
-                        lineHeight = 11.sp
-                    ),
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.weight(1f),
-                    textAlign = TextAlign.Center,
-                    maxLines = 1
-                )
-                Text(
-                    text = homeTeam,
-                    style = MaterialTheme.typography.bodySmall.copy(
-                        lineHeight = 11.sp
-                    ),
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.weight(1f),
-                    textAlign = TextAlign.End,
-                    maxLines = 1
-                )
+                // Team names row
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = awayTeam,
+                        style = MaterialTheme.typography.bodySmall.copy(lineHeight = 11.sp),
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.weight(1f),
+                        maxLines = 1
+                    )
+
+                    // Team/Versus navigation in center
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.weight(1f).wrapContentWidth(Alignment.CenterHorizontally)
+                    ) {
+                        TeamStatsNavBadge(
+                            text = "Team",
+                            isSelected = teamStatsView == 0,
+                            onClick = { teamStatsView = 0 }
+                        )
+                        TeamStatsNavBadge(
+                            text = "Versus",
+                            isSelected = teamStatsView == 1,
+                            onClick = { teamStatsView = 1 }
+                        )
+                    }
+
+                    Text(
+                        text = homeTeam,
+                        style = MaterialTheme.typography.bodySmall.copy(lineHeight = 11.sp),
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.weight(1f),
+                        textAlign = TextAlign.End,
+                        maxLines = 1
+                    )
+                }
+
+                // Versus sub-navigation (only shown when Versus is selected)
+                if (teamStatsView == 1) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 4.dp),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        TeamStatsNavBadge(
+                            text = "$awayTeam Off",
+                            isSelected = versusComparison == 0,
+                            onClick = { versusComparison = 0 }
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        TeamStatsNavBadge(
+                            text = "$homeTeam Off",
+                            isSelected = versusComparison == 1,
+                            onClick = { versusComparison = 1 }
+                        )
+                    }
+                }
             }
         }
     }
 }
+
 
 @Composable
 private fun TeamHeader(

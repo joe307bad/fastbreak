@@ -407,12 +407,65 @@ data class TeamGameResult(
 // For example: { "KC": { "buf": [{week:1, result:"W", score:"31-10"}], "mia": [{week:3, result:"L", score:"21-24"}] } }
 typealias CommonOpponents = Map<String, Map<String, List<TeamGameResult>>>
 
+// Comparison view data structures for matchup analysis
+
+/**
+ * A stat comparison entry for side-by-side view (offense vs offense, defense vs defense)
+ */
+@Serializable
+data class SideBySideStatComparison(
+    val label: String,
+    val home: StatValue,
+    val away: StatValue
+)
+
+/**
+ * A matchup stat comparison entry (offense vs defense)
+ * Shows how one team's offense compares to the other team's defense
+ */
+@Serializable
+data class MatchupStatComparison(
+    val statKey: String,
+    val offLabel: String,
+    val defLabel: String,
+    val offense: TeamStatEntry,
+    val defense: TeamStatEntry
+)
+
+@Serializable
+data class TeamStatEntry(
+    val team: String,
+    val value: Double? = null,
+    val rank: Int? = null,
+    val rankDisplay: String? = null
+)
+
+/**
+ * Side-by-side comparison views (offense vs offense, defense vs defense)
+ */
+@Serializable
+data class SideBySideComparison(
+    val offense: Map<String, SideBySideStatComparison> = emptyMap(),
+    val defense: Map<String, SideBySideStatComparison> = emptyMap()
+)
+
+/**
+ * All comparison views for a matchup
+ */
+@Serializable
+data class MatchupComparisons(
+    val sideBySide: SideBySideComparison? = null,
+    val homeOffVsAwayDef: Map<String, MatchupStatComparison> = emptyMap(),
+    val awayOffVsHomeDef: Map<String, MatchupStatComparison> = emptyMap()
+)
+
 @Serializable
 data class MatchupV2(
     val game_datetime: String? = null,
     val odds: OddsData? = null,
     val h2h_record: List<H2HGame> = emptyList(),
     val common_opponents: CommonOpponents? = null,
+    val comparisons: MatchupComparisons? = null,
     val teams: Map<String, TeamData>
 )
 

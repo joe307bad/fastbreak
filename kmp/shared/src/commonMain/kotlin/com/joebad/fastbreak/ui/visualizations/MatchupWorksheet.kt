@@ -13,17 +13,27 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.layer.drawLayer
+import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.joebad.fastbreak.data.model.*
+import com.joebad.fastbreak.platform.getImageExporter
 import com.joebad.fastbreak.ui.QuadrantScatterPlot
+import com.joebad.fastbreak.ui.components.ShareFab
 import kotlin.math.round
+import kotlinx.coroutines.launch
 import kotlinx.serialization.json.*
 
 // Team colors for advantage indicators
@@ -624,6 +634,12 @@ fun MatchupWorksheet(
     modifier: Modifier = Modifier,
     highlightedTeamCodes: Set<String> = emptySet()
 ) {
+    // Graphics layer for capturing share image
+    val graphicsLayer = rememberGraphicsLayer()
+    val coroutineScope = rememberCoroutineScope()
+    val imageExporter = remember { getImageExporter() }
+    var isCapturing by remember { mutableStateOf(false) }
+
     // Reorder matchups to put highlighted team matchups first, but sort by game time within each group
     val matchups = remember(visualization.dataPoints, highlightedTeamCodes) {
         // First, sort all matchups by game time (earliest first)
@@ -679,11 +695,28 @@ fun MatchupWorksheet(
     val awayTeam = teams[0].uppercase()
     val homeTeam = teams[1].uppercase()
 
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(horizontal = 16.dp)
-    ) {
+    // Extract week label from visualization title (e.g., "Divisional Round Matchup Worksheets")
+    val weekLabel = remember(visualization.title) {
+        visualization.title
+            .replace("Matchup Worksheets", "")
+            .replace("Matchup Worksheet", "")
+            .trim()
+    }
+
+    // Format the game date for display
+    val formattedDate = remember(selectedMatchup.game_datetime) {
+        selectedMatchup.game_datetime?.let { formatGameDateTime(it) } ?: ""
+    }
+
+    // Share title for the image
+    val shareTitle = "$awayTeam vs $homeTeam - $weekLabel"
+
+    Box(modifier = modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 16.dp)
+        ) {
         // Badge-based navigation row
         Row(
             modifier = Modifier
@@ -755,17 +788,70 @@ fun MatchupWorksheet(
             }
         }
 
-        // Source attribution
-        visualization.source?.let { source ->
-            Text(
-                text = "Source: $source",
-                style = MaterialTheme.typography.bodySmall,
-                fontSize = 9.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            // Source attribution
+            visualization.source?.let { source ->
+                Text(
+                    text = "Source: $source",
+                    style = MaterialTheme.typography.bodySmall,
+                    fontSize = 9.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 8.dp)
+                )
+            }
+        }
+
+        // Share FAB positioned at bottom-end
+        ShareFab(
+            onClick = {
+                coroutineScope.launch {
+                    isCapturing = true
+                    try {
+                        val bitmap = graphicsLayer.toImageBitmap()
+                        println("📸 Matchup Share: Captured bitmap size: ${bitmap.width}x${bitmap.height} (width x height)")
+                        println("📸 Matchup Share: Expected landscape - width should be > height")
+                        imageExporter.shareImage(bitmap, shareTitle)
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    } finally {
+                        isCapturing = false
+                    }
+                }
+            },
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(16.dp)
+        )
+
+        // Off-screen shareable content for capture (wide landscape, high-res)
+        // Using requiredSize to force exact dimensions regardless of parent constraints
+        // Higher density (2.0) renders crisper text
+        CompositionLocalProvider(LocalDensity provides Density(2f, 1f)) {
+            Box(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 8.dp)
-            )
+                    .requiredWidth(3400.dp)
+                    .requiredHeight(1800.dp)
+                    .offset { IntOffset(-10000, 0) }  // Off-screen
+                    .drawWithCache {
+                        onDrawWithContent {
+                            graphicsLayer.record {
+                                this@onDrawWithContent.drawContent()
+                            }
+                            drawLayer(graphicsLayer)
+                        }
+                    }
+            ) {
+                MatchupShareImage(
+                    awayTeam = awayTeam,
+                    homeTeam = homeTeam,
+                    matchup = selectedMatchup,
+                    weekLabel = weekLabel,
+                    formattedDate = formattedDate,
+                    source = visualization.source ?: "nflfastR / ESPN",
+                    modifier = Modifier.requiredWidth(3400.dp).requiredHeight(1800.dp)
+                )
+            }
         }
     }
 }
@@ -804,6 +890,7 @@ private sealed class RowData(val key: String) {
         val usePlayerRankColors: Boolean
     ) : RowData(k)
     data class DateText(val k: String, val text: String) : RowData(k)
+    data class ViewNavigation(val k: String, val awayTeam: String, val homeTeam: String) : RowData(k)
 }
 
 /**
@@ -952,6 +1039,10 @@ private fun StatsTab(
                     add(RowData.Spacer("odds_spacer", 12.dp))
                 }
             }
+
+            // View navigation row (Team / Versus options)
+            add(RowData.ViewNavigation("view_nav", awayTeam, homeTeam))
+            add(RowData.Spacer("nav_spacer", 8.dp))
 
             // Team Stats section - content depends on view selection
             if (teamStatsView == 0) {
@@ -1381,8 +1472,8 @@ private fun StatsTab(
                 .fillMaxSize()
                 .background(MaterialTheme.colorScheme.surface) // Match surface background
         ) {
-            // Dynamic top padding based on header height (taller when Versus sub-nav is shown)
-            val topPadding = if (teamStatsView == 1) 52.dp else 30.dp
+            // Fixed top padding for header (just team names now)
+            val topPadding = 28.dp
             LazyColumn(
                 state = listState,
                 modifier = Modifier
@@ -1438,92 +1529,78 @@ private fun StatsTab(
                                 .fillMaxWidth()
                                 .padding(start = 8.dp, end = 8.dp)
                         )
+                        is RowData.ViewNavigation -> Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.Start,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            TeamStatsNavBadge(
+                                text = "Team",
+                                isSelected = teamStatsView == 0,
+                                onClick = { teamStatsView = 0 }
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            TeamStatsNavBadge(
+                                text = "${row.awayTeam} Off vs ${row.homeTeam} Def",
+                                isSelected = teamStatsView == 1 && versusComparison == 0,
+                                onClick = { teamStatsView = 1; versusComparison = 0 }
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            TeamStatsNavBadge(
+                                text = "${row.homeTeam} Off vs ${row.awayTeam} Def",
+                                isSelected = teamStatsView == 1 && versusComparison == 1,
+                                onClick = { teamStatsView = 1; versusComparison = 1 }
+                            )
+                        }
                     }
                 }
 
             }
         }
 
-        // Pinned header at the top with team names and Team/Versus navigation
+        // Pinned header at the top with team names only
         Surface(
             modifier = Modifier
                 .fillMaxWidth()
                 .align(Alignment.TopCenter),
             color = MaterialTheme.colorScheme.surface
         ) {
-            Column(
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(start = 8.dp, end = 8.dp, top = 6.dp)
+                    .padding(start = 8.dp, end = 8.dp, top = 6.dp, bottom = 4.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                // Team names row
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = awayTeam,
-                        style = MaterialTheme.typography.bodySmall.copy(lineHeight = 11.sp),
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.weight(1f),
-                        maxLines = 1
-                    )
+                Text(
+                    text = awayTeam,
+                    style = MaterialTheme.typography.bodySmall.copy(lineHeight = 11.sp),
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.weight(1f),
+                    maxLines = 1
+                )
 
-                    // Team/Versus navigation in center
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.weight(1f).wrapContentWidth(Alignment.CenterHorizontally)
-                    ) {
-                        TeamStatsNavBadge(
-                            text = "Team",
-                            isSelected = teamStatsView == 0,
-                            onClick = { teamStatsView = 0 }
-                        )
-                        TeamStatsNavBadge(
-                            text = "Versus",
-                            isSelected = teamStatsView == 1,
-                            onClick = { teamStatsView = 1 }
-                        )
-                    }
+                Text(
+                    text = "VS",
+                    style = MaterialTheme.typography.bodySmall.copy(lineHeight = 11.sp),
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                    textAlign = TextAlign.Center
+                )
 
-                    Text(
-                        text = homeTeam,
-                        style = MaterialTheme.typography.bodySmall.copy(lineHeight = 11.sp),
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.weight(1f),
-                        textAlign = TextAlign.End,
-                        maxLines = 1
-                    )
-                }
-
-                // Versus sub-navigation (only shown when Versus is selected)
-                if (teamStatsView == 1) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 4.dp),
-                        horizontalArrangement = Arrangement.Center,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        TeamStatsNavBadge(
-                            text = "$awayTeam Off",
-                            isSelected = versusComparison == 0,
-                            onClick = { versusComparison = 0 }
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        TeamStatsNavBadge(
-                            text = "$homeTeam Off",
-                            isSelected = versusComparison == 1,
-                            onClick = { versusComparison = 1 }
-                        )
-                    }
-                }
+                Text(
+                    text = homeTeam,
+                    style = MaterialTheme.typography.bodySmall.copy(lineHeight = 11.sp),
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.weight(1f),
+                    textAlign = TextAlign.End,
+                    maxLines = 1
+                )
             }
         }
     }

@@ -867,4 +867,103 @@ class DemoUITests {
 
         println("✓ Demo complete!")
     }
+
+    /**
+     * Demo test: Walkthrough of loading app, selecting Divisional Round matchup worksheet, and sharing
+     * Shows: App loading > Divisional Round Matchup Worksheet > Share FAB
+     */
+    @Test
+    fun testDemo_DivisionalRoundShareWalkthrough() {
+        println("🎬 RECORDING_READY - Starting walkthrough demo...")
+
+        println("⏱ Waiting for app to load...")
+        Thread.sleep(2000)
+
+        // Find and tap on "Divisional Round Matchup Worksheet" chart
+        println("🔍 Looking for 'Divisional Round Matchup Worksheet' chart...")
+        val divisionalWorksheet = device.wait(
+            Until.findObject(By.textContains("Divisional Round Matchup Worksheet")),
+            10000
+        )
+
+        if (divisionalWorksheet != null) {
+            println("✓ Found 'Divisional Round Matchup Worksheet', tapping...")
+            divisionalWorksheet.click()
+            Thread.sleep(2000)
+        } else {
+            println("⚠ 'Divisional Round Matchup Worksheet' not found, trying alternative search...")
+            // Try searching for just "Divisional Round"
+            val divisionalAlt = device.wait(
+                Until.findObject(By.textContains("Divisional Round")),
+                5000
+            )
+            if (divisionalAlt != null) {
+                println("✓ Found 'Divisional Round', tapping...")
+                divisionalAlt.click()
+                Thread.sleep(2000)
+            } else {
+                println("⚠ Could not find Divisional Round worksheet, trying 'Divisional'...")
+                val divisionalShort = device.wait(
+                    Until.findObject(By.textContains("Divisional")),
+                    5000
+                )
+                if (divisionalShort != null) {
+                    divisionalShort.click()
+                    Thread.sleep(2000)
+                } else {
+                    println("⚠ Could not find any Divisional Round worksheet")
+                }
+            }
+        }
+
+        println("✓ Divisional Round Matchup Worksheet should be visible")
+        Thread.sleep(1500)
+
+        // Pause to show the worksheet content
+        println("📊 Showing matchup worksheet content...")
+        Thread.sleep(2000)
+
+        // Find and tap the Share FAB (Floating Action Button)
+        println("🔍 Looking for Share FAB button...")
+        val shareFab = device.wait(
+            Until.findObject(By.desc("Share")),
+            5000
+        )
+
+        if (shareFab != null) {
+            println("✓ Found Share FAB, tapping...")
+            shareFab.click()
+            Thread.sleep(2000)
+        } else {
+            println("⚠ Share FAB not found by description, trying alternative search...")
+            // Try to find any FAB-like element (floating action buttons are typically clickable)
+            val fabAlt = device.wait(
+                Until.findObject(By.descContains("share").clickable(true)),
+                3000
+            )
+
+            if (fabAlt != null) {
+                println("✓ Found Share button (alternative), tapping...")
+                fabAlt.click()
+                Thread.sleep(2000)
+            } else {
+                println("⚠ Share button not found, trying bottom-right corner (typical FAB location)...")
+                // Try clicking the typical FAB location (bottom-right corner)
+                device.click(
+                    device.displayWidth - 150,
+                    device.displayHeight - 200
+                )
+                Thread.sleep(2000)
+            }
+        }
+
+        println("✓ Share dialog should be visible")
+        Thread.sleep(2000)
+
+        // Final pause to show the share dialog
+        println("✓ Showing share dialog...")
+        Thread.sleep(2000)
+
+        println("✓ Demo complete!")
+    }
 }

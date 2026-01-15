@@ -1,5 +1,6 @@
 package com.joebad.fastbreak.platform
 
+import android.content.ClipData
 import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
@@ -70,18 +71,30 @@ class AndroidImageExporter(private val context: Context) : ImageExporter {
 
             println("📤 File saved successfully to MediaStore Downloads")
 
-            // Create share intent
+            // Create share intent with ClipData for better preview support
             val shareIntent = Intent(Intent.ACTION_SEND).apply {
                 type = "image/jpeg"
                 putExtra(Intent.EXTRA_STREAM, imageUri)
                 putExtra(Intent.EXTRA_SUBJECT, title)
+                putExtra(Intent.EXTRA_TITLE, title)
+
+                // Set ClipData for better preview support on Android
+                clipData = ClipData.newRawUri("image", imageUri)
+
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }
 
-            // Start share activity
+            // Start share activity with preview enabled
             val chooserIntent = Intent.createChooser(shareIntent, title).apply {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+
+                // Add EXTRA_CHOOSER_TARGETS for better preview on Android 10+
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    putExtra(Intent.EXTRA_CHOOSER_CONTENT_TYPE_HINT, "image/jpeg")
+                }
             }
+
+            println("📤 Launching share sheet with preview")
             context.startActivity(chooserIntent)
 
         } catch (e: Exception) {

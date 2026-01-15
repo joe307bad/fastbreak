@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { DemoGif } from './DemoGif';
 import { PlatformSupport } from './PlatformSupport';
 import manualFeatures from '@/data/manual-features.json';
@@ -29,6 +29,29 @@ interface ManualFeature {
 
 export function ManualPage() {
   const [sortMode, setSortMode] = useState<SortMode>('all');
+  const [mounted, setMounted] = useState(false);
+
+  // Sync with hash immediately on mount to avoid flicker
+  useEffect(() => {
+    const hash = window.location.hash;
+    if (hash === '#latest-changes') {
+      setSortMode('latest');
+    }
+    // Use requestAnimationFrame to ensure the sort happens before paint
+    requestAnimationFrame(() => {
+      setMounted(true);
+    });
+  }, []);
+
+  // Update hash when sort mode changes
+  const handleSortModeChange = (mode: SortMode) => {
+    setSortMode(mode);
+    if (mode === 'latest') {
+      window.history.pushState(null, '', '#latest-changes');
+    } else {
+      window.history.pushState(null, '', window.location.pathname);
+    }
+  };
 
   const sortedFeatures = [...(manualFeatures as ManualFeature[])].sort((a, b) => {
     if (sortMode === 'latest') {
@@ -44,9 +67,9 @@ export function ManualPage() {
         Learn how to use fastbreak with this guide.
       </p>
 
-      <div className="flex gap-3 mb-8">
+      <div className="flex gap-3 mb-8" style={{ opacity: mounted ? 1 : 0, transition: 'opacity 0.15s ease-in' }}>
         <button
-          onClick={() => setSortMode('all')}
+          onClick={() => handleSortModeChange('all')}
           className={`px-4 py-2 rounded-md text-sm font-medium transition-colors border ${
             sortMode === 'all'
               ? 'border-blue-600 text-blue-600 bg-blue-600/10'
@@ -56,7 +79,7 @@ export function ManualPage() {
           All features
         </button>
         <button
-          onClick={() => setSortMode('latest')}
+          onClick={() => handleSortModeChange('latest')}
           className={`px-4 py-2 rounded-md text-sm font-medium transition-colors border ${
             sortMode === 'latest'
               ? 'border-blue-600 text-blue-600 bg-blue-600/10'
@@ -67,7 +90,8 @@ export function ManualPage() {
         </button>
       </div>
 
-      {sortedFeatures.map((feature) => {
+      <div style={{ opacity: mounted ? 1 : 0, transition: 'opacity 0.15s ease-in' }}>
+        {sortedFeatures.map((feature) => {
         const headingId = feature.id;
 
         return (
@@ -125,6 +149,7 @@ export function ManualPage() {
         </div>
         );
       })}
+      </div>
     </div>
   );
 }

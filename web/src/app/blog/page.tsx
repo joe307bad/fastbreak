@@ -31,12 +31,15 @@ export default function BlogPage() {
       {posts.length === 0 ? (
         <p className="text-[var(--muted)]">No posts yet.</p>
       ) : (
-        <ul className="space-y-6">
-          {posts.map((post) => (
-            <li key={post.slug}>
+        <ol className="space-y-6 list-none">
+          {posts.map((post, index) => (
+            <li key={post.slug} className="pl-2 flex gap-3 items-end">
+              <span className="text-[var(--foreground)] shrink-0">
+                {posts.length - index}.
+              </span>
               <Link
                 href={`/blog/${post.slug}`}
-                className="block group"
+                className="block group flex-1"
               >
                 <article>
                   <time className="text-xs text-[var(--muted)]">
@@ -58,7 +61,7 @@ export default function BlogPage() {
               </Link>
             </li>
           ))}
-        </ul>
+        </ol>
       )}
     </main>
   );

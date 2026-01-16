@@ -68,12 +68,14 @@ fun DataVizScreen(
         }
     }
 
-    // State to track if we're showing a scatter plot (for FAB)
-    val isScatterPlot = state is DataVizState.Success &&
-                       (state as DataVizState.Success).data is ScatterPlotVisualization
+    // State to track if we're showing a chart that supports sharing (for FAB)
+    val isShareableChart = state is DataVizState.Success &&
+                          ((state as DataVizState.Success).data is ScatterPlotVisualization ||
+                           (state as DataVizState.Success).data is LineChartVisualization ||
+                           (state as DataVizState.Success).data is BarGraphVisualization)
 
-    // State to hold the share callback from scatter plot
-    var scatterPlotShareHandler by remember { mutableStateOf<(() -> Unit)?>(null) }
+    // State to hold the share callback from charts
+    var chartShareHandler by remember { mutableStateOf<(() -> Unit)?>(null) }
 
     Scaffold(
         topBar = {
@@ -125,10 +127,10 @@ fun DataVizScreen(
             )
         },
         floatingActionButton = {
-            // Show FAB only for scatter plots
-            if (isScatterPlot) {
+            // Show FAB for all shareable charts
+            if (isShareableChart) {
                 ScatterPlotFab(
-                    onShareClick = scatterPlotShareHandler
+                    onShareClick = chartShareHandler
                 )
             }
         }
@@ -144,8 +146,8 @@ fun DataVizScreen(
                 is DataVizState.Success -> SuccessContent(
                     visualization = currentState.data,
                     pinnedTeams = pinnedTeams,
-                    onScatterPlotShareHandlerChanged = { handler ->
-                        scatterPlotShareHandler = handler
+                    onChartShareHandlerChanged = { handler ->
+                        chartShareHandler = handler
                     }
                 )
                 is DataVizState.Error -> ErrorContent(
@@ -243,7 +245,7 @@ private fun LoadingContent() {
 private fun SuccessContent(
     visualization: VisualizationType,
     pinnedTeams: List<PinnedTeam>,
-    onScatterPlotShareHandlerChanged: ((() -> Unit)?) -> Unit
+    onChartShareHandlerChanged: ((() -> Unit)?) -> Unit
 ) {
     // State for filters and team highlighting
     var selectedFilters by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
@@ -348,7 +350,7 @@ private fun SuccessContent(
             visualization = displayVisualization,
             highlightedTeamCodes = allHighlightedTeamCodes,
             highlightedPlayerLabels = selectedPlayerLabels,
-            onScatterPlotShareHandlerChanged = onScatterPlotShareHandlerChanged,
+            onChartShareHandlerChanged = onChartShareHandlerChanged,
             onTeamClick = { label ->
                 // For PLAYER scatter plots, highlight individual players by label
                 // For TEAM scatter plots (and others), highlight teams by extracting team code
@@ -386,7 +388,7 @@ private fun RenderVisualization(
     visualization: VisualizationType,
     highlightedTeamCodes: Set<String> = emptySet(),
     highlightedPlayerLabels: Set<String> = emptySet(),
-    onScatterPlotShareHandlerChanged: ((() -> Unit)?) -> Unit = {},
+    onChartShareHandlerChanged: ((() -> Unit)?) -> Unit = {},
     onTeamClick: (String) -> Unit = {}
 ) {
     println("📊 RenderVisualization - highlightedPlayerLabels: $highlightedPlayerLabels")
@@ -429,7 +431,7 @@ private fun RenderVisualization(
         val scrollState = rememberScrollState()
 
         // Capture the callback to avoid scoping issues
-        val shareHandlerCallback = onScatterPlotShareHandlerChanged
+        val shareHandlerCallback = onChartShareHandlerChanged
 
         BoxWithConstraints(
             modifier = Modifier.fillMaxSize()
@@ -471,6 +473,12 @@ private fun RenderVisualization(
                                 BarChartComponent(
                                     data = visualization.dataPoints,
                                     highlightedTeamCodes = highlightedTeamCodes,
+                                    title = visualization.title,
+                                    showShareButton = false,
+                                    onShareClick = { handler ->
+                                        shareHandlerCallback(handler)
+                                    },
+                                    source = visualization.source ?: "",
                                     modifier = Modifier.fillMaxWidth()
                                 )
                             }
@@ -478,6 +486,12 @@ private fun RenderVisualization(
                                 LineChartComponent(
                                     series = visualization.series,
                                     highlightedTeamCodes = highlightedTeamCodes,
+                                    title = visualization.title,
+                                    showShareButton = false,
+                                    onShareClick = { handler ->
+                                        shareHandlerCallback(handler)
+                                    },
+                                    source = visualization.source ?: "",
                                     modifier = Modifier.fillMaxWidth()
                                 )
                             }

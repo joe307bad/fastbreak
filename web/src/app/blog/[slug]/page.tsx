@@ -25,19 +25,22 @@ export async function generateMetadata({ params }: Props) {
 
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://fastbreak.joebad.com";
 
+  // Use generated SVG OG image
+  const ogImageUrl = `${siteUrl}/og-images/${slug}.svg`;
+
   return {
     title: post.title,
     description: post.description,
     openGraph: {
       title: post.title,
       description: post.description,
-      images: [`${siteUrl}/og-image.png`],
+      images: [ogImageUrl],
     },
     twitter: {
       card: "summary_large_image",
       title: post.title,
       description: post.description,
-      images: [`${siteUrl}/og-image.png`],
+      images: [ogImageUrl],
     },
   };
 }
@@ -90,6 +93,11 @@ export default async function BlogPostPage({ params }: Props) {
             )}
           </div>
           <h1 className="text-2xl font-bold mt-2">{post.title}</h1>
+          {post.description && (
+            <p className="text-sm text-[var(--foreground)] mt-2 opacity-80">
+              {post.description}
+            </p>
+          )}
         </header>
 
         <div className="prose-sm">

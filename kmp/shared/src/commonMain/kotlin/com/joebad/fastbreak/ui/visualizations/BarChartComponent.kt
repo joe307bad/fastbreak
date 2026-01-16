@@ -70,7 +70,11 @@ private fun formatToTenth(value: Float): String {
 fun BarChartComponent(
     data: List<BarGraphDataPoint>,
     modifier: Modifier = Modifier,
-    highlightedTeamCodes: Set<String> = emptySet()
+    highlightedTeamCodes: Set<String> = emptySet(),
+    title: String = "Bar Chart",
+    showShareButton: Boolean = false,
+    onShareClick: ((() -> Unit)?) -> Unit = {},
+    source: String = ""
 ) {
     if (data.isEmpty()) return
 
@@ -202,12 +206,18 @@ fun BarChartComponent(
         )
     }
 
-    Column(
-        modifier = modifier,
-        horizontalAlignment = Alignment.CenterHorizontally
+    ShareableChartContainer(
+        title = title,
+        source = source,
+        showShareButton = showShareButton,
+        onShareClick = onShareClick,
+        modifier = modifier
     ) {
-        // Chart with label overlay
-        Box(
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            // Chart with label overlay
+            Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(400.dp)
@@ -374,14 +384,15 @@ fun BarChartComponent(
                 }
             }
         }
-        }
+            }
 
-        // Interaction hint
-        Text(
-            text = "Pinch to zoom • Drag to pan",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = 4.dp)
-        )
+            // Interaction hint
+            Text(
+                text = "Pinch to zoom • Drag to pan",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 4.dp)
+            )
+        }
     }
 }

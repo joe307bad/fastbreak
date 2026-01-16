@@ -79,7 +79,11 @@ fun LineChartComponent(
     series: List<LineChartSeries>,
     modifier: Modifier = Modifier,
     highlightedTeamCodes: Set<String> = emptySet(),
-    yAxisTitle: String? = null
+    yAxisTitle: String? = null,
+    title: String = "Line Chart",
+    showShareButton: Boolean = false,
+    onShareClick: ((() -> Unit)?) -> Unit = {},
+    source: String = ""
 ) {
     if (series.isEmpty() || series.all { it.dataPoints.isEmpty() }) return
 
@@ -144,11 +148,17 @@ fun LineChartComponent(
         )
     }
 
-    Column(
-        modifier = modifier,
-        horizontalAlignment = Alignment.CenterHorizontally
+    ShareableChartContainer(
+        title = title,
+        source = source,
+        showShareButton = showShareButton,
+        onShareClick = onShareClick,
+        modifier = modifier
     ) {
-        XYGraph(
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            XYGraph(
             xAxisModel = xAxisModel,
             yAxisModel = yAxisModel,
             gestureConfig = GestureConfig(
@@ -277,6 +287,7 @@ fun LineChartComponent(
                     }
                 }
             }
+        }
         }
     }
 }

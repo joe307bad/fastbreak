@@ -51,9 +51,9 @@
     "dateReleased": "2025-12-27",
     "version": "1.1.0",
     "sections": {
-      "howToUse": "Tap the filter icon to open the team selector. Select your favorite teams to pin them. Pinned teams will be highlighted in all charts, making them easier to track across different visualizations.",
-      "whatItDoes": "Allows you to select and highlight specific teams across all charts in the app. Your pinned teams are saved and persist across sessions, so you don't need to select them every time.",
-      "whyUseful": "If you follow specific teams, pinning them makes it much easier to find and compare their stats across different charts. The persistent highlighting helps you quickly identify your teams' performance in any visualization."
+      "howToUse": "Select the menu icon and select Settings. Tap the Manage Teams button and select the filter icon to open the team selector. Select your favorite teams to pin them. Pinned teams created a badge in each chart to easily highlight each pinned team for that chart.",
+      "whatItDoes": "Allows you to select and highlight specific teams within each chart. Your pinned teams are saved and persist across sessions, so you don't need to select them every time.",
+      "whyUseful": "If you follow specific teams, pinning them makes it much easier to find and highlight their stats within a chart. Easy selection and highlighting helps you quickly identify your teams' performance in any visualization."
     }
   },
   {
@@ -70,7 +70,7 @@
     "dateReleased": "2025-12-27",
     "version": "1.2.0",
     "sections": {
-      "howToUse": "Tap on any data point in a chart to highlight it and see detailed information. The selected point will be emphasized while other points fade slightly, making it easier to focus on specific values.",
+      "howToUse": "Tap on any data point in the list below the chart to highlight it on the chart. The selected point will be emphasized while other points fade slightly, making it easier to focus on specific values.",
       "whatItDoes": "Provides an interactive way to explore individual data points in charts. When you tap a point, a tooltip or detail view appears showing the exact values, team name, and any relevant contextual information.",
       "whyUseful": "Charts often contain many overlapping or closely-spaced data points. Highlighting lets you precisely examine individual values without confusion, and the detailed view provides context that might not fit in the main chart."
     }

@@ -9,6 +9,9 @@ import { HighlightingDataPointsDemo } from "./src/components/ui/HighlightingData
 import { NavigateChartsDemo } from "./src/components/ui/NavigateChartsDemo";
 import { HeadingWithAnchor } from "./src/components/ui/HeadingWithAnchor";
 import { ManualPage } from "./src/components/ui/ManualPage";
+import { SportsTalkGallery } from "./src/components/ui/SportsTalkGallery";
+import { WorksheetLightbox } from "./src/components/ui/WorksheetLightbox";
+import { SportsTalkExamplesGallery } from "./src/components/ui/SportsTalkExamplesGallery";
 
 export function useMDXComponents(components: MDXComponents): MDXComponents {
   return {
@@ -21,6 +24,9 @@ export function useMDXComponents(components: MDXComponents): MDXComponents {
     HighlightingDataPointsDemo,
     NavigateChartsDemo,
     ManualPage,
+    SportsTalkGallery,
+    WorksheetLightbox,
+    SportsTalkExamplesGallery,
     h1: ({ children }) => (
       <h1 className="text-2xl font-bold mb-4">{children}</h1>
     ),
@@ -32,12 +38,12 @@ export function useMDXComponents(components: MDXComponents): MDXComponents {
       <p className="text-[var(--muted)] mb-4 leading-relaxed">{children}</p>
     ),
     ul: ({ children }) => (
-      <ul className="list-disc list-inside mb-4 text-[var(--muted)]">{children}</ul>
+      <ul className="list-disc ml-6 mb-4 text-[var(--muted)] space-y-2">{children}</ul>
     ),
     ol: ({ children }) => (
-      <ol className="list-decimal list-inside mb-4 text-[var(--muted)]">{children}</ol>
+      <ol className="list-decimal ml-6 mb-4 text-[var(--muted)] space-y-2">{children}</ol>
     ),
-    li: ({ children }) => <li className="mb-1">{children}</li>,
+    li: ({ children }) => <li className="leading-relaxed">{children}</li>,
     a: ({ href, children }) => (
       <a href={href} className="text-blue-500 hover:underline">
         {children}

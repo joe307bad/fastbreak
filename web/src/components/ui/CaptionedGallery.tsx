@@ -42,17 +42,9 @@ export function CaptionedGallery({ images }: CaptionedGalleryProps) {
           className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4"
           onClick={() => setLightboxIndex(null)}
         >
-          <button
-            className="absolute top-4 right-4 text-white text-4xl hover:opacity-70 transition-opacity"
-            onClick={() => setLightboxIndex(null)}
-            aria-label="Close"
-          >
-            ×
-          </button>
-
           {lightboxIndex > 0 && (
             <button
-              className="absolute left-4 text-white text-4xl hover:opacity-70 transition-opacity"
+              className="absolute left-4 text-white text-4xl hover:opacity-70 transition-opacity z-10"
               onClick={(e) => {
                 e.stopPropagation();
                 setLightboxIndex(lightboxIndex - 1);
@@ -65,7 +57,7 @@ export function CaptionedGallery({ images }: CaptionedGalleryProps) {
 
           {lightboxIndex < images.length - 1 && (
             <button
-              className="absolute right-4 text-white text-4xl hover:opacity-70 transition-opacity"
+              className="absolute right-4 text-white text-4xl hover:opacity-70 transition-opacity z-10"
               onClick={(e) => {
                 e.stopPropagation();
                 setLightboxIndex(lightboxIndex + 1);
@@ -76,15 +68,22 @@ export function CaptionedGallery({ images }: CaptionedGalleryProps) {
             </button>
           )}
 
-          <div className="max-w-5xl max-h-[90vh] relative flex flex-col items-center" onClick={(e) => e.stopPropagation()}>
-            <div className="mb-4 text-white text-lg">{images[lightboxIndex].caption}</div>
+          <div className="max-w-5xl w-full h-full relative flex flex-col items-center" onClick={(e) => e.stopPropagation()}>
+            <button
+              className="self-end mb-2 text-white text-4xl hover:opacity-70 transition-opacity leading-none"
+              onClick={() => setLightboxIndex(null)}
+              aria-label="Close"
+            >
+              ×
+            </button>
             <Image
               src={images[lightboxIndex].src}
               alt={images[lightboxIndex].caption}
               width={1200}
               height={2400}
-              className="rounded-lg max-h-[80vh] w-auto"
+              className="rounded-lg max-h-[calc(100vh-8rem)] w-auto"
             />
+            <div className="mt-2 text-white text-sm px-4">{images[lightboxIndex].caption}</div>
           </div>
         </div>
       )}

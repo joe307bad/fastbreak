@@ -25,8 +25,9 @@ export async function generateMetadata({ params }: Props) {
 
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://fastbreak.joebad.com";
 
-  // Use generated SVG OG image
-  const ogImageUrl = `${siteUrl}/og-images/${slug}.png`;
+  // Use generated SVG OG image with cache busting
+  const cacheBuster = Date.now();
+  const ogImageUrl = `${siteUrl}/og-images/${slug}.png?v=${cacheBuster}`;
 
   return {
     title: post.title,
@@ -34,7 +35,11 @@ export async function generateMetadata({ params }: Props) {
     openGraph: {
       title: post.title,
       description: post.description,
-      images: [ogImageUrl],
+      images: [{
+        url: ogImageUrl,
+        type: 'image/png',
+        alt: post.title,
+      }],
       type: "website"
     },
     twitter: {

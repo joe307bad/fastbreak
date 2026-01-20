@@ -123,13 +123,12 @@ export function DocsNav({ docs }: DocsNavProps) {
               className="flex items-center justify-between gap-2 px-3 py-2 text-sm text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--border)] rounded transition-colors"
             >
               <div className="flex items-center gap-2">
-                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M8 2v4M16 2v4"/>
-                  <path d="M3 11h18M3 16h18"/>
-                  <rect x="4" y="6" width="16" height="16" rx="2"/>
-                  <circle cx="9" cy="10" r="1" fill="currentColor"/>
-                  <circle cx="15" cy="10" r="1" fill="currentColor"/>
-                </svg>
+                <div className="w-6 h-5 flex items-center justify-start overflow-hidden">
+                  <svg className="w-9 h-9 -ml-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                    <path d="M8 9V13.017C8 15.2261 9.79086 17.017 12 17.017C14.2091 17.017 16 15.2261 16 13.017V9H8Z"/>
+                    <path d="M10.75 9V7M13.25 9V7M12 12.267V17.784M5 13.017H8M16 13.017H19M5.46795 7.51561L7.46795 9.52861M18.532 7.51561L16.532 9.52861M8.64055 15.3278L6.51955 17.4578M15.3595 15.3278L17.4805 17.4578" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </div>
                 <span>GitHub Issues</span>
               </div>
               <svg className="w-3.5 h-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -143,10 +142,12 @@ export function DocsNav({ docs }: DocsNavProps) {
               className="flex items-center justify-between gap-2 px-3 py-2 text-sm text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--border)] rounded transition-colors"
             >
               <div className="flex items-center gap-2">
-                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <circle cx="12" cy="12" r="10"/>
-                  <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
-                </svg>
+                <div className="w-6 h-5 flex items-center justify-start overflow-hidden">
+                  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <circle cx="12" cy="12" r="10"/>
+                    <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+                  </svg>
+                </div>
                 <span>joebad.com</span>
               </div>
               <svg className="w-3.5 h-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">

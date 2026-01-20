@@ -46,6 +46,28 @@ class IOSImageExporter : ImageExporter {
                 applicationActivities = null
             )
 
+            // Configure popover presentation controller for iPad and certain share targets
+            // This is crucial to prevent crashes when sharing to apps like Twitter
+            activityViewController.popoverPresentationController?.let { popover ->
+                // Set source view to the key window - this prevents crashes on iPad
+                val keyWindow = UIApplication.sharedApplication.keyWindow
+                popover.sourceView = keyWindow
+
+                // Set source rect to center of the screen
+                keyWindow?.let { window ->
+                    val bounds = window.bounds
+                    popover.sourceRect = platform.CoreGraphics.CGRectMake(
+                        bounds.size.width / 2.0,
+                        bounds.size.height / 2.0,
+                        0.0,
+                        0.0
+                    )
+                }
+
+                // Allow any arrow direction
+                popover.permittedArrowDirections = platform.UIKit.UIPopoverArrowDirectionAny
+            }
+
             // Get the root view controller and present the share sheet
             val rootViewController = UIApplication.sharedApplication.keyWindow?.rootViewController
             rootViewController?.presentViewController(

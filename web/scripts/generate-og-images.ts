@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import sharp from 'sharp';
 import { getAllPosts } from '../src/lib/blog';
 
 const OUTPUT_DIR = path.join(process.cwd(), 'public', 'og-images');
@@ -55,16 +56,16 @@ function generateOGImageSVG(
     return lines;
   };
 
-  const subtitleLines = subtitle ? wrapText(subtitle, 35) : [];
+  const subtitleLines = subtitle ? wrapText(subtitle, 50) : [];
   const fontFamily = "'Geist Mono', 'SF Mono', 'Monaco', 'Menlo', 'Consolas', 'Liberation Mono', 'Courier New', monospace";
 
-  return `<svg width="1200" height="630" viewBox="0 0 1200 630" xmlns="http://www.w3.org/2000/svg">
+  return `<svg width="516" height="270" viewBox="0 0 516 270" xmlns="http://www.w3.org/2000/svg">
   <!-- Background -->
-  <rect width="1200" height="630" fill="#fafafa"/>
+  <rect width="516" height="270" fill="#fafafa"/>
 
   <!-- Title -->
-  <text x="40" y="140" font-family="${fontFamily}" font-size="80" font-weight="bold" fill="#171717" text-anchor="start">
-    <tspan x="40" dy="0">${escapeXml(title)}</tspan>
+  <text x="20" y="60" font-family="${fontFamily}" font-size="34" font-weight="bold" fill="#171717" text-anchor="start">
+    <tspan x="20" dy="0">${escapeXml(title)}</tspan>
   </text>
 
   <!-- Subtitle (wrapped) -->
@@ -73,8 +74,8 @@ function generateOGImageSVG(
       ? subtitleLines
           .map(
             (line, i) =>
-              `<text x="40" y="${260 + i * 50}" font-family="${fontFamily}" font-size="40" fill="#525252" text-anchor="start">
-    <tspan x="40" dy="0">${escapeXml(line)}</tspan>
+              `<text x="20" y="${110 + i * 22}" font-family="${fontFamily}" font-size="17" fill="#525252" text-anchor="start">
+    <tspan x="20" dy="0">${escapeXml(line)}</tspan>
   </text>`
           )
           .join('\n  ')
@@ -84,14 +85,14 @@ function generateOGImageSVG(
   <!-- Date -->
   ${
     formattedDate
-      ? `<text x="40" y="570" font-family="${fontFamily}" font-size="36" fill="#525252" text-anchor="start">${escapeXml(
+      ? `<text x="20" y="245" font-family="${fontFamily}" font-size="15" fill="#525252" text-anchor="start">${escapeXml(
           formattedDate
         )}</text>`
       : ''
   }
 
   <!-- Logo in bottom right (aligned with date) -->
-  <image x="1000" y="430" width="160" height="160" href="data:image/png;base64,${logoBase64}"/>
+  <image x="430" y="180" width="68" height="68" href="data:image/png;base64,${logoBase64}"/>
 </svg>`;
 }
 
@@ -101,14 +102,15 @@ async function main() {
   for (const post of posts) {
     const svg = generateOGImageSVG(post.title, post.description, post.date);
 
-    // Save as PNG (browsers will render SVG as PNG for OG images)
-    const outputPath = path.join(OUTPUT_DIR, `${post.slug}.svg`);
-    fs.writeFileSync(outputPath, svg);
+    // Convert SVG to PNG
+    const outputPath = path.join(OUTPUT_DIR, `${post.slug}.png`);
+    await sharp(Buffer.from(svg))
+      .png()
+      .toFile(outputPath);
     console.log(`Generated: ${outputPath}`);
   }
 
-  console.log(`\nGenerated ${posts.length} OG images (SVG format)`);
-  console.log('Note: SVG files work as OG images and will render correctly on social media');
+  console.log(`\nGenerated ${posts.length} OG images (PNG format)`);
 }
 
 main().catch(console.error);

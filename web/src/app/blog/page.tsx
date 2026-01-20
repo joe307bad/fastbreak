@@ -34,7 +34,7 @@ export default function BlogPage() {
         <ol className="space-y-6 list-none">
           {posts.map((post, index) => (
             <li key={post.slug} className="pl-2 flex gap-3 items-end">
-              <span className="text-[var(--foreground)] shrink-0">
+              <span className="text-[var(--foreground)] shrink-0 translate-y-[1px]">
                 {posts.length - index}.
               </span>
               <Link

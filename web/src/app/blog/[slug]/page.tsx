@@ -26,7 +26,7 @@ export async function generateMetadata({ params }: Props) {
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://fastbreak.joebad.com";
 
   // Use generated SVG OG image
-  const ogImageUrl = `${siteUrl}/og-images/${slug}.svg`;
+  const ogImageUrl = `${siteUrl}/og-images/${slug}.png`;
 
   return {
     title: post.title,
@@ -35,6 +35,7 @@ export async function generateMetadata({ params }: Props) {
       title: post.title,
       description: post.description,
       images: [ogImageUrl],
+      type: "website"
     },
     twitter: {
       card: "summary_large_image",
@@ -53,7 +54,7 @@ export default async function BlogPostPage({ params }: Props) {
     notFound();
   }
 
-  const components = useMDXComponents({});
+  const components = useMDXComponents({ });
 
   return (
     <main className="max-w-2xl mx-auto px-4 py-8">

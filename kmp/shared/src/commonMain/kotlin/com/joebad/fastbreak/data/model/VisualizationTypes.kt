@@ -40,6 +40,13 @@ data class BarGraphDataPoint(
 )
 
 @Serializable
+data class ReferenceLine(
+    val value: Double,
+    val label: String,
+    val color: String // hex color string (e.g., "#4CAF50")
+)
+
+@Serializable
 data class BarGraphVisualization(
     override val sport: String,
     override val visualizationType: String,
@@ -51,7 +58,9 @@ data class BarGraphVisualization(
     @Serializable(with = TagListSerializer::class)
     override val tags: List<Tag>? = null,
     override val sortOrder: Int? = null,
-    val dataPoints: List<BarGraphDataPoint>
+    val dataPoints: List<BarGraphDataPoint>,
+    val topReferenceLine: ReferenceLine? = null,
+    val bottomReferenceLine: ReferenceLine? = null
 ) : VisualizationType
 
 // Scatter Plot data structures

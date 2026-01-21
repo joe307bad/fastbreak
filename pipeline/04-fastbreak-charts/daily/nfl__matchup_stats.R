@@ -636,7 +636,7 @@ get_current_week_info <- function(schedules_df) {
     # Strategy: Look for the first week with upcoming games (no results yet)
     # but allow Tuesday rollover by checking if all games in current week are complete
 
-    current_day_of_week <- as.POSIXlt(Sys.Date())$wday  # 0=Sunday, 2=Tuesday, etc.
+    current_day_of_week <- as.POSIXlt(Sys.Date())$wday  # 0=Sunday, 1=Monday, 2=Tuesday, etc.
 
     # For regular season
     if (espn_season_type == 2) {
@@ -648,17 +648,17 @@ get_current_week_info <- function(schedules_df) {
         sort()
 
       # Check if ESPN's current week has all games completed
-      # Note: We advance on Tuesday regardless of completion status because
-      # by Tuesday, all current week games (including MNF) have been played
       espn_week_games <- schedules_df %>%
         filter(game_type == "REG", week == espn_week)
 
       espn_week_all_complete <- nrow(espn_week_games) > 0 &&
                                 all(!is.na(espn_week_games$result))
 
-      # If it's Tuesday (2) or later, advance to the next week
-      # We don't require all games to be marked complete in the data
-      # because by Tuesday morning, the week's games are done (MNF finishes Monday night)
+      # Day of week logic:
+      # - Sunday (0): Show upcoming Sunday's games
+      # - Monday (1): Show previous Sunday's games (just finished)
+      # - Tuesday-Saturday (2-6): Show upcoming Sunday's games
+      # Advance to next week on Tuesday or later (after MNF is done)
       if (current_day_of_week >= 2 && nrow(espn_week_games) > 0) {
         if (length(upcoming_weeks) > 0) {
           target_week <- upcoming_weeks[1]
@@ -721,13 +721,21 @@ get_current_week_info <- function(schedules_df) {
                   paste(upcoming_playoff_weeks, collapse=","),
                   paste(completed_playoff_weeks, collapse=",")))
 
-      # If nflreadr has no playoff data at all, trust ESPN but apply Tuesday rollover
+      # If nflreadr has no playoff data at all, trust ESPN
       if (length(all_playoff_weeks) == 0) {
         cat(sprintf("No playoff data in nflreadr, trusting ESPN week %d\n", espn_week))
-        # On Tuesday or later, advance to next week (games from previous week are done)
-        if (current_day_of_week >= 2) {
+        # Check if ESPN scoreboard has any events for the current week
+        # If there are events, use ESPN's week (don't advance)
+        # Only advance if ESPN's week has no events (meaning games are done)
+        has_espn_events <- !is.null(scoreboard$events) && length(scoreboard$events) > 0
+
+        if (has_espn_events) {
+          cat(sprintf("ESPN shows events for week %d, using that week\n", espn_week))
+          return(list(week = espn_week, season_type = 3))
+        } else if (current_day_of_week >= 2) {
+          # No events showing and it's Tuesday or later - advance to next week
           next_week <- espn_week + 1
-          cat(sprintf("Tuesday rollover (no playoff data): Advancing from week %d to week %d\n",
+          cat(sprintf("Tuesday rollover (no playoff data, no ESPN events): Advancing from week %d to week %d\n",
                       espn_week, next_week))
           return(list(week = next_week, season_type = 3))
         }
@@ -747,6 +755,10 @@ get_current_week_info <- function(schedules_df) {
       # Check if ESPN's current week is actually complete (has results in nflreadr)
       espn_week_is_complete <- espn_week %in% completed_playoff_weeks
 
+      # Day of week logic (same as regular season):
+      # - Sunday (0): Show upcoming Sunday's games
+      # - Monday (1): Show previous Sunday's games (just finished)
+      # - Tuesday-Saturday (2-6): Show upcoming Sunday's games
       # If it's Tuesday or later AND current week is verified complete, advance to the NEXT playoff week
       if (current_day_of_week >= 2 && espn_week_is_complete) {
         next_playoff_weeks <- all_playoff_weeks[all_playoff_weeks > espn_week]
@@ -905,6 +917,12 @@ if (!is.null(scoreboard_resp) && !is.null(scoreboard_resp$events)) {
     if (!is.null(event$competitions) && length(event$competitions) > 0) {
       comp <- event$competitions[[1]]
 
+      # Skip all-star games (Pro Bowl)
+      if (!is.null(comp$type) && !is.null(comp$type$type) && comp$type$type == "ALLSTAR") {
+        cat(sprintf("  Skipping all-star game (event %s)\n", event_id))
+        next
+      }
+
       if (!is.null(comp$competitors) && length(comp$competitors) >= 2) {
         home_abbr <- NULL
         away_abbr <- NULL
@@ -921,6 +939,12 @@ if (!is.null(scoreboard_resp) && !is.null(scoreboard_resp$events)) {
         }
 
         if (!is.null(home_abbr) && !is.null(away_abbr)) {
+          # Skip NFC vs AFC games (Pro Bowl, all-star games)
+          if (tolower(home_abbr) %in% c("nfc", "afc") || tolower(away_abbr) %in% c("nfc", "afc")) {
+            cat(sprintf("  Skipping NFC/AFC all-star matchup (event %s)\n", event_id))
+            next
+          }
+
           # Normalize team abbreviations (ESPN -> nflreadr format)
           home_abbr_norm <- case_when(
             home_abbr == "WSH" ~ "WAS",
@@ -989,11 +1013,23 @@ if (!is.null(scoreboard_resp) && !is.null(scoreboard_resp$events)) {
   if (needs_placeholder_games && length(placeholder_games_list) > 0) {
     current_week_games <- do.call(rbind, placeholder_games_list)
     cat(sprintf("Created %d placeholder games from ESPN data\n", nrow(current_week_games)))
+  } else if (needs_placeholder_games && length(placeholder_games_list) == 0) {
+    cat("\nWARNING: No valid games found after filtering (all-star games excluded)\n")
+    cat("This likely means only Pro Bowl or other exhibition games are scheduled\n")
+    cat("Exiting without generating output.\n")
+    quit(status = 1)
   }
 }
 
 cat(sprintf("Built mapping for %d matchups\n", length(team_to_event_map)))
 cat(sprintf("Final game count: %d games to process\n", nrow(current_week_games)))
+
+# Final check to ensure we have games to process
+if (nrow(current_week_games) == 0) {
+  cat("\nERROR: No valid games to process after all filtering\n")
+  cat("Exiting without generating output.\n")
+  quit(status = 1)
+}
 
 # Process all matchups
 

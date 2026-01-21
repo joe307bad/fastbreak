@@ -3,6 +3,7 @@ package com.joebad.fastbreak.ui
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -243,6 +244,9 @@ fun QuadrantScatterPlot(
     val imageExporter = remember { getImageExporter() }
     var isCapturing by remember { mutableStateOf(false) }
 
+    // Track selected quadrants for interactive legend
+    var selectedQuadrants by remember { mutableStateOf(setOf<String>()) }
+
     // Text colors: use theme color always
     val textColor = MaterialTheme.colorScheme.onBackground
 
@@ -369,7 +373,7 @@ fun QuadrantScatterPlot(
         val labels: List<LabelPosition>
     )
 
-    val quadrantData = remember(data, avgX, avgY, yMultiplier, topRightColor, topLeftColor, bottomLeftColor, bottomRightColor, subject, highlightedTeamCodes, highlightedPlayerLabels) {
+    val quadrantData = remember(data, avgX, avgY, yMultiplier, topRightColor, topLeftColor, bottomLeftColor, bottomRightColor, subject, highlightedTeamCodes, highlightedPlayerLabels, selectedQuadrants) {
         println("🎨 KoalaScatterPlot - Subject: $subject, Highlighted Team Codes: $highlightedTeamCodes, Highlighted Player Labels: $highlightedPlayerLabels, Data Points: ${data.size}")
 
         val trNormal = mutableListOf<ColoredPoint>()
@@ -382,8 +386,8 @@ fun QuadrantScatterPlot(
         val brHighlighted = mutableListOf<ColoredPoint>()
         val allLabels = mutableListOf<LabelPosition>()
 
-        // Check if highlighting is active (either team codes or player labels)
-        val isHighlighting = highlightedTeamCodes.isNotEmpty() || highlightedPlayerLabels.isNotEmpty()
+        // Check if highlighting is active (either team codes, player labels, or legend selection)
+        val isHighlighting = highlightedTeamCodes.isNotEmpty() || highlightedPlayerLabels.isNotEmpty() || selectedQuadrants.isNotEmpty()
 
         println("🎯 KoalaScatterPlot - Subject: $subject")
         println("🎯 KoalaScatterPlot - highlightedTeamCodes: $highlightedTeamCodes")
@@ -409,7 +413,18 @@ fun QuadrantScatterPlot(
                 else -> false
             }
 
-            val isHighlighted = matchesPlayerLabel || matchesTeamCode
+            // Determine which quadrant this point is in
+            val pointQuadrant = when {
+                x >= avgX && y >= avgY -> "topRight"
+                x < avgX && y >= avgY -> "topLeft"
+                x < avgX && y < avgY -> "bottomLeft"
+                else -> "bottomRight"
+            }
+
+            // Check if point matches legend selection
+            val matchesLegendSelection = selectedQuadrants.isEmpty() || selectedQuadrants.contains(pointQuadrant)
+
+            val isHighlighted = matchesPlayerLabel || matchesTeamCode || (selectedQuadrants.isNotEmpty() && matchesLegendSelection)
 
             if (isHighlighted) {
                 highlightedCount++
@@ -748,10 +763,58 @@ fun QuadrantScatterPlot(
                     horizontalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterHorizontally),
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    LegendItem(topRightLabel, topRightColor, textColor)
-                    LegendItem(topLeftLabel, topLeftColor, textColor)
-                    LegendItem(bottomLeftLabel, bottomLeftColor, textColor)
-                    LegendItem(bottomRightLabel, bottomRightColor, textColor)
+                    LegendItem(
+                        text = topRightLabel,
+                        color = topRightColor,
+                        textColor = textColor,
+                        isSelected = selectedQuadrants.isEmpty() || selectedQuadrants.contains("topRight"),
+                        onClick = {
+                            selectedQuadrants = if (selectedQuadrants.contains("topRight")) {
+                                selectedQuadrants - "topRight"
+                            } else {
+                                selectedQuadrants + "topRight"
+                            }
+                        }
+                    )
+                    LegendItem(
+                        text = topLeftLabel,
+                        color = topLeftColor,
+                        textColor = textColor,
+                        isSelected = selectedQuadrants.isEmpty() || selectedQuadrants.contains("topLeft"),
+                        onClick = {
+                            selectedQuadrants = if (selectedQuadrants.contains("topLeft")) {
+                                selectedQuadrants - "topLeft"
+                            } else {
+                                selectedQuadrants + "topLeft"
+                            }
+                        }
+                    )
+                    LegendItem(
+                        text = bottomLeftLabel,
+                        color = bottomLeftColor,
+                        textColor = textColor,
+                        isSelected = selectedQuadrants.isEmpty() || selectedQuadrants.contains("bottomLeft"),
+                        onClick = {
+                            selectedQuadrants = if (selectedQuadrants.contains("bottomLeft")) {
+                                selectedQuadrants - "bottomLeft"
+                            } else {
+                                selectedQuadrants + "bottomLeft"
+                            }
+                        }
+                    )
+                    LegendItem(
+                        text = bottomRightLabel,
+                        color = bottomRightColor,
+                        textColor = textColor,
+                        isSelected = selectedQuadrants.isEmpty() || selectedQuadrants.contains("bottomRight"),
+                        onClick = {
+                            selectedQuadrants = if (selectedQuadrants.contains("bottomRight")) {
+                                selectedQuadrants - "bottomRight"
+                            } else {
+                                selectedQuadrants + "bottomRight"
+                            }
+                        }
+                    )
                     if (regression != null) {
                         LegendItem("Trend", Color(0xFF607D8B), textColor)
                     }
@@ -868,21 +931,33 @@ private fun isColorTooLight(color: Color): Boolean {
 }
 
 @Composable
-private fun LegendItem(text: String, color: Color, textColor: Color) {
+private fun LegendItem(
+    text: String,
+    color: Color,
+    textColor: Color,
+    isSelected: Boolean = false,
+    onClick: (() -> Unit)? = null
+) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(4.dp),
-        modifier = Modifier.padding(vertical = 2.dp)
+        modifier = Modifier
+            .padding(vertical = 2.dp)
+            .then(if (onClick != null) Modifier.clickable { onClick() } else Modifier)
+            .padding(horizontal = 4.dp, vertical = 2.dp)
     ) {
         Box(
             modifier = Modifier
                 .size(12.dp)
-                .background(color, CircleShape)
+                .background(
+                    if (isSelected || onClick == null) color else color.copy(alpha = 0.3f),
+                    CircleShape
+                )
         )
         Text(
             text = text,
             style = MaterialTheme.typography.bodySmall,
-            color = textColor,
+            color = if (isSelected || onClick == null) textColor else textColor.copy(alpha = 0.5f),
             maxLines = 1
         )
     }

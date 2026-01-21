@@ -89,7 +89,17 @@ output_data <- list(
     list(label = "regular season", layout = "right", color = "#9C27B0")
   ),
   sortOrder = 2,
-  dataPoints = data_points
+  dataPoints = data_points,
+  topReferenceLine = list(
+    value = 115,
+    label = "Elite Offense",
+    color = "#4CAF50"
+  ),
+  bottomReferenceLine = list(
+    value = 110,
+    label = "Struggling Offense",
+    color = "#F44336"
+  )
 )
 
 # Upload to S3

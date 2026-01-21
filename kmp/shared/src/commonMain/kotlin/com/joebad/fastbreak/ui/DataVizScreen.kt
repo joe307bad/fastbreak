@@ -479,6 +479,8 @@ private fun RenderVisualization(
                                         shareHandlerCallback(handler)
                                     },
                                     source = visualization.source ?: "",
+                                    topReferenceLine = visualization.topReferenceLine,
+                                    bottomReferenceLine = visualization.bottomReferenceLine,
                                     modifier = Modifier.fillMaxWidth()
                                 )
                             }

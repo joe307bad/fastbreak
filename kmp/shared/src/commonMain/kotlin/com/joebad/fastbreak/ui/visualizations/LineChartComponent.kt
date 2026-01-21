@@ -2,12 +2,16 @@ package com.joebad.fastbreak.ui.visualizations
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -86,6 +90,9 @@ fun LineChartComponent(
     source: String = ""
 ) {
     if (series.isEmpty() || series.all { it.dataPoints.isEmpty() }) return
+
+    // State for legend-based selection (using series index)
+    var selectedSeriesIndices by remember { mutableStateOf(setOf<Int>()) }
 
     // Check if highlighting is active
     val isHighlighting = highlightedTeamCodes.isNotEmpty()
@@ -223,17 +230,23 @@ fun LineChartComponent(
             series.forEachIndexed { seriesIndex, lineSeries ->
                 if (lineSeries.dataPoints.size < 2) return@forEachIndexed
 
-                // Check if this series should be highlighted
-                val isHighlighted = isHighlighting && highlightedTeamCodes.any { code ->
+                // Check if this series should be highlighted by team codes
+                val isHighlightedByTeam = isHighlighting && highlightedTeamCodes.any { code ->
                     lineSeries.label.contains(code, ignoreCase = true)
                 }
 
-                // Apply transparency if highlighting is active and this series is not highlighted
+                // Check if this series is selected via legend (if any legend selections are active)
+                val isSelectedByLegend = selectedSeriesIndices.isEmpty() || selectedSeriesIndices.contains(seriesIndex)
+
+                // Apply transparency based on highlighting or legend selection
                 val baseColor = seriesColors[seriesIndex]
-                val color = if (isHighlighting && !isHighlighted) {
-                    baseColor.copy(alpha = 0.2f)
-                } else {
-                    baseColor
+                val color = when {
+                    // If team highlighting is active and this series is not highlighted by team
+                    isHighlighting && !isHighlightedByTeam -> baseColor.copy(alpha = 0.2f)
+                    // If legend selection is active and this series is not selected
+                    selectedSeriesIndices.isNotEmpty() && !isSelectedByLegend -> baseColor.copy(alpha = 0.2f)
+                    // Otherwise, use the base color
+                    else -> baseColor
                 }
 
                 // Convert data points to DefaultPoint
@@ -270,18 +283,37 @@ fun LineChartComponent(
                     val endIndex = minOf(startIndex + maxItemsPerRow, series.size)
 
                     for (index in startIndex until endIndex) {
+                        val isSelected = selectedSeriesIndices.isEmpty() || selectedSeriesIndices.contains(index)
+
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            modifier = Modifier
+                                .clickable {
+                                    selectedSeriesIndices = if (selectedSeriesIndices.contains(index)) {
+                                        selectedSeriesIndices - index
+                                    } else {
+                                        selectedSeriesIndices + index
+                                    }
+                                }
+                                .padding(horizontal = 4.dp, vertical = 2.dp)
                         ) {
                             Box(
                                 modifier = Modifier
                                     .size(12.dp)
-                                    .background(seriesColors[index], CircleShape)
+                                    .background(
+                                        if (isSelected) seriesColors[index] else seriesColors[index].copy(alpha = 0.3f),
+                                        CircleShape
+                                    )
                             )
                             Text(
                                 text = series[index].label,
-                                style = MaterialTheme.typography.bodySmall
+                                style = MaterialTheme.typography.bodySmall,
+                                color = if (isSelected) {
+                                    MaterialTheme.colorScheme.onSurface
+                                } else {
+                                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                                }
                             )
                         }
                     }

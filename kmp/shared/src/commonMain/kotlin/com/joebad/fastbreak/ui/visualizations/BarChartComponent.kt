@@ -1,7 +1,10 @@
 package com.joebad.fastbreak.ui.visualizations
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
@@ -9,6 +12,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.drawscope.DrawScope
@@ -22,6 +26,7 @@ import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.joebad.fastbreak.data.model.BarGraphDataPoint
+import com.joebad.fastbreak.data.model.ReferenceLine
 import io.github.koalaplot.core.bar.VerticalBarPlot
 import io.github.koalaplot.core.bar.verticalSolidBar
 import io.github.koalaplot.core.gestures.GestureConfig
@@ -54,6 +59,16 @@ private fun formatToTenth(value: Float): String {
     }
 }
 
+// Parse hex color string to Color
+private fun parseHexColor(hexColor: String): Color {
+    val hex = hexColor.removePrefix("#")
+    return when (hex.length) {
+        6 -> Color(("FF" + hex).toLong(16))
+        8 -> Color(hex.toLong(16))
+        else -> Color.Gray
+    }
+}
+
 /**
  * Reusable bar chart component using Koala Plot.
  * Supports both positive and negative values with pan and zoom.
@@ -74,14 +89,33 @@ fun BarChartComponent(
     title: String = "Bar Chart",
     showShareButton: Boolean = false,
     onShareClick: ((() -> Unit)?) -> Unit = {},
-    source: String = ""
+    source: String = "",
+    topReferenceLine: ReferenceLine? = null,
+    bottomReferenceLine: ReferenceLine? = null
 ) {
     if (data.isEmpty()) return
 
     val textMeasurer = rememberTextMeasurer()
     val labelBackgroundColor = MaterialTheme.colorScheme.surface
 
-    // Define alternating colors for positive and negative values
+    // State for reference line selection: "top", "bottom", or empty set (all shown)
+    var selectedReferenceLines by remember { mutableStateOf(setOf<String>()) }
+
+    // Define color palettes for different regions
+    val aboveTopColors = listOf(
+        Color(0xFF2196F3), // Blue
+        Color(0xFF4CAF50)  // Green
+    )
+    val betweenColors = listOf(
+        Color(0xFFFF9800), // Orange
+        Color(0xFF000000)  // Black
+    )
+    val belowBottomColors = listOf(
+        Color(0xFFF44336), // Red
+        Color(0xFF9C27B0)  // Purple
+    )
+
+    // Fallback colors when no reference lines exist (original behavior)
     val positiveColors = listOf(
         Color(0xFF2196F3), // Blue
         Color(0xFF4CAF50)  // Green
@@ -110,71 +144,190 @@ fun BarChartComponent(
         val labelYPosition: Float  // Y position along the diagonal line (in data coordinates)
     )
 
-    val barsWithLayout = remember(data, isHighlighting, highlightedTeamCodes, paddedMaxValue, paddedMinValue) {
+    val barsWithLayout = remember(data, isHighlighting, highlightedTeamCodes, selectedReferenceLines, topReferenceLine, bottomReferenceLine, paddedMaxValue, paddedMinValue, textMeasurer) {
+        // Counters for each region
+        var aboveTopIndex = 0
+        var betweenIndex = 0
+        var belowBottomIndex = 0
         var positiveIndex = 0
         var negativeIndex = 0
 
         // First pass: assign colors
         val coloredBars = data.map { point ->
-            // Check if this bar should be highlighted
-            val isHighlighted = isHighlighting && highlightedTeamCodes.any { code ->
+            // Check if this bar should be highlighted by team codes
+            val isHighlightedByTeam = isHighlighting && highlightedTeamCodes.any { code ->
                 point.label.contains(code, ignoreCase = true)
             }
 
-            // Determine color with alternating pattern
-            val baseColor = if (point.value < 0) {
-                val color = negativeColors[negativeIndex % negativeColors.size]
-                negativeIndex++
-                color
-            } else {
-                val color = positiveColors[positiveIndex % positiveColors.size]
-                positiveIndex++
-                color
+            // Determine which region this bar is in (if reference lines exist)
+            val barRegion = when {
+                topReferenceLine != null && bottomReferenceLine != null -> {
+                    when {
+                        point.value >= topReferenceLine.value -> "aboveTop"
+                        point.value <= bottomReferenceLine.value -> "belowBottom"
+                        else -> "between"
+                    }
+                }
+                topReferenceLine != null -> {
+                    if (point.value >= topReferenceLine.value) "aboveTop" else "belowTop"
+                }
+                bottomReferenceLine != null -> {
+                    if (point.value <= bottomReferenceLine.value) "belowBottom" else "aboveBottom"
+                }
+                else -> null
             }
 
-            val color = if (isHighlighting && !isHighlighted) {
-                baseColor.copy(alpha = 0.2f)
+            // Check if this bar matches the reference line selection
+            val matchesReferenceLineSelection = if (selectedReferenceLines.isEmpty()) {
+                true
             } else {
-                baseColor
+                val aboveTop = topReferenceLine != null &&
+                              selectedReferenceLines.contains("top") &&
+                              point.value >= topReferenceLine.value
+                val belowBottom = bottomReferenceLine != null &&
+                                 selectedReferenceLines.contains("bottom") &&
+                                 point.value <= bottomReferenceLine.value
+                aboveTop || belowBottom
+            }
+
+            // Determine color with alternating pattern based on region
+            val baseColor = if (barRegion != null) {
+                // Use region-based colors when reference lines exist
+                when (barRegion) {
+                    "aboveTop" -> {
+                        val color = aboveTopColors[aboveTopIndex % aboveTopColors.size]
+                        aboveTopIndex++
+                        color
+                    }
+                    "between" -> {
+                        val color = betweenColors[betweenIndex % betweenColors.size]
+                        betweenIndex++
+                        color
+                    }
+                    "belowBottom" -> {
+                        val color = belowBottomColors[belowBottomIndex % belowBottomColors.size]
+                        belowBottomIndex++
+                        color
+                    }
+                    "belowTop" -> {
+                        val color = betweenColors[betweenIndex % betweenColors.size]
+                        betweenIndex++
+                        color
+                    }
+                    "aboveBottom" -> {
+                        val color = betweenColors[betweenIndex % betweenColors.size]
+                        betweenIndex++
+                        color
+                    }
+                    else -> Color.Gray
+                }
+            } else {
+                // Fallback to original positive/negative color scheme
+                if (point.value < 0) {
+                    val color = negativeColors[negativeIndex % negativeColors.size]
+                    negativeIndex++
+                    color
+                } else {
+                    val color = positiveColors[positiveIndex % positiveColors.size]
+                    positiveIndex++
+                    color
+                }
+            }
+
+            val color = when {
+                // If team highlighting is active and this bar is not highlighted by team
+                isHighlighting && !isHighlightedByTeam -> baseColor.copy(alpha = 0.2f)
+                // If reference line selection is active and this bar doesn't match
+                selectedReferenceLines.isNotEmpty() && !matchesReferenceLineSelection -> baseColor.copy(alpha = 0.2f)
+                // Otherwise, use the base color
+                else -> baseColor
             }
 
             point to color
         }
 
-        // Second pass: calculate label Y positions along diagonal line
-        // For each bar, the label's Y position is determined by its X position (index)
-        // Positive bars: diagonal line from paddedMaxValue (leftmost) to 0 (rightmost)
-        // Negative bars: diagonal line from paddedMinValue (leftmost) to 0 (rightmost)
+        // Second pass: calculate label Y positions
+        // If all values are positive or all negative, align labels to top of each bar
+        // Otherwise use diagonal line positioning for mixed positive/negative charts
 
-        val positiveIndices = data.indices.filter { data[it].value >= 0 }
-        val negativeIndices = data.indices.filter { data[it].value < 0 }
+        val allPositive = data.all { it.value >= 0 }
+        val allNegative = data.all { it.value < 0 }
 
         val labelPositions = mutableMapOf<Int, Float>()
 
-        // Positive bars: line descends from max value (with small buffer) to 0 as we go left to right
-        if (positiveIndices.isNotEmpty()) {
-            // Start at max value with a small buffer for label visibility (5% of range)
-            val buffer = (maxValue - minValue) * 0.05f
-            val startY = maxValue + buffer
-            val endY = 0f
-            positiveIndices.forEachIndexed { idx, dataIndex ->
-                // Linear interpolation based on bar index
-                val t = idx.toFloat() / positiveIndices.size.coerceAtLeast(1).toFloat()
-                val yValue = startY + (endY - startY) * t
-                labelPositions[dataIndex] = yValue
-            }
-        }
+        if (allPositive || allNegative) {
+            // Simple stepped layout - start high and step down consistently
 
-        // Negative bars: line descends from 0 to min value (with small buffer) as we go left to right
-        if (negativeIndices.isNotEmpty()) {
-            val buffer = (maxValue - minValue) * 0.05f
-            val startY = 0f
-            val endY = minValue - buffer
-            negativeIndices.forEachIndexed { idx, dataIndex ->
-                // Linear interpolation based on position in negative bar sequence
-                val t = idx.toFloat() / negativeIndices.size.coerceAtLeast(1).toFloat()
-                val yValue = startY + (endY - startY) * t
-                labelPositions[dataIndex] = yValue
+            // Start a few units above the highest value
+            var currentY = if (allPositive) {
+                maxValue + 4f
+            } else {
+                minValue - 4f
+            }
+
+            // Step size - 3% of data range
+            val stepSize = (maxValue - minValue) * 0.03f
+
+            // First pass: calculate initial positions
+            val initialPositions = mutableMapOf<Int, Float>()
+            data.indices.forEach { index ->
+                initialPositions[index] = currentY
+                if (allPositive) {
+                    currentY -= stepSize
+                } else {
+                    currentY += stepSize
+                }
+            }
+
+            // Second pass: find the minimum distance between any label and its bar
+            val minDistance = data.indices.minOfOrNull { index ->
+                val labelY = initialPositions[index] ?: 0f
+                val barY = data[index].value.toFloat()
+                if (allPositive) {
+                    labelY - barY  // Distance above the bar
+                } else {
+                    barY - labelY  // Distance below the bar
+                }
+            } ?: 0f
+
+            // Third pass: shift all labels down by the minimum distance to get as close as possible
+            data.indices.forEach { index ->
+                val initialY = initialPositions[index] ?: 0f
+                labelPositions[index] = if (allPositive) {
+                    initialY - minDistance
+                } else {
+                    initialY + minDistance
+                }
+            }
+        } else {
+            // Mixed positive/negative - use diagonal line positioning
+            val positiveIndices = data.indices.filter { data[it].value >= 0 }
+            val negativeIndices = data.indices.filter { data[it].value < 0 }
+
+            // Positive bars: line descends from max value (with small buffer) to 0 as we go left to right
+            if (positiveIndices.isNotEmpty()) {
+                val buffer = (maxValue - minValue) * 0.05f
+                val startY = maxValue + buffer
+                val endY = 0f
+                positiveIndices.forEachIndexed { idx, dataIndex ->
+                    // Linear interpolation based on bar index
+                    val t = idx.toFloat() / positiveIndices.size.coerceAtLeast(1).toFloat()
+                    val yValue = startY + (endY - startY) * t
+                    labelPositions[dataIndex] = yValue
+                }
+            }
+
+            // Negative bars: line descends from 0 to min value (with small buffer) as we go left to right
+            if (negativeIndices.isNotEmpty()) {
+                val buffer = (maxValue - minValue) * 0.05f
+                val startY = 0f
+                val endY = minValue - buffer
+                negativeIndices.forEachIndexed { idx, dataIndex ->
+                    // Linear interpolation based on position in negative bar sequence
+                    val t = idx.toFloat() / negativeIndices.size.coerceAtLeast(1).toFloat()
+                    val yValue = startY + (endY - startY) * t
+                    labelPositions[dataIndex] = yValue
+                }
             }
         }
 
@@ -278,6 +431,86 @@ fun BarChartComponent(
                 .fillMaxHeight()
                 .padding(start = 4.dp, end = 4.dp, top = 8.dp, bottom = 4.dp)
         ) {
+            // Draw reference line shading first (behind everything)
+            topReferenceLine?.let { refLine ->
+                val refValue = refLine.value.toFloat()
+                val refColor = parseHexColor(refLine.color)
+
+                // Create horizontal line shading above the reference line
+                val numLines = 50
+                val yStep = (yAxisModel.range.endInclusive - refValue) / numLines
+
+                for (i in 0 until numLines) {
+                    val y = refValue + (i * yStep)
+                    LinePlot(
+                        data = listOf(
+                            Point(xAxisModel.range.start, y),
+                            Point(xAxisModel.range.endInclusive, y)
+                        ),
+                        lineStyle = LineStyle(
+                            brush = SolidColor(refColor.copy(alpha = 0.15f)),
+                            strokeWidth = 2.dp
+                        )
+                    )
+                }
+            }
+
+            bottomReferenceLine?.let { refLine ->
+                val refValue = refLine.value.toFloat()
+                val refColor = parseHexColor(refLine.color)
+
+                // Create horizontal line shading below the reference line
+                val numLines = 50
+                val yStep = (refValue - yAxisModel.range.start) / numLines
+
+                for (i in 0 until numLines) {
+                    val y = yAxisModel.range.start + (i * yStep)
+                    LinePlot(
+                        data = listOf(
+                            Point(xAxisModel.range.start, y),
+                            Point(xAxisModel.range.endInclusive, y)
+                        ),
+                        lineStyle = LineStyle(
+                            brush = SolidColor(refColor.copy(alpha = 0.15f)),
+                            strokeWidth = 2.dp
+                        )
+                    )
+                }
+            }
+
+            // Draw reference lines (on top of shading, behind bars)
+            topReferenceLine?.let { refLine ->
+                val refValue = refLine.value.toFloat()
+                val refColor = parseHexColor(refLine.color)
+
+                LinePlot(
+                    data = listOf(
+                        Point(xAxisModel.range.start, refValue),
+                        Point(xAxisModel.range.endInclusive, refValue)
+                    ),
+                    lineStyle = LineStyle(
+                        brush = SolidColor(refColor),
+                        strokeWidth = 2.dp
+                    )
+                )
+            }
+
+            bottomReferenceLine?.let { refLine ->
+                val refValue = refLine.value.toFloat()
+                val refColor = parseHexColor(refLine.color)
+
+                LinePlot(
+                    data = listOf(
+                        Point(xAxisModel.range.start, refValue),
+                        Point(xAxisModel.range.endInclusive, refValue)
+                    ),
+                    lineStyle = LineStyle(
+                        brush = SolidColor(refColor),
+                        strokeWidth = 2.dp
+                    )
+                )
+            }
+
             // Create bar plot with numeric x-axis indices for zoom support
             // Replace zero values with tiny positive values to ensure bars render
             VerticalBarPlot(
@@ -325,6 +558,7 @@ fun BarChartComponent(
             val currentYRange = yAxisModel.viewRange.value
 
             Canvas(modifier = Modifier.fillMaxSize()) {
+                // Draw bar labels
                 data.forEachIndexed { index, point ->
                     val barInfo = barsWithLayout[index]
                     val barColor = barInfo.color
@@ -386,13 +620,82 @@ fun BarChartComponent(
         }
             }
 
-            // Interaction hint
-            Text(
-                text = "Pinch to zoom • Drag to pan",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 4.dp)
-            )
+            // Interactive legend for reference lines
+            if (topReferenceLine != null || bottomReferenceLine != null) {
+                Spacer(modifier = Modifier.height(16.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    topReferenceLine?.let { refLine ->
+                        val refColor = parseHexColor(refLine.color)
+                        val isSelected = selectedReferenceLines.isEmpty() || selectedReferenceLines.contains("top")
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .padding(end = 16.dp)
+                                .clickable {
+                                    selectedReferenceLines = if (selectedReferenceLines.contains("top")) {
+                                        selectedReferenceLines - "top"
+                                    } else {
+                                        selectedReferenceLines + "top"
+                                    }
+                                }
+                                .padding(horizontal = 4.dp, vertical = 2.dp)
+                        ) {
+                            Canvas(modifier = Modifier.size(16.dp, 3.dp)) {
+                                drawRect(
+                                    color = if (isSelected) refColor else refColor.copy(alpha = 0.3f)
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = refLine.label,
+                                fontSize = 11.sp,
+                                color = if (isSelected) {
+                                    MaterialTheme.colorScheme.onSurface
+                                } else {
+                                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                                }
+                            )
+                        }
+                    }
+
+                    bottomReferenceLine?.let { refLine ->
+                        val refColor = parseHexColor(refLine.color)
+                        val isSelected = selectedReferenceLines.isEmpty() || selectedReferenceLines.contains("bottom")
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .clickable {
+                                    selectedReferenceLines = if (selectedReferenceLines.contains("bottom")) {
+                                        selectedReferenceLines - "bottom"
+                                    } else {
+                                        selectedReferenceLines + "bottom"
+                                    }
+                                }
+                                .padding(horizontal = 4.dp, vertical = 2.dp)
+                        ) {
+                            Canvas(modifier = Modifier.size(16.dp, 3.dp)) {
+                                drawRect(
+                                    color = if (isSelected) refColor else refColor.copy(alpha = 0.3f)
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = refLine.label,
+                                fontSize = 11.sp,
+                                color = if (isSelected) {
+                                    MaterialTheme.colorScheme.onSurface
+                                } else {
+                                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                                }
+                            )
+                        }
+                    }
+                }
+            }
         }
     }
 }

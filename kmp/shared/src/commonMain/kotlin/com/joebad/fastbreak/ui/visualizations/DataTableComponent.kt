@@ -145,6 +145,9 @@ private fun ScatterDataTable(
         }
     }
 
+    // Check if any data point has a team code
+    val hasTeamCodes = data.any { it.teamCode != null }
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -157,6 +160,9 @@ private fun ScatterDataTable(
         ) {
             TableHeader("Rank", 40.dp)
             TableHeader("Player/Team", 130.dp)
+            if (hasTeamCodes) {
+                TableHeader("Team", 60.dp)
+            }
             TableHeader(xColumnLabel ?: "X Value", 80.dp)
             TableHeader(yColumnLabel ?: "Y Value", 80.dp)
             TableHeader("Score", 80.dp)
@@ -222,6 +228,9 @@ private fun ScatterDataTable(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
+                }
+                if (hasTeamCodes) {
+                    TableCell(point.teamCode ?: "-", 60.dp)
                 }
                 TableCell(point.x.formatTo(2), 80.dp)
                 TableCell(point.y.formatTo(2), 80.dp)

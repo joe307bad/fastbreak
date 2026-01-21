@@ -1,8 +1,12 @@
 FROM rocker/tidyverse:latest
 
+# Set timezone to Eastern Time
+ENV TZ=America/New_York
+RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
+
 # Install cron and AWS CLI
 RUN apt-get update && \
-    apt-get install -y cron python3-pip && \
+    apt-get install -y cron python3-pip tzdata && \
     pip3 install awscli --break-system-packages && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*

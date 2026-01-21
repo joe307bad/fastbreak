@@ -16,16 +16,20 @@ import platform.Foundation.create
 import platform.UIKit.UIActivityViewController
 import platform.UIKit.UIApplication
 import platform.UIKit.UIImage
+import platform.darwin.dispatch_async
+import platform.darwin.dispatch_get_main_queue
+import kotlinx.cinterop.COpaquePointer
+import kotlinx.cinterop.staticCFunction
 
 class IOSImageExporter : ImageExporter {
     @OptIn(ExperimentalForeignApi::class)
     override suspend fun shareImage(bitmap: ImageBitmap, title: String) {
         try {
-            // Convert ImageBitmap to Skia Bitmap and encode to JPEG (no transparency, ensures opaque white background)
+            // Convert ImageBitmap to Skia Bitmap and encode to PNG for better compatibility
             val skiaBitmap = bitmap.asSkiaBitmap()
             val encodedData = org.jetbrains.skia.Image.makeFromBitmap(skiaBitmap)
-                .encodeToData(EncodedImageFormat.JPEG, quality = 95)
-                ?: throw IllegalStateException("Failed to encode bitmap to JPEG")
+                .encodeToData(EncodedImageFormat.PNG)
+                ?: throw IllegalStateException("Failed to encode bitmap to PNG")
 
             // Convert Skia Data to NSData
             val bytes = encodedData.bytes
@@ -46,37 +50,25 @@ class IOSImageExporter : ImageExporter {
                 applicationActivities = null
             )
 
-            // Configure popover presentation controller for iPad and certain share targets
-            // This is crucial to prevent crashes when sharing to apps like Twitter
-            activityViewController.popoverPresentationController?.let { popover ->
-                // Set source view to the key window - this prevents crashes on iPad
+            // Get the root view controller and present the share sheet on the main thread
+            // This is critical for Twitter and other social media apps to work correctly
+            dispatch_async(dispatch_get_main_queue()) {
                 val keyWindow = UIApplication.sharedApplication.keyWindow
-                popover.sourceView = keyWindow
+                val rootViewController = keyWindow?.rootViewController
 
-                // Set source rect to center of the screen
-                keyWindow?.let { window ->
-                    val bounds = window.bounds
-                    popover.sourceRect = platform.CoreGraphics.CGRectMake(
-                        bounds.size.width / 2.0,
-                        bounds.size.height / 2.0,
-                        0.0,
-                        0.0
+                if (rootViewController != null) {
+                    rootViewController.presentViewController(
+                        viewControllerToPresent = activityViewController,
+                        animated = true,
+                        completion = null
                     )
+                } else {
+                    println("Error: No root view controller available")
                 }
-
-                // Allow any arrow direction
-                popover.permittedArrowDirections = platform.UIKit.UIPopoverArrowDirectionAny
             }
 
-            // Get the root view controller and present the share sheet
-            val rootViewController = UIApplication.sharedApplication.keyWindow?.rootViewController
-            rootViewController?.presentViewController(
-                viewControllerToPresent = activityViewController,
-                animated = true,
-                completion = null
-            )
-
         } catch (e: Exception) {
+            println("Error sharing image: ${e.message}")
             e.printStackTrace()
             throw e
         }

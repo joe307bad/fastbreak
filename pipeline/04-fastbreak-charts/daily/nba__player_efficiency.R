@@ -2,19 +2,26 @@ library(hoopR)
 library(dplyr)
 library(jsonlite)
 
-# Get current NBA season (NBA season spans two years, e.g., 2024-25)
-current_year <- as.numeric(format(Sys.Date(), "%Y"))
-current_month <- as.numeric(format(Sys.Date(), "%m"))
+# Load NBA utilities
+# Get script directory - works with both source() and Rscript
+args <- commandArgs(trailingOnly = FALSE)
+file_arg <- grep("^--file=", args, value = TRUE)
+if (length(file_arg) > 0) {
+  script_dir <- dirname(sub("^--file=", "", file_arg))
+} else {
+  script_dir <- getwd()
+}
+source(file.path(script_dir, "..", "utils", "nba_utils.R"))
 
-# NBA season starts in October, so if we're in Jan-Sep, use previous year as season start
-nba_season <- if (current_month >= 10) current_year + 1 else current_year
+# Get current NBA season
+nba_season <- get_current_nba_season()
 
 cat("Processing NBA Player Efficiency for", nba_season - 1, "-", nba_season, "season\n")
 
 # Load player advanced stats using hoopR
 player_stats <- tryCatch({
   hoopR::nba_leaguedashplayerstats(
-    season = paste0(nba_season - 1, "-", substr(nba_season, 3, 4)),
+    season = format_nba_season(nba_season),
     measure_type = "Advanced",
     per_mode = "PerGame"
   )$LeagueDashPlayerStats
@@ -25,33 +32,6 @@ player_stats <- tryCatch({
 
 cat("Loaded advanced stats for", nrow(player_stats), "players\n")
 cat("Available columns:", paste(names(player_stats), collapse = ", "), "\n")
-
-# NBA division and conference mapping by team
-team_divisions <- c(
-  "ATL" = "Southeast", "BOS" = "Atlantic", "BKN" = "Atlantic",
-  "CHA" = "Southeast", "CHI" = "Central", "CLE" = "Central",
-  "DAL" = "Southwest", "DEN" = "Northwest", "DET" = "Central",
-  "GSW" = "Pacific", "HOU" = "Southwest", "IND" = "Central",
-  "LAC" = "Pacific", "LAL" = "Pacific", "MEM" = "Southwest",
-  "MIA" = "Southeast", "MIL" = "Central", "MIN" = "Northwest",
-  "NOP" = "Southwest", "NYK" = "Atlantic", "OKC" = "Northwest",
-  "ORL" = "Southeast", "PHI" = "Atlantic", "PHX" = "Pacific",
-  "POR" = "Northwest", "SAC" = "Pacific", "SAS" = "Southwest",
-  "TOR" = "Atlantic", "UTA" = "Northwest", "WAS" = "Southeast"
-)
-
-team_conferences <- c(
-  "ATL" = "Eastern", "BOS" = "Eastern", "BKN" = "Eastern",
-  "CHA" = "Eastern", "CHI" = "Eastern", "CLE" = "Eastern",
-  "DAL" = "Western", "DEN" = "Western", "DET" = "Eastern",
-  "GSW" = "Western", "HOU" = "Western", "IND" = "Eastern",
-  "LAC" = "Western", "LAL" = "Western", "MEM" = "Western",
-  "MIA" = "Eastern", "MIL" = "Eastern", "MIN" = "Western",
-  "NOP" = "Western", "NYK" = "Eastern", "OKC" = "Western",
-  "ORL" = "Eastern", "PHI" = "Eastern", "PHX" = "Western",
-  "POR" = "Western", "SAC" = "Western", "SAS" = "Western",
-  "TOR" = "Eastern", "UTA" = "Western", "WAS" = "Eastern"
-)
 
 # Filter to players with significant playing time (at least 20 MPG and 15 games)
 # This ensures we're looking at meaningful sample sizes
@@ -95,8 +75,8 @@ data_points <- top_players %>%
     y = round(TS_PCT * 100, 1),
     sum = round(PIE * 100, 1),
     teamCode = TEAM_ABBREVIATION,
-    division = team_divisions[TEAM_ABBREVIATION],
-    conference = team_conferences[TEAM_ABBREVIATION]
+    division = nba_team_divisions[TEAM_ABBREVIATION],
+    conference = nba_team_conferences[TEAM_ABBREVIATION]
   ))) %>%
   pull(data_point)
 

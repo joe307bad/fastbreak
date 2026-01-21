@@ -721,10 +721,16 @@ get_current_week_info <- function(schedules_df) {
                   paste(upcoming_playoff_weeks, collapse=","),
                   paste(completed_playoff_weeks, collapse=",")))
 
-      # If nflreadr has no playoff data at all, just trust ESPN's week
-      # Don't try to do Tuesday rollover without data to verify games are complete
+      # If nflreadr has no playoff data at all, trust ESPN but apply Tuesday rollover
       if (length(all_playoff_weeks) == 0) {
         cat(sprintf("No playoff data in nflreadr, trusting ESPN week %d\n", espn_week))
+        # On Tuesday or later, advance to next week (games from previous week are done)
+        if (current_day_of_week >= 2) {
+          next_week <- espn_week + 1
+          cat(sprintf("Tuesday rollover (no playoff data): Advancing from week %d to week %d\n",
+                      espn_week, next_week))
+          return(list(week = next_week, season_type = 3))
+        }
         return(list(week = espn_week, season_type = 3))
       }
 

@@ -1,10 +1,7 @@
-# Set timezone to Eastern Time
-TZ=America/New_York
+# Run daily scripts every day at 10am Eastern Time
+0 10 * * * . /app/env.sh && /usr/bin/find /app/daily -name "*.R" -exec /usr/local/bin/Rscript {} \; >> /var/log/cron.log 2>&1
 
-# Run daily scripts every day at 1am Eastern Time
-0 1 * * * . /app/env.sh && /usr/bin/find /app/daily -name "*.R" -exec /usr/local/bin/Rscript {} \; >> /var/log/cron.log 2>&1
-
-# Run weekly scripts every Sunday at 1am Eastern Time
-0 1 * * 0 . /app/env.sh && /usr/bin/find /app/weekly -name "*.R" -exec /usr/local/bin/Rscript {} \; >> /var/log/cron.log 2>&1
+# Run weekly scripts every Sunday at 10am Eastern Time
+0 10 * * 0 . /app/env.sh && /usr/bin/find /app/weekly -name "*.R" -exec /usr/local/bin/Rscript {} \; >> /var/log/cron.log 2>&1
 
 # Empty line required at end of file

@@ -49,8 +49,9 @@ cat("Processing NFL Cumulative EPA Trend for season:", current_season, "through 
 
 # Calculate total EPA per team per week (offense - defense for net EPA)
 # Filter to only regular season weeks (1-18)
+# Only include pass and run plays to match matchup_stats.R calculation
 weekly_epa <- pbp %>%
-  filter(!is.na(epa), !is.na(posteam), !is.na(defteam), week <= most_recent_week) %>%
+  filter(!is.na(epa), !is.na(posteam), !is.na(defteam), week <= most_recent_week, play_type %in% c("pass", "run")) %>%
   group_by(week, posteam) %>%
   summarise(
     offense_epa = sum(epa, na.rm = TRUE),
@@ -60,8 +61,9 @@ weekly_epa <- pbp %>%
   mutate(team = ifelse(team == "LA", "LAR", team))
 
 # Get defensive EPA allowed per team per week
+# Only include pass and run plays to match matchup_stats.R calculation
 defensive_epa <- pbp %>%
-  filter(!is.na(epa), !is.na(defteam), week <= most_recent_week) %>%
+  filter(!is.na(epa), !is.na(defteam), week <= most_recent_week, play_type %in% c("pass", "run")) %>%
   group_by(week, defteam) %>%
   summarise(
     defense_epa_allowed = sum(epa, na.rm = TRUE),
@@ -149,7 +151,7 @@ output_data <- list(
   visualizationType = "LINE_CHART",
   title = paste("Cumulative EPA Trend - Week", most_recent_week),
   subtitle = "Top 10 Teams Net EPA Over the Season",
-  description = "This chart tracks the cumulative Net EPA (Expected Points Added) for the top 10 NFL teams throughout the season. Net EPA combines offensive production with defensive efficiency - positive values mean the team is outperforming expectations. Teams with steeper upward slopes are playing at an elite level, while flat or declining lines indicate struggles. The gap between lines shows the relative dominance between top teams.",
+  description = "This chart tracks the cumulative Net EPA (Expected Points Added) for the top 10 NFL teams throughout the season. Net EPA combines offensive production with defensive efficiency - positive values mean the team is outperforming expectations. Teams with steeper upward slopes are playing at an elite level, while flat or declining lines indicate struggles. The gap between lines shows the relative dominance between top teams. EPA calculations include only passing and running plays.",
   lastUpdated = format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC"),
   source = "nflfastR / nflreadr",
   tags = list(

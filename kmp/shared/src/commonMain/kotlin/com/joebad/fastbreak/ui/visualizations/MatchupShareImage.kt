@@ -113,35 +113,112 @@ fun MatchupShareImage(
 
     val awayTeamData = matchup.teams[awayTeam.lowercase()]
     val homeTeamData = matchup.teams[homeTeam.lowercase()]
+    val odds = matchup.odds
 
     Column(
         modifier = modifier
             .background(backgroundColor)
             .padding(40.dp)
     ) {
-        // Compact header row
+        // Compact header row with team names and odds
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = awayTeam,
-                fontSize = 72.sp,
-                fontWeight = FontWeight.Bold,
-                color = Team1Color
-            )
-            Text(
-                text = "$weekLabel • $formattedDate",
-                fontSize = 48.sp,
-                color = textColor.copy(alpha = 0.8f)
-            )
-            Text(
-                text = homeTeam,
-                fontSize = 72.sp,
-                fontWeight = FontWeight.Bold,
-                color = Team2Color
-            )
+            // Away team with moneyline and spread
+            Column(
+                horizontalAlignment = Alignment.Start
+            ) {
+                Text(
+                    text = awayTeam,
+                    fontSize = 72.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Team1Color
+                )
+                // Away moneyline and spread
+                if (odds != null) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        odds.away_moneyline?.let { ml ->
+                            Text(
+                                text = "ML: $ml",
+                                fontSize = 36.sp,
+                                color = textColor.copy(alpha = 0.7f)
+                            )
+                        }
+                        // Calculate away spread from home spread
+                        odds.home_spread?.let { homeSpread ->
+                            val awaySpread = if (homeSpread.startsWith("-")) {
+                                "+" + homeSpread.substring(1)
+                            } else if (homeSpread.startsWith("+")) {
+                                "-" + homeSpread.substring(1)
+                            } else {
+                                "-$homeSpread"
+                            }
+                            Text(
+                                text = "Spread: $awaySpread",
+                                fontSize = 36.sp,
+                                color = textColor.copy(alpha = 0.7f)
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Center: Week, Date, and O/U
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = "$weekLabel • $formattedDate",
+                    fontSize = 48.sp,
+                    color = textColor.copy(alpha = 0.8f)
+                )
+                odds?.over_under?.let { ou ->
+                    Text(
+                        text = "O/U: $ou",
+                        fontSize = 36.sp,
+                        color = textColor.copy(alpha = 0.7f)
+                    )
+                }
+            }
+
+            // Home team with moneyline and spread
+            Column(
+                horizontalAlignment = Alignment.End
+            ) {
+                Text(
+                    text = homeTeam,
+                    fontSize = 72.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Team2Color
+                )
+                // Home moneyline and spread
+                if (odds != null) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        odds.home_spread?.let { spread ->
+                            Text(
+                                text = "Spread: $spread",
+                                fontSize = 36.sp,
+                                color = textColor.copy(alpha = 0.7f)
+                            )
+                        }
+                        odds.home_moneyline?.let { ml ->
+                            Text(
+                                text = "ML: $ml",
+                                fontSize = 36.sp,
+                                color = textColor.copy(alpha = 0.7f)
+                            )
+                        }
+                    }
+                }
+            }
         }
 
         Spacer(modifier = Modifier.height(20.dp))
@@ -348,13 +425,15 @@ private fun ShareVersusStats(
 ) {
     // Extended list of stats for versus comparison: (offKey, defKey, label, decimals)
     val statsToShow = listOf(
-        listOf("off_epa", "def_epa", "EPA", "2"),
+        listOf("off_epa", "def_epa", "EPA", "3"),
         listOf("yards_per_game", "yards_allowed_per_game", "Total Yds/G", "1"),
         listOf("pass_yards_per_game", "pass_yards_allowed_per_game", "Pass Yds/G", "1"),
         listOf("rush_yards_per_game", "rush_yards_allowed_per_game", "Rush Yds/G", "1"),
         listOf("points_per_game", "points_allowed_per_game", "Pts/G", "1"),
         listOf("third_down_pct", "third_down_pct_def", "3rd Down %", "1"),
-        listOf("red_zone_pct", "red_zone_pct_def", "Red Zone %", "1"),
+        listOf("interceptions_thrown", "interceptions_made", "INTs Thrown", "0"),
+        listOf("fumbles_lost", "fumbles_forced", "Fumbles Lost", "0"),
+        listOf("sacks_suffered", "sacks_made", "Sacks Allowed", "0"),
         listOf("touchdowns", "touchdowns_allowed", "Touchdowns", "0")
     )
 
@@ -366,11 +445,27 @@ private fun ShareVersusStats(
             val defStat = defStats[defKey]
             val offValue = offStat?.value
             val defValue = defStat?.value
+
+            // For negative stats (INTs, fumbles, sacks), lower offense value is better
+            val isInvertedStat = offKey.contains("interceptions_thrown") ||
+                                offKey.contains("fumbles_lost") ||
+                                offKey.contains("sacks_suffered")
+
             val advantage = if (offValue != null && defValue != null) {
-                when {
-                    offValue > defValue -> -1
-                    offValue < defValue -> 1
-                    else -> 0
+                if (isInvertedStat) {
+                    // Lower offense value beats higher defense value
+                    when {
+                        offValue < defValue -> -1
+                        offValue > defValue -> 1
+                        else -> 0
+                    }
+                } else {
+                    // Higher offense value beats lower defense value
+                    when {
+                        offValue > defValue -> -1
+                        offValue < defValue -> 1
+                        else -> 0
+                    }
                 }
             } else 0
 

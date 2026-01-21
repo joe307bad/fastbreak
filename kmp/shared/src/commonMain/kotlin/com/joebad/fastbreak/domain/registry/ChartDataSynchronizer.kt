@@ -298,17 +298,28 @@ class ChartDataSynchronizer(
 
             val chartId = fileKeyToChartId(fileKey)
 
-            // Create cached data entry
+            // Check if there's existing cached data to preserve the viewed status
+            val existingCached = chartDataRepository.getChartData(chartId)
+            val preserveViewed = existingCached?.viewed ?: false
+
+            if (existingCached != null) {
+                println("   📌 Preserving viewed status for $chartId: viewed=${existingCached.viewed}")
+            } else {
+                println("   🆕 New chart $chartId: viewed=false")
+            }
+
+            // Create cached data entry, preserving viewed status if chart was already viewed
             val cachedData = CachedChartData(
                 chartId = chartId,
                 lastUpdated = entry.updatedAt,
                 visualizationType = vizType,
                 cachedAt = Clock.System.now(),
                 dataJson = rawJson,
-                interval = entry.interval
+                interval = entry.interval,
+                viewed = preserveViewed
             )
 
-            println("💾 Caching chart $chartId with timestamp: ${entry.updatedAt}")
+            println("💾 Caching chart $chartId with timestamp: ${entry.updatedAt} (viewed=${cachedData.viewed})")
 
             // Save to repository
             chartDataRepository.saveChartData(chartId, cachedData)

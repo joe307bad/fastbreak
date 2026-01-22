@@ -8,6 +8,7 @@ import com.joebad.fastbreak.logging.SpanStatus
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
+import kotlinx.serialization.json.*
 import kotlin.time.Clock
 import kotlin.time.DurationUnit
 
@@ -63,10 +64,44 @@ class RegistryApi(
                 )
             )
 
-            // Parse as Map<String, RegistryEntry>
-            val registryMap: Map<String, RegistryEntry> = response.body()
+            // Parse as JsonObject, handling individual entry errors gracefully
+            val jsonObject: JsonObject = response.body()
+            val registryMap = jsonObject.entries.mapNotNull { (key, jsonElement) ->
+                try {
+                    // Try to deserialize this entry
+                    val entryObject = jsonElement.jsonObject
+
+                    val titleStr = entryObject["title"]?.jsonPrimitive?.contentOrNull ?: run {
+                        println("⚠️ Skipping entry '$key': missing required field 'title'")
+                        return@mapNotNull null
+                    }
+                    val updatedAtStr = entryObject["updatedAt"]?.jsonPrimitive?.contentOrNull ?: run {
+                        println("⚠️ Skipping entry '$key': missing required field 'updatedAt'")
+                        return@mapNotNull null
+                    }
+                    val updatedAtInstant = kotlin.time.Instant.parse(updatedAtStr)
+
+                    val entry = RegistryEntry(
+                        title = titleStr,
+                        updatedAt = updatedAtInstant,
+                        interval = entryObject["interval"]?.jsonPrimitive?.contentOrNull
+                    )
+                    key to entry
+                } catch (e: Exception) {
+                    println("⚠️ Failed to parse registry entry '$key': ${e.message}")
+                    SentryLogger.captureException(
+                        throwable = e,
+                        extras = mapOf(
+                            "entryKey" to key,
+                            "action" to "parse_registry_entry"
+                        )
+                    )
+                    null
+                }
+            }.toMap()
             println("✅ Response parsed successfully")
-            println("   Total entries: ${registryMap.size}")
+            println("   Total entries: ${jsonObject.size}")
+            println("   Valid entries: ${registryMap.size}")
 
             // Filter based on dev_mode
             val filteredEntries = registryMap.filter { (key, _) ->

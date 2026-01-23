@@ -84,6 +84,9 @@ team_stats <- team_box %>%
     blocks_total = sum(blocks, na.rm = TRUE),
     turnovers_total = sum(turnovers, na.rm = TRUE),
 
+    # Defensive stats (what opponents did against this team)
+    opp_points = sum(opponent_team_score, na.rm = TRUE),
+
     .groups = "drop"
   ) %>%
   mutate(
@@ -96,8 +99,48 @@ team_stats <- team_box %>%
     assists_per_game = assists_total / games_played,
     steals_per_game = steals_total / games_played,
     blocks_per_game = blocks_total / games_played,
-    turnovers_per_game = turnovers_total / games_played
+    turnovers_per_game = turnovers_total / games_played,
+
+    # Defensive per-game averages
+    opp_points_per_game = opp_points / games_played
   )
+
+# Calculate opponent stats by matching what the opponent did in games against each team
+# For each team, look at what their opponents scored/did when playing against them
+opponent_stats <- team_box %>%
+  select(game_id, team_id,
+         opp_id = opponent_team_id,
+         opp_field_goals_made = field_goals_made,
+         opp_field_goals_attempted = field_goals_attempted,
+         opp_three_point_made = three_point_field_goals_made,
+         opp_three_point_attempted = three_point_field_goals_attempted,
+         opp_assists = assists,
+         opp_rebounds = offensive_rebounds,  # Offensive rebounds by opponent
+         opp_turnovers_forced = turnovers) %>%  # Turnovers by opponent (forced by this team)
+  # Flip perspective: this is what opponents did AGAINST the opp_id team
+  group_by(team_id = opp_id) %>%
+  summarise(
+    games = n(),
+    opp_fg_made = sum(opp_field_goals_made, na.rm = TRUE),
+    opp_fg_attempted = sum(opp_field_goals_attempted, na.rm = TRUE),
+    opp_three_pt_made = sum(opp_three_point_made, na.rm = TRUE),
+    opp_three_pt_attempted = sum(opp_three_point_attempted, na.rm = TRUE),
+    opp_assists_total = sum(opp_assists, na.rm = TRUE),
+    opp_oreb_total = sum(opp_rebounds, na.rm = TRUE),
+    opp_turnovers_total = sum(opp_turnovers_forced, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  mutate(
+    opp_fg_pct = opp_fg_made / opp_fg_attempted * 100,
+    opp_three_pt_pct = opp_three_pt_made / opp_three_pt_attempted * 100,
+    opp_assists_per_game = opp_assists_total / games,
+    opp_oreb_per_game = opp_oreb_total / games,
+    opp_turnovers_per_game = opp_turnovers_total / games
+  )
+
+# Join opponent stats with team stats
+team_stats <- team_stats %>%
+  left_join(opponent_stats, by = "team_id")
 
 cat("Calculated stats for", nrow(team_stats), "teams\n")
 
@@ -202,6 +245,13 @@ spg_ranks <- tied_rank(-team_stats$steals_per_game)
 bpg_ranks <- tied_rank(-team_stats$blocks_per_game)
 tpg_ranks <- tied_rank(team_stats$turnovers_per_game)  # Lower is better
 
+# Opponent/defensive stat ranks
+opp_ppg_ranks <- tied_rank(team_stats$opp_points_per_game)  # Lower is better (points allowed)
+opp_fg_pct_ranks <- tied_rank(team_stats$opp_fg_pct)  # Lower is better
+opp_three_pt_pct_ranks <- tied_rank(team_stats$opp_three_pt_pct)  # Lower is better
+opp_apg_ranks <- tied_rank(team_stats$opp_assists_per_game)  # Lower is better (assists allowed)
+opp_turnovers_pg_ranks <- tied_rank(-team_stats$opp_turnovers_per_game)  # Higher is better (forcing turnovers)
+
 team_stats <- team_stats %>%
   mutate(
     points_per_game_rank = ppg_ranks$rank,
@@ -219,7 +269,19 @@ team_stats <- team_stats %>%
     blocks_per_game_rank = bpg_ranks$rank,
     blocks_per_game_rankDisplay = bpg_ranks$rankDisplay,
     turnovers_per_game_rank = tpg_ranks$rank,
-    turnovers_per_game_rankDisplay = tpg_ranks$rankDisplay
+    turnovers_per_game_rankDisplay = tpg_ranks$rankDisplay,
+
+    # Opponent/defensive stat ranks
+    opp_points_per_game_rank = opp_ppg_ranks$rank,
+    opp_points_per_game_rankDisplay = opp_ppg_ranks$rankDisplay,
+    opp_fg_pct_rank = opp_fg_pct_ranks$rank,
+    opp_fg_pct_rankDisplay = opp_fg_pct_ranks$rankDisplay,
+    opp_three_pt_pct_rank = opp_three_pt_pct_ranks$rank,
+    opp_three_pt_pct_rankDisplay = opp_three_pt_pct_ranks$rankDisplay,
+    opp_assists_per_game_rank = opp_apg_ranks$rank,
+    opp_assists_per_game_rankDisplay = opp_apg_ranks$rankDisplay,
+    opp_turnovers_per_game_rank = opp_turnovers_pg_ranks$rank,
+    opp_turnovers_per_game_rankDisplay = opp_turnovers_pg_ranks$rankDisplay
   )
 
 if (!is.null(advanced_stats)) {
@@ -256,13 +318,22 @@ if (!is.null(advanced_stats)) {
 if (!is.null(four_factors_stats)) {
   fta_rate_ranks <- tied_rank(-team_stats$fta_rate)
   opp_efg_pct_ranks <- tied_rank(team_stats$opp_efg_pct)  # Lower is better (opponent stat)
+  opp_fta_rate_ranks <- tied_rank(team_stats$opp_fta_rate)  # Lower is better (opponent stat)
+  opp_tov_pct_ranks <- tied_rank(-team_stats$opp_tov_pct)  # Higher is better (forcing turnovers)
+  opp_oreb_pct_ranks <- tied_rank(team_stats$opp_oreb_pct)  # Lower is better (opponent stat)
 
   team_stats <- team_stats %>%
     mutate(
       fta_rate_rank = fta_rate_ranks$rank,
       fta_rate_rankDisplay = fta_rate_ranks$rankDisplay,
       opp_efg_pct_rank = opp_efg_pct_ranks$rank,
-      opp_efg_pct_rankDisplay = opp_efg_pct_ranks$rankDisplay
+      opp_efg_pct_rankDisplay = opp_efg_pct_ranks$rankDisplay,
+      opp_fta_rate_rank = opp_fta_rate_ranks$rank,
+      opp_fta_rate_rankDisplay = opp_fta_rate_ranks$rankDisplay,
+      opp_tov_pct_rank = opp_tov_pct_ranks$rank,
+      opp_tov_pct_rankDisplay = opp_tov_pct_ranks$rankDisplay,
+      opp_oreb_pct_rank = opp_oreb_pct_ranks$rank,
+      opp_oreb_pct_rankDisplay = opp_oreb_pct_ranks$rankDisplay
     )
 }
 
@@ -299,6 +370,7 @@ player_stats <- player_box %>%
     three_point_field_goals_attempted = sum(.data$three_point_field_goals_attempted, na.rm = TRUE),
     free_throws_made = sum(.data$free_throws_made, na.rm = TRUE),
     free_throws_attempted = sum(.data$free_throws_attempted, na.rm = TRUE),
+    minutes_total = sum(.data$minutes, na.rm = TRUE),
 
     .groups = "drop"
   ) %>%
@@ -311,6 +383,7 @@ player_stats <- player_box %>%
     steals_per_game = steals_total / games_played,
     blocks_per_game = blocks_total / games_played,
     turnovers_per_game = turnovers_total / games_played,
+    minutes_per_game = minutes_total / games_played,
 
     # Shooting percentages
     fg_pct = if_else(field_goals_attempted > 0,
@@ -355,14 +428,14 @@ player_usage_stats <- tryCatch({
   NULL
 })
 
-# Join advanced stats with player stats
+# Join advanced stats with player stats (join on player name since IDs don't match)
 if (!is.null(player_advanced_stats)) {
   player_stats <- player_stats %>%
     left_join(
       player_advanced_stats %>%
-        select(PLAYER_ID, OFF_RATING, DEF_RATING, NET_RATING, PIE, TS_PCT, EFG_PCT, AST_PCT, REB_PCT) %>%
+        select(PLAYER_NAME, OFF_RATING, DEF_RATING, NET_RATING, PIE, TS_PCT, EFG_PCT, AST_PCT, REB_PCT) %>%
         rename(
-          athlete_id = PLAYER_ID,
+          athlete_display_name = PLAYER_NAME,
           player_off_rating = OFF_RATING,
           player_def_rating = DEF_RATING,
           player_net_rating = NET_RATING,
@@ -373,7 +446,6 @@ if (!is.null(player_advanced_stats)) {
           player_reb_pct = REB_PCT
         ) %>%
         mutate(
-          athlete_id = as.character(athlete_id),
           player_off_rating = as.numeric(player_off_rating),
           player_def_rating = as.numeric(player_def_rating),
           player_net_rating = as.numeric(player_net_rating),
@@ -383,7 +455,7 @@ if (!is.null(player_advanced_stats)) {
           player_ast_pct = as.numeric(player_ast_pct),
           player_reb_pct = as.numeric(player_reb_pct)
         ),
-      by = "athlete_id"
+      by = "athlete_display_name"
     )
 }
 
@@ -392,16 +464,15 @@ if (!is.null(player_usage_stats)) {
   player_stats <- player_stats %>%
     left_join(
       player_usage_stats %>%
-        select(PLAYER_ID, USG_PCT) %>%
+        select(PLAYER_NAME, USG_PCT) %>%
         rename(
-          athlete_id = PLAYER_ID,
+          athlete_display_name = PLAYER_NAME,
           player_usg_pct = USG_PCT
         ) %>%
         mutate(
-          athlete_id = as.character(athlete_id),
           player_usg_pct = as.numeric(player_usg_pct)
         ),
-      by = "athlete_id"
+      by = "athlete_display_name"
     )
 }
 
@@ -415,6 +486,8 @@ player_spg_ranks <- tied_rank(-player_stats$steals_per_game)
 player_bpg_ranks <- tied_rank(-player_stats$blocks_per_game)
 player_fg_pct_ranks <- tied_rank(-player_stats$fg_pct)
 player_three_pt_pct_ranks <- tied_rank(-player_stats$three_pt_pct)
+player_mpg_ranks <- tied_rank(-player_stats$minutes_per_game)
+player_games_ranks <- tied_rank(-player_stats$games_played)
 
 player_stats <- player_stats %>%
   mutate(
@@ -431,7 +504,11 @@ player_stats <- player_stats %>%
     fg_pct_rank = player_fg_pct_ranks$rank,
     fg_pct_rankDisplay = player_fg_pct_ranks$rankDisplay,
     three_pt_pct_rank = player_three_pt_pct_ranks$rank,
-    three_pt_pct_rankDisplay = player_three_pt_pct_ranks$rankDisplay
+    three_pt_pct_rankDisplay = player_three_pt_pct_ranks$rankDisplay,
+    minutes_per_game_rank = player_mpg_ranks$rank,
+    minutes_per_game_rankDisplay = player_mpg_ranks$rankDisplay,
+    games_played_rank = player_games_ranks$rank,
+    games_played_rankDisplay = player_games_ranks$rankDisplay
   )
 
 # Add ranks for advanced player stats
@@ -498,9 +575,14 @@ while (current_date <= end_date) {
     if (!is.null(scoreboard_data$events) && length(scoreboard_data$events) > 0) {
       for (event in scoreboard_data$events) {
         game_id <- event$id
-        # Ensure proper ISO 8601 format with seconds (YYYY-MM-DDTHH:MM:SSZ)
-        game_date <- format(as.POSIXct(event$date, format = "%Y-%m-%dT%H:%M", tz = "UTC"),
-                           "%Y-%m-%dT%H:%M:%SZ", tz = "UTC")
+        # event$date is in ISO 8601 format (e.g., "2026-01-23T00:00Z")
+        # Need to add seconds component for proper Instant parsing
+        game_date <- event$date
+        # Check if it has seconds (ends with :SS followed by Z or timezone)
+        if (grepl("T\\d{2}:\\d{2}Z$", game_date)) {
+          # Has HH:MM but no seconds, insert :00 before Z
+          game_date <- sub("Z$", ":00Z", game_date)
+        }
         game_name <- event$name
 
         # Extract teams
@@ -575,6 +657,258 @@ if (length(upcoming_games) == 0) {
 # ============================================================================
 cat("\n4. Building matchup statistics...\n")
 
+# Helper function to build comparison data
+build_nba_comparisons <- function(home_stats, away_stats, home_team, away_team) {
+  # Define which stats are offensive vs defensive
+  # For NBA, offensive rating, net rating, and most counting stats are offensive
+  # Defensive rating and opponent stats are defensive
+
+  # Offensive comparison (side-by-side team offense)
+  off_comparison <- list()
+  off_stats <- list(
+    list(key = "pointsPerGame", label = "Points/Game", value_home = home_stats$points_per_game, rank_home = home_stats$points_per_game_rank, rankDisplay_home = home_stats$points_per_game_rankDisplay, value_away = away_stats$points_per_game, rank_away = away_stats$points_per_game_rank, rankDisplay_away = away_stats$points_per_game_rankDisplay),
+    list(key = "fieldGoalPct", label = "Field Goal %", value_home = home_stats$fg_pct, rank_home = home_stats$fg_pct_rank, rankDisplay_home = home_stats$fg_pct_rankDisplay, value_away = away_stats$fg_pct, rank_away = away_stats$fg_pct_rank, rankDisplay_away = away_stats$fg_pct_rankDisplay),
+    list(key = "threePtPct", label = "3-Point %", value_home = home_stats$three_pt_pct, rank_home = home_stats$three_pt_pct_rank, rankDisplay_home = home_stats$three_pt_pct_rankDisplay, value_away = away_stats$three_pt_pct, rank_away = away_stats$three_pt_pct_rank, rankDisplay_away = away_stats$three_pt_pct_rankDisplay),
+    list(key = "assistsPerGame", label = "Assists/Game", value_home = home_stats$assists_per_game, rank_home = home_stats$assists_per_game_rank, rankDisplay_home = home_stats$assists_per_game_rankDisplay, value_away = away_stats$assists_per_game, rank_away = away_stats$assists_per_game_rank, rankDisplay_away = away_stats$assists_per_game_rankDisplay),
+    list(key = "reboundsPerGame", label = "Rebounds/Game", value_home = home_stats$rebounds_per_game, rank_home = home_stats$rebounds_per_game_rank, rankDisplay_home = home_stats$rebounds_per_game_rankDisplay, value_away = away_stats$rebounds_per_game, rank_away = away_stats$rebounds_per_game_rank, rankDisplay_away = away_stats$rebounds_per_game_rankDisplay)
+  )
+
+  # Add advanced offensive stats if available
+  if (!is.na(home_stats$offensive_rating) && !is.na(away_stats$offensive_rating)) {
+    off_stats <- c(off_stats, list(
+      list(key = "offensiveRating", label = "Offensive Rating", value_home = home_stats$offensive_rating, rank_home = home_stats$offensive_rating_rank, rankDisplay_home = home_stats$offensive_rating_rankDisplay, value_away = away_stats$offensive_rating, rank_away = away_stats$offensive_rating_rank, rankDisplay_away = away_stats$offensive_rating_rankDisplay),
+      list(key = "trueShootingPct", label = "True Shooting %", value_home = home_stats$ts_pct, rank_home = home_stats$ts_pct_rank, rankDisplay_home = home_stats$ts_pct_rankDisplay, value_away = away_stats$ts_pct, rank_away = away_stats$ts_pct_rank, rankDisplay_away = away_stats$ts_pct_rankDisplay),
+      list(key = "effectiveFgPct", label = "Effective FG %", value_home = home_stats$efg_pct, rank_home = home_stats$efg_pct_rank, rankDisplay_home = home_stats$efg_pct_rankDisplay, value_away = away_stats$efg_pct, rank_away = away_stats$efg_pct_rank, rankDisplay_away = away_stats$efg_pct_rankDisplay)
+    ))
+  }
+
+  for (stat in off_stats) {
+    off_comparison[[stat$key]] <- list(
+      label = stat$label,
+      home = list(
+        value = if (!is.na(stat$value_home)) round(stat$value_home, 2) else NULL,
+        rank = if (!is.na(stat$rank_home)) as.integer(stat$rank_home) else NULL,
+        rankDisplay = if (!is.na(stat$rankDisplay_home)) stat$rankDisplay_home else NULL
+      ),
+      away = list(
+        value = if (!is.na(stat$value_away)) round(stat$value_away, 2) else NULL,
+        rank = if (!is.na(stat$rank_away)) as.integer(stat$rank_away) else NULL,
+        rankDisplay = if (!is.na(stat$rankDisplay_away)) stat$rankDisplay_away else NULL
+      )
+    )
+  }
+
+  # Defensive comparison (side-by-side team defense)
+  def_comparison <- list()
+  def_stats <- list(
+    list(key = "stealsPerGame", label = "Steals/Game", value_home = home_stats$steals_per_game, rank_home = home_stats$steals_per_game_rank, rankDisplay_home = home_stats$steals_per_game_rankDisplay, value_away = away_stats$steals_per_game, rank_away = away_stats$steals_per_game_rank, rankDisplay_away = away_stats$steals_per_game_rankDisplay),
+    list(key = "blocksPerGame", label = "Blocks/Game", value_home = home_stats$blocks_per_game, rank_home = home_stats$blocks_per_game_rank, rankDisplay_home = home_stats$blocks_per_game_rankDisplay, value_away = away_stats$blocks_per_game, rank_away = away_stats$blocks_per_game_rank, rankDisplay_away = away_stats$blocks_per_game_rankDisplay),
+    list(key = "turnoversPerGame", label = "Turnovers/Game", value_home = home_stats$turnovers_per_game, rank_home = home_stats$turnovers_per_game_rank, rankDisplay_home = home_stats$turnovers_per_game_rankDisplay, value_away = away_stats$turnovers_per_game, rank_away = away_stats$turnovers_per_game_rank, rankDisplay_away = away_stats$turnovers_per_game_rankDisplay)
+  )
+
+  # Add advanced defensive stats if available
+  if (!is.na(home_stats$defensive_rating) && !is.na(away_stats$defensive_rating)) {
+    def_stats <- c(def_stats, list(
+      list(key = "defensiveRating", label = "Defensive Rating", value_home = home_stats$defensive_rating, rank_home = home_stats$defensive_rating_rank, rankDisplay_home = home_stats$defensive_rating_rankDisplay, value_away = away_stats$defensive_rating, rank_away = away_stats$defensive_rating_rank, rankDisplay_away = away_stats$defensive_rating_rankDisplay)
+    ))
+  }
+
+  if (!is.na(home_stats$opp_efg_pct) && !is.na(away_stats$opp_efg_pct)) {
+    def_stats <- c(def_stats, list(
+      list(key = "oppEffectiveFgPct", label = "Opp Effective FG %", value_home = home_stats$opp_efg_pct, rank_home = home_stats$opp_efg_pct_rank, rankDisplay_home = home_stats$opp_efg_pct_rankDisplay, value_away = away_stats$opp_efg_pct, rank_away = away_stats$opp_efg_pct_rank, rankDisplay_away = away_stats$opp_efg_pct_rankDisplay)
+    ))
+  }
+
+  for (stat in def_stats) {
+    def_comparison[[stat$key]] <- list(
+      label = stat$label,
+      home = list(
+        value = if (!is.na(stat$value_home)) round(stat$value_home, 2) else NULL,
+        rank = if (!is.na(stat$rank_home)) as.integer(stat$rank_home) else NULL,
+        rankDisplay = if (!is.na(stat$rankDisplay_home)) stat$rankDisplay_home else NULL
+      ),
+      away = list(
+        value = if (!is.na(stat$value_away)) round(stat$value_away, 2) else NULL,
+        rank = if (!is.na(stat$rank_away)) as.integer(stat$rank_away) else NULL,
+        rankDisplay = if (!is.na(stat$rankDisplay_away)) stat$rankDisplay_away else NULL
+      )
+    )
+  }
+
+  # For NBA, offense vs defense matchups are more straightforward
+  # Home offense vs Away defense
+  home_off_vs_away_def <- list()
+
+  # Define offense vs defense stat matchups
+  off_vs_def_matchups <- list(
+    list(
+      key = "pointsPerGame",
+      off_label = "Points/Game",
+      def_label = "Points Allowed/Game",
+      off_stat = "points_per_game",
+      def_stat = "opp_points_per_game",
+      off_rank = "points_per_game_rank",
+      def_rank = "opp_points_per_game_rank",
+      off_rankDisplay = "points_per_game_rankDisplay",
+      def_rankDisplay = "opp_points_per_game_rankDisplay"
+    ),
+    list(
+      key = "fieldGoalPct",
+      off_label = "Field Goal %",
+      def_label = "Opp Field Goal %",
+      off_stat = "fg_pct",
+      def_stat = "opp_fg_pct",
+      off_rank = "fg_pct_rank",
+      def_rank = "opp_fg_pct_rank",
+      off_rankDisplay = "fg_pct_rankDisplay",
+      def_rankDisplay = "opp_fg_pct_rankDisplay"
+    ),
+    list(
+      key = "threePtPct",
+      off_label = "3-Point %",
+      def_label = "Opp 3-Point %",
+      off_stat = "three_pt_pct",
+      def_stat = "opp_three_pt_pct",
+      off_rank = "three_pt_pct_rank",
+      def_rank = "opp_three_pt_pct_rank",
+      off_rankDisplay = "three_pt_pct_rankDisplay",
+      def_rankDisplay = "opp_three_pt_pct_rankDisplay"
+    ),
+    list(
+      key = "effectiveFgPct",
+      off_label = "Effective FG %",
+      def_label = "Opp Effective FG %",
+      off_stat = "efg_pct",
+      def_stat = "opp_efg_pct",
+      off_rank = "efg_pct_rank",
+      def_rank = "opp_efg_pct_rank",
+      off_rankDisplay = "efg_pct_rankDisplay",
+      def_rankDisplay = "opp_efg_pct_rankDisplay"
+    ),
+    list(
+      key = "assistsPerGame",
+      off_label = "Assists/Game",
+      def_label = "Assists Allowed/Game",
+      off_stat = "assists_per_game",
+      def_stat = "opp_assists_per_game",
+      off_rank = "assists_per_game_rank",
+      def_rank = "opp_assists_per_game_rank",
+      off_rankDisplay = "assists_per_game_rankDisplay",
+      def_rankDisplay = "opp_assists_per_game_rankDisplay"
+    ),
+    list(
+      key = "turnoversPerGame",
+      off_label = "Turnovers/Game",
+      def_label = "Turnovers Forced/Game",
+      off_stat = "turnovers_per_game",
+      def_stat = "opp_turnovers_per_game",
+      off_rank = "turnovers_per_game_rank",
+      def_rank = "opp_turnovers_per_game_rank",
+      off_rankDisplay = "turnovers_per_game_rankDisplay",
+      def_rankDisplay = "opp_turnovers_per_game_rankDisplay"
+    ),
+    list(
+      key = "rating",
+      off_label = "Offensive Rating",
+      def_label = "Defensive Rating",
+      off_stat = "offensive_rating",
+      def_stat = "defensive_rating",
+      off_rank = "offensive_rating_rank",
+      def_rank = "defensive_rating_rank",
+      off_rankDisplay = "offensive_rating_rankDisplay",
+      def_rankDisplay = "defensive_rating_rankDisplay"
+    )
+  )
+
+  # Build home offense vs away defense comparisons
+  for (matchup in off_vs_def_matchups) {
+    off_val <- home_stats[[matchup$off_stat]]
+    def_val <- away_stats[[matchup$def_stat]]
+    off_rank <- home_stats[[matchup$off_rank]]
+    def_rank <- away_stats[[matchup$def_rank]]
+
+    if (!is.na(off_val) && !is.na(def_val)) {
+      advantage <- 0
+      if (!is.na(off_rank) && !is.na(def_rank)) {
+        if (off_rank < def_rank) {
+          advantage <- -1  # Offense advantage
+        } else if (off_rank > def_rank) {
+          advantage <- 1   # Defense advantage
+        }
+      }
+
+      home_off_vs_away_def[[matchup$key]] <- list(
+        statKey = matchup$key,
+        offLabel = matchup$off_label,
+        defLabel = matchup$def_label,
+        offense = list(
+          team = home_team,
+          value = round(off_val, 2),
+          rank = as.integer(off_rank),
+          rankDisplay = home_stats[[matchup$off_rankDisplay]]
+        ),
+        defense = list(
+          team = away_team,
+          value = round(def_val, 2),
+          rank = as.integer(def_rank),
+          rankDisplay = away_stats[[matchup$def_rankDisplay]]
+        ),
+        advantage = advantage
+      )
+    }
+  }
+
+  # Away offense vs Home defense
+  away_off_vs_home_def <- list()
+
+  # Build away offense vs home defense comparisons
+  for (matchup in off_vs_def_matchups) {
+    off_val <- away_stats[[matchup$off_stat]]
+    def_val <- home_stats[[matchup$def_stat]]
+    off_rank <- away_stats[[matchup$off_rank]]
+    def_rank <- home_stats[[matchup$def_rank]]
+
+    if (!is.na(off_val) && !is.na(def_val)) {
+      advantage <- 0
+      if (!is.na(off_rank) && !is.na(def_rank)) {
+        if (off_rank < def_rank) {
+          advantage <- -1  # Offense advantage
+        } else if (off_rank > def_rank) {
+          advantage <- 1   # Defense advantage
+        }
+      }
+
+      away_off_vs_home_def[[matchup$key]] <- list(
+        statKey = matchup$key,
+        offLabel = matchup$off_label,
+        defLabel = matchup$def_label,
+        offense = list(
+          team = away_team,
+          value = round(off_val, 2),
+          rank = as.integer(off_rank),
+          rankDisplay = away_stats[[matchup$off_rankDisplay]]
+        ),
+        defense = list(
+          team = home_team,
+          value = round(def_val, 2),
+          rank = as.integer(def_rank),
+          rankDisplay = home_stats[[matchup$def_rankDisplay]]
+        ),
+        advantage = advantage
+      )
+    }
+  }
+
+  return(list(
+    sideBySide = list(
+      offense = off_comparison,
+      defense = def_comparison
+    ),
+    homeOffVsAwayDef = home_off_vs_away_def,
+    awayOffVsHomeDef = away_off_vs_home_def
+  ))
+}
+
 matchups_json <- list()
 
 for (game in upcoming_games) {
@@ -590,15 +924,17 @@ for (game in upcoming_games) {
   }
 
   # Get top players for both teams
+  # Sort by minutes per game (best indicator of who's actually playing), then games played, then PIE
+  # This ensures we get the most active and impactful players
   home_players <- player_stats %>%
     filter(team_id == game$home_team_id) %>%
-    arrange(desc(points_per_game)) %>%
-    head(5)
+    arrange(desc(minutes_per_game), desc(games_played), desc(if_else(!is.na(player_pie), player_pie, 0))) %>%
+    head(7)
 
   away_players <- player_stats %>%
     filter(team_id == game$away_team_id) %>%
-    arrange(desc(points_per_game)) %>%
-    head(5)
+    arrange(desc(minutes_per_game), desc(games_played), desc(if_else(!is.na(player_pie), player_pie, 0))) %>%
+    head(7)
 
   # Build team comparison data
   home_team_data <- list(
@@ -748,111 +1084,197 @@ for (game in upcoming_games) {
   # Build player data
   home_players_data <- lapply(1:nrow(home_players), function(i) {
     p <- home_players[i, ]
-    player_data <- list(
-      id = p$athlete_id,
+
+    # Helper to create NULL if value is NA
+    na_to_null <- function(x) if (is.na(x)) NULL else x
+
+    list(
       name = p$athlete_display_name,
       position = p$athlete_position_abbreviation,
-      stats = list(
-        gamesPlayed = p$games_played,
-        pointsPerGame = round(p$points_per_game, 1),
-        pointsPerGameRank = p$points_per_game_rank,
-        pointsPerGameRankDisplay = p$points_per_game_rankDisplay,
-        reboundsPerGame = round(p$rebounds_per_game, 1),
-        reboundsPerGameRank = p$rebounds_per_game_rank,
-        reboundsPerGameRankDisplay = p$rebounds_per_game_rankDisplay,
-        assistsPerGame = round(p$assists_per_game, 1),
-        assistsPerGameRank = p$assists_per_game_rank,
-        assistsPerGameRankDisplay = p$assists_per_game_rankDisplay,
-        stealsPerGame = round(p$steals_per_game, 1),
-        stealsPerGameRank = p$steals_per_game_rank,
-        stealsPerGameRankDisplay = p$steals_per_game_rankDisplay,
-        blocksPerGame = round(p$blocks_per_game, 1),
-        blocksPerGameRank = p$blocks_per_game_rank,
-        blocksPerGameRankDisplay = p$blocks_per_game_rankDisplay,
-        fieldGoalPct = round(p$fg_pct, 1),
-        fieldGoalPctRank = p$fg_pct_rank,
-        fieldGoalPctRankDisplay = p$fg_pct_rankDisplay,
-        threePtPct = round(p$three_pt_pct, 1),
-        threePtPctRank = p$three_pt_pct_rank,
-        threePtPctRankDisplay = p$three_pt_pct_rankDisplay
+      points_per_game = list(
+        value = na_to_null(round(p$points_per_game, 2)),
+        rank = na_to_null(as.integer(p$points_per_game_rank)),
+        rankDisplay = na_to_null(p$points_per_game_rankDisplay)
+      ),
+      rebounds_per_game = list(
+        value = na_to_null(round(p$rebounds_per_game, 2)),
+        rank = na_to_null(as.integer(p$rebounds_per_game_rank)),
+        rankDisplay = na_to_null(p$rebounds_per_game_rankDisplay)
+      ),
+      assists_per_game = list(
+        value = na_to_null(round(p$assists_per_game, 2)),
+        rank = na_to_null(as.integer(p$assists_per_game_rank)),
+        rankDisplay = na_to_null(p$assists_per_game_rankDisplay)
+      ),
+      steals_per_game = list(
+        value = na_to_null(round(p$steals_per_game, 2)),
+        rank = na_to_null(as.integer(p$steals_per_game_rank)),
+        rankDisplay = na_to_null(p$steals_per_game_rankDisplay)
+      ),
+      blocks_per_game = list(
+        value = na_to_null(round(p$blocks_per_game, 2)),
+        rank = na_to_null(as.integer(p$blocks_per_game_rank)),
+        rankDisplay = na_to_null(p$blocks_per_game_rankDisplay)
+      ),
+      field_goal_pct = list(
+        value = na_to_null(round(p$fg_pct, 2)),
+        rank = na_to_null(as.integer(p$fg_pct_rank)),
+        rankDisplay = na_to_null(p$fg_pct_rankDisplay)
+      ),
+      three_pt_pct = list(
+        value = na_to_null(round(p$three_pt_pct, 2)),
+        rank = na_to_null(as.integer(p$three_pt_pct_rank)),
+        rankDisplay = na_to_null(p$three_pt_pct_rankDisplay)
+      ),
+      true_shooting_pct = if ("player_ts_pct" %in% names(p) && !is.na(p$player_ts_pct)) {
+        list(
+          value = na_to_null(round(p$player_ts_pct, 2)),
+          rank = na_to_null(as.integer(p$player_ts_pct_rank)),
+          rankDisplay = na_to_null(p$player_ts_pct_rankDisplay)
+        )
+      } else {
+        list(value = NULL, rank = NULL, rankDisplay = NULL)
+      },
+      effective_fg_pct = if ("player_efg_pct" %in% names(p) && !is.na(p$player_efg_pct)) {
+        list(
+          value = na_to_null(round(p$player_efg_pct, 2)),
+          rank = na_to_null(as.integer(p$player_efg_pct_rank)),
+          rankDisplay = na_to_null(p$player_efg_pct_rankDisplay)
+        )
+      } else {
+        list(value = NULL, rank = NULL, rankDisplay = NULL)
+      },
+      pie = if ("player_pie" %in% names(p) && !is.na(p$player_pie)) {
+        list(
+          value = na_to_null(round(p$player_pie, 2)),
+          rank = na_to_null(as.integer(p$player_pie_rank)),
+          rankDisplay = na_to_null(p$player_pie_rankDisplay)
+        )
+      } else {
+        list(value = NULL, rank = NULL, rankDisplay = NULL)
+      },
+      usage_pct = if ("player_usg_pct" %in% names(p) && !is.na(p$player_usg_pct)) {
+        list(
+          value = na_to_null(round(p$player_usg_pct, 2)),
+          rank = na_to_null(as.integer(p$player_usg_pct_rank)),
+          rankDisplay = na_to_null(p$player_usg_pct_rankDisplay)
+        )
+      } else {
+        list(value = NULL, rank = NULL, rankDisplay = NULL)
+      },
+      minutes_per_game = list(
+        value = na_to_null(round(p$minutes_per_game, 1)),
+        rank = na_to_null(as.integer(p$minutes_per_game_rank)),
+        rankDisplay = na_to_null(p$minutes_per_game_rankDisplay)
+      ),
+      games_played = list(
+        value = na_to_null(as.integer(p$games_played)),
+        rank = na_to_null(as.integer(p$games_played_rank)),
+        rankDisplay = na_to_null(p$games_played_rankDisplay)
       )
     )
-
-    # Add advanced player stats if available
-    if (!is.null(player_advanced_stats) && !is.na(p$player_ts_pct)) {
-      player_data$stats$trueShootingPct <- round(p$player_ts_pct, 1)
-      player_data$stats$trueShootingPctRank <- p$player_ts_pct_rank
-      player_data$stats$trueShootingPctRankDisplay <- p$player_ts_pct_rankDisplay
-      player_data$stats$effectiveFgPct <- round(p$player_efg_pct, 1)
-      player_data$stats$effectiveFgPctRank <- p$player_efg_pct_rank
-      player_data$stats$effectiveFgPctRankDisplay <- p$player_efg_pct_rankDisplay
-      player_data$stats$pie <- round(p$player_pie, 1)
-      player_data$stats$pieRank <- p$player_pie_rank
-      player_data$stats$pieRankDisplay <- p$player_pie_rankDisplay
-    }
-
-    if (!is.null(player_usage_stats) && !is.na(p$player_usg_pct)) {
-      player_data$stats$usagePct <- round(p$player_usg_pct, 1)
-      player_data$stats$usagePctRank <- p$player_usg_pct_rank
-      player_data$stats$usagePctRankDisplay <- p$player_usg_pct_rankDisplay
-    }
-
-    player_data
   })
 
   away_players_data <- lapply(1:nrow(away_players), function(i) {
     p <- away_players[i, ]
-    player_data <- list(
-      id = p$athlete_id,
+
+    # Helper to create NULL if value is NA
+    na_to_null <- function(x) if (is.na(x)) NULL else x
+
+    list(
       name = p$athlete_display_name,
       position = p$athlete_position_abbreviation,
-      stats = list(
-        gamesPlayed = p$games_played,
-        pointsPerGame = round(p$points_per_game, 1),
-        pointsPerGameRank = p$points_per_game_rank,
-        pointsPerGameRankDisplay = p$points_per_game_rankDisplay,
-        reboundsPerGame = round(p$rebounds_per_game, 1),
-        reboundsPerGameRank = p$rebounds_per_game_rank,
-        reboundsPerGameRankDisplay = p$rebounds_per_game_rankDisplay,
-        assistsPerGame = round(p$assists_per_game, 1),
-        assistsPerGameRank = p$assists_per_game_rank,
-        assistsPerGameRankDisplay = p$assists_per_game_rankDisplay,
-        stealsPerGame = round(p$steals_per_game, 1),
-        stealsPerGameRank = p$steals_per_game_rank,
-        stealsPerGameRankDisplay = p$steals_per_game_rankDisplay,
-        blocksPerGame = round(p$blocks_per_game, 1),
-        blocksPerGameRank = p$blocks_per_game_rank,
-        blocksPerGameRankDisplay = p$blocks_per_game_rankDisplay,
-        fieldGoalPct = round(p$fg_pct, 1),
-        fieldGoalPctRank = p$fg_pct_rank,
-        fieldGoalPctRankDisplay = p$fg_pct_rankDisplay,
-        threePtPct = round(p$three_pt_pct, 1),
-        threePtPctRank = p$three_pt_pct_rank,
-        threePtPctRankDisplay = p$three_pt_pct_rankDisplay
+      points_per_game = list(
+        value = na_to_null(round(p$points_per_game, 2)),
+        rank = na_to_null(as.integer(p$points_per_game_rank)),
+        rankDisplay = na_to_null(p$points_per_game_rankDisplay)
+      ),
+      rebounds_per_game = list(
+        value = na_to_null(round(p$rebounds_per_game, 2)),
+        rank = na_to_null(as.integer(p$rebounds_per_game_rank)),
+        rankDisplay = na_to_null(p$rebounds_per_game_rankDisplay)
+      ),
+      assists_per_game = list(
+        value = na_to_null(round(p$assists_per_game, 2)),
+        rank = na_to_null(as.integer(p$assists_per_game_rank)),
+        rankDisplay = na_to_null(p$assists_per_game_rankDisplay)
+      ),
+      steals_per_game = list(
+        value = na_to_null(round(p$steals_per_game, 2)),
+        rank = na_to_null(as.integer(p$steals_per_game_rank)),
+        rankDisplay = na_to_null(p$steals_per_game_rankDisplay)
+      ),
+      blocks_per_game = list(
+        value = na_to_null(round(p$blocks_per_game, 2)),
+        rank = na_to_null(as.integer(p$blocks_per_game_rank)),
+        rankDisplay = na_to_null(p$blocks_per_game_rankDisplay)
+      ),
+      field_goal_pct = list(
+        value = na_to_null(round(p$fg_pct, 2)),
+        rank = na_to_null(as.integer(p$fg_pct_rank)),
+        rankDisplay = na_to_null(p$fg_pct_rankDisplay)
+      ),
+      three_pt_pct = list(
+        value = na_to_null(round(p$three_pt_pct, 2)),
+        rank = na_to_null(as.integer(p$three_pt_pct_rank)),
+        rankDisplay = na_to_null(p$three_pt_pct_rankDisplay)
+      ),
+      true_shooting_pct = if ("player_ts_pct" %in% names(p) && !is.na(p$player_ts_pct)) {
+        list(
+          value = na_to_null(round(p$player_ts_pct, 2)),
+          rank = na_to_null(as.integer(p$player_ts_pct_rank)),
+          rankDisplay = na_to_null(p$player_ts_pct_rankDisplay)
+        )
+      } else {
+        list(value = NULL, rank = NULL, rankDisplay = NULL)
+      },
+      effective_fg_pct = if ("player_efg_pct" %in% names(p) && !is.na(p$player_efg_pct)) {
+        list(
+          value = na_to_null(round(p$player_efg_pct, 2)),
+          rank = na_to_null(as.integer(p$player_efg_pct_rank)),
+          rankDisplay = na_to_null(p$player_efg_pct_rankDisplay)
+        )
+      } else {
+        list(value = NULL, rank = NULL, rankDisplay = NULL)
+      },
+      pie = if ("player_pie" %in% names(p) && !is.na(p$player_pie)) {
+        list(
+          value = na_to_null(round(p$player_pie, 2)),
+          rank = na_to_null(as.integer(p$player_pie_rank)),
+          rankDisplay = na_to_null(p$player_pie_rankDisplay)
+        )
+      } else {
+        list(value = NULL, rank = NULL, rankDisplay = NULL)
+      },
+      usage_pct = if ("player_usg_pct" %in% names(p) && !is.na(p$player_usg_pct)) {
+        list(
+          value = na_to_null(round(p$player_usg_pct, 2)),
+          rank = na_to_null(as.integer(p$player_usg_pct_rank)),
+          rankDisplay = na_to_null(p$player_usg_pct_rankDisplay)
+        )
+      } else {
+        list(value = NULL, rank = NULL, rankDisplay = NULL)
+      },
+      minutes_per_game = list(
+        value = na_to_null(round(p$minutes_per_game, 1)),
+        rank = na_to_null(as.integer(p$minutes_per_game_rank)),
+        rankDisplay = na_to_null(p$minutes_per_game_rankDisplay)
+      ),
+      games_played = list(
+        value = na_to_null(as.integer(p$games_played)),
+        rank = na_to_null(as.integer(p$games_played_rank)),
+        rankDisplay = na_to_null(p$games_played_rankDisplay)
       )
     )
-
-    # Add advanced player stats if available
-    if (!is.null(player_advanced_stats) && !is.na(p$player_ts_pct)) {
-      player_data$stats$trueShootingPct <- round(p$player_ts_pct, 1)
-      player_data$stats$trueShootingPctRank <- p$player_ts_pct_rank
-      player_data$stats$trueShootingPctRankDisplay <- p$player_ts_pct_rankDisplay
-      player_data$stats$effectiveFgPct <- round(p$player_efg_pct, 1)
-      player_data$stats$effectiveFgPctRank <- p$player_efg_pct_rank
-      player_data$stats$effectiveFgPctRankDisplay <- p$player_efg_pct_rankDisplay
-      player_data$stats$pie <- round(p$player_pie, 1)
-      player_data$stats$pieRank <- p$player_pie_rank
-      player_data$stats$pieRankDisplay <- p$player_pie_rankDisplay
-    }
-
-    if (!is.null(player_usage_stats) && !is.na(p$player_usg_pct)) {
-      player_data$stats$usagePct <- round(p$player_usg_pct, 1)
-      player_data$stats$usagePctRank <- p$player_usg_pct_rank
-      player_data$stats$usagePctRankDisplay <- p$player_usg_pct_rankDisplay
-    }
-
-    player_data
   })
+
+  # Build comparison data
+  comparisons <- build_nba_comparisons(
+    home_stats,
+    away_stats,
+    game$home_team_abbrev,
+    game$away_team_abbrev
+  )
 
   # Build matchup object
   matchup <- list(
@@ -862,7 +1284,8 @@ for (game in upcoming_games) {
     homeTeam = home_team_data,
     awayTeam = away_team_data,
     homePlayers = home_players_data,
-    awayPlayers = away_players_data
+    awayPlayers = away_players_data,
+    comparisons = comparisons
   )
 
   # Add odds if available
@@ -946,8 +1369,10 @@ if (nzchar(s3_bucket)) {
     cat("Updated DynamoDB:", dynamodb_table, "key:", s3_key, "\n")
   }
 } else {
-  # Development mode - just print the output location
-  cat("Development mode - output written to:", tmp_file, "\n")
+  # Development mode - just print the output location and copy to persistent location
+  dev_output <- "/tmp/nba_matchup_test.json"
+  file.copy(tmp_file, dev_output, overwrite = TRUE)
+  cat("Development mode - output written to:", dev_output, "\n")
   cat("To upload to S3, set AWS_S3_BUCKET environment variable\n")
 }
 

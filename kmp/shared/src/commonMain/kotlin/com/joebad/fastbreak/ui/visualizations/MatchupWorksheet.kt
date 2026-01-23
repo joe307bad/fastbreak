@@ -36,10 +36,6 @@ import kotlin.math.round
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.*
 
-// Team colors for advantage indicators
-private val Team1Color = Color(0xFF2196F3) // Blue (away team)
-private val Team2Color = Color(0xFFFF5722) // Deep Orange (home team)
-
 /**
  * Pre-computed rank colors for team/QB stats (1-32 scale, with 32+ clamped to darkest red)
  * Computed once at initialization to eliminate calculation overhead during scrolling
@@ -305,97 +301,11 @@ private fun JsonObject.getInt(key: String): Int? {
 }
 
 /**
- * Generic three-column layout component for consistent compact formatting
- */
-@Composable
-private fun ThreeColumnRow(
-    leftText: String,
-    centerText: String,
-    rightText: String,
-    modifier: Modifier = Modifier,
-    leftWeight: FontWeight = FontWeight.Medium,
-    centerWeight: FontWeight = FontWeight.Normal,
-    rightWeight: FontWeight = FontWeight.Medium,
-    leftColor: Color = MaterialTheme.colorScheme.onSurface,
-    centerColor: Color = MaterialTheme.colorScheme.primary,
-    rightColor: Color = MaterialTheme.colorScheme.onSurface,
-    advantage: Int = 0, // -1 for left (away team), 0 for even, 1 for right (home team)
-    centerMaxLines: Int = Int.MAX_VALUE,
-    centerOverflow: androidx.compose.ui.text.style.TextOverflow = androidx.compose.ui.text.style.TextOverflow.Clip,
-    centerSoftWrap: Boolean = false
-) {
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 8.dp, vertical = 6.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Row(
-            modifier = Modifier.weight(1f),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Start
-        ) {
-            if (advantage == -1) {
-                Box(
-                    modifier = Modifier
-                        .size(6.dp)
-                        .background(Team1Color, CircleShape)
-                )
-                Spacer(modifier = Modifier.width(4.dp))
-            }
-            Text(
-                text = leftText,
-                style = MaterialTheme.typography.bodySmall,
-                fontSize = 11.sp,
-                fontWeight = leftWeight,
-                color = leftColor
-            )
-        }
-
-        Text(
-            text = centerText,
-            style = MaterialTheme.typography.bodySmall,
-            modifier = Modifier.weight(1f),
-            textAlign = TextAlign.Center,
-            fontSize = 11.sp,
-            fontWeight = centerWeight,
-            color = centerColor,
-            maxLines = centerMaxLines,
-            overflow = centerOverflow,
-            softWrap = centerSoftWrap
-        )
-
-        Row(
-            modifier = Modifier.weight(1f),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.End
-        ) {
-            Text(
-                text = rightText,
-                style = MaterialTheme.typography.bodySmall,
-                fontSize = 11.sp,
-                fontWeight = rightWeight,
-                color = rightColor
-            )
-            if (advantage == 1) {
-                Spacer(modifier = Modifier.width(4.dp))
-                Box(
-                    modifier = Modifier
-                        .size(6.dp)
-                        .background(Team2Color, CircleShape)
-                )
-            }
-        }
-    }
-}
-
-/**
- * Five-column layout component with color-coded rank boxes
+ * Five-column layout component with color-coded rank boxes for NFL (uses 32-team scale)
  * Layout: [value] [rank] [label] [rank] [value]
  */
 @Composable
-private fun FiveColumnRowWithRanks(
+private fun NFLFiveColumnRowWithRanks(
     leftValue: String,
     leftRank: Int?,  // Numeric rank for color coding
     leftRankDisplay: String?,  // Display string with "T" prefix for ties
@@ -893,44 +803,6 @@ private sealed class RowData(val key: String) {
     data class ViewNavigation(val k: String, val awayTeam: String, val homeTeam: String) : RowData(k)
 }
 
-/**
- * Compact navigation badge for Team/Versus toggle within team stats section
- */
-@Composable
-private fun TeamStatsNavBadge(
-    text: String,
-    isSelected: Boolean,
-    onClick: () -> Unit
-) {
-    val backgroundColor = if (isSelected) {
-        MaterialTheme.colorScheme.primary
-    } else {
-        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-    }
-
-    val textColor = if (isSelected) {
-        MaterialTheme.colorScheme.onPrimary
-    } else {
-        MaterialTheme.colorScheme.onSurfaceVariant
-    }
-
-    Box(
-        modifier = Modifier
-            .background(backgroundColor, RoundedCornerShape(10.dp))
-            .clickable(onClick = onClick)
-            .padding(horizontal = 10.dp, vertical = 4.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            text = text,
-            style = MaterialTheme.typography.labelSmall,
-            fontSize = 10.sp,
-            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-            color = textColor
-        )
-    }
-}
-
 @Composable
 private fun StatsTab(
     awayTeam: String,
@@ -1047,53 +919,26 @@ private fun StatsTab(
             // Team Stats section - content depends on view selection
             if (teamStatsView == 0) {
                 // TEAM VIEW: Side-by-side offense vs offense, defense vs defense
-                val offensiveStatLabels = mapOf(
-                    "off_epa" to "Offensive EPA",
-                    "yards_per_game" to "Yards/Game",
-                    "pass_yards_per_game" to "Pass Yds/Game",
-                    "rush_yards_per_game" to "Rush Yds/Game",
-                    "points_per_game" to "Points/Game",
-                    "yards_per_play" to "Yards/Play",
-                    "third_down_pct" to "3rd Down %",
-                    "rushing_epa" to "Rushing EPA",
-                    "receiving_epa" to "Receiving EPA",
-                    "pacr" to "PACR",
-                    "passing_first_downs" to "Pass 1st Downs",
-                    "sacks_suffered" to "Sacks Suffered",
-                    "touchdowns" to "Touchdowns",
-                    "interceptions_thrown" to "Interceptions",
-                    "fumbles_lost" to "Fumbles Lost"
-                )
 
                 add(RowData.SubsectionHeader("offensive_stats_header", "Offensive Stats"))
+                add(RowData.Spacer("offensive_header_spacer", 4.dp))
 
-                offensiveStatLabels.forEach { (key, label) ->
-                    val awayStat = awayTeamStats.current.offense[key]
-                    val homeStat = homeTeamStats.current.offense[key]
-                    if (awayStat != null && homeStat != null) {
-                        val awayValue = awayStat.value
-                    val awayRank = awayStat.rank
-                    val awayRankDisplay = awayStat.rankDisplay
-                    val homeValue = homeStat.value
-                    val homeRank = homeStat.rank
-                    val homeRankDisplay = homeStat.rankDisplay
+                // Use labels from comparisons.sideBySide
+                matchup.comparisons?.sideBySide?.offense?.forEach { (key, stat) ->
+                    val awayValue = stat.away.value
+                    val awayRank = stat.away.rank
+                    val awayRankDisplay = stat.away.rankDisplay
+                    val homeValue = stat.home.value
+                    val homeRank = stat.home.rank
+                    val homeRankDisplay = stat.home.rankDisplay
+                    val label = stat.label
 
-                    val lowerIsBetter = key.contains("sacks_suffered") ||
-                                      key.contains("interceptions_thrown") ||
-                                      key.contains("fumbles_lost")
-                    val advantage = if (awayValue != null && homeValue != null) {
-                        if (lowerIsBetter) {
-                            when {
-                                awayValue < homeValue -> -1
-                                awayValue > homeValue -> 1
-                                else -> 0
-                            }
-                        } else {
-                            when {
-                                awayValue > homeValue -> -1
-                                awayValue < homeValue -> 1
-                                else -> 0
-                            }
+                    // Use rank-based advantage (sport-agnostic: lower rank is always better)
+                    val advantage = if (awayRank != null && homeRank != null) {
+                        when {
+                            awayRank < homeRank -> -1  // away team has better rank (advantage)
+                            awayRank > homeRank -> 1   // home team has better rank (advantage)
+                            else -> 0
                         }
                     } else 0
 
@@ -1103,51 +948,26 @@ private fun StatsTab(
 
                     add(RowData.FiveColumn("team_off_$key", awayText, awayRank, awayRankDisplay, label, homeText, homeRank, homeRankDisplay, advantage, false))
                 }
-            }
 
-            add(RowData.Spacer("offensive_spacer", 8.dp))
-            add(RowData.SubsectionHeader("defensive_stats_header", "Defensive Stats"))
+                add(RowData.Spacer("offensive_spacer", 8.dp))
+                add(RowData.SubsectionHeader("defensive_stats_header", "Defensive Stats"))
 
-            val defensiveStatLabels = mapOf(
-                "def_epa" to "Defensive EPA",
-                "yards_allowed_per_game" to "Yds Allowed/Game",
-                "pass_yards_allowed_per_game" to "Pass Yds Allowed/Game",
-                "rush_yards_allowed_per_game" to "Rush Yds Allowed/Game",
-                "points_allowed_per_game" to "Pts Allowed/Game",
-                "third_down_pct_def" to "3rd Down % Allowed",
-                "sacks_made" to "Sacks",
-                "interceptions_made" to "Interceptions",
-                "fumbles_forced" to "Fumbles Forced",
-                "touchdowns_allowed" to "TDs Allowed",
-                "turnover_differential" to "Turnover Diff"
-            )
+                // Use labels from comparisons.sideBySide
+                matchup.comparisons?.sideBySide?.defense?.forEach { (key, stat) ->
+                    val awayValue = stat.away.value
+                    val awayRank = stat.away.rank
+                    val awayRankDisplay = stat.away.rankDisplay
+                    val homeValue = stat.home.value
+                    val homeRank = stat.home.rank
+                    val homeRankDisplay = stat.home.rankDisplay
+                    val label = stat.label
 
-            defensiveStatLabels.forEach { (key, label) ->
-                val awayStat = awayTeamStats.current.defense[key]
-                val homeStat = homeTeamStats.current.defense[key]
-                if (awayStat != null && homeStat != null) {
-                    val awayValue = awayStat.value
-                    val awayRank = awayStat.rank
-                    val awayRankDisplay = awayStat.rankDisplay
-                    val homeValue = homeStat.value
-                    val homeRank = homeStat.rank
-                    val homeRankDisplay = homeStat.rankDisplay
-
-                    val higherIsBetter = key == "sacks_made" || key == "interceptions_made" ||
-                                       key == "fumbles_forced" || key == "turnover_differential"
-                    val advantage = if (awayValue != null && homeValue != null) {
-                        if (higherIsBetter) {
-                            when {
-                                awayValue > homeValue -> -1
-                                awayValue < homeValue -> 1
-                                else -> 0
-                            }
-                        } else {
-                            when {
-                                awayValue < homeValue -> -1
-                                awayValue > homeValue -> 1
-                                else -> 0
-                            }
+                    // Use rank-based advantage (sport-agnostic: lower rank is always better)
+                    val advantage = if (awayRank != null && homeRank != null) {
+                        when {
+                            awayRank < homeRank -> -1  // away team has better rank (advantage)
+                            awayRank > homeRank -> 1   // home team has better rank (advantage)
+                            else -> 0
                         }
                     } else 0
 
@@ -1159,94 +979,57 @@ private fun StatsTab(
 
                     add(RowData.FiveColumn("team_def_$key", awayText, awayRank, awayRankDisplay, label, homeText, homeRank, homeRankDisplay, advantage, false))
                 }
-            }
-            } else {
-                // VERSUS VIEW: Offense vs Defense matchup comparisons
-                val comparisons = matchup.comparisons
-                if (comparisons != null) {
-                    // Show the selected comparison: 0 = away off vs home def, 1 = home off vs away def
-                    val currentComparison = if (versusComparison == 0) {
-                        comparisons.awayOffVsHomeDef
-                    } else {
-                        comparisons.homeOffVsAwayDef
-                    }
-
-                    // Header showing which matchup we're viewing
-                    val headerText = if (versusComparison == 0) {
-                        "$awayTeam Offense vs $homeTeam Defense"
-                    } else {
-                        "$homeTeam Offense vs $awayTeam Defense"
-                    }
-                    add(RowData.SubsectionHeader("versus_header", headerText))
-                    add(RowData.Spacer("versus_header_spacer", 4.dp))
-
-                    // Display matchup stats with offense on left, defense on right
-                    // Order stats logically
-                    val statOrder = listOf(
-                        "off_epa", "yards_per_game", "pass_yards_per_game", "rush_yards_per_game",
-                        "points_per_game", "third_down_pct", "touchdowns",
-                        "sacks_suffered", "interceptions_thrown", "fumbles_lost"
-                    )
-
-                    statOrder.forEach { statKey ->
-                        val stat = currentComparison[statKey]
-                        if (stat != null) {
-                            val offValue = stat.offense.value
-                            val offRank = stat.offense.rank
-                            val offRankDisplay = stat.offense.rankDisplay
-                            val defValue = stat.defense.value
-                            val defRank = stat.defense.rank
-                            val defRankDisplay = stat.defense.rankDisplay
-
-                            // Determine advantage based on stat type
-                            // For yards/points gained vs allowed: offense wants more, defense wants less allowed
-                            // So if offense > defense allowed, offense has advantage
-                            val lowerOffenseIsBetter = statKey.contains("sacks_suffered") ||
-                                                       statKey.contains("interceptions_thrown") ||
-                                                       statKey.contains("fumbles_lost")
-                            val advantage = if (offValue != null && defValue != null) {
-                                if (lowerOffenseIsBetter) {
-                                    // Lower offense is better (e.g., fewer sacks suffered)
-                                    // Advantage to offense if they suffer fewer than defense forces
-                                    when {
-                                        offValue < defValue -> -1  // offense advantage
-                                        offValue > defValue -> 1   // defense advantage
-                                        else -> 0
-                                    }
-                                } else {
-                                    // Higher offense is better (e.g., more yards)
-                                    // Advantage to offense if they gain more than defense allows
-                                    when {
-                                        offValue > defValue -> -1  // offense advantage
-                                        offValue < defValue -> 1   // defense advantage
-                                        else -> 0
-                                    }
-                                }
-                            } else 0
-
-                            val decimals = if (statKey.contains("pct") || statKey.contains("per_game") || statKey.contains("per_play")) 1 else 2
-                            val offText = offValue?.format(decimals) ?: "-"
-                            val defText = defValue?.format(decimals) ?: "-"
-
-                            // Label shows both stat descriptions
-                            val label = stat.offLabel.replace("/Game", "").replace("Off ", "")
-
-                            add(RowData.FiveColumn(
-                                "versus_$statKey",
-                                offText, offRank, offRankDisplay,
-                                label,
-                                defText, defRank, defRankDisplay,
-                                advantage, false
-                            ))
-                        }
-                    }
+        } else {
+            // VERSUS VIEW: Offense vs Defense matchup comparisons
+            matchup.comparisons?.let { comparisons ->
+                // Show the selected comparison: 0 = away off vs home def, 1 = home off vs away def
+                val currentComparison = if (versusComparison == 0) {
+                    comparisons.awayOffVsHomeDef
                 } else {
-                    // Fallback if no comparisons data
-                    add(RowData.SubsectionHeader("versus_no_data", "Comparison data not available"))
+                    comparisons.homeOffVsAwayDef
+                }
+
+                // Header showing which matchup we're viewing
+                val headerText = if (versusComparison == 0) {
+                    "$awayTeam Offense vs $homeTeam Defense"
+                } else {
+                    "$homeTeam Offense vs $awayTeam Defense"
+                }
+                add(RowData.SubsectionHeader("versus_header", headerText))
+                add(RowData.Spacer("versus_header_spacer", 4.dp))
+
+                // Display matchup stats with offense on left, defense on right
+                // Iterate through all stats provided by the API
+                currentComparison.forEach { (statKey, stat) ->
+                    val offValue = stat.offense.value
+                    val offRank = stat.offense.rank
+                    val offRankDisplay = stat.offense.rankDisplay
+                    val defValue = stat.defense.value
+                    val defRank = stat.defense.rank
+                    val defRankDisplay = stat.defense.rankDisplay
+
+                    // Use advantage from API (calculated by backend)
+                    val advantage = stat.advantage ?: 0
+
+                    val decimals = if (statKey.contains("pct") || statKey.contains("per_game") || statKey.contains("per_play")) 1 else 2
+                    val offText = offValue?.format(decimals) ?: "-"
+                    val defText = defValue?.format(decimals) ?: "-"
+
+                    // Use offLabel directly (sport-agnostic)
+                    val label = stat.offLabel
+
+                    add(RowData.FiveColumn(
+                        "versus_$statKey",
+                        offText, offRank, offRankDisplay,
+                        label,
+                        defText, defRank, defRankDisplay,
+                        advantage, false
+                    ))
                 }
             }
+        }
 
-            add(RowData.Spacer("team_stats_spacer", 12.dp))
+        add(RowData.Spacer("team_stats_spacer", 12.dp))
 
             // Player Stats - pre-compute all player comparison rows
             add(RowData.SectionHeader("player_stats_header", "Key Players"))
@@ -1509,7 +1292,7 @@ private fun StatsTab(
                             centerOverflow = row.centerOverflow,
                             centerSoftWrap = row.centerSoftWrap
                         )
-                        is RowData.FiveColumn -> FiveColumnRowWithRanks(
+                        is RowData.FiveColumn -> NFLFiveColumnRowWithRanks(
                             leftValue = row.leftValue,
                             leftRank = row.leftRank,
                             leftRankDisplay = row.leftRankDisplay,
@@ -1583,7 +1366,7 @@ private fun StatsTab(
                 )
 
                 Text(
-                    text = "VS",
+                    text = "@",
                     style = MaterialTheme.typography.bodySmall.copy(lineHeight = 11.sp),
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
@@ -1771,7 +1554,7 @@ private fun TeamStatsComparison(
         if (offensiveRows.isNotEmpty()) {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 offensiveRows.forEach { row ->
-                    FiveColumnRowWithRanks(
+                    NFLFiveColumnRowWithRanks(
                         leftValue = row.awayText,
                         leftRank = row.awayRank,
                         leftRankDisplay = row.awayRankDisplay,
@@ -1798,7 +1581,7 @@ private fun TeamStatsComparison(
         if (defensiveRows.isNotEmpty()) {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 defensiveRows.forEach { row ->
-                    FiveColumnRowWithRanks(
+                    NFLFiveColumnRowWithRanks(
                         leftValue = row.awayText,
                         leftRank = row.awayRank,
                         leftRankDisplay = row.awayRankDisplay,
@@ -1986,7 +1769,7 @@ private fun PlayerStatsComparison(
                 rightWeight = FontWeight.Bold
             )
             qb.stats.forEach { stat ->
-                FiveColumnRowWithRanks(
+                NFLFiveColumnRowWithRanks(
                     leftValue = stat.awayText,
                     leftRank = stat.awayRank,
                     leftRankDisplay = stat.awayRankDisplay,
@@ -2011,7 +1794,7 @@ private fun PlayerStatsComparison(
                 rightWeight = FontWeight.Bold
             )
             rb.stats.forEach { stat ->
-                FiveColumnRowWithRanks(
+                NFLFiveColumnRowWithRanks(
                     leftValue = stat.awayText,
                     leftRank = stat.awayRank,
                     leftRankDisplay = stat.awayRankDisplay,
@@ -2037,7 +1820,7 @@ private fun PlayerStatsComparison(
                 rightWeight = FontWeight.Bold
             )
             receiver.stats.forEach { stat ->
-                FiveColumnRowWithRanks(
+                NFLFiveColumnRowWithRanks(
                     leftValue = stat.awayText,
                     leftRank = stat.awayRank,
                     leftRankDisplay = stat.awayRankDisplay,

@@ -16,10 +16,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.joebad.fastbreak.data.model.*
 
-// Team colors for advantage indicators (matching worksheet)
-private val Team1Color = Color(0xFF2196F3) // Blue (away team)
-private val Team2Color = Color(0xFFFF5722) // Deep Orange (home team)
-
 /**
  * Pre-computed rank colors for team stats (1-32 scale)
  */

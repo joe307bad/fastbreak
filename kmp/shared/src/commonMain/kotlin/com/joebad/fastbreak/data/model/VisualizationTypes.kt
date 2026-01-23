@@ -438,7 +438,8 @@ data class MatchupStatComparison(
     val offLabel: String,
     val defLabel: String,
     val offense: TeamStatEntry,
-    val defense: TeamStatEntry
+    val defense: TeamStatEntry,
+    val advantage: Int? = null  // -1 = offense advantage, 1 = defense advantage, 0 = even
 )
 
 @Serializable
@@ -505,11 +506,29 @@ data class NBATeamInfo(
 )
 
 @Serializable
+data class NBAPlayerStatValue(
+    val value: Double? = null,
+    val rank: Int? = null,
+    val rankDisplay: String? = null
+)
+
+@Serializable
 data class NBAPlayerInfo(
-    val id: String,
     val name: String,
     val position: String,
-    val stats: Map<String, JsonPrimitive>
+    val points_per_game: NBAPlayerStatValue = NBAPlayerStatValue(),
+    val rebounds_per_game: NBAPlayerStatValue = NBAPlayerStatValue(),
+    val assists_per_game: NBAPlayerStatValue = NBAPlayerStatValue(),
+    val steals_per_game: NBAPlayerStatValue = NBAPlayerStatValue(),
+    val blocks_per_game: NBAPlayerStatValue = NBAPlayerStatValue(),
+    val field_goal_pct: NBAPlayerStatValue = NBAPlayerStatValue(),
+    val three_pt_pct: NBAPlayerStatValue = NBAPlayerStatValue(),
+    val true_shooting_pct: NBAPlayerStatValue = NBAPlayerStatValue(),
+    val effective_fg_pct: NBAPlayerStatValue = NBAPlayerStatValue(),
+    val pie: NBAPlayerStatValue = NBAPlayerStatValue(),
+    val usage_pct: NBAPlayerStatValue = NBAPlayerStatValue(),
+    val minutes_per_game: NBAPlayerStatValue = NBAPlayerStatValue(),
+    val games_played: NBAPlayerStatValue = NBAPlayerStatValue()
 )
 
 @Serializable
@@ -529,7 +548,8 @@ data class NBAMatchup(
     val awayTeam: NBATeamInfo,
     val homePlayers: List<NBAPlayerInfo> = emptyList(),
     val awayPlayers: List<NBAPlayerInfo> = emptyList(),
-    val odds: NBAMatchupOdds? = null
+    val odds: NBAMatchupOdds? = null,
+    val comparisons: MatchupComparisons? = null
 )
 
 @Serializable

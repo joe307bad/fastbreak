@@ -25,9 +25,39 @@ class IOSImageExporter : ImageExporter {
     @OptIn(ExperimentalForeignApi::class)
     override suspend fun shareImage(bitmap: ImageBitmap, title: String) {
         try {
-            // Convert ImageBitmap to Skia Bitmap and encode to PNG for better compatibility
+            // Convert ImageBitmap to Skia Bitmap
             val skiaBitmap = bitmap.asSkiaBitmap()
-            val encodedData = org.jetbrains.skia.Image.makeFromBitmap(skiaBitmap)
+
+            // Scale down if image is too large for Twitter (max 4096x4096)
+            val maxDimension = 4096
+            val scaledBitmap = if (skiaBitmap.width > maxDimension || skiaBitmap.height > maxDimension) {
+                val scale = minOf(
+                    maxDimension.toFloat() / skiaBitmap.width,
+                    maxDimension.toFloat() / skiaBitmap.height
+                )
+                val newWidth = (skiaBitmap.width * scale).toInt()
+                val newHeight = (skiaBitmap.height * scale).toInt()
+
+                println("📸 Scaling image from ${skiaBitmap.width}x${skiaBitmap.height} to ${newWidth}x${newHeight}")
+
+                val surface = Surface.makeRasterN32Premul(newWidth, newHeight)
+                val canvas = surface.canvas
+                val image = org.jetbrains.skia.Image.makeFromBitmap(skiaBitmap)
+                canvas.drawImageRect(
+                    image,
+                    org.jetbrains.skia.Rect.makeWH(skiaBitmap.width.toFloat(), skiaBitmap.height.toFloat()),
+                    org.jetbrains.skia.Rect.makeWH(newWidth.toFloat(), newHeight.toFloat()),
+                    org.jetbrains.skia.SamplingMode.DEFAULT,
+                    null,
+                    true
+                )
+                surface.makeImageSnapshot().toComposeImageBitmap().asSkiaBitmap()
+            } else {
+                skiaBitmap
+            }
+
+            // Encode to PNG for better compatibility
+            val encodedData = org.jetbrains.skia.Image.makeFromBitmap(scaledBitmap)
                 .encodeToData(EncodedImageFormat.PNG)
                 ?: throw IllegalStateException("Failed to encode bitmap to PNG")
 

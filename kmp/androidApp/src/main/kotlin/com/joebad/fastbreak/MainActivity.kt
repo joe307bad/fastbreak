@@ -22,6 +22,7 @@ import com.joebad.fastbreak.ui.theme.SystemThemeDetector
 import com.joebad.fastbreak.ui.theme.ThemeRepository
 import com.joebad.fastbreak.platform.AppVersion
 import com.joebad.fastbreak.platform.initializeImageExporter
+import com.joebad.fastbreak.platform.initializeUrlLauncher
 import com.russhwolf.settings.Settings
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -40,6 +41,9 @@ class MainActivity : ComponentActivity() {
 
         // Initialize image exporter for sharing charts
         initializeImageExporter(this)
+
+        // Initialize URL launcher for opening external links
+        initializeUrlLauncher(this)
 
         val settings = Settings()
         val themeRepository = ThemeRepository(

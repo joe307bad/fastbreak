@@ -41,6 +41,7 @@ kotlin {
         languageSettings.optIn("androidx.compose.material3.ExperimentalMaterial3Api")
         languageSettings.optIn("com.mohamedrejeb.calf.permissions.ExperimentalPermissionsApi")
         languageSettings.optIn("kotlin.time.ExperimentalTime")
+        languageSettings.optIn("org.jetbrains.compose.resources.ExperimentalResourceApi")
     }
 
     listOf(
@@ -65,6 +66,7 @@ kotlin {
             implementation(compose.material3)
             implementation(compose.materialIconsExtended)
             implementation(compose.ui)
+            implementation(compose.components.resources)
 
             // Decompose
             implementation(libs.decompose)

@@ -69,15 +69,30 @@ private fun Double.formatStat(decimals: Int = 1): String {
 @Composable
 fun NBAMatchupWorksheet(
     visualization: NBAMatchupVisualization,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    pinnedTeams: List<com.joebad.fastbreak.data.model.PinnedTeam> = emptyList()
 ) {
+    // Get NBA pinned teams only
+    val nbaPinnedTeamCodes = remember(pinnedTeams) {
+        pinnedTeams.filter { it.sport == "NBA" }.map { it.teamCode }.toSet()
+    }
+
     // Group matchups by date in Eastern timezone and sort dates chronologically
-    val matchupsByDate = remember(visualization.dataPoints) {
+    // Within each date, prioritize pinned team matchups first
+    val matchupsByDate = remember(visualization.dataPoints, nbaPinnedTeamCodes) {
         visualization.dataPoints
             .groupBy { matchup ->
                 // Parse ISO 8601 date and extract date part in Eastern timezone
                 val instant = Instant.parse(matchup.gameDate)
                 instant.toLocalDateTime(TimeZone.of("America/New_York")).date
+            }
+            .mapValues { (_, matchups) ->
+                // Sort matchups: pinned teams first, then others
+                matchups.sortedByDescending { matchup ->
+                    val hasPinnedTeam = nbaPinnedTeamCodes.contains(matchup.awayTeam.abbreviation) ||
+                                       nbaPinnedTeamCodes.contains(matchup.homeTeam.abbreviation)
+                    if (hasPinnedTeam) 1 else 0
+                }
             }
             .toList()
             .sortedBy { (date, _) -> date }
@@ -90,14 +105,16 @@ fun NBAMatchupWorksheet(
     var selectedDateIndex by remember { mutableStateOf(0) }
     var selectedMatchupIndex by remember { mutableStateOf(0) }
 
-    // Reset matchup index when date changes
-    LaunchedEffect(selectedDateIndex) {
-        selectedMatchupIndex = 0
-    }
-
     // Get matchups for selected date
     val selectedDate = if (dates.isNotEmpty()) dates[selectedDateIndex] else null
     val matchupsForDate = selectedDate?.let { matchupsByDate[it] } ?: emptyList()
+
+    // Only reset matchup index if it's out of bounds for the new date
+    LaunchedEffect(selectedDateIndex, matchupsForDate.size) {
+        if (selectedMatchupIndex >= matchupsForDate.size && matchupsForDate.isNotEmpty()) {
+            selectedMatchupIndex = 0
+        }
+    }
 
     if (dates.isEmpty() || matchupsForDate.isEmpty()) {
         Box(
@@ -212,6 +229,19 @@ fun NBAMatchupWorksheet(
                     awayTeam = selectedMatchup.awayTeam.abbreviation,
                     homeTeam = selectedMatchup.homeTeam.abbreviation,
                     modifier = Modifier.align(Alignment.TopCenter)
+                )
+            }
+
+            // Source attribution
+            visualization.source?.let { source ->
+                Text(
+                    text = "Source: $source",
+                    style = MaterialTheme.typography.bodySmall,
+                    fontSize = 9.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 8.dp, vertical = 2.dp)
                 )
             }
         }
@@ -455,6 +485,54 @@ fun NBAMatchupWorksheet(
                                             usePlayerRanks = true
                                         )
                                     }
+                                },
+                                ShareFiveColStat(
+                                    leftValue = awayPlayer.steals_per_game.value?.formatStat(1) ?: "-",
+                                    leftRank = awayPlayer.steals_per_game.rank,
+                                    leftRankDisplay = awayPlayer.steals_per_game.rankDisplay,
+                                    centerText = "Stl/Game",
+                                    rightValue = homePlayer.steals_per_game.value?.formatStat(1) ?: "-",
+                                    rightRank = homePlayer.steals_per_game.rank,
+                                    rightRankDisplay = homePlayer.steals_per_game.rankDisplay,
+                                    advantage = 0,
+                                    usePlayerRanks = true
+                                ),
+                                ShareFiveColStat(
+                                    leftValue = awayPlayer.blocks_per_game.value?.formatStat(1) ?: "-",
+                                    leftRank = awayPlayer.blocks_per_game.rank,
+                                    leftRankDisplay = awayPlayer.blocks_per_game.rankDisplay,
+                                    centerText = "Blk/Game",
+                                    rightValue = homePlayer.blocks_per_game.value?.formatStat(1) ?: "-",
+                                    rightRank = homePlayer.blocks_per_game.rank,
+                                    rightRankDisplay = homePlayer.blocks_per_game.rankDisplay,
+                                    advantage = 0,
+                                    usePlayerRanks = true
+                                ),
+                                ShareFiveColStat(
+                                    leftValue = awayPlayer.three_pt_pct.value?.formatStat(1) ?: "-",
+                                    leftRank = awayPlayer.three_pt_pct.rank,
+                                    leftRankDisplay = awayPlayer.three_pt_pct.rankDisplay,
+                                    centerText = "3PT%",
+                                    rightValue = homePlayer.three_pt_pct.value?.formatStat(1) ?: "-",
+                                    rightRank = homePlayer.three_pt_pct.rank,
+                                    rightRankDisplay = homePlayer.three_pt_pct.rankDisplay,
+                                    advantage = 0,
+                                    usePlayerRanks = true
+                                ),
+                                awayPlayer.usage_pct.value?.let { awayUsage ->
+                                    homePlayer.usage_pct.value?.let { homeUsage ->
+                                        ShareFiveColStat(
+                                            leftValue = (awayUsage * 100).formatStat(1),
+                                            leftRank = awayPlayer.usage_pct.rank,
+                                            leftRankDisplay = awayPlayer.usage_pct.rankDisplay,
+                                            centerText = "Usage%",
+                                            rightValue = (homeUsage * 100).formatStat(1),
+                                            rightRank = homePlayer.usage_pct.rank,
+                                            rightRankDisplay = homePlayer.usage_pct.rankDisplay,
+                                            advantage = 0,
+                                            usePlayerRanks = true
+                                        )
+                                    }
                                 }
                             ).take(9)
                         ))
@@ -525,6 +603,54 @@ fun NBAMatchupWorksheet(
                                             rightValue = (homeTS * 100).formatStat(1),
                                             rightRank = homePlayer.true_shooting_pct.rank,
                                             rightRankDisplay = homePlayer.true_shooting_pct.rankDisplay,
+                                            advantage = 0,
+                                            usePlayerRanks = true
+                                        )
+                                    }
+                                },
+                                ShareFiveColStat(
+                                    leftValue = awayPlayer.steals_per_game.value?.formatStat(1) ?: "-",
+                                    leftRank = awayPlayer.steals_per_game.rank,
+                                    leftRankDisplay = awayPlayer.steals_per_game.rankDisplay,
+                                    centerText = "Stl/Game",
+                                    rightValue = homePlayer.steals_per_game.value?.formatStat(1) ?: "-",
+                                    rightRank = homePlayer.steals_per_game.rank,
+                                    rightRankDisplay = homePlayer.steals_per_game.rankDisplay,
+                                    advantage = 0,
+                                    usePlayerRanks = true
+                                ),
+                                ShareFiveColStat(
+                                    leftValue = awayPlayer.blocks_per_game.value?.formatStat(1) ?: "-",
+                                    leftRank = awayPlayer.blocks_per_game.rank,
+                                    leftRankDisplay = awayPlayer.blocks_per_game.rankDisplay,
+                                    centerText = "Blk/Game",
+                                    rightValue = homePlayer.blocks_per_game.value?.formatStat(1) ?: "-",
+                                    rightRank = homePlayer.blocks_per_game.rank,
+                                    rightRankDisplay = homePlayer.blocks_per_game.rankDisplay,
+                                    advantage = 0,
+                                    usePlayerRanks = true
+                                ),
+                                ShareFiveColStat(
+                                    leftValue = awayPlayer.three_pt_pct.value?.formatStat(1) ?: "-",
+                                    leftRank = awayPlayer.three_pt_pct.rank,
+                                    leftRankDisplay = awayPlayer.three_pt_pct.rankDisplay,
+                                    centerText = "3PT%",
+                                    rightValue = homePlayer.three_pt_pct.value?.formatStat(1) ?: "-",
+                                    rightRank = homePlayer.three_pt_pct.rank,
+                                    rightRankDisplay = homePlayer.three_pt_pct.rankDisplay,
+                                    advantage = 0,
+                                    usePlayerRanks = true
+                                ),
+                                awayPlayer.usage_pct.value?.let { awayUsage ->
+                                    homePlayer.usage_pct.value?.let { homeUsage ->
+                                        ShareFiveColStat(
+                                            leftValue = (awayUsage * 100).formatStat(1),
+                                            leftRank = awayPlayer.usage_pct.rank,
+                                            leftRankDisplay = awayPlayer.usage_pct.rankDisplay,
+                                            centerText = "Usage%",
+                                            rightValue = (homeUsage * 100).formatStat(1),
+                                            rightRank = homePlayer.usage_pct.rank,
+                                            rightRankDisplay = homePlayer.usage_pct.rankDisplay,
                                             advantage = 0,
                                             usePlayerRanks = true
                                         )
@@ -607,8 +733,10 @@ private fun NBAMatchupContent(
 
         // View Navigation
         Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.Start,
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             TeamStatsNavBadge(
@@ -616,13 +744,11 @@ private fun NBAMatchupContent(
                 isSelected = viewSelection == 0,
                 onClick = { onViewSelectionChange(0) }
             )
-            Spacer(modifier = Modifier.width(6.dp))
             TeamStatsNavBadge(
                 text = "${matchup.awayTeam.abbreviation} Off vs ${matchup.homeTeam.abbreviation} Def",
                 isSelected = viewSelection == 1,
                 onClick = { onViewSelectionChange(1) }
             )
-            Spacer(modifier = Modifier.width(6.dp))
             TeamStatsNavBadge(
                 text = "${matchup.homeTeam.abbreviation} Off vs ${matchup.awayTeam.abbreviation} Def",
                 isSelected = viewSelection == 2,

@@ -293,8 +293,10 @@ private fun SuccessContent(
 
     Column(modifier = Modifier.fillMaxSize()) {
         // Show filter bar if there are any filterable properties or pinned teams
-        // BUT hide it for MatchupV2Visualization (it handles pinned teams internally)
-        if ((filterOptions.isNotEmpty() || sportPinnedTeams.isNotEmpty()) && visualization !is MatchupV2Visualization) {
+        // BUT hide it for MatchupV2Visualization and NBAMatchupVisualization (they handle pinned teams internally)
+        if ((filterOptions.isNotEmpty() || sportPinnedTeams.isNotEmpty())
+            && visualization !is MatchupV2Visualization
+            && visualization !is NBAMatchupVisualization) {
             val scrollState = rememberScrollState()
             Row(
                 modifier = Modifier
@@ -351,6 +353,7 @@ private fun SuccessContent(
             highlightedTeamCodes = allHighlightedTeamCodes,
             highlightedPlayerLabels = selectedPlayerLabels,
             onChartShareHandlerChanged = onChartShareHandlerChanged,
+            pinnedTeams = pinnedTeams,
             onTeamClick = { label ->
                 // For PLAYER scatter plots, highlight individual players by label
                 // For TEAM scatter plots (and others), highlight teams by extracting team code
@@ -389,7 +392,8 @@ private fun RenderVisualization(
     highlightedTeamCodes: Set<String> = emptySet(),
     highlightedPlayerLabels: Set<String> = emptySet(),
     onChartShareHandlerChanged: ((() -> Unit)?) -> Unit = {},
-    onTeamClick: (String) -> Unit = {}
+    onTeamClick: (String) -> Unit = {},
+    pinnedTeams: List<PinnedTeam> = emptyList()
 ) {
     println("📊 RenderVisualization - highlightedPlayerLabels: $highlightedPlayerLabels")
     println("📊 RenderVisualization - visualization type: ${visualization::class.simpleName}")
@@ -430,7 +434,8 @@ private fun RenderVisualization(
         // NBA Matchup has its own dedicated screen with two-row navigation
         NBAMatchupWorksheet(
             visualization = visualization,
-            modifier = Modifier.fillMaxSize()
+            modifier = Modifier.fillMaxSize(),
+            pinnedTeams = pinnedTeams
         )
     } else {
         // For charts: use vertical scroll to show chart + data table

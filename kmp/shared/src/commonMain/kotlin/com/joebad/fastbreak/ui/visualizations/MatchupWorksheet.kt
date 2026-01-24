@@ -707,7 +707,7 @@ fun MatchupWorksheet(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 8.dp)
+                        .padding(horizontal = 8.dp, vertical = 2.dp)
                 )
             }
         }

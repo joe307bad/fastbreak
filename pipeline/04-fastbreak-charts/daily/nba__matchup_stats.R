@@ -428,52 +428,182 @@ player_usage_stats <- tryCatch({
   NULL
 })
 
-# Join advanced stats with player stats (join on player name since IDs don't match)
+# Join advanced stats with player stats
+# Try to join on player ID first (after converting to character), fall back to name matching
 if (!is.null(player_advanced_stats)) {
+  # Add debugging to see which players aren't matching
+  cat("Players in player_stats:", nrow(player_stats), "\n")
+  cat("Players in player_advanced_stats:", nrow(player_advanced_stats), "\n")
+
+  # Debug: Check sample IDs
+  cat("Sample athlete_ids from player_stats:", paste(head(player_stats$athlete_id, 3), collapse=", "), "\n")
+  cat("Sample PLAYER_IDs from advanced stats:", paste(head(player_advanced_stats$PLAYER_ID, 3), collapse=", "), "\n")
+
+  # Prepare advanced stats with both ID and name for joining
+  advanced_for_join <- player_advanced_stats %>%
+    select(PLAYER_ID, PLAYER_NAME, OFF_RATING, DEF_RATING, NET_RATING, PIE, TS_PCT, EFG_PCT, AST_PCT, REB_PCT) %>%
+    mutate(
+      athlete_id = as.character(PLAYER_ID),
+      athlete_display_name = PLAYER_NAME,  # Keep name for fallback join
+      player_off_rating = as.numeric(OFF_RATING),
+      player_def_rating = as.numeric(DEF_RATING),
+      player_net_rating = as.numeric(NET_RATING),
+      player_pie = as.numeric(PIE),
+      player_ts_pct = as.numeric(TS_PCT),
+      player_efg_pct = as.numeric(EFG_PCT),
+      player_ast_pct = as.numeric(AST_PCT),
+      player_reb_pct = as.numeric(REB_PCT)
+    ) %>%
+    select(athlete_id, athlete_display_name, player_off_rating, player_def_rating, player_net_rating,
+           player_pie, player_ts_pct, player_efg_pct, player_ast_pct, player_reb_pct)
+
+  # Try join on player ID first
   player_stats <- player_stats %>%
-    left_join(
-      player_advanced_stats %>%
-        select(PLAYER_NAME, OFF_RATING, DEF_RATING, NET_RATING, PIE, TS_PCT, EFG_PCT, AST_PCT, REB_PCT) %>%
-        rename(
-          athlete_display_name = PLAYER_NAME,
-          player_off_rating = OFF_RATING,
-          player_def_rating = DEF_RATING,
-          player_net_rating = NET_RATING,
-          player_pie = PIE,
-          player_ts_pct = TS_PCT,
-          player_efg_pct = EFG_PCT,
-          player_ast_pct = AST_PCT,
-          player_reb_pct = REB_PCT
-        ) %>%
+    left_join(advanced_for_join %>% select(-athlete_display_name), by = "athlete_id", suffix = c("", "_adv"))
+
+  # Check how many players got matched by ID
+  matched_count <- sum(!is.na(player_stats$player_pie))
+  cat("Players matched with advanced stats by ID:", matched_count, "out of", nrow(player_stats), "\n")
+
+  # If ID join didn't work well, try name-based join for unmatched players
+  if (matched_count == 0) {
+    cat("ID join failed, falling back to name-based join...\n")
+    player_stats <- player_stats %>%
+      select(-starts_with("player_off_rating"), -starts_with("player_def_rating"),
+             -starts_with("player_net_rating"), -starts_with("player_pie"),
+             -starts_with("player_ts_pct"), -starts_with("player_efg_pct"),
+             -starts_with("player_ast_pct"), -starts_with("player_reb_pct")) %>%
+      left_join(advanced_for_join %>% select(-athlete_id), by = "athlete_display_name")
+
+    matched_count <- sum(!is.na(player_stats$player_pie))
+    cat("Players matched with advanced stats by name:", matched_count, "out of", nrow(player_stats), "\n")
+
+    # For remaining unmatched players, try normalized name matching (remove accents/special chars)
+    # Create a better normalization function that removes apostrophes and special chars
+    normalize_name <- function(name) {
+      # Convert accents to ASCII, remove apostrophes/special chars, lowercase
+      name %>%
+        iconv(to='ASCII//TRANSLIT') %>%
+        gsub("[^A-Za-z ]", "", .) %>%  # Remove everything except letters and spaces
+        tolower() %>%
+        trimws()
+    }
+
+    unmatched_players <- player_stats %>%
+      filter(is.na(player_pie)) %>%
+      select(athlete_id, athlete_display_name) %>%
+      mutate(name_normalized = normalize_name(athlete_display_name))
+
+    advanced_normalized <- advanced_for_join %>%
+      select(-athlete_id) %>%
+      mutate(name_normalized = normalize_name(athlete_display_name))
+
+    # Join on normalized names for unmatched players
+    normalized_matches <- unmatched_players %>%
+      left_join(advanced_normalized %>% select(-athlete_display_name), by = "name_normalized") %>%
+      filter(!is.na(player_pie)) %>%
+      select(athlete_id, player_off_rating, player_def_rating, player_net_rating,
+             player_pie, player_ts_pct, player_efg_pct, player_ast_pct, player_reb_pct)
+
+    # Update player_stats with normalized matches
+    if (nrow(normalized_matches) > 0) {
+      # Remove the null values for these players
+      player_stats <- player_stats %>%
+        left_join(normalized_matches, by = "athlete_id", suffix = c("", "_norm")) %>%
         mutate(
-          player_off_rating = as.numeric(player_off_rating),
-          player_def_rating = as.numeric(player_def_rating),
-          player_net_rating = as.numeric(player_net_rating),
-          player_pie = as.numeric(player_pie),
-          player_ts_pct = as.numeric(player_ts_pct),
-          player_efg_pct = as.numeric(player_efg_pct),
-          player_ast_pct = as.numeric(player_ast_pct),
-          player_reb_pct = as.numeric(player_reb_pct)
-        ),
-      by = "athlete_display_name"
-    )
+          player_off_rating = coalesce(player_off_rating, player_off_rating_norm),
+          player_def_rating = coalesce(player_def_rating, player_def_rating_norm),
+          player_net_rating = coalesce(player_net_rating, player_net_rating_norm),
+          player_pie = coalesce(player_pie, player_pie_norm),
+          player_ts_pct = coalesce(player_ts_pct, player_ts_pct_norm),
+          player_efg_pct = coalesce(player_efg_pct, player_efg_pct_norm),
+          player_ast_pct = coalesce(player_ast_pct, player_ast_pct_norm),
+          player_reb_pct = coalesce(player_reb_pct, player_reb_pct_norm)
+        ) %>%
+        select(-ends_with("_norm"))
+
+      matched_count <- sum(!is.na(player_stats$player_pie))
+      cat("After normalized name matching:", matched_count, "out of", nrow(player_stats), "\n")
+    }
+  }
+
+  # Print a few examples of unmatched players for debugging
+  unmatched <- player_stats %>%
+    filter(is.na(player_pie)) %>%
+    select(athlete_id, athlete_display_name, games_played) %>%
+    head(5)
+  if (nrow(unmatched) > 0) {
+    cat("Sample unmatched players:\n")
+    print(unmatched)
+  }
 }
 
-# Join usage stats
+# Join usage stats (using player ID for better matching, fallback to name)
 if (!is.null(player_usage_stats)) {
+  usage_for_join <- player_usage_stats %>%
+    select(PLAYER_ID, PLAYER_NAME, USG_PCT) %>%
+    mutate(
+      athlete_id = as.character(PLAYER_ID),
+      athlete_display_name = PLAYER_NAME,
+      player_usg_pct = as.numeric(USG_PCT)
+    ) %>%
+    select(athlete_id, athlete_display_name, player_usg_pct)
+
+  # Try ID join first
   player_stats <- player_stats %>%
-    left_join(
-      player_usage_stats %>%
-        select(PLAYER_NAME, USG_PCT) %>%
-        rename(
-          athlete_display_name = PLAYER_NAME,
-          player_usg_pct = USG_PCT
-        ) %>%
-        mutate(
-          player_usg_pct = as.numeric(player_usg_pct)
-        ),
-      by = "athlete_display_name"
-    )
+    left_join(usage_for_join %>% select(-athlete_display_name), by = "athlete_id", suffix = c("", "_usg"))
+
+  # Check how many players got matched
+  matched_count <- sum(!is.na(player_stats$player_usg_pct))
+  cat("Players matched with usage stats by ID:", matched_count, "out of", nrow(player_stats), "\n")
+
+  # If ID join didn't work, try name join
+  if (matched_count == 0) {
+    cat("ID join failed, falling back to name-based join for usage stats...\n")
+    player_stats <- player_stats %>%
+      select(-player_usg_pct) %>%
+      left_join(usage_for_join %>% select(-athlete_id), by = "athlete_display_name")
+
+    matched_count <- sum(!is.na(player_stats$player_usg_pct))
+    cat("Players matched with usage stats by name:", matched_count, "out of", nrow(player_stats), "\n")
+
+    # For remaining unmatched players, try normalized name matching
+    # Use same normalization function as advanced stats
+    normalize_name <- function(name) {
+      # Convert accents to ASCII, remove apostrophes/special chars, lowercase
+      name %>%
+        iconv(to='ASCII//TRANSLIT') %>%
+        gsub("[^A-Za-z ]", "", .) %>%  # Remove everything except letters and spaces
+        tolower() %>%
+        trimws()
+    }
+
+    unmatched_players <- player_stats %>%
+      filter(is.na(player_usg_pct)) %>%
+      select(athlete_id, athlete_display_name) %>%
+      mutate(name_normalized = normalize_name(athlete_display_name))
+
+    usage_normalized <- usage_for_join %>%
+      select(-athlete_id) %>%
+      mutate(name_normalized = normalize_name(athlete_display_name))
+
+    # Join on normalized names for unmatched players
+    normalized_matches <- unmatched_players %>%
+      left_join(usage_normalized %>% select(-athlete_display_name), by = "name_normalized") %>%
+      filter(!is.na(player_usg_pct)) %>%
+      select(athlete_id, player_usg_pct)
+
+    # Update player_stats with normalized matches
+    if (nrow(normalized_matches) > 0) {
+      player_stats <- player_stats %>%
+        left_join(normalized_matches, by = "athlete_id", suffix = c("", "_norm")) %>%
+        mutate(player_usg_pct = coalesce(player_usg_pct, player_usg_pct_norm)) %>%
+        select(-ends_with("_norm"))
+
+      matched_count <- sum(!is.na(player_stats$player_usg_pct))
+      cat("After normalized name matching:", matched_count, "out of", nrow(player_stats), "\n")
+    }
+  }
 }
 
 # Calculate player ranks
@@ -701,9 +831,13 @@ build_nba_comparisons <- function(home_stats, away_stats, home_team, away_team) 
   # Defensive comparison (side-by-side team defense)
   def_comparison <- list()
   def_stats <- list(
+    list(key = "oppPointsPerGame", label = "Opp Points/Game", value_home = home_stats$opp_points_per_game, rank_home = home_stats$opp_points_per_game_rank, rankDisplay_home = home_stats$opp_points_per_game_rankDisplay, value_away = away_stats$opp_points_per_game, rank_away = away_stats$opp_points_per_game_rank, rankDisplay_away = away_stats$opp_points_per_game_rankDisplay),
+    list(key = "oppFieldGoalPct", label = "Opp Field Goal %", value_home = home_stats$opp_fg_pct, rank_home = home_stats$opp_fg_pct_rank, rankDisplay_home = home_stats$opp_fg_pct_rankDisplay, value_away = away_stats$opp_fg_pct, rank_away = away_stats$opp_fg_pct_rank, rankDisplay_away = away_stats$opp_fg_pct_rankDisplay),
+    list(key = "oppThreePtPct", label = "Opp 3-Point %", value_home = home_stats$opp_three_pt_pct, rank_home = home_stats$opp_three_pt_pct_rank, rankDisplay_home = home_stats$opp_three_pt_pct_rankDisplay, value_away = away_stats$opp_three_pt_pct, rank_away = away_stats$opp_three_pt_pct_rank, rankDisplay_away = away_stats$opp_three_pt_pct_rankDisplay),
     list(key = "stealsPerGame", label = "Steals/Game", value_home = home_stats$steals_per_game, rank_home = home_stats$steals_per_game_rank, rankDisplay_home = home_stats$steals_per_game_rankDisplay, value_away = away_stats$steals_per_game, rank_away = away_stats$steals_per_game_rank, rankDisplay_away = away_stats$steals_per_game_rankDisplay),
     list(key = "blocksPerGame", label = "Blocks/Game", value_home = home_stats$blocks_per_game, rank_home = home_stats$blocks_per_game_rank, rankDisplay_home = home_stats$blocks_per_game_rankDisplay, value_away = away_stats$blocks_per_game, rank_away = away_stats$blocks_per_game_rank, rankDisplay_away = away_stats$blocks_per_game_rankDisplay),
-    list(key = "turnoversPerGame", label = "Turnovers/Game", value_home = home_stats$turnovers_per_game, rank_home = home_stats$turnovers_per_game_rank, rankDisplay_home = home_stats$turnovers_per_game_rankDisplay, value_away = away_stats$turnovers_per_game, rank_away = away_stats$turnovers_per_game_rank, rankDisplay_away = away_stats$turnovers_per_game_rankDisplay)
+    list(key = "oppAssistsPerGame", label = "Opp Assists/Game", value_home = home_stats$opp_assists_per_game, rank_home = home_stats$opp_assists_per_game_rank, rankDisplay_home = home_stats$opp_assists_per_game_rankDisplay, value_away = away_stats$opp_assists_per_game, rank_away = away_stats$opp_assists_per_game_rank, rankDisplay_away = away_stats$opp_assists_per_game_rankDisplay),
+    list(key = "oppTurnoversPerGame", label = "Opp Turnovers/Game", value_home = home_stats$opp_turnovers_per_game, rank_home = home_stats$opp_turnovers_per_game_rank, rankDisplay_home = home_stats$opp_turnovers_per_game_rankDisplay, value_away = away_stats$opp_turnovers_per_game, rank_away = away_stats$opp_turnovers_per_game_rank, rankDisplay_away = away_stats$opp_turnovers_per_game_rankDisplay)
   )
 
   # Add advanced defensive stats if available

@@ -27,12 +27,30 @@ class AndroidImageExporter(private val context: Context) : ImageExporter {
             // Convert ImageBitmap to Android Bitmap
             val sourceBitmap = bitmap.asAndroidBitmap()
             // Copy to software bitmap if it's a hardware bitmap (hardware bitmaps can't be compressed)
-            val androidBitmap = if (sourceBitmap.config == Bitmap.Config.HARDWARE) {
+            val convertedBitmap = if (sourceBitmap.config == Bitmap.Config.HARDWARE) {
                 sourceBitmap.copy(Bitmap.Config.ARGB_8888, false)
             } else {
                 sourceBitmap
             }
-            println("📤 Converted to Android bitmap: ${androidBitmap.width}x${androidBitmap.height}")
+            println("📤 Converted to Android bitmap: ${convertedBitmap.width}x${convertedBitmap.height}")
+
+            // Scale down if image is too large for Twitter (max 4096x4096)
+            val maxDimension = 4096
+            val androidBitmap = if (convertedBitmap.width > maxDimension || convertedBitmap.height > maxDimension) {
+                val scale = minOf(
+                    maxDimension.toFloat() / convertedBitmap.width,
+                    maxDimension.toFloat() / convertedBitmap.height
+                )
+                val newWidth = (convertedBitmap.width * scale).toInt()
+                val newHeight = (convertedBitmap.height * scale).toInt()
+
+                println("📤 Scaling image from ${convertedBitmap.width}x${convertedBitmap.height} to ${newWidth}x${newHeight}")
+
+                Bitmap.createScaledBitmap(convertedBitmap, newWidth, newHeight, true)
+            } else {
+                convertedBitmap
+            }
+            println("📤 Final bitmap size: ${androidBitmap.width}x${androidBitmap.height}")
 
             // Save to MediaStore Downloads directory - works better with Files app
             val filename = "fastbreak_${System.currentTimeMillis()}.jpg"

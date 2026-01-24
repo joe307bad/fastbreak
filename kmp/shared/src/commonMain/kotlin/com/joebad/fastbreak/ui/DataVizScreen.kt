@@ -426,6 +426,12 @@ private fun RenderVisualization(
             modifier = Modifier.fillMaxSize(),
             highlightedTeamCodes = highlightedTeamCodes
         )
+    } else if (visualization is NBAMatchupVisualization) {
+        // NBA Matchup has its own dedicated screen with two-row navigation
+        NBAMatchupWorksheet(
+            visualization = visualization,
+            modifier = Modifier.fillMaxSize()
+        )
     } else {
         // For charts: use vertical scroll to show chart + data table
         val scrollState = rememberScrollState()
@@ -505,6 +511,9 @@ private fun RenderVisualization(
                             }
                             is MatchupV2Visualization -> {
                                 // Handled by MatchupWorksheet below
+                            }
+                            is NBAMatchupVisualization -> {
+                                // Handled by NBAMatchupWorksheet below
                             }
                         }
                     }

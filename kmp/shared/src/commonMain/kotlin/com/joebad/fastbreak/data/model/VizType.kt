@@ -13,5 +13,6 @@ enum class VizType {
     LINE_CHART,
     TABLE,
     MATCHUP,
-    MATCHUP_V2
+    MATCHUP_V2,
+    NBA_MATCHUP
 }

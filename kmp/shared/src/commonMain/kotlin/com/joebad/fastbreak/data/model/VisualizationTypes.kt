@@ -438,7 +438,8 @@ data class MatchupStatComparison(
     val offLabel: String,
     val defLabel: String,
     val offense: TeamStatEntry,
-    val defense: TeamStatEntry
+    val defense: TeamStatEntry,
+    val advantage: Int? = null  // -1 = offense advantage, 1 = defense advantage, 0 = even
 )
 
 @Serializable
@@ -492,4 +493,76 @@ data class MatchupV2Visualization(
     override val sortOrder: Int? = null,
     val week: Int,
     val dataPoints: Map<String, MatchupV2> // matchup key (e.g., "car-tb") -> matchup data
+) : VisualizationType
+
+// NBA Matchup data structures (MATCHUP_V2 for NBA)
+@Serializable
+data class NBATeamInfo(
+    val id: String,
+    val name: String,
+    val abbreviation: String,
+    val logo: String,
+    val stats: Map<String, JsonPrimitive>
+)
+
+@Serializable
+data class NBAPlayerStatValue(
+    val value: Double? = null,
+    val rank: Int? = null,
+    val rankDisplay: String? = null
+)
+
+@Serializable
+data class NBAPlayerInfo(
+    val name: String,
+    val position: String,
+    val points_per_game: NBAPlayerStatValue = NBAPlayerStatValue(),
+    val rebounds_per_game: NBAPlayerStatValue = NBAPlayerStatValue(),
+    val assists_per_game: NBAPlayerStatValue = NBAPlayerStatValue(),
+    val steals_per_game: NBAPlayerStatValue = NBAPlayerStatValue(),
+    val blocks_per_game: NBAPlayerStatValue = NBAPlayerStatValue(),
+    val field_goal_pct: NBAPlayerStatValue = NBAPlayerStatValue(),
+    val three_pt_pct: NBAPlayerStatValue = NBAPlayerStatValue(),
+    val true_shooting_pct: NBAPlayerStatValue = NBAPlayerStatValue(),
+    val effective_fg_pct: NBAPlayerStatValue = NBAPlayerStatValue(),
+    val pie: NBAPlayerStatValue = NBAPlayerStatValue(),
+    val usage_pct: NBAPlayerStatValue = NBAPlayerStatValue(),
+    val minutes_per_game: NBAPlayerStatValue = NBAPlayerStatValue(),
+    val games_played: NBAPlayerStatValue = NBAPlayerStatValue()
+)
+
+@Serializable
+data class NBAMatchupOdds(
+    val spread: Double? = null,
+    val overUnder: Double? = null,
+    val homeMoneyline: String? = null,
+    val awayMoneyline: String? = null
+)
+
+@Serializable
+data class NBAMatchup(
+    val gameId: String,
+    val gameDate: String,  // ISO 8601 format
+    val gameName: String,
+    val homeTeam: NBATeamInfo,
+    val awayTeam: NBATeamInfo,
+    val homePlayers: List<NBAPlayerInfo> = emptyList(),
+    val awayPlayers: List<NBAPlayerInfo> = emptyList(),
+    val odds: NBAMatchupOdds? = null,
+    val comparisons: MatchupComparisons? = null
+)
+
+@Serializable
+data class NBAMatchupVisualization(
+    override val sport: String,
+    override val visualizationType: String,
+    override val title: String,
+    override val subtitle: String,
+    override val description: String,
+    override val lastUpdated: Instant,
+    override val source: String? = null,
+    @Serializable(with = TagListSerializer::class)
+    override val tags: List<Tag>? = null,
+    override val sortOrder: Int? = null,
+    val dataPoints: List<NBAMatchup>
 ) : VisualizationType

@@ -1793,6 +1793,17 @@ build_comparison_views <- function(home_stats, away_stats, home_team, away_team)
     if (!is.null(paired_def_name) && paired_def_name %in% names(away_stats$defense)) {
       def_stat <- away_stats$defense[[paired_def_name]]
 
+      # Calculate advantage: -1 = offense advantage, 1 = defense advantage, 0 = even
+      # Lower rank is better for both offense and defense
+      advantage <- 0
+      if (!is.null(off_stat$rank) && !is.null(def_stat$rank)) {
+        if (off_stat$rank < def_stat$rank) {
+          advantage <- -1  # Offense has better rank (advantage)
+        } else if (off_stat$rank > def_stat$rank) {
+          advantage <- 1   # Defense has better rank (advantage)
+        }
+      }
+
       home_off_vs_away_def[[stat_name]] <- list(
         statKey = stat_name,
         offLabel = off_stat$label,
@@ -1808,7 +1819,8 @@ build_comparison_views <- function(home_stats, away_stats, home_team, away_team)
           value = def_stat$value,
           rank = def_stat$rank,
           rankDisplay = def_stat$rankDisplay
-        )
+        ),
+        advantage = advantage
       )
     }
   }
@@ -1821,6 +1833,17 @@ build_comparison_views <- function(home_stats, away_stats, home_team, away_team)
 
     if (!is.null(paired_def_name) && paired_def_name %in% names(home_stats$defense)) {
       def_stat <- home_stats$defense[[paired_def_name]]
+
+      # Calculate advantage: -1 = offense advantage, 1 = defense advantage, 0 = even
+      # Lower rank is better for both offense and defense
+      advantage <- 0
+      if (!is.null(off_stat$rank) && !is.null(def_stat$rank)) {
+        if (off_stat$rank < def_stat$rank) {
+          advantage <- -1  # Offense has better rank (advantage)
+        } else if (off_stat$rank > def_stat$rank) {
+          advantage <- 1   # Defense has better rank (advantage)
+        }
+      }
 
       away_off_vs_home_def[[stat_name]] <- list(
         statKey = stat_name,
@@ -1837,7 +1860,8 @@ build_comparison_views <- function(home_stats, away_stats, home_team, away_team)
           value = def_stat$value,
           rank = def_stat$rank,
           rankDisplay = def_stat$rankDisplay
-        )
+        ),
+        advantage = advantage
       )
     }
   }

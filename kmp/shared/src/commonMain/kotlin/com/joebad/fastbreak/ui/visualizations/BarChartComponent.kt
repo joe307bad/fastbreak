@@ -108,7 +108,7 @@ fun BarChartComponent(
     )
     val betweenColors = listOf(
         Color(0xFFFF9800), // Orange
-        Color(0xFF000000)  // Black
+        Color(0xFFBF6F00)  // Dark Orange (darker version of orange)
     )
     val belowBottomColors = listOf(
         Color(0xFFF44336), // Red

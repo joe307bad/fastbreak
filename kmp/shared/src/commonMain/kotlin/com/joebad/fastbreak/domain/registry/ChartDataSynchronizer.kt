@@ -8,6 +8,7 @@ import com.joebad.fastbreak.data.model.ChartDefinition
 import com.joebad.fastbreak.data.model.LineChartVisualization
 import com.joebad.fastbreak.data.model.MatchupVisualization
 import com.joebad.fastbreak.data.model.MatchupV2Visualization
+import com.joebad.fastbreak.data.model.NBAMatchupVisualization
 import com.joebad.fastbreak.data.model.RegistryEntry
 import com.joebad.fastbreak.data.model.ScatterPlotVisualization
 import com.joebad.fastbreak.data.model.Sport
@@ -294,6 +295,7 @@ class ChartDataSynchronizer(
                 VizType.TABLE -> json.decodeFromString<TableVisualization>(rawJson)
                 VizType.MATCHUP -> json.decodeFromString<MatchupVisualization>(rawJson)
                 VizType.MATCHUP_V2 -> json.decodeFromString<MatchupV2Visualization>(rawJson)
+                VizType.NBA_MATCHUP -> json.decodeFromString<NBAMatchupVisualization>(rawJson)
             }
 
             val chartId = fileKeyToChartId(fileKey)

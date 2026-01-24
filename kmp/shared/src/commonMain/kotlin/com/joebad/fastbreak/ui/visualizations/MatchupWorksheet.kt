@@ -752,14 +752,126 @@ fun MatchupWorksheet(
                         }
                     }
             ) {
-                MatchupShareImage(
+                val awayTeamData = selectedMatchup.teams[awayTeam.lowercase()]
+                val homeTeamData = selectedMatchup.teams[homeTeam.lowercase()]
+
+                // Build game info
+                val gameInfo = ShareGameInfo(
                     awayTeam = awayTeam,
                     homeTeam = homeTeam,
-                    matchup = selectedMatchup,
-                    weekLabel = weekLabel,
+                    eventLabel = weekLabel,
                     formattedDate = formattedDate,
-                    source = visualization.source ?: "nflfastR / ESPN",
-                    modifier = Modifier.requiredWidth(3400.dp).requiredHeight(1800.dp)
+                    source = visualization.source ?: "nflfastR / ESPN"
+                )
+
+                // Build odds
+                val odds = selectedMatchup.odds?.let { oddsData ->
+                    val awaySpread = oddsData.home_spread?.let { homeSpread ->
+                        if (homeSpread.startsWith("-")) {
+                            "+" + homeSpread.substring(1)
+                        } else if (homeSpread.startsWith("+")) {
+                            "-" + homeSpread.substring(1)
+                        } else {
+                            "-$homeSpread"
+                        }
+                    }
+
+                    ShareOdds(
+                        awayMoneyline = oddsData.away_moneyline,
+                        homeMoneyline = oddsData.home_moneyline,
+                        awaySpread = awaySpread,
+                        homeSpread = oddsData.home_spread,
+                        overUnder = oddsData.over_under
+                    )
+                }
+
+                // Build the 6 stat boxes
+                val statBoxes = buildList {
+                    // Box 1: Away Off vs Home Def
+                    add(ShareStatBox(
+                        title = "$awayTeam Off vs $homeTeam Def",
+                        leftLabel = "$awayTeam Off",
+                        middleLabel = "vs",
+                        rightLabel = "$homeTeam Def",
+                        fiveColStats = if (awayTeamData != null && homeTeamData != null) {
+                            buildNFLVersusStats(
+                                awayTeamData.team_stats.current.offense,
+                                homeTeamData.team_stats.current.defense
+                            )
+                        } else emptyList()
+                    ))
+
+                    // Box 2: Home Off vs Away Def
+                    add(ShareStatBox(
+                        title = "$homeTeam Off vs $awayTeam Def",
+                        leftLabel = "$homeTeam Off",
+                        middleLabel = "vs",
+                        rightLabel = "$awayTeam Def",
+                        fiveColStats = if (awayTeamData != null && homeTeamData != null) {
+                            buildNFLVersusStats(
+                                homeTeamData.team_stats.current.offense,
+                                awayTeamData.team_stats.current.defense
+                            )
+                        } else emptyList()
+                    ))
+
+                    // Box 3: QB Comparison
+                    val awayQB = awayTeamData?.players?.qb
+                    val homeQB = homeTeamData?.players?.qb
+                    add(ShareStatBox(
+                        title = if (awayQB != null && homeQB != null) {
+                            "${awayQB.name} vs ${homeQB.name}"
+                        } else "QB Comparison",
+                        leftLabel = awayQB?.name,
+                        middleLabel = "vs",
+                        rightLabel = homeQB?.name,
+                        fiveColStats = if (awayQB != null && homeQB != null) {
+                            buildNFLQBStats(awayQB, homeQB)
+                        } else emptyList()
+                    ))
+
+                    // Box 4: RB Comparison
+                    val awayRB = awayTeamData?.players?.rbs?.firstOrNull()
+                    val homeRB = homeTeamData?.players?.rbs?.firstOrNull()
+                    add(ShareStatBox(
+                        title = if (awayRB != null && homeRB != null) {
+                            "${awayRB.name} vs ${homeRB.name}"
+                        } else "RB Comparison",
+                        leftLabel = awayRB?.name,
+                        middleLabel = "vs",
+                        rightLabel = homeRB?.name,
+                        fiveColStats = if (awayRB != null && homeRB != null) {
+                            buildNFLRBStats(awayRB, homeRB)
+                        } else emptyList()
+                    ))
+
+                    // Box 5: WR Comparison
+                    val awayWR = awayTeamData?.players?.receivers?.firstOrNull()
+                    val homeWR = homeTeamData?.players?.receivers?.firstOrNull()
+                    add(ShareStatBox(
+                        title = if (awayWR != null && homeWR != null) {
+                            "${awayWR.name} vs ${homeWR.name}"
+                        } else "WR Comparison",
+                        leftLabel = awayWR?.name,
+                        middleLabel = "vs",
+                        rightLabel = homeWR?.name,
+                        fiveColStats = if (awayWR != null && homeWR != null) {
+                            buildNFLWRStats(awayWR, homeWR)
+                        } else emptyList()
+                    ))
+
+                    // Box 6: H2H + Common Opponents
+                    add(ShareStatBox(
+                        title = "H2H + Common Opponents",
+                        threeColStats = buildNFLH2HStats(awayTeam, homeTeam, selectedMatchup)
+                    ))
+                }
+
+                GenericMatchupShareImage(
+                    gameInfo = gameInfo,
+                    odds = odds,
+                    statBoxes = statBoxes,
+                    modifier = Modifier.fillMaxSize()
                 )
             }
         }
@@ -2722,5 +2834,234 @@ private fun WeekRangeBadge(
             fontSize = 10.sp
         )
     }
+}
+
+/**
+ * Helper functions to build NFL stat boxes for GenericMatchupShareImage
+ */
+
+private fun buildNFLVersusStats(
+    offStats: Map<String, StatValue>,
+    defStats: Map<String, StatValue>
+): List<ShareFiveColStat> {
+    val statsToShow = listOf(
+        listOf("off_epa", "def_epa", "EPA", 3),
+        listOf("yards_per_game", "yards_allowed_per_game", "Total Yds/G", 1),
+        listOf("pass_yards_per_game", "pass_yards_allowed_per_game", "Pass Yds/G", 1),
+        listOf("rush_yards_per_game", "rush_yards_allowed_per_game", "Rush Yds/G", 1),
+        listOf("points_per_game", "points_allowed_per_game", "Pts/G", 1),
+        listOf("third_down_pct", "third_down_pct_def", "3rd Down %", 1),
+        listOf("interceptions_thrown", "interceptions_made", "INTs Thrown", 0),
+        listOf("fumbles_lost", "fumbles_forced", "Fumbles Lost", 0),
+        listOf("sacks_suffered", "sacks_made", "Sacks Allowed", 0)
+    )
+
+    return statsToShow.mapNotNull { statConfig ->
+        val (offKey, defKey, label, decimals) = statConfig
+        val offStat = offStats[offKey as String]
+        val defStat = defStats[defKey as String]
+        val offValue = offStat?.value
+        val defValue = defStat?.value
+
+        if (offValue != null && defValue != null) {
+            val isInvertedStat = (offKey as String).contains("interceptions_thrown") ||
+                                (offKey as String).contains("fumbles_lost") ||
+                                (offKey as String).contains("sacks_suffered")
+
+            val advantage = when {
+                isInvertedStat -> when {
+                    offValue < defValue -> -1
+                    offValue > defValue -> 1
+                    else -> 0
+                }
+                else -> when {
+                    offValue > defValue -> -1
+                    offValue < defValue -> 1
+                    else -> 0
+                }
+            }
+
+            ShareFiveColStat(
+                leftValue = offValue.formatNFLStat(decimals as Int),
+                leftRank = offStat?.rank,
+                centerText = label as String,
+                rightValue = defValue.formatNFLStat(decimals as Int),
+                rightRank = defStat?.rank,
+                advantage = advantage,
+                usePlayerRanks = false
+            )
+        } else null
+    }.take(9)
+}
+
+private fun buildNFLQBStats(awayQB: QBPlayerStats, homeQB: QBPlayerStats): List<ShareFiveColStat> {
+    val stats = listOf(
+        Triple("Total EPA" to 2, awayQB.total_epa, homeQB.total_epa),
+        Triple("Pass Yards" to 0, awayQB.passing_yards, homeQB.passing_yards),
+        Triple("Pass Yds/G" to 1, awayQB.passing_yards_per_game, homeQB.passing_yards_per_game),
+        Triple("Pass TDs" to 0, awayQB.passing_tds, homeQB.passing_tds),
+        Triple("Comp %" to 1, awayQB.completion_pct, homeQB.completion_pct),
+        Triple("CPOE" to 2, awayQB.passing_cpoe, homeQB.passing_cpoe),
+        Triple("PACR" to 2, awayQB.pacr, homeQB.pacr),
+        Triple("INTs" to 0, awayQB.interceptions, homeQB.interceptions)
+    )
+
+    return stats.mapNotNull { (labelAndDecimals, awayStat, homeStat) ->
+        val (label, decimals) = labelAndDecimals
+        val awayValue = awayStat.value
+        val homeValue = homeStat.value
+
+        if (awayValue != null && homeValue != null) {
+            val isInvertedStat = label == "INTs"
+            val advantage = when {
+                isInvertedStat -> when {
+                    awayValue < homeValue -> -1
+                    awayValue > homeValue -> 1
+                    else -> 0
+                }
+                else -> when {
+                    awayValue > homeValue -> -1
+                    awayValue < homeValue -> 1
+                    else -> 0
+                }
+            }
+
+            ShareFiveColStat(
+                leftValue = awayValue.formatNFLStat(decimals),
+                leftRank = awayStat.rank,
+                centerText = label,
+                rightValue = homeValue.formatNFLStat(decimals),
+                rightRank = homeStat.rank,
+                advantage = advantage,
+                usePlayerRanks = false
+            )
+        } else null
+    }.take(9)
+}
+
+private fun buildNFLRBStats(awayRB: RBPlayerStats, homeRB: RBPlayerStats): List<ShareFiveColStat> {
+    val stats = listOf(
+        Triple("Rush Yards" to 0, awayRB.rushing_yards, homeRB.rushing_yards),
+        Triple("Rush Yds/G" to 1, awayRB.rushing_yards_per_game, homeRB.rushing_yards_per_game),
+        Triple("Yds/Carry" to 1, awayRB.yards_per_carry, homeRB.yards_per_carry),
+        Triple("Rush TDs" to 0, awayRB.rushing_tds, homeRB.rushing_tds),
+        Triple("Rush EPA" to 2, awayRB.rushing_epa, homeRB.rushing_epa),
+        Triple("Receptions" to 0, awayRB.receptions, homeRB.receptions),
+        Triple("Rec Yards" to 0, awayRB.receiving_yards, homeRB.receiving_yards),
+        Triple("Rec TDs" to 0, awayRB.receiving_tds, homeRB.receiving_tds)
+    )
+
+    return stats.mapNotNull { (labelAndDecimals, awayStat, homeStat) ->
+        val (label, decimals) = labelAndDecimals
+        val awayValue = awayStat.value
+        val homeValue = homeStat.value
+
+        if (awayValue != null && homeValue != null) {
+            val advantage = when {
+                awayValue > homeValue -> -1
+                awayValue < homeValue -> 1
+                else -> 0
+            }
+
+            ShareFiveColStat(
+                leftValue = awayValue.formatNFLStat(decimals),
+                leftRank = awayStat.rank,
+                centerText = label,
+                rightValue = homeValue.formatNFLStat(decimals),
+                rightRank = homeStat.rank,
+                advantage = advantage,
+                usePlayerRanks = true
+            )
+        } else null
+    }.take(9)
+}
+
+private fun buildNFLWRStats(awayWR: ReceiverPlayerStats, homeWR: ReceiverPlayerStats): List<ShareFiveColStat> {
+    val stats = listOf(
+        Triple("Receptions" to 0, awayWR.receptions, homeWR.receptions),
+        Triple("Rec Yards" to 0, awayWR.receiving_yards, homeWR.receiving_yards),
+        Triple("Rec Yds/G" to 1, awayWR.receiving_yards_per_game, homeWR.receiving_yards_per_game),
+        Triple("Yds/Rec" to 1, awayWR.yards_per_reception, homeWR.yards_per_reception),
+        Triple("Rec TDs" to 0, awayWR.receiving_tds, homeWR.receiving_tds),
+        Triple("Rec EPA" to 2, awayWR.receiving_epa, homeWR.receiving_epa),
+        Triple("WOPR" to 2, awayWR.wopr, homeWR.wopr),
+        Triple("Catch %" to 1, awayWR.catch_pct, homeWR.catch_pct)
+    )
+
+    return stats.mapNotNull { (labelAndDecimals, awayStat, homeStat) ->
+        val (label, decimals) = labelAndDecimals
+        val awayValue = awayStat.value
+        val homeValue = homeStat.value
+
+        if (awayValue != null && homeValue != null) {
+            val advantage = when {
+                awayValue > homeValue -> -1
+                awayValue < homeValue -> 1
+                else -> 0
+            }
+
+            ShareFiveColStat(
+                leftValue = awayValue.formatNFLStat(decimals),
+                leftRank = awayStat.rank,
+                centerText = label,
+                rightValue = homeValue.formatNFLStat(decimals),
+                rightRank = homeStat.rank,
+                advantage = advantage,
+                usePlayerRanks = true
+            )
+        } else null
+    }.take(9)
+}
+
+private fun buildNFLH2HStats(awayTeam: String, homeTeam: String, matchup: MatchupV2): List<ShareThreeColStat> {
+    val stats = mutableListOf<ShareThreeColStat>()
+
+    // H2H record
+    matchup.h2h_record.take(3).forEach { h2hGame ->
+        val advantage = when (h2hGame.winner.uppercase()) {
+            awayTeam -> -1
+            homeTeam -> 1
+            else -> 0
+        }
+        stats.add(ShareThreeColStat(
+            leftText = if (h2hGame.winner == awayTeam) "W" else if (h2hGame.winner == homeTeam) "L" else "T",
+            centerText = "W${h2hGame.week}: ${h2hGame.finalScore}",
+            rightText = if (h2hGame.winner == homeTeam) "W" else if (h2hGame.winner == awayTeam) "L" else "T",
+            advantage = advantage
+        ))
+    }
+
+    // Common opponents
+    matchup.common_opponents?.entries?.take(4)?.forEach { (opponentCode, opponentData) ->
+        val awayGames = opponentData[awayTeam.lowercase()] ?: emptyList()
+        val homeGames = opponentData[homeTeam.lowercase()] ?: emptyList()
+
+        if (awayGames.isNotEmpty() || homeGames.isNotEmpty()) {
+            val awayGame = awayGames.firstOrNull()
+            val homeGame = homeGames.firstOrNull()
+            val awayResult = awayGame?.let { "${it.result} ${it.score}" } ?: "-"
+            val homeResult = homeGame?.let { "${it.result} ${it.score}" } ?: "-"
+
+            stats.add(ShareThreeColStat(
+                leftText = awayResult,
+                centerText = "vs $opponentCode",
+                rightText = homeResult,
+                advantage = 0
+            ))
+        }
+    }
+
+    return stats.take(9)
+}
+
+private fun Double.formatNFLStat(decimals: Int): String {
+    val multiplier = when (decimals) {
+        0 -> 1.0
+        1 -> 10.0
+        2 -> 100.0
+        else -> 1000.0
+    }
+    val rounded = kotlin.math.round(this * multiplier) / multiplier
+    return if (decimals == 0) rounded.toInt().toString() else rounded.toString()
 }
 

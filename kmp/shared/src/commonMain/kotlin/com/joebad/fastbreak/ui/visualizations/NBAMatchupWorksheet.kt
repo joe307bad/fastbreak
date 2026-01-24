@@ -12,12 +12,22 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.layer.drawLayer
+import androidx.compose.ui.graphics.rememberGraphicsLayer
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.joebad.fastbreak.data.model.NBAMatchupVisualization
+import com.joebad.fastbreak.platform.getImageExporter
+import com.joebad.fastbreak.ui.components.ShareFab
+import kotlinx.coroutines.launch
 import kotlinx.datetime.Instant
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
@@ -108,71 +118,435 @@ fun NBAMatchupWorksheet(
     // State for view selection: 0 = Team, 1 = Away Off vs Home Def, 2 = Home Off vs Away Def
     var viewSelection by remember { mutableStateOf(0) }
 
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(start = 16.dp, end = 16.dp, bottom = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        // First row: Date badges
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            dates.forEachIndexed { index, date ->
-                DateBadge(
-                    date = date,
-                    isSelected = selectedDateIndex == index,
-                    onClick = { selectedDateIndex = index }
-                )
-            }
-        }
+    // Graphics layer for capturing share image
+    val graphicsLayer = rememberGraphicsLayer()
+    val coroutineScope = rememberCoroutineScope()
+    val imageExporter = remember { getImageExporter() }
+    var isCapturing by remember { mutableStateOf(false) }
 
-        // Second row: Matchup badges for selected date
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            matchupsForDate.forEachIndexed { index, matchup ->
-                MatchupBadge(
-                    awayTeam = matchup.awayTeam.abbreviation,
-                    homeTeam = matchup.homeTeam.abbreviation,
-                    gameDate = matchup.gameDate,
-                    isSelected = selectedMatchupIndex == index,
-                    onClick = { selectedMatchupIndex = index }
-                )
-            }
-        }
+    // Format date and event label for share image (matching NFL format)
+    val eventLabel = remember(selectedMatchup.gameDate) {
+        "Regular Season"
+    }
 
-        // Matchup content with pinned header
-        Box(
+    val formattedDate = remember(selectedMatchup.gameDate) {
+        try {
+            val instant = Instant.parse(selectedMatchup.gameDate)
+            val dateTime = instant.toLocalDateTime(TimeZone.of("America/New_York"))
+            val hour = if (dateTime.hour == 0) 12 else if (dateTime.hour > 12) dateTime.hour - 12 else dateTime.hour
+            val amPm = if (dateTime.hour < 12) "am" else "pm"
+            val dayOfWeek = dateTime.dayOfWeek.name.lowercase().replaceFirstChar { it.uppercase() }
+            val month = dateTime.month.name.lowercase().replaceFirstChar { it.uppercase() }
+            "$dayOfWeek, $month ${dateTime.dayOfMonth}, @ ${hour}:${dateTime.minute.toString().padStart(2, '0')}$amPm ET"
+        } catch (e: Exception) {
+            ""
+        }
+    }
+
+    val shareTitle = remember(selectedMatchup) {
+        "${selectedMatchup.awayTeam.abbreviation} @ ${selectedMatchup.homeTeam.abbreviation} - NBA Matchup"
+    }
+
+    Box(modifier = modifier.fillMaxSize()) {
+        Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f)
+                .fillMaxSize()
+                .padding(start = 16.dp, end = 16.dp, bottom = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Column(
+            // First row: Date badges
+            Row(
                 modifier = Modifier
-                    .fillMaxSize()
-                    .verticalScroll(rememberScrollState())
-                    .padding(top = 22.dp) // Space for pinned header
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                NBAMatchupContent(
-                    matchup = selectedMatchup,
-                    viewSelection = viewSelection,
-                    onViewSelectionChange = { viewSelection = it }
-                )
+                dates.forEachIndexed { index, date ->
+                    DateBadge(
+                        date = date,
+                        isSelected = selectedDateIndex == index,
+                        onClick = { selectedDateIndex = index }
+                    )
+                }
             }
 
-            // Pinned header
-            PinnedMatchupHeader(
-                awayTeam = selectedMatchup.awayTeam.abbreviation,
-                homeTeam = selectedMatchup.homeTeam.abbreviation,
-                modifier = Modifier.align(Alignment.TopCenter)
-            )
+            // Second row: Matchup badges for selected date
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                matchupsForDate.forEachIndexed { index, matchup ->
+                    MatchupBadge(
+                        awayTeam = matchup.awayTeam.abbreviation,
+                        homeTeam = matchup.homeTeam.abbreviation,
+                        gameDate = matchup.gameDate,
+                        isSelected = selectedMatchupIndex == index,
+                        onClick = { selectedMatchupIndex = index }
+                    )
+                }
+            }
+
+            // Matchup content with pinned header
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(top = 22.dp) // Space for pinned header
+                ) {
+                    NBAMatchupContent(
+                        matchup = selectedMatchup,
+                        viewSelection = viewSelection,
+                        onViewSelectionChange = { viewSelection = it }
+                    )
+                }
+
+                // Pinned header
+                PinnedMatchupHeader(
+                    awayTeam = selectedMatchup.awayTeam.abbreviation,
+                    homeTeam = selectedMatchup.homeTeam.abbreviation,
+                    modifier = Modifier.align(Alignment.TopCenter)
+                )
+            }
+        }
+
+        // Share button
+        ShareFab(
+            onClick = {
+                if (!isCapturing) {
+                    coroutineScope.launch {
+                        isCapturing = true
+                        try {
+                            // Wait for composition to complete
+                            kotlinx.coroutines.delay(100)
+                            val bitmap = graphicsLayer.toImageBitmap()
+                            println("📸 NBA Matchup Share: Captured bitmap size: ${bitmap.width}x${bitmap.height}")
+                            imageExporter.shareImage(bitmap, shareTitle)
+                        } catch (e: Exception) {
+                            e.printStackTrace()
+                        } finally {
+                            isCapturing = false
+                        }
+                    }
+                }
+            },
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(16.dp)
+        )
+
+        // Off-screen shareable content for capture (wide landscape, high-res)
+        CompositionLocalProvider(LocalDensity provides Density(2f, 1f)) {
+            Box(
+                modifier = Modifier
+                    .requiredWidth(3400.dp)
+                    .requiredHeight(1800.dp)
+                    .offset { IntOffset(-10000, 0) }  // Off-screen
+                    .drawWithCache {
+                        onDrawWithContent {
+                            graphicsLayer.record {
+                                this@onDrawWithContent.drawContent()
+                            }
+                            drawLayer(graphicsLayer)
+                        }
+                    }
+            ) {
+                // Build stat boxes from NBA matchup data
+                val gameInfo = ShareGameInfo(
+                    awayTeam = selectedMatchup.awayTeam.abbreviation,
+                    homeTeam = selectedMatchup.homeTeam.abbreviation,
+                    eventLabel = eventLabel,
+                    formattedDate = formattedDate,
+                    source = "ESPN"
+                )
+
+                val odds = selectedMatchup.odds?.let {
+                    ShareOdds(
+                        awayMoneyline = it.awayMoneyline,
+                        homeMoneyline = it.homeMoneyline,
+                        awaySpread = it.spread?.let { spread ->
+                            if (spread > 0) "+$spread" else spread.toString()
+                        },
+                        homeSpread = it.spread?.let { spread ->
+                            if (spread < 0) "+${-spread}" else (-spread).toString()
+                        },
+                        overUnder = it.overUnder?.toString()
+                    )
+                }
+
+                // Build the 6 stat boxes (2 rows x 3 columns)
+                val statBoxes = buildList {
+                    // Box 1: Offensive Team Stats
+                    add(ShareStatBox(
+                        title = "Offensive Stats",
+                        fiveColStats = selectedMatchup.comparisons?.sideBySide?.offense?.mapNotNull { (key, stat) ->
+                            val awayValue = stat.away.value?.formatStat(2) ?: return@mapNotNull null
+                            val homeValue = stat.home.value?.formatStat(2) ?: return@mapNotNull null
+                            val advantage = if (stat.away.rank != null && stat.home.rank != null) {
+                                when {
+                                    stat.away.rank < stat.home.rank -> -1
+                                    stat.away.rank > stat.home.rank -> 1
+                                    else -> 0
+                                }
+                            } else 0
+
+                            ShareFiveColStat(
+                                leftValue = awayValue,
+                                leftRank = stat.away.rank,
+                                leftRankDisplay = stat.away.rankDisplay,
+                                centerText = stat.label,
+                                rightValue = homeValue,
+                                rightRank = stat.home.rank,
+                                rightRankDisplay = stat.home.rankDisplay,
+                                advantage = advantage,
+                                usePlayerRanks = false
+                            )
+                        }?.take(9) ?: emptyList()
+                    ))
+
+                    // Box 2: Defensive Team Stats
+                    add(ShareStatBox(
+                        title = "Defensive Stats",
+                        fiveColStats = selectedMatchup.comparisons?.sideBySide?.defense?.mapNotNull { (key, stat) ->
+                            val awayValue = stat.away.value?.formatStat(2) ?: return@mapNotNull null
+                            val homeValue = stat.home.value?.formatStat(2) ?: return@mapNotNull null
+                            val advantage = if (stat.away.rank != null && stat.home.rank != null) {
+                                when {
+                                    stat.away.rank < stat.home.rank -> -1
+                                    stat.away.rank > stat.home.rank -> 1
+                                    else -> 0
+                                }
+                            } else 0
+
+                            ShareFiveColStat(
+                                leftValue = awayValue,
+                                leftRank = stat.away.rank,
+                                leftRankDisplay = stat.away.rankDisplay,
+                                centerText = stat.label,
+                                rightValue = homeValue,
+                                rightRank = stat.home.rank,
+                                rightRankDisplay = stat.home.rankDisplay,
+                                advantage = advantage,
+                                usePlayerRanks = false
+                            )
+                        }?.take(9) ?: emptyList()
+                    ))
+
+                    // Box 3: Away Off vs Home Def
+                    add(ShareStatBox(
+                        title = "${selectedMatchup.awayTeam.abbreviation} Off vs ${selectedMatchup.homeTeam.abbreviation} Def",
+                        leftLabel = "${selectedMatchup.awayTeam.abbreviation} Off",
+                        middleLabel = "vs",
+                        rightLabel = "${selectedMatchup.homeTeam.abbreviation} Def",
+                        fiveColStats = selectedMatchup.comparisons?.awayOffVsHomeDef?.mapNotNull { (key, stat) ->
+                            val offValue = stat.offense.value?.formatStat(2) ?: return@mapNotNull null
+                            val defValue = stat.defense.value?.formatStat(2) ?: return@mapNotNull null
+
+                            ShareFiveColStat(
+                                leftValue = offValue,
+                                leftRank = stat.offense.rank,
+                                leftRankDisplay = stat.offense.rankDisplay,
+                                centerText = stat.offLabel,
+                                rightValue = defValue,
+                                rightRank = stat.defense.rank,
+                                rightRankDisplay = stat.defense.rankDisplay,
+                                advantage = stat.advantage ?: 0,
+                                usePlayerRanks = false
+                            )
+                        }?.take(9) ?: emptyList()
+                    ))
+
+                    // Box 4: Home Off vs Away Def
+                    add(ShareStatBox(
+                        title = "${selectedMatchup.homeTeam.abbreviation} Off vs ${selectedMatchup.awayTeam.abbreviation} Def",
+                        leftLabel = "${selectedMatchup.homeTeam.abbreviation} Off",
+                        middleLabel = "vs",
+                        rightLabel = "${selectedMatchup.awayTeam.abbreviation} Def",
+                        fiveColStats = selectedMatchup.comparisons?.homeOffVsAwayDef?.mapNotNull { (key, stat) ->
+                            val offValue = stat.offense.value?.formatStat(2) ?: return@mapNotNull null
+                            val defValue = stat.defense.value?.formatStat(2) ?: return@mapNotNull null
+
+                            ShareFiveColStat(
+                                leftValue = offValue,
+                                leftRank = stat.offense.rank,
+                                leftRankDisplay = stat.offense.rankDisplay,
+                                centerText = stat.offLabel,
+                                rightValue = defValue,
+                                rightRank = stat.defense.rank,
+                                rightRankDisplay = stat.defense.rankDisplay,
+                                advantage = stat.advantage ?: 0,
+                                usePlayerRanks = false
+                            )
+                        }?.take(9) ?: emptyList()
+                    ))
+
+                    // Box 5: Key Player #1
+                    if (selectedMatchup.awayPlayers.isNotEmpty() && selectedMatchup.homePlayers.isNotEmpty()) {
+                        val awayPlayer = selectedMatchup.awayPlayers[0]
+                        val homePlayer = selectedMatchup.homePlayers[0]
+
+                        add(ShareStatBox(
+                            title = "${awayPlayer.name} vs ${homePlayer.name}",
+                            leftLabel = awayPlayer.name,
+                            middleLabel = "vs",
+                            rightLabel = homePlayer.name,
+                            fiveColStats = listOfNotNull(
+                                ShareFiveColStat(
+                                    leftValue = awayPlayer.points_per_game.value?.formatStat(1) ?: "-",
+                                    leftRank = awayPlayer.points_per_game.rank,
+                                    leftRankDisplay = awayPlayer.points_per_game.rankDisplay,
+                                    centerText = "Pts/Game",
+                                    rightValue = homePlayer.points_per_game.value?.formatStat(1) ?: "-",
+                                    rightRank = homePlayer.points_per_game.rank,
+                                    rightRankDisplay = homePlayer.points_per_game.rankDisplay,
+                                    advantage = 0,
+                                    usePlayerRanks = true
+                                ),
+                                ShareFiveColStat(
+                                    leftValue = awayPlayer.rebounds_per_game.value?.formatStat(1) ?: "-",
+                                    leftRank = awayPlayer.rebounds_per_game.rank,
+                                    leftRankDisplay = awayPlayer.rebounds_per_game.rankDisplay,
+                                    centerText = "Reb/Game",
+                                    rightValue = homePlayer.rebounds_per_game.value?.formatStat(1) ?: "-",
+                                    rightRank = homePlayer.rebounds_per_game.rank,
+                                    rightRankDisplay = homePlayer.rebounds_per_game.rankDisplay,
+                                    advantage = 0,
+                                    usePlayerRanks = true
+                                ),
+                                ShareFiveColStat(
+                                    leftValue = awayPlayer.assists_per_game.value?.formatStat(1) ?: "-",
+                                    leftRank = awayPlayer.assists_per_game.rank,
+                                    leftRankDisplay = awayPlayer.assists_per_game.rankDisplay,
+                                    centerText = "Ast/Game",
+                                    rightValue = homePlayer.assists_per_game.value?.formatStat(1) ?: "-",
+                                    rightRank = homePlayer.assists_per_game.rank,
+                                    rightRankDisplay = homePlayer.assists_per_game.rankDisplay,
+                                    advantage = 0,
+                                    usePlayerRanks = true
+                                ),
+                                ShareFiveColStat(
+                                    leftValue = awayPlayer.field_goal_pct.value?.formatStat(1) ?: "-",
+                                    leftRank = awayPlayer.field_goal_pct.rank,
+                                    leftRankDisplay = awayPlayer.field_goal_pct.rankDisplay,
+                                    centerText = "FG%",
+                                    rightValue = homePlayer.field_goal_pct.value?.formatStat(1) ?: "-",
+                                    rightRank = homePlayer.field_goal_pct.rank,
+                                    rightRankDisplay = homePlayer.field_goal_pct.rankDisplay,
+                                    advantage = 0,
+                                    usePlayerRanks = true
+                                ),
+                                awayPlayer.true_shooting_pct.value?.let { awayTS ->
+                                    homePlayer.true_shooting_pct.value?.let { homeTS ->
+                                        ShareFiveColStat(
+                                            leftValue = (awayTS * 100).formatStat(1),
+                                            leftRank = awayPlayer.true_shooting_pct.rank,
+                                            leftRankDisplay = awayPlayer.true_shooting_pct.rankDisplay,
+                                            centerText = "TS%",
+                                            rightValue = (homeTS * 100).formatStat(1),
+                                            rightRank = homePlayer.true_shooting_pct.rank,
+                                            rightRankDisplay = homePlayer.true_shooting_pct.rankDisplay,
+                                            advantage = 0,
+                                            usePlayerRanks = true
+                                        )
+                                    }
+                                }
+                            ).take(9)
+                        ))
+                    }
+
+                    // Box 6: Key Player #2 (if exists)
+                    if (selectedMatchup.awayPlayers.size > 1 && selectedMatchup.homePlayers.size > 1) {
+                        val awayPlayer = selectedMatchup.awayPlayers[1]
+                        val homePlayer = selectedMatchup.homePlayers[1]
+
+                        add(ShareStatBox(
+                            title = "${awayPlayer.name} vs ${homePlayer.name}",
+                            leftLabel = awayPlayer.name,
+                            middleLabel = "vs",
+                            rightLabel = homePlayer.name,
+                            fiveColStats = listOfNotNull(
+                                ShareFiveColStat(
+                                    leftValue = awayPlayer.points_per_game.value?.formatStat(1) ?: "-",
+                                    leftRank = awayPlayer.points_per_game.rank,
+                                    leftRankDisplay = awayPlayer.points_per_game.rankDisplay,
+                                    centerText = "Pts/Game",
+                                    rightValue = homePlayer.points_per_game.value?.formatStat(1) ?: "-",
+                                    rightRank = homePlayer.points_per_game.rank,
+                                    rightRankDisplay = homePlayer.points_per_game.rankDisplay,
+                                    advantage = 0,
+                                    usePlayerRanks = true
+                                ),
+                                ShareFiveColStat(
+                                    leftValue = awayPlayer.rebounds_per_game.value?.formatStat(1) ?: "-",
+                                    leftRank = awayPlayer.rebounds_per_game.rank,
+                                    leftRankDisplay = awayPlayer.rebounds_per_game.rankDisplay,
+                                    centerText = "Reb/Game",
+                                    rightValue = homePlayer.rebounds_per_game.value?.formatStat(1) ?: "-",
+                                    rightRank = homePlayer.rebounds_per_game.rank,
+                                    rightRankDisplay = homePlayer.rebounds_per_game.rankDisplay,
+                                    advantage = 0,
+                                    usePlayerRanks = true
+                                ),
+                                ShareFiveColStat(
+                                    leftValue = awayPlayer.assists_per_game.value?.formatStat(1) ?: "-",
+                                    leftRank = awayPlayer.assists_per_game.rank,
+                                    leftRankDisplay = awayPlayer.assists_per_game.rankDisplay,
+                                    centerText = "Ast/Game",
+                                    rightValue = homePlayer.assists_per_game.value?.formatStat(1) ?: "-",
+                                    rightRank = homePlayer.assists_per_game.rank,
+                                    rightRankDisplay = homePlayer.assists_per_game.rankDisplay,
+                                    advantage = 0,
+                                    usePlayerRanks = true
+                                ),
+                                ShareFiveColStat(
+                                    leftValue = awayPlayer.field_goal_pct.value?.formatStat(1) ?: "-",
+                                    leftRank = awayPlayer.field_goal_pct.rank,
+                                    leftRankDisplay = awayPlayer.field_goal_pct.rankDisplay,
+                                    centerText = "FG%",
+                                    rightValue = homePlayer.field_goal_pct.value?.formatStat(1) ?: "-",
+                                    rightRank = homePlayer.field_goal_pct.rank,
+                                    rightRankDisplay = homePlayer.field_goal_pct.rankDisplay,
+                                    advantage = 0,
+                                    usePlayerRanks = true
+                                ),
+                                awayPlayer.true_shooting_pct.value?.let { awayTS ->
+                                    homePlayer.true_shooting_pct.value?.let { homeTS ->
+                                        ShareFiveColStat(
+                                            leftValue = (awayTS * 100).formatStat(1),
+                                            leftRank = awayPlayer.true_shooting_pct.rank,
+                                            leftRankDisplay = awayPlayer.true_shooting_pct.rankDisplay,
+                                            centerText = "TS%",
+                                            rightValue = (homeTS * 100).formatStat(1),
+                                            rightRank = homePlayer.true_shooting_pct.rank,
+                                            rightRankDisplay = homePlayer.true_shooting_pct.rankDisplay,
+                                            advantage = 0,
+                                            usePlayerRanks = true
+                                        )
+                                    }
+                                }
+                            ).take(9)
+                        ))
+                    }
+                }
+
+                // Ensure we have exactly 6 boxes by filling with empty boxes if needed
+                val finalStatBoxes = statBoxes + List(6 - statBoxes.size) {
+                    ShareStatBox(title = "", fiveColStats = emptyList())
+                }
+
+                GenericMatchupShareImage(
+                    gameInfo = gameInfo,
+                    odds = odds,
+                    statBoxes = finalStatBoxes.take(6),
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
         }
     }
 }
@@ -187,6 +561,9 @@ private fun NBAMatchupContent(
     onViewSelectionChange: (Int) -> Unit
 ) {
     Column {
+        // Extra spacing below pinned team header
+        Spacer(modifier = Modifier.height(6.dp))
+
         // Betting Odds Section
         matchup.odds?.let { odds ->
             val hasOdds = odds.spread != null || odds.overUnder != null ||
@@ -495,7 +872,7 @@ private fun PlayerStatsView(matchup: com.joebad.fastbreak.data.model.NBAMatchup)
             homePlayerStats = homePlayer,
             positionLabel = "${awayPlayer.position} / ${homePlayer.position}",
             statsConfig = statsConfig,
-            usePlayerRanks = false // NBA uses team-count ranks (482 players, not 64)
+            usePlayerRanks = true // Use player rank colors (1-30 green, 31-60 orange-red, 61+ dark red)
         )
     }
 }

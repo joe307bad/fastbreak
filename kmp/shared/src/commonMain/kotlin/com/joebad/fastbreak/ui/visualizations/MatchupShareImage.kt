@@ -17,6 +17,60 @@ import androidx.compose.ui.unit.sp
 import com.joebad.fastbreak.data.model.*
 
 /**
+ * Generic data structures for sport-agnostic matchup share images
+ */
+
+/** Generic game information for share image */
+data class ShareGameInfo(
+    val awayTeam: String,
+    val homeTeam: String,
+    val eventLabel: String, // e.g., "Week 18" for NFL, "Jan 23" for NBA
+    val formattedDate: String, // e.g., "Sat, Dec 28 7:00 PM"
+    val source: String = "ESPN"
+)
+
+/** Generic odds information */
+data class ShareOdds(
+    val awayMoneyline: String? = null,
+    val homeMoneyline: String? = null,
+    val awaySpread: String? = null,
+    val homeSpread: String? = null,
+    val overUnder: String? = null
+)
+
+/** A single stat row in three-column format */
+data class ShareThreeColStat(
+    val leftText: String,
+    val centerText: String,
+    val rightText: String,
+    val advantage: Int = 0 // -1 for left (away), 0 for even, 1 for right (home)
+)
+
+/** A single stat row in five-column format with ranks */
+data class ShareFiveColStat(
+    val leftValue: String,
+    val leftRank: Int? = null,
+    val leftRankDisplay: String? = null,
+    val centerText: String,
+    val rightValue: String,
+    val rightRank: Int? = null,
+    val rightRankDisplay: String? = null,
+    val advantage: Int = 0, // -1 for left (away), 0 for even, 1 for right (home)
+    val usePlayerRanks: Boolean = false // true for player ranks, false for team ranks
+)
+
+/** A box/card in the share image containing stats */
+data class ShareStatBox(
+    val title: String,
+    val threeColStats: List<ShareThreeColStat> = emptyList(),
+    val fiveColStats: List<ShareFiveColStat> = emptyList(),
+    // Three-part header for displaying team-specific labels
+    val leftLabel: String? = null,   // e.g., "DET Off" in Team1Color
+    val middleLabel: String? = null, // e.g., "vs" in neutral color
+    val rightLabel: String? = null   // e.g., "HOU Def" in Team2Color
+)
+
+/**
  * Pre-computed rank colors for team stats (1-32 scale)
  */
 private val shareTeamRankColors: Map<Int, Color> = buildMap {
@@ -73,6 +127,22 @@ private fun getShareTeamRankColor(rank: Int?): Color = shareTeamRankColors[rank 
 private fun getSharePlayerRankColor(rank: Int?): Color {
     if (rank == null || rank == 0) return Color.Transparent
     return sharePlayerRankColors[rank] ?: Color(139, 0, 0)
+}
+
+/**
+ * Calculate appropriate text color (white or black) based on background color luminance
+ */
+private fun getContrastingTextColor(backgroundColor: Color): Color {
+    // Calculate relative luminance using the standard formula
+    val r = backgroundColor.red
+    val g = backgroundColor.green
+    val b = backgroundColor.blue
+
+    // Relative luminance formula (ITU-R BT.709)
+    val luminance = 0.2126f * r + 0.7152f * g + 0.0722f * b
+
+    // Use white text for dark backgrounds, black for light backgrounds
+    return if (luminance > 0.5f) Color.Black else Color.White
 }
 
 private fun Double.formatShare(decimals: Int): String {
@@ -353,11 +423,370 @@ fun MatchupShareImage(
     }
 }
 
+/**
+ * Generic sport-agnostic shareable image composable in landscape orientation (3400x1800).
+ * Layout: 2 rows x 3 columns grid of stat boxes.
+ *
+ * @param gameInfo Basic game information (teams, date, event label)
+ * @param odds Betting odds information
+ * @param statBoxes List of 6 stat boxes (row 1: boxes 0-2, row 2: boxes 3-5)
+ */
+@Composable
+fun GenericMatchupShareImage(
+    gameInfo: ShareGameInfo,
+    odds: ShareOdds? = null,
+    statBoxes: List<ShareStatBox>,
+    modifier: Modifier = Modifier
+) {
+    val backgroundColor = MaterialTheme.colorScheme.surface
+    val textColor = MaterialTheme.colorScheme.onSurface
+    val cardBackground = MaterialTheme.colorScheme.background
+
+    Column(
+        modifier = modifier
+            .background(backgroundColor)
+            .padding(40.dp)
+    ) {
+        // Compact header row with team names and odds
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Away team with moneyline and spread
+            Column(
+                horizontalAlignment = Alignment.Start
+            ) {
+                Text(
+                    text = gameInfo.awayTeam,
+                    fontSize = 72.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Team1Color
+                )
+                // Away moneyline and spread
+                if (odds != null) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        odds.awayMoneyline?.let { ml ->
+                            Text(
+                                text = "ML: $ml",
+                                fontSize = 36.sp,
+                                color = textColor.copy(alpha = 0.7f)
+                            )
+                        }
+                        odds.awaySpread?.let { spread ->
+                            Text(
+                                text = "Spread: $spread",
+                                fontSize = 36.sp,
+                                color = textColor.copy(alpha = 0.7f)
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Center: Event, Date, and O/U
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = "${gameInfo.eventLabel} • ${gameInfo.formattedDate}",
+                    fontSize = 48.sp,
+                    color = textColor.copy(alpha = 0.8f)
+                )
+                odds?.overUnder?.let { ou ->
+                    Text(
+                        text = "O/U: $ou",
+                        fontSize = 36.sp,
+                        color = textColor.copy(alpha = 0.7f)
+                    )
+                }
+            }
+
+            // Home team with moneyline and spread
+            Column(
+                horizontalAlignment = Alignment.End
+            ) {
+                Text(
+                    text = gameInfo.homeTeam,
+                    fontSize = 72.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Team2Color
+                )
+                // Home moneyline and spread
+                if (odds != null) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        odds.homeSpread?.let { spread ->
+                            Text(
+                                text = "Spread: $spread",
+                                fontSize = 36.sp,
+                                color = textColor.copy(alpha = 0.7f)
+                            )
+                        }
+                        odds.homeMoneyline?.let { ml ->
+                            Text(
+                                text = "ML: $ml",
+                                fontSize = 36.sp,
+                                color = textColor.copy(alpha = 0.7f)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(20.dp))
+
+        // 2x3 Grid of stat boxes
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            // Row 1: Boxes 0-2
+            Row(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                statBoxes.take(3).forEach { box ->
+                    ShareComparisonCard(
+                        title = box.title,
+                        modifier = Modifier.weight(1f),
+                        cardBackground = cardBackground,
+                        leftLabel = box.leftLabel,
+                        middleLabel = box.middleLabel,
+                        rightLabel = box.rightLabel
+                    ) {
+                        GenericStatBoxContent(box, textColor)
+                    }
+                }
+            }
+
+            // Row 2: Boxes 3-5
+            Row(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                statBoxes.drop(3).take(3).forEach { box ->
+                    ShareComparisonCard(
+                        title = box.title,
+                        modifier = Modifier.weight(1f),
+                        cardBackground = cardBackground,
+                        leftLabel = box.leftLabel,
+                        middleLabel = box.middleLabel,
+                        rightLabel = box.rightLabel
+                    ) {
+                        GenericStatBoxContent(box, textColor)
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Footer
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                text = "Source: ${gameInfo.source}",
+                fontSize = 36.sp,
+                color = textColor.copy(alpha = 0.6f)
+            )
+            Text(
+                text = "fbrk.app",
+                fontSize = 36.sp,
+                fontWeight = FontWeight.Bold,
+                color = textColor.copy(alpha = 0.6f)
+            )
+        }
+    }
+}
+
+/**
+ * Renders the content of a stat box using three-column and five-column stats
+ */
+@Composable
+private fun GenericStatBoxContent(
+    box: ShareStatBox,
+    textColor: Color
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        // Render three-column stats
+        box.threeColStats.forEach { stat ->
+            ShareThreeColumnRow(
+                leftText = stat.leftText,
+                centerText = stat.centerText,
+                rightText = stat.rightText,
+                advantage = stat.advantage,
+                textColor = textColor
+            )
+        }
+
+        // Render five-column stats with ranks
+        box.fiveColStats.forEach { stat ->
+            ShareGenericFiveColumnRow(
+                leftValue = stat.leftValue,
+                leftRank = stat.leftRank,
+                leftRankDisplay = stat.leftRankDisplay,
+                centerText = stat.centerText,
+                rightValue = stat.rightValue,
+                rightRank = stat.rightRank,
+                rightRankDisplay = stat.rightRankDisplay,
+                advantage = stat.advantage,
+                usePlayerRanks = stat.usePlayerRanks,
+                textColor = textColor
+            )
+        }
+    }
+}
+
+/**
+ * Generic five-column row with support for both team and player rank colors
+ */
+@Composable
+private fun ShareGenericFiveColumnRow(
+    leftValue: String,
+    leftRank: Int?,
+    leftRankDisplay: String?,
+    centerText: String,
+    rightValue: String,
+    rightRank: Int?,
+    rightRankDisplay: String?,
+    advantage: Int = 0,
+    usePlayerRanks: Boolean = false,
+    textColor: Color
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 6.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // Left value with advantage indicator
+        Row(
+            modifier = Modifier.weight(1f),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Start
+        ) {
+            if (advantage == -1) {
+                Box(
+                    modifier = Modifier
+                        .size(20.dp)
+                        .background(Team1Color, CircleShape)
+                )
+                Spacer(modifier = Modifier.width(10.dp))
+            }
+            Text(
+                text = leftValue,
+                fontSize = 36.sp,
+                fontWeight = FontWeight.Medium,
+                color = textColor
+            )
+        }
+
+        // Left rank badge
+        ShareGenericRankBadge(
+            rank = leftRank,
+            rankDisplay = leftRankDisplay,
+            usePlayerRanks = usePlayerRanks
+        )
+
+        Spacer(modifier = Modifier.width(12.dp))
+
+        // Center label
+        Text(
+            text = centerText,
+            fontSize = 34.sp,
+            color = MaterialTheme.colorScheme.primary,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.weight(1.5f)
+        )
+
+        Spacer(modifier = Modifier.width(12.dp))
+
+        // Right rank badge
+        ShareGenericRankBadge(
+            rank = rightRank,
+            rankDisplay = rightRankDisplay,
+            usePlayerRanks = usePlayerRanks
+        )
+
+        // Right value with advantage indicator
+        Row(
+            modifier = Modifier.weight(1f),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.End
+        ) {
+            Text(
+                text = rightValue,
+                fontSize = 36.sp,
+                fontWeight = FontWeight.Medium,
+                color = textColor,
+                textAlign = TextAlign.End
+            )
+            if (advantage == 1) {
+                Spacer(modifier = Modifier.width(10.dp))
+                Box(
+                    modifier = Modifier
+                        .size(20.dp)
+                        .background(Team2Color, CircleShape)
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Generic rank badge that can display rank text and use appropriate colors
+ */
+@Composable
+private fun ShareGenericRankBadge(
+    rank: Int?,
+    rankDisplay: String?,
+    usePlayerRanks: Boolean
+) {
+    val backgroundColor = if (usePlayerRanks) {
+        getSharePlayerRankColor(rank)
+    } else {
+        getShareTeamRankColor(rank)
+    }
+
+    Box(
+        modifier = Modifier
+            .width(70.dp)
+            .background(backgroundColor, RoundedCornerShape(8.dp))
+            .padding(vertical = 6.dp, horizontal = 8.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = rankDisplay ?: rank?.toString() ?: "-",
+            fontSize = 28.sp,
+            fontWeight = FontWeight.Bold,
+            color = Color.White,
+            maxLines = 1
+        )
+    }
+}
+
 @Composable
 private fun ShareComparisonCard(
     title: String,
     modifier: Modifier = Modifier,
     cardBackground: Color,
+    leftLabel: String? = null,
+    middleLabel: String? = null,
+    rightLabel: String? = null,
     content: @Composable ColumnScope.() -> Unit
 ) {
     Column(
@@ -366,14 +795,51 @@ private fun ShareComparisonCard(
             .background(cardBackground, RoundedCornerShape(16.dp))
             .padding(24.dp)
     ) {
-        Text(
-            text = title,
-            fontSize = 46.sp,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onBackground,
-            modifier = Modifier.fillMaxWidth(),
-            textAlign = TextAlign.Center
-        )
+        // Use three-label header if labels are provided, otherwise use centered title
+        if (leftLabel != null || middleLabel != null || rightLabel != null) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Left label (e.g., "DET Off")
+                Text(
+                    text = leftLabel ?: "",
+                    fontSize = 46.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Team1Color,
+                    modifier = Modifier.weight(1f),
+                    textAlign = TextAlign.Start
+                )
+                // Middle label (e.g., "vs")
+                Text(
+                    text = middleLabel ?: "",
+                    fontSize = 40.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
+                    textAlign = TextAlign.Center
+                )
+                // Right label (e.g., "HOU Def")
+                Text(
+                    text = rightLabel ?: "",
+                    fontSize = 46.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Team2Color,
+                    modifier = Modifier.weight(1f),
+                    textAlign = TextAlign.End
+                )
+            }
+        } else {
+            // Fallback to centered title
+            Text(
+                text = title,
+                fontSize = 46.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onBackground,
+                modifier = Modifier.fillMaxWidth(),
+                textAlign = TextAlign.Center
+            )
+        }
         Spacer(modifier = Modifier.height(14.dp))
         content()
     }

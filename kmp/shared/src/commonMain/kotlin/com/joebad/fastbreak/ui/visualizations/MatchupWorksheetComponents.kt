@@ -21,37 +21,40 @@ internal val Team1Color = Color(0xFF2196F3) // Blue (away team)
 internal val Team2Color = Color(0xFFFF5722) // Deep Orange (home team)
 
 /**
- * Pre-computed rank colors for NBA team stats (1-30 scale, with 30+ clamped to darkest red)
+ * Pre-computed rank colors for NBA team stats (1-30 scale)
+ * - Ranks 1-10: Green gradient
+ * - Ranks 11-20: Orange to dark orange gradient
+ * - Ranks 21-30: Red to dark red gradient
  */
 val nbaTeamRankColors: Map<Int, Color> = buildMap {
     put(0, Color.Transparent) // For null ranks
 
-    // Darkest red color for rank 30
+    // Darkest red color for rank 30+
     val darkestRed = Color(139, 0, 0)
 
     for (rank in 1..30) {
         val color = when {
             rank <= 10 -> {
-                // Green gradient (ranks 1-10): Top third
+                // Green gradient (ranks 1-10): Bright green to darker green
                 val ratio = (rank - 1) / 9f
-                val red = (0 + ratio * 140).toInt()
-                val green = (120 + ratio * 40).toInt()
+                val red = (0 + ratio * 80).toInt()
+                val green = (150 + ratio * 30).toInt()
                 val blue = 0
                 Color(red, green, blue)
             }
             rank <= 20 -> {
-                // Yellow-orange gradient (ranks 11-20): Middle third
+                // Orange to dark orange gradient (ranks 11-20)
                 val ratio = (rank - 11) / 9f
-                val red = (140 + ratio * 75).toInt()
-                val green = (160 - ratio * 100).toInt()
+                val red = (255 - ratio * 55).toInt()
+                val green = (140 - ratio * 40).toInt()
                 val blue = 0
                 Color(red, green, blue)
             }
             else -> {
-                // Red gradient (ranks 21-30): Bottom third
+                // Red to dark red gradient (ranks 21-30)
                 val ratio = (rank - 21) / 9f
-                val red = (215 - ratio * 76).toInt()
-                val green = (60 - ratio * 60).toInt()
+                val red = (200 - ratio * 61).toInt()
+                val green = (0 + ratio * 0).toInt()
                 val blue = 0
                 Color(red, green, blue)
             }
@@ -71,6 +74,53 @@ val nbaTeamRankColors: Map<Int, Color> = buildMap {
 fun getNBATeamRankColor(rank: Int?): Color {
     if (rank == null || rank <= 0) return Color.Transparent
     return nbaTeamRankColors[rank.coerceIn(1, 50)] ?: Color.Transparent
+}
+
+/**
+ * Pre-computed rank colors for NBA player stats
+ * - Ranks 1-30: Green gradient (dark green to lighter green)
+ * - Ranks 31-60: Orange to red gradient
+ * - Ranks 61+: Dark red
+ */
+val nbaPlayerRankColors: Map<Int, Color> = buildMap {
+    put(0, Color.Transparent) // For null ranks
+
+    // Dark red for ranks 61+
+    val darkestRed = Color(139, 0, 0)
+
+    for (rank in 1..100) {
+        val color = when {
+            rank <= 30 -> {
+                // Green gradient (ranks 1-30): Dark green to lighter green
+                val ratio = (rank - 1) / 29f
+                val red = (0 + ratio * 100).toInt()
+                val green = (100 + ratio * 80).toInt()
+                val blue = 0
+                Color(red, green, blue)
+            }
+            rank <= 60 -> {
+                // Orange to red gradient (ranks 31-60)
+                val ratio = (rank - 31) / 29f
+                val red = (200 + ratio * 15).toInt()
+                val green = (180 - ratio * 180).toInt()
+                val blue = 0
+                Color(red, green, blue)
+            }
+            else -> {
+                // Dark red for ranks 61+
+                darkestRed
+            }
+        }
+        put(rank, color)
+    }
+}
+
+/**
+ * Get color for NBA player rank (1-100+ scale)
+ */
+fun getNBAPlayerRankColor(rank: Int?): Color {
+    if (rank == null || rank <= 0) return Color.Transparent
+    return nbaPlayerRankColors[rank.coerceIn(1, 100)] ?: nbaPlayerRankColors[100]!!
 }
 
 /**
@@ -172,7 +222,8 @@ fun FiveColumnRowWithRanks(
     rightRank: Int?,
     rightRankDisplay: String?,
     advantage: Int = 0,
-    useNBARanks: Boolean = true // true for NBA (30 teams), false for NFL (32 teams)
+    useNBARanks: Boolean = true, // true for NBA (30 teams), false for NFL (32 teams)
+    usePlayerRanks: Boolean = false // true for player ranks (1-100+ scale), overrides useNBARanks
 ) {
     Row(
         modifier = Modifier
@@ -210,7 +261,11 @@ fun FiveColumnRowWithRanks(
             modifier = Modifier
                 .width(32.dp)
                 .background(
-                    if (useNBARanks) getNBATeamRankColor(leftRank) else Color.Gray,
+                    when {
+                        usePlayerRanks -> getNBAPlayerRankColor(leftRank)
+                        useNBARanks -> getNBATeamRankColor(leftRank)
+                        else -> Color.Gray
+                    },
                     RoundedCornerShape(4.dp)
                 )
                 .padding(4.dp),
@@ -247,7 +302,11 @@ fun FiveColumnRowWithRanks(
             modifier = Modifier
                 .width(32.dp)
                 .background(
-                    if (useNBARanks) getNBATeamRankColor(rightRank) else Color.Gray,
+                    when {
+                        usePlayerRanks -> getNBAPlayerRankColor(rightRank)
+                        useNBARanks -> getNBATeamRankColor(rightRank)
+                        else -> Color.Gray
+                    },
                     RoundedCornerShape(4.dp)
                 )
                 .padding(4.dp),
@@ -518,7 +577,8 @@ fun <T> PlayerComparisonSection(
             rightRank = homeRank,
             rightRankDisplay = homeRankDisplay,
             advantage = advantage,
-            useNBARanks = !usePlayerRanks
+            useNBARanks = !usePlayerRanks,
+            usePlayerRanks = usePlayerRanks
         )
     }
 

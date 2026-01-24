@@ -809,7 +809,7 @@ build_nba_comparisons <- function(home_stats, away_stats, home_team, away_team) 
     ),
     list(
       key = "rating",
-      off_label = "Offensive Rating",
+      off_label = "Rating",
       def_label = "Defensive Rating",
       off_stat = "offensive_rating",
       def_stat = "defensive_rating",

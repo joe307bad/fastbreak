@@ -67,6 +67,8 @@ cat("Loaded", nrow(team_box), "team box score records\n")
 team_stats <- team_box %>%
   group_by(team_id, team_display_name, team_short_display_name) %>%
   summarise(
+    # Get team abbreviation from first row (all rows for a team have same abbreviation)
+    team_abbreviation = first(team_abbreviation),
     games_played = n(),
 
     # Offensive stats
@@ -669,9 +671,98 @@ if (!is.null(player_usage_stats)) {
 }
 
 # ============================================================================
-# STEP 3: Get upcoming games (next 7 days)
+# STEP 3: Get team standings (records, division/conference rankings)
 # ============================================================================
-cat("\n3. Fetching upcoming NBA games for next", DAYS_AHEAD, "days...\n")
+cat("\n3. Fetching team standings...\n")
+
+# Fetch standings from ESPN API
+standings_url <- "https://site.api.espn.com/apis/v2/sports/basketball/nba/standings"
+add_api_delay()
+
+standings_data <- tryCatch({
+  standings_resp <- GET(standings_url)
+  if (status_code(standings_resp) == 200) {
+    content(standings_resp, as = "parsed")
+  } else {
+    cat("Warning: Failed to fetch standings (status:", status_code(standings_resp), ")\n")
+    NULL
+  }
+}, error = function(e) {
+  cat("Warning: Could not load standings:", e$message, "\n")
+  NULL
+})
+
+# Process standings data
+team_standings <- NULL
+if (!is.null(standings_data) && !is.null(standings_data$children)) {
+  # standings_data$children contains conferences (Eastern, Western)
+  all_teams_standings <- list()
+
+  for (conference in standings_data$children) {
+    conference_name <- conference$name  # "Eastern Conference" or "Western Conference"
+    conference_abbrev <- conference$abbreviation  # "east" or "west"
+
+    if (!is.null(conference$standings) && !is.null(conference$standings$entries)) {
+      # Conference rank is the position in the standings
+      for (conf_rank_idx in seq_along(conference$standings$entries)) {
+        team <- conference$standings$entries[[conf_rank_idx]]
+
+        # Extract stats by name for robustness
+        get_stat_value <- function(stats_list, stat_name) {
+          for (stat in stats_list) {
+            if (!is.null(stat$name) && stat$name == stat_name) {
+              return(as.numeric(stat$value))
+            }
+          }
+          return(NA)
+        }
+
+        team_info <- list(
+          team_id = team$team$id,
+          team_name = team$team$displayName,
+          team_abbrev = team$team$abbreviation,
+          wins = get_stat_value(team$stats, "wins"),
+          losses = get_stat_value(team$stats, "losses"),
+          win_pct = get_stat_value(team$stats, "winPercent"),
+          games_back = get_stat_value(team$stats, "gamesBehind"),
+          conference = conference_abbrev
+        )
+        all_teams_standings[[length(all_teams_standings) + 1]] <- team_info
+      }
+    }
+  }
+
+  # Convert to data frame
+  if (length(all_teams_standings) > 0) {
+    team_standings <- bind_rows(all_teams_standings)
+
+    # Calculate conference rank based on wins (descending) and losses (ascending)
+    team_standings <- team_standings %>%
+      arrange(conference, desc(wins), losses) %>%
+      group_by(conference) %>%
+      mutate(conference_rank = row_number()) %>%
+      ungroup()
+
+    cat("Loaded standings for", nrow(team_standings), "teams\n")
+
+    # Join standings with team_stats
+    team_stats <- team_stats %>%
+      left_join(
+        team_standings %>%
+          select(team_abbrev, wins, losses, win_pct, games_back, conference_rank, conference),
+        by = c("team_abbreviation" = "team_abbrev")
+      )
+
+    cat("Merged standings with team stats\n")
+  }
+} else {
+  cat("Warning: No standings data available\n")
+}
+
+# ============================================================================
+# STEP 4: Get upcoming games (next 7 days)
+# ============================================================================
+cat("\n4. Fetching upcoming NBA games for next", DAYS_AHEAD, "days...\n")
 
 # Get today's date and calculate date range
 today <- Sys.Date()
@@ -783,9 +874,9 @@ if (length(upcoming_games) == 0) {
 }
 
 # ============================================================================
-# STEP 4: Build matchup data for each game
+# STEP 5: Build matchup data for each game
 # ============================================================================
-cat("\n4. Building matchup statistics...\n")
+cat("\n5. Building matchup statistics...\n")
 
 # Helper function to build comparison data
 build_nba_comparisons <- function(home_stats, away_stats, home_team, away_team) {
@@ -1076,6 +1167,10 @@ for (game in upcoming_games) {
     name = game$home_team_name,
     abbreviation = game$home_team_abbrev,
     logo = game$home_team_logo,
+    wins = if (!is.na(home_stats$wins)) as.integer(home_stats$wins) else NULL,
+    losses = if (!is.na(home_stats$losses)) as.integer(home_stats$losses) else NULL,
+    conferenceRank = if (!is.na(home_stats$conference_rank)) as.integer(home_stats$conference_rank) else NULL,
+    conference = if (!is.na(home_stats$conference)) as.character(home_stats$conference) else NULL,
     stats = list(
       gamesPlayed = home_stats$games_played,
       pointsPerGame = round(home_stats$points_per_game, 1),
@@ -1148,6 +1243,10 @@ for (game in upcoming_games) {
     name = game$away_team_name,
     abbreviation = game$away_team_abbrev,
     logo = game$away_team_logo,
+    wins = if (!is.na(away_stats$wins)) as.integer(away_stats$wins) else NULL,
+    losses = if (!is.na(away_stats$losses)) as.integer(away_stats$losses) else NULL,
+    conferenceRank = if (!is.na(away_stats$conference_rank)) as.integer(away_stats$conference_rank) else NULL,
+    conference = if (!is.na(away_stats$conference)) as.character(away_stats$conference) else NULL,
     stats = list(
       gamesPlayed = away_stats$games_played,
       pointsPerGame = round(away_stats$points_per_game, 1),
@@ -1437,9 +1536,9 @@ for (game in upcoming_games) {
 }
 
 # ============================================================================
-# STEP 5: Generate output JSON
+# STEP 6: Generate output JSON
 # ============================================================================
-cat("\n5. Generating output JSON...\n")
+cat("\n6. Generating output JSON...\n")
 
 output_data <- list(
   sport = "NBA",
@@ -1451,7 +1550,8 @@ output_data <- list(
   source = "hoopR / ESPN",
   tags = list(
     list(label = "team", layout = "left", color = "#4CAF50"),
-    list(label = "player", layout = "left", color = "#2196F3")
+    list(label = "player", layout = "left", color = "#2196F3"),
+    list(label = "regular season", layout = "right", color = "#9C27B0")
   ),
   sortOrder = 0,
   dataPoints = matchups_json

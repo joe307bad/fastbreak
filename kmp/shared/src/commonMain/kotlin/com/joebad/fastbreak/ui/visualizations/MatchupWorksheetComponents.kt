@@ -124,6 +124,37 @@ fun getNBAPlayerRankColor(rank: Int?): Color {
 }
 
 /**
+ * Get color for conference rank (1-15 scale)
+ * Light green for 1st, dark red for 15th
+ */
+fun getConferenceRankColor(rank: Int?): Color {
+    if (rank == null || rank <= 0) return Color.Transparent
+
+    // Clamp to 1-15 range
+    val clampedRank = rank.coerceIn(1, 15)
+
+    // Interpolate from light green (1st) to dark red (15th)
+    // Using 15 steps
+    val ratio = (clampedRank - 1) / 14f  // 0.0 for rank 1, 1.0 for rank 15
+
+    // Start: Light green (#66BB6A - rgb(102, 187, 106))
+    // End: Dark red (#C62828 - rgb(198, 40, 40))
+    val startR = 102
+    val startG = 187
+    val startB = 106
+
+    val endR = 198
+    val endG = 40
+    val endB = 40
+
+    val r = (startR + ratio * (endR - startR)).toInt()
+    val g = (startG + ratio * (endG - startG)).toInt()
+    val b = (startB + ratio * (endB - startB)).toInt()
+
+    return Color(r, g, b)
+}
+
+/**
  * Generic three-column layout component for consistent compact formatting
  */
 @Composable
@@ -409,51 +440,161 @@ fun TeamStatsNavBadge(
 fun PinnedMatchupHeader(
     awayTeam: String,
     homeTeam: String,
+    awayWins: Int? = null,
+    awayLosses: Int? = null,
+    awayConferenceRank: Int? = null,
+    awayConference: String? = null,
+    homeWins: Int? = null,
+    homeLosses: Int? = null,
+    homeConferenceRank: Int? = null,
+    homeConference: String? = null,
     modifier: Modifier = Modifier
 ) {
+    // Helper to format conference name
+    fun formatConference(conf: String?): String {
+        return when (conf?.lowercase()) {
+            "east" -> "East"
+            "west" -> "West"
+            else -> "Conf"
+        }
+    }
+
+    // Build record strings
+    val awayRecord = if (awayWins != null && awayLosses != null && awayConferenceRank != null) {
+        "$awayWins-$awayLosses / ${formatOrdinal(awayConferenceRank)} / ${formatConference(awayConference)}"
+    } else {
+        null
+    }
+
+    val homeRecord = if (homeWins != null && homeLosses != null && homeConferenceRank != null) {
+        "$homeWins-$homeLosses / ${formatOrdinal(homeConferenceRank)} / ${formatConference(homeConference)}"
+    } else {
+        null
+    }
+
     androidx.compose.material3.Surface(
         modifier = modifier.fillMaxWidth(),
         color = MaterialTheme.colorScheme.background
     ) {
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(start = 8.dp, end = 8.dp, top = 6.dp, bottom = 4.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+                .padding(start = 8.dp, end = 8.dp, top = 6.dp, bottom = 12.dp)
         ) {
-            Text(
-                text = awayTeam,
-                style = MaterialTheme.typography.bodySmall.copy(lineHeight = 11.sp),
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.weight(1f),
-                maxLines = 1
-            )
+            // First row: Team abbreviations
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = awayTeam,
+                    style = MaterialTheme.typography.bodySmall.copy(lineHeight = 11.sp),
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.weight(1f),
+                    maxLines = 1
+                )
 
-            Text(
-                text = "@",
-                style = MaterialTheme.typography.bodySmall.copy(lineHeight = 11.sp),
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-                modifier = Modifier.weight(1f),
-                textAlign = TextAlign.Center,
-                maxLines = 1
-            )
+                Text(
+                    text = "@",
+                    style = MaterialTheme.typography.bodySmall.copy(lineHeight = 11.sp),
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                    modifier = Modifier.weight(1f),
+                    textAlign = TextAlign.Center,
+                    maxLines = 1
+                )
 
-            Text(
-                text = homeTeam,
-                style = MaterialTheme.typography.bodySmall.copy(lineHeight = 11.sp),
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.weight(1f),
-                textAlign = TextAlign.End,
-                maxLines = 1
-            )
+                Text(
+                    text = homeTeam,
+                    style = MaterialTheme.typography.bodySmall.copy(lineHeight = 11.sp),
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.weight(1f),
+                    textAlign = TextAlign.End,
+                    maxLines = 1
+                )
+            }
+
+            // Second row: Records and conference ranks (if available)
+            if (awayRecord != null || homeRecord != null) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Away team record with conference rank indicator
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Start
+                    ) {
+                        if (awayConferenceRank != null) {
+                            Box(
+                                modifier = Modifier
+                                    .size(6.dp)
+                                    .background(
+                                        color = getConferenceRankColor(awayConferenceRank),
+                                        shape = CircleShape
+                                    )
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                        }
+                        Text(
+                            text = awayRecord ?: "",
+                            style = MaterialTheme.typography.bodySmall.copy(lineHeight = 10.sp),
+                            fontSize = 9.sp,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                            maxLines = 1
+                        )
+                    }
+
+                    // Home team record with conference rank indicator
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.End
+                    ) {
+                        Text(
+                            text = homeRecord ?: "",
+                            style = MaterialTheme.typography.bodySmall.copy(lineHeight = 10.sp),
+                            fontSize = 9.sp,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                            textAlign = TextAlign.End,
+                            maxLines = 1
+                        )
+                        if (homeConferenceRank != null) {
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Box(
+                                modifier = Modifier
+                                    .size(6.dp)
+                                    .background(
+                                        color = getConferenceRankColor(homeConferenceRank),
+                                        shape = CircleShape
+                                    )
+                            )
+                        }
+                    }
+                }
+            }
         }
+    }
+}
+
+/**
+ * Helper function to format ordinal numbers (1st, 2nd, 3rd, etc.)
+ */
+private fun formatOrdinal(number: Int): String {
+    return when {
+        number % 100 in 11..13 -> "${number}th"
+        number % 10 == 1 -> "${number}st"
+        number % 10 == 2 -> "${number}nd"
+        number % 10 == 3 -> "${number}rd"
+        else -> "${number}th"
     }
 }
 

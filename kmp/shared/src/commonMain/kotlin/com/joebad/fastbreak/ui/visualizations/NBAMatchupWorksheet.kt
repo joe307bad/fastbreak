@@ -215,7 +215,7 @@ fun NBAMatchupWorksheet(
                     modifier = Modifier
                         .fillMaxSize()
                         .verticalScroll(rememberScrollState())
-                        .padding(top = 22.dp) // Space for pinned header
+                        .padding(top = 38.dp) // Space for pinned header (two rows)
                 ) {
                     NBAMatchupContent(
                         matchup = selectedMatchup,
@@ -228,6 +228,14 @@ fun NBAMatchupWorksheet(
                 PinnedMatchupHeader(
                     awayTeam = selectedMatchup.awayTeam.abbreviation,
                     homeTeam = selectedMatchup.homeTeam.abbreviation,
+                    awayWins = selectedMatchup.awayTeam.wins,
+                    awayLosses = selectedMatchup.awayTeam.losses,
+                    awayConferenceRank = selectedMatchup.awayTeam.conferenceRank,
+                    awayConference = selectedMatchup.awayTeam.conference,
+                    homeWins = selectedMatchup.homeTeam.wins,
+                    homeLosses = selectedMatchup.homeTeam.losses,
+                    homeConferenceRank = selectedMatchup.homeTeam.conferenceRank,
+                    homeConference = selectedMatchup.homeTeam.conference,
                     modifier = Modifier.align(Alignment.TopCenter)
                 )
             }
@@ -732,6 +740,8 @@ private fun NBAMatchupContent(
         }
 
         // View Navigation
+        Spacer(modifier = Modifier.height(8.dp))
+
         Row(
             modifier = Modifier
                 .fillMaxWidth()

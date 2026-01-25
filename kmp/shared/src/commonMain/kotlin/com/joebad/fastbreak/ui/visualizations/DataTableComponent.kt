@@ -13,7 +13,10 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -36,6 +39,32 @@ private fun Double.formatTo(decimals: Int): String {
     }
     val rounded = (this * multiplier).roundToInt() / multiplier
     return rounded.toString()
+}
+
+/**
+ * Helper function to format ordinal numbers (1st, 2nd, 3rd, etc.)
+ */
+private fun formatOrdinal(number: Int): String {
+    return when {
+        number % 100 in 11..13 -> "${number}th"
+        number % 10 == 1 -> "${number}st"
+        number % 10 == 2 -> "${number}nd"
+        number % 10 == 3 -> "${number}rd"
+        else -> "${number}th"
+    }
+}
+
+/**
+ * Helper function to format conference ranking (e.g., "6th / East")
+ */
+private fun formatConferenceRank(rank: Int?, conference: String?): String {
+    if (rank == null) return "-"
+    val confName = when (conference?.lowercase()) {
+        "east", "eastern" -> "East"
+        "west", "western" -> "West"
+        else -> conference ?: "Conf"
+    }
+    return "${formatOrdinal(rank)} / $confName"
 }
 
 /**
@@ -118,6 +147,10 @@ private fun ScatterDataTable(
 ) {
     val horizontalScrollState = rememberScrollState()
 
+    // Sort state - null sortColumn means default sort (score)
+    var sortColumn by remember { mutableStateOf<String?>(null) }
+    var sortAscending by remember { mutableStateOf(false) }
+
     // Calculate averages for quadrant determination (using all data)
     val avgX = data.map { it.x }.average()
     val avgY = data.map { it.y }.average()
@@ -128,12 +161,54 @@ private fun ScatterDataTable(
     val bottomLeftColor = quadrantBottomLeft?.let { parseHexColor(it.color) } ?: Color(0xFFFF9800)
     val bottomRightColor = quadrantBottomRight?.let { parseHexColor(it.color) } ?: Color(0xFFF44336)
 
-    // When invertYAxis is true, lower Y values are better (e.g., defensive EPA)
-    // So we sort by x - y (higher x, lower y = better) instead of x + y
-    val sortedData = if (invertYAxis) {
-        data.sortedByDescending { it.x - it.y }
-    } else {
-        data.sortedByDescending { it.sum }
+    // Calculate rank based on default score sort (always descending)
+    val scoreRankMap = remember(data, invertYAxis) {
+        val sortedByScore = if (invertYAxis) {
+            data.sortedByDescending { it.x - it.y }
+        } else {
+            data.sortedByDescending { it.sum }
+        }
+        sortedByScore.mapIndexed { index, point -> point to (index + 1) }.toMap()
+    }
+
+    // Sort data based on selected column
+    val sortedData = remember(data, sortColumn, sortAscending) {
+        val sorted = when (sortColumn) {
+            "label" -> if (sortAscending) data.sortedBy { it.label } else data.sortedByDescending { it.label }
+            "winPct" -> if (sortAscending) {
+                data.sortedBy { point ->
+                    if (point.wins != null && point.losses != null) {
+                        val total = point.wins + point.losses
+                        if (total > 0) point.wins.toDouble() / total else 0.0
+                    } else 0.0
+                }
+            } else {
+                data.sortedByDescending { point ->
+                    if (point.wins != null && point.losses != null) {
+                        val total = point.wins + point.losses
+                        if (total > 0) point.wins.toDouble() / total else 0.0
+                    } else 0.0
+                }
+            }
+            "confRank" -> if (sortAscending) {
+                data.sortedBy { it.conferenceRank ?: Int.MAX_VALUE }
+            } else {
+                data.sortedByDescending { it.conferenceRank ?: Int.MIN_VALUE }
+            }
+            "team" -> if (sortAscending) data.sortedBy { it.teamCode ?: "" } else data.sortedByDescending { it.teamCode ?: "" }
+            "x" -> if (sortAscending) data.sortedBy { it.x } else data.sortedByDescending { it.x }
+            "y" -> if (sortAscending) data.sortedBy { it.y } else data.sortedByDescending { it.y }
+            "score", null -> {
+                // Default sort by score (descending)
+                if (invertYAxis) {
+                    if (sortAscending) data.sortedBy { it.x - it.y } else data.sortedByDescending { it.x - it.y }
+                } else {
+                    if (sortAscending) data.sortedBy { it.sum } else data.sortedByDescending { it.sum }
+                }
+            }
+            else -> data
+        }
+        sorted
     }
 
     // Helper to get quadrant color for a point
@@ -151,6 +226,12 @@ private fun ScatterDataTable(
     // Check if any data point has a team code
     val hasTeamCodes = data.any { it.teamCode != null }
 
+    // Check if any data point has win/loss records
+    val hasRecords = data.any { it.wins != null && it.losses != null }
+
+    // Check if any data point has conference rankings
+    val hasConfRanks = data.any { it.conferenceRank != null }
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -161,14 +242,124 @@ private fun ScatterDataTable(
             modifier = Modifier.padding(vertical = 8.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            TableHeader("Rank", 40.dp)
-            TableHeader("Player/Team", 130.dp)
-            if (hasTeamCodes) {
-                TableHeader("Team", 60.dp)
+            TableHeader(
+                text = "Rank",
+                width = 50.dp,
+                sortable = true,
+                isCurrentSort = sortColumn == null || sortColumn == "score",
+                sortAscending = sortAscending,
+                onClick = {
+                    when {
+                        sortColumn == null && !sortAscending -> sortAscending = true
+                        sortColumn == null && sortAscending -> { sortColumn = null; sortAscending = false }
+                        else -> { sortColumn = null; sortAscending = false }
+                    }
+                }
+            )
+            TableHeader(
+                text = "Player/Team",
+                width = 110.dp,
+                sortable = true,
+                isCurrentSort = sortColumn == "label",
+                sortAscending = sortAscending,
+                onClick = {
+                    when {
+                        sortColumn == "label" && !sortAscending -> sortAscending = true
+                        sortColumn == "label" && sortAscending -> { sortColumn = null; sortAscending = false }
+                        else -> { sortColumn = "label"; sortAscending = false }
+                    }
+                }
+            )
+            if (hasRecords) {
+                TableHeader(
+                    text = "Win%",
+                    width = 60.dp,
+                    sortable = true,
+                    isCurrentSort = sortColumn == "winPct",
+                    sortAscending = sortAscending,
+                    onClick = {
+                        when {
+                            sortColumn == "winPct" && !sortAscending -> sortAscending = true
+                            sortColumn == "winPct" && sortAscending -> { sortColumn = null; sortAscending = false }
+                            else -> { sortColumn = "winPct"; sortAscending = false }
+                        }
+                    }
+                )
             }
-            TableHeader(xColumnLabel ?: "X Value", 80.dp)
-            TableHeader(yColumnLabel ?: "Y Value", 80.dp)
-            TableHeader("Score", 80.dp)
+            if (hasConfRanks) {
+                TableHeader(
+                    text = "Conf Rank",
+                    width = 100.dp,
+                    sortable = true,
+                    isCurrentSort = sortColumn == "confRank",
+                    sortAscending = sortAscending,
+                    onClick = {
+                        when {
+                            sortColumn == "confRank" && !sortAscending -> sortAscending = true
+                            sortColumn == "confRank" && sortAscending -> { sortColumn = null; sortAscending = false }
+                            else -> { sortColumn = "confRank"; sortAscending = false }
+                        }
+                    }
+                )
+            }
+            if (hasTeamCodes) {
+                TableHeader(
+                    text = "Team",
+                    width = 50.dp,
+                    sortable = true,
+                    isCurrentSort = sortColumn == "team",
+                    sortAscending = sortAscending,
+                    onClick = {
+                        when {
+                            sortColumn == "team" && !sortAscending -> sortAscending = true
+                            sortColumn == "team" && sortAscending -> { sortColumn = null; sortAscending = false }
+                            else -> { sortColumn = "team"; sortAscending = false }
+                        }
+                    }
+                )
+            }
+            TableHeader(
+                text = xColumnLabel ?: "X Value",
+                width = 80.dp,
+                sortable = true,
+                isCurrentSort = sortColumn == "x",
+                sortAscending = sortAscending,
+                onClick = {
+                    when {
+                        sortColumn == "x" && !sortAscending -> sortAscending = true
+                        sortColumn == "x" && sortAscending -> { sortColumn = null; sortAscending = false }
+                        else -> { sortColumn = "x"; sortAscending = false }
+                    }
+                }
+            )
+            TableHeader(
+                text = yColumnLabel ?: "Y Value",
+                width = 80.dp,
+                sortable = true,
+                isCurrentSort = sortColumn == "y",
+                sortAscending = sortAscending,
+                onClick = {
+                    when {
+                        sortColumn == "y" && !sortAscending -> sortAscending = true
+                        sortColumn == "y" && sortAscending -> { sortColumn = null; sortAscending = false }
+                        else -> { sortColumn = "y"; sortAscending = false }
+                    }
+                }
+            )
+            TableHeader(
+                text = "Score",
+                width = 80.dp,
+                sortable = true,
+                isCurrentSort = sortColumn == "score" || sortColumn == null,
+                sortAscending = sortAscending,
+                onClick = {
+                    when {
+                        (sortColumn == "score" || sortColumn == null) && !sortAscending -> sortAscending = true
+                        (sortColumn == "score" || sortColumn == null) && sortAscending -> { sortColumn = null; sortAscending = false }
+                        else -> { sortColumn = "score"; sortAscending = false }
+                    }
+                }
+            )
         }
 
         HorizontalDivider(
@@ -177,10 +368,13 @@ private fun ScatterDataTable(
         )
 
         // Data rows sorted by score (accounting for Y-axis inversion)
-        sortedData.forEachIndexed { index, point ->
+        sortedData.forEach { point ->
             // Calculate display score based on inversion
             val score = if (invertYAxis) point.x - point.y else point.sum
             val quadrantColor = getQuadrantColor(point)
+
+            // Get rank from scoreRankMap
+            val rank = scoreRankMap[point] ?: 0
 
             // Check if this team is highlighted
             // For TEAM scatter plots, extract team code from label (first word)
@@ -203,16 +397,31 @@ private fun ScatterDataTable(
                 else -> false
             }
 
+            // Calculate win percentage
+            val winPct = if (point.wins != null && point.losses != null) {
+                val totalGames = point.wins + point.losses
+                if (totalGames > 0) {
+                    (point.wins.toDouble() / totalGames * 100).formatTo(1)
+                } else {
+                    "-"
+                }
+            } else {
+                "-"
+            }
+
+            // Format conference ranking
+            val confRank = formatConferenceRank(point.conferenceRank, point.conference)
+
             Row(
                 modifier = Modifier.padding(vertical = 8.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                TableCell((index + 1).toString(), 40.dp)
+                TableCell(rank.toString(), 50.dp)
                 // Team name with colored dot (clickable)
                 Row(
                     modifier = Modifier
-                        .width(130.dp)
+                        .width(110.dp)
                         .clickable { onTeamClick(point.label) }
                         .padding(vertical = 4.dp),
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -232,8 +441,14 @@ private fun ScatterDataTable(
                         overflow = TextOverflow.Ellipsis
                     )
                 }
+                if (hasRecords) {
+                    TableCell(winPct, 60.dp)
+                }
+                if (hasConfRanks) {
+                    TableCell(confRank, 100.dp)
+                }
                 if (hasTeamCodes) {
-                    TableCell(point.teamCode ?: "-", 60.dp)
+                    TableCell(point.teamCode ?: "-", 50.dp)
                 }
                 TableCell(point.x.formatTo(2), 80.dp)
                 TableCell(point.y.formatTo(2), 80.dp)
@@ -255,6 +470,51 @@ private fun BarDataTable(
 ) {
     val horizontalScrollState = rememberScrollState()
 
+    // Sort state - null sortColumn means default sort (value)
+    var sortColumn by remember { mutableStateOf<String?>(null) }
+    var sortAscending by remember { mutableStateOf(false) }
+
+    // Check if any data point has win/loss records
+    val hasRecords = data.any { it.wins != null && it.losses != null }
+
+    // Check if any data point has conference rankings
+    val hasConfRanks = data.any { it.conferenceRank != null }
+
+    // Calculate rank based on default value sort (always descending)
+    val valueRankMap = remember(data) {
+        val sortedByValue = data.sortedByDescending { it.value }
+        sortedByValue.mapIndexed { index, point -> point to (index + 1) }.toMap()
+    }
+
+    // Sort data based on selected column
+    val sortedData = remember(data, sortColumn, sortAscending) {
+        when (sortColumn) {
+            "label" -> if (sortAscending) data.sortedBy { it.label } else data.sortedByDescending { it.label }
+            "winPct" -> if (sortAscending) {
+                data.sortedBy { point ->
+                    if (point.wins != null && point.losses != null) {
+                        val total = point.wins + point.losses
+                        if (total > 0) point.wins.toDouble() / total else 0.0
+                    } else 0.0
+                }
+            } else {
+                data.sortedByDescending { point ->
+                    if (point.wins != null && point.losses != null) {
+                        val total = point.wins + point.losses
+                        if (total > 0) point.wins.toDouble() / total else 0.0
+                    } else 0.0
+                }
+            }
+            "confRank" -> if (sortAscending) {
+                data.sortedBy { it.conferenceRank ?: Int.MAX_VALUE }
+            } else {
+                data.sortedByDescending { it.conferenceRank ?: Int.MIN_VALUE }
+            }
+            "value", null -> if (sortAscending) data.sortedBy { it.value } else data.sortedByDescending { it.value }
+            else -> data
+        }
+    }
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -265,9 +525,80 @@ private fun BarDataTable(
             modifier = Modifier.padding(vertical = 8.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            TableHeader("Rank", 40.dp)
-            TableHeader("Team", 120.dp)
-            TableHeader("Value", 100.dp)
+            TableHeader(
+                text = "Rank",
+                width = 50.dp,
+                sortable = true,
+                isCurrentSort = sortColumn == null || sortColumn == "value",
+                sortAscending = sortAscending,
+                onClick = {
+                    when {
+                        sortColumn == null && !sortAscending -> sortAscending = true
+                        sortColumn == null && sortAscending -> { sortColumn = null; sortAscending = false }
+                        else -> { sortColumn = null; sortAscending = false }
+                    }
+                }
+            )
+            TableHeader(
+                text = "Team",
+                width = 80.dp,
+                sortable = true,
+                isCurrentSort = sortColumn == "label",
+                sortAscending = sortAscending,
+                onClick = {
+                    when {
+                        sortColumn == "label" && !sortAscending -> sortAscending = true
+                        sortColumn == "label" && sortAscending -> { sortColumn = null; sortAscending = false }
+                        else -> { sortColumn = "label"; sortAscending = false }
+                    }
+                }
+            )
+            if (hasRecords) {
+                TableHeader(
+                    text = "Win%",
+                    width = 60.dp,
+                    sortable = true,
+                    isCurrentSort = sortColumn == "winPct",
+                    sortAscending = sortAscending,
+                    onClick = {
+                        when {
+                            sortColumn == "winPct" && !sortAscending -> sortAscending = true
+                            sortColumn == "winPct" && sortAscending -> { sortColumn = null; sortAscending = false }
+                            else -> { sortColumn = "winPct"; sortAscending = false }
+                        }
+                    }
+                )
+            }
+            if (hasConfRanks) {
+                TableHeader(
+                    text = "Conf Rank",
+                    width = 100.dp,
+                    sortable = true,
+                    isCurrentSort = sortColumn == "confRank",
+                    sortAscending = sortAscending,
+                    onClick = {
+                        when {
+                            sortColumn == "confRank" && !sortAscending -> sortAscending = true
+                            sortColumn == "confRank" && sortAscending -> { sortColumn = null; sortAscending = false }
+                            else -> { sortColumn = "confRank"; sortAscending = false }
+                        }
+                    }
+                )
+            }
+            TableHeader(
+                text = "Value",
+                width = 100.dp,
+                sortable = true,
+                isCurrentSort = sortColumn == "value" || sortColumn == null,
+                sortAscending = sortAscending,
+                onClick = {
+                    when {
+                        (sortColumn == "value" || sortColumn == null) && !sortAscending -> sortAscending = true
+                        (sortColumn == "value" || sortColumn == null) && sortAscending -> { sortColumn = null; sortAscending = false }
+                        else -> { sortColumn = "value"; sortAscending = false }
+                    }
+                }
+            )
         }
 
         HorizontalDivider(
@@ -275,16 +606,34 @@ private fun BarDataTable(
             thickness = 1.dp
         )
 
-        // Data rows sorted by value (descending)
-        data.sortedByDescending { it.value }.forEachIndexed { index, point ->
+        // Data rows
+        sortedData.forEach { point ->
             val teamCode = point.label.split(" ").firstOrNull() ?: ""
             val isHighlighted = highlightedTeamCodes.contains(teamCode)
+
+            // Get rank from valueRankMap
+            val rank = valueRankMap[point] ?: 0
+
+            // Calculate win percentage
+            val winPct = if (point.wins != null && point.losses != null) {
+                val totalGames = point.wins + point.losses
+                if (totalGames > 0) {
+                    (point.wins.toDouble() / totalGames * 100).formatTo(1)
+                } else {
+                    "-"
+                }
+            } else {
+                "-"
+            }
+
+            // Format conference ranking
+            val confRank = formatConferenceRank(point.conferenceRank, point.conference)
 
             Row(
                 modifier = Modifier.padding(vertical = 8.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                TableCell((index + 1).toString(), 40.dp)
+                TableCell(rank.toString(), 50.dp)
                 // Clickable team name
                 Text(
                     text = point.label,
@@ -294,10 +643,16 @@ private fun BarDataTable(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier
-                        .width(120.dp)
+                        .width(80.dp)
                         .clickable { onTeamClick(point.label) }
                         .padding(vertical = 4.dp)
                 )
+                if (hasRecords) {
+                    TableCell(winPct, 60.dp)
+                }
+                if (hasConfRanks) {
+                    TableCell(confRank, 100.dp)
+                }
                 TableCell(point.value.formatTo(1), 100.dp)
             }
             HorizontalDivider(
@@ -384,15 +739,40 @@ private fun LineDataTable(
 }
 
 @Composable
-private fun TableHeader(text: String, width: androidx.compose.ui.unit.Dp) {
-    Text(
-        text = text,
-        style = MaterialTheme.typography.labelMedium,
-        color = MaterialTheme.colorScheme.onBackground,
-        maxLines = 1,
-        overflow = TextOverflow.Ellipsis,
-        modifier = Modifier.width(width)
-    )
+private fun TableHeader(
+    text: String,
+    width: androidx.compose.ui.unit.Dp,
+    sortable: Boolean = false,
+    isCurrentSort: Boolean = false,
+    sortAscending: Boolean = true,
+    onClick: () -> Unit = {}
+) {
+    Row(
+        modifier = Modifier
+            .width(width)
+            .clickable(enabled = sortable, onClick = onClick)
+            .padding(vertical = 4.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelMedium,
+            color = if (isCurrentSort) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onBackground,
+            fontWeight = if (isCurrentSort) FontWeight.Bold else FontWeight.Normal,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f, fill = false)
+        )
+        if (sortable && isCurrentSort) {
+            Text(
+                text = if (sortAscending) "▲" else "▼",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(start = 2.dp)
+            )
+        }
+    }
 }
 
 @Composable

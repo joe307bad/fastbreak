@@ -36,7 +36,10 @@ data class BarGraphDataPoint(
     val label: String,
     val value: Double,
     val division: String? = null,
-    val conference: String? = null
+    val conference: String? = null,
+    val wins: Int? = null,
+    val losses: Int? = null,
+    val conferenceRank: Int? = null
 )
 
 @Serializable
@@ -73,7 +76,10 @@ data class ScatterPlotDataPoint(
     val teamCode: String? = null,
     val division: String? = null,
     val conference: String? = null,
-    val color: String? = null // Optional hex color for the dot (e.g., "#2196F3")
+    val color: String? = null, // Optional hex color for the dot (e.g., "#2196F3")
+    val wins: Int? = null,
+    val losses: Int? = null,
+    val conferenceRank: Int? = null
 )
 
 @Serializable
@@ -502,7 +508,11 @@ data class NBATeamInfo(
     val name: String,
     val abbreviation: String,
     val logo: String,
-    val stats: Map<String, JsonPrimitive>
+    val stats: Map<String, JsonPrimitive>,
+    val wins: Int? = null,
+    val losses: Int? = null,
+    val conferenceRank: Int? = null,
+    val conference: String? = null
 )
 
 @Serializable

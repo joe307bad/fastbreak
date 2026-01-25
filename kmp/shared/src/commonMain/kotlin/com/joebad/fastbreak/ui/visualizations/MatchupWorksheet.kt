@@ -1020,13 +1020,13 @@ private fun StatsTab(
                     if (odds.overUnder != null) {
                         add(RowData.ThreeColumn("odds_ou", odds.overUnderLeftText, "O/U", odds.overUnderRightText))
                     }
-                    add(RowData.Spacer("odds_spacer", 12.dp))
+                    add(RowData.Spacer("odds_spacer", 6.dp))
                 }
             }
 
             // View navigation row (Team / Versus options)
             add(RowData.ViewNavigation("view_nav", awayTeam, homeTeam))
-            add(RowData.Spacer("nav_spacer", 8.dp))
+            add(RowData.Spacer("nav_spacer", 4.dp))
 
             // Team Stats section - content depends on view selection
             if (teamStatsView == 0) {

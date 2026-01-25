@@ -828,9 +828,19 @@ while (current_date <= end_date) {
             odds_data <- NULL
             if (!is.null(competition$odds) && length(competition$odds) > 0) {
               odds <- competition$odds[[1]]
+
+              # Extract home team spread (preferred method)
+              home_spread <- NA
+              if (!is.null(odds$homeTeamOdds) && !is.null(odds$homeTeamOdds$spreadOdds)) {
+                home_spread <- as.numeric(odds$homeTeamOdds$spreadOdds)
+              } else if (!is.null(odds$spread)) {
+                # Fallback: use generic spread field (assumed to be home team's spread per ESPN convention)
+                home_spread <- as.numeric(odds$spread)
+              }
+
               odds_data <- list(
                 provider = if (!is.null(odds$provider)) odds$provider$name else NA,
-                spread = if (!is.null(odds$spread)) as.numeric(odds$spread) else NA,
+                spread = home_spread,  # This is explicitly the home team's spread
                 over_under = if (!is.null(odds$overUnder)) as.numeric(odds$overUnder) else NA,
                 home_moneyline = if (!is.null(odds$homeTeamOdds)) {
                   if (!is.null(odds$homeTeamOdds$moneyLine)) as.numeric(odds$homeTeamOdds$moneyLine) else NA

@@ -8,6 +8,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.*
@@ -77,6 +79,9 @@ fun DataVizScreen(
     // State to hold the share callback from charts
     var chartShareHandler by remember { mutableStateOf<(() -> Unit)?>(null) }
 
+    // State to hold the schedule toggle handler from NBA matchup worksheet
+    var scheduleToggleHandler by remember { mutableStateOf<ScheduleToggleHandler?>(null) }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -104,6 +109,15 @@ fun DataVizScreen(
                     }
                 },
                 actions = {
+                    // Show schedule toggle icon for NBA matchup worksheets
+                    scheduleToggleHandler?.let { handler ->
+                        IconButton(onClick = handler.toggle) {
+                            Icon(
+                                imageVector = if (handler.isExpanded) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
+                                contentDescription = if (handler.isExpanded) "Collapse schedule" else "Expand schedule"
+                            )
+                        }
+                    }
                     // Show info icon only when data is loaded and has a description
                     if (state is DataVizState.Success && (state as DataVizState.Success).data.description.isNotEmpty()) {
                         IconButton(onClick = { showInfoSheet = true }) {
@@ -148,6 +162,9 @@ fun DataVizScreen(
                     pinnedTeams = pinnedTeams,
                     onChartShareHandlerChanged = { handler ->
                         chartShareHandler = handler
+                    },
+                    onScheduleToggleHandlerChanged = { handler ->
+                        scheduleToggleHandler = handler
                     }
                 )
                 is DataVizState.Error -> ErrorContent(
@@ -245,7 +262,8 @@ private fun LoadingContent() {
 private fun SuccessContent(
     visualization: VisualizationType,
     pinnedTeams: List<PinnedTeam>,
-    onChartShareHandlerChanged: ((() -> Unit)?) -> Unit
+    onChartShareHandlerChanged: ((() -> Unit)?) -> Unit,
+    onScheduleToggleHandlerChanged: ((ScheduleToggleHandler?) -> Unit)? = null
 ) {
     // State for filters and team highlighting
     var selectedFilters by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
@@ -354,6 +372,7 @@ private fun SuccessContent(
             highlightedPlayerLabels = selectedPlayerLabels,
             onChartShareHandlerChanged = onChartShareHandlerChanged,
             pinnedTeams = pinnedTeams,
+            onScheduleToggleHandlerChanged = onScheduleToggleHandlerChanged,
             onTeamClick = { label ->
                 // For PLAYER scatter plots, highlight individual players by label
                 // For TEAM scatter plots (and others), highlight teams by extracting team code
@@ -393,7 +412,8 @@ private fun RenderVisualization(
     highlightedPlayerLabels: Set<String> = emptySet(),
     onChartShareHandlerChanged: ((() -> Unit)?) -> Unit = {},
     onTeamClick: (String) -> Unit = {},
-    pinnedTeams: List<PinnedTeam> = emptyList()
+    pinnedTeams: List<PinnedTeam> = emptyList(),
+    onScheduleToggleHandlerChanged: ((ScheduleToggleHandler?) -> Unit)? = null
 ) {
     println("📊 RenderVisualization - highlightedPlayerLabels: $highlightedPlayerLabels")
     println("📊 RenderVisualization - visualization type: ${visualization::class.simpleName}")
@@ -435,7 +455,8 @@ private fun RenderVisualization(
         NBAMatchupWorksheet(
             visualization = visualization,
             modifier = Modifier.fillMaxSize(),
-            pinnedTeams = pinnedTeams
+            pinnedTeams = pinnedTeams,
+            onScheduleToggleHandlerChanged = onScheduleToggleHandlerChanged
         )
     } else {
         // For charts: use vertical scroll to show chart + data table

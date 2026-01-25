@@ -177,7 +177,7 @@ fun ThreeColumnRow(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 8.dp, vertical = 6.dp),
+            .padding(horizontal = 8.dp, vertical = 3.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -450,137 +450,49 @@ fun PinnedMatchupHeader(
     homeConference: String? = null,
     modifier: Modifier = Modifier
 ) {
-    // Helper to format conference name
-    fun formatConference(conf: String?): String {
-        return when (conf?.lowercase()) {
-            "east" -> "East"
-            "west" -> "West"
-            else -> "Conf"
-        }
-    }
-
-    // Build record strings
-    val awayRecord = if (awayWins != null && awayLosses != null && awayConferenceRank != null) {
-        "$awayWins-$awayLosses / ${formatOrdinal(awayConferenceRank)} / ${formatConference(awayConference)}"
-    } else {
-        null
-    }
-
-    val homeRecord = if (homeWins != null && homeLosses != null && homeConferenceRank != null) {
-        "$homeWins-$homeLosses / ${formatOrdinal(homeConferenceRank)} / ${formatConference(homeConference)}"
-    } else {
-        null
-    }
-
     androidx.compose.material3.Surface(
         modifier = modifier.fillMaxWidth(),
         color = MaterialTheme.colorScheme.background
     ) {
-        Column(
+        // Only show team abbreviations (single row)
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(start = 8.dp, end = 8.dp, top = 6.dp, bottom = 12.dp)
+                .padding(start = 8.dp, end = 8.dp, top = 6.dp, bottom = 6.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            // First row: Team abbreviations
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = awayTeam,
-                    style = MaterialTheme.typography.bodySmall.copy(lineHeight = 11.sp),
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.weight(1f),
-                    maxLines = 1
-                )
+            Text(
+                text = awayTeam,
+                style = MaterialTheme.typography.bodySmall.copy(lineHeight = 11.sp),
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.weight(1f),
+                maxLines = 1
+            )
 
-                Text(
-                    text = "@",
-                    style = MaterialTheme.typography.bodySmall.copy(lineHeight = 11.sp),
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-                    modifier = Modifier.weight(1f),
-                    textAlign = TextAlign.Center,
-                    maxLines = 1
-                )
+            Text(
+                text = "@",
+                style = MaterialTheme.typography.bodySmall.copy(lineHeight = 11.sp),
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                modifier = Modifier.weight(1f),
+                textAlign = TextAlign.Center,
+                maxLines = 1
+            )
 
-                Text(
-                    text = homeTeam,
-                    style = MaterialTheme.typography.bodySmall.copy(lineHeight = 11.sp),
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.weight(1f),
-                    textAlign = TextAlign.End,
-                    maxLines = 1
-                )
-            }
-
-            // Second row: Records and conference ranks (if available)
-            if (awayRecord != null || homeRecord != null) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    // Away team record with conference rank indicator
-                    Row(
-                        modifier = Modifier.weight(1f),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Start
-                    ) {
-                        if (awayConferenceRank != null) {
-                            Box(
-                                modifier = Modifier
-                                    .size(6.dp)
-                                    .background(
-                                        color = getConferenceRankColor(awayConferenceRank),
-                                        shape = CircleShape
-                                    )
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                        }
-                        Text(
-                            text = awayRecord ?: "",
-                            style = MaterialTheme.typography.bodySmall.copy(lineHeight = 10.sp),
-                            fontSize = 9.sp,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
-                            maxLines = 1
-                        )
-                    }
-
-                    // Home team record with conference rank indicator
-                    Row(
-                        modifier = Modifier.weight(1f),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.End
-                    ) {
-                        Text(
-                            text = homeRecord ?: "",
-                            style = MaterialTheme.typography.bodySmall.copy(lineHeight = 10.sp),
-                            fontSize = 9.sp,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
-                            textAlign = TextAlign.End,
-                            maxLines = 1
-                        )
-                        if (homeConferenceRank != null) {
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Box(
-                                modifier = Modifier
-                                    .size(6.dp)
-                                    .background(
-                                        color = getConferenceRankColor(homeConferenceRank),
-                                        shape = CircleShape
-                                    )
-                            )
-                        }
-                    }
-                }
-            }
+            Text(
+                text = homeTeam,
+                style = MaterialTheme.typography.bodySmall.copy(lineHeight = 11.sp),
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.weight(1f),
+                textAlign = TextAlign.End,
+                maxLines = 1
+            )
         }
     }
 }

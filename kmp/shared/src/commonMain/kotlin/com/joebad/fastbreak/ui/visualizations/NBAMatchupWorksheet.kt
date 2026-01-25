@@ -1,5 +1,9 @@
 package com.joebad.fastbreak.ui.visualizations
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -8,6 +12,9 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -33,6 +40,14 @@ import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import kotlin.math.round
+
+/**
+ * Data class to hold schedule toggle state and handler
+ */
+data class ScheduleToggleHandler(
+    val isExpanded: Boolean,
+    val toggle: () -> Unit
+)
 
 /**
  * Helper to format doubles with specified decimal places
@@ -70,7 +85,8 @@ private fun Double.formatStat(decimals: Int = 1): String {
 fun NBAMatchupWorksheet(
     visualization: NBAMatchupVisualization,
     modifier: Modifier = Modifier,
-    pinnedTeams: List<com.joebad.fastbreak.data.model.PinnedTeam> = emptyList()
+    pinnedTeams: List<com.joebad.fastbreak.data.model.PinnedTeam> = emptyList(),
+    onScheduleToggleHandlerChanged: ((ScheduleToggleHandler?) -> Unit)? = null
 ) {
     // Get NBA pinned teams only
     val nbaPinnedTeamCodes = remember(pinnedTeams) {
@@ -104,6 +120,26 @@ fun NBAMatchupWorksheet(
     // State for selected date and matchup
     var selectedDateIndex by remember { mutableStateOf(0) }
     var selectedMatchupIndex by remember { mutableStateOf(0) }
+
+    // State for collapsing/expanding schedule selection
+    var isScheduleExpanded by remember { mutableStateOf(true) }
+
+    // Expose schedule toggle handler to parent
+    LaunchedEffect(isScheduleExpanded) {
+        onScheduleToggleHandlerChanged?.invoke(
+            ScheduleToggleHandler(
+                isExpanded = isScheduleExpanded,
+                toggle = { isScheduleExpanded = !isScheduleExpanded }
+            )
+        )
+    }
+
+    // Cleanup when leaving
+    DisposableEffect(Unit) {
+        onDispose {
+            onScheduleToggleHandlerChanged?.invoke(null)
+        }
+    }
 
     // Get matchups for selected date
     val selectedDate = if (dates.isNotEmpty()) dates[selectedDateIndex] else null
@@ -168,40 +204,58 @@ fun NBAMatchupWorksheet(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(start = 16.dp, end = 16.dp, bottom = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+                .padding(start = 16.dp, end = 16.dp, bottom = 16.dp)
         ) {
-            // First row: Date badges
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            // Collapsible schedule selection
+            AnimatedVisibility(
+                visible = isScheduleExpanded,
+                enter = expandVertically(
+                    animationSpec = tween(durationMillis = 200),
+                    expandFrom = Alignment.Top
+                ),
+                exit = shrinkVertically(
+                    animationSpec = tween(durationMillis = 200),
+                    shrinkTowards = Alignment.Top
+                )
             ) {
-                dates.forEachIndexed { index, date ->
-                    DateBadge(
-                        date = date,
-                        isSelected = selectedDateIndex == index,
-                        onClick = { selectedDateIndex = index }
-                    )
-                }
-            }
+                Column {
+                    // First row: Date badges
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        dates.forEachIndexed { index, date ->
+                            DateBadge(
+                                date = date,
+                                isSelected = selectedDateIndex == index,
+                                onClick = { selectedDateIndex = index }
+                            )
+                        }
+                    }
 
-            // Second row: Matchup badges for selected date
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                matchupsForDate.forEachIndexed { index, matchup ->
-                    MatchupBadge(
-                        awayTeam = matchup.awayTeam.abbreviation,
-                        homeTeam = matchup.homeTeam.abbreviation,
-                        gameDate = matchup.gameDate,
-                        isSelected = selectedMatchupIndex == index,
-                        onClick = { selectedMatchupIndex = index }
-                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // Second row: Matchup badges for selected date
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        matchupsForDate.forEachIndexed { index, matchup ->
+                            MatchupBadge(
+                                awayTeam = matchup.awayTeam.abbreviation,
+                                homeTeam = matchup.homeTeam.abbreviation,
+                                gameDate = matchup.gameDate,
+                                isSelected = selectedMatchupIndex == index,
+                                onClick = { selectedMatchupIndex = index }
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
                 }
             }
 
@@ -215,8 +269,24 @@ fun NBAMatchupWorksheet(
                     modifier = Modifier
                         .fillMaxSize()
                         .verticalScroll(rememberScrollState())
-                        .padding(top = 38.dp) // Space for pinned header (two rows)
+                        .padding(top = 20.dp) // Space for pinned header (one row now)
                 ) {
+                    // Record and conference rank section (scrollable)
+                    RecordAndConferenceSection(
+                        awayTeam = selectedMatchup.awayTeam.abbreviation,
+                        homeTeam = selectedMatchup.homeTeam.abbreviation,
+                        awayWins = selectedMatchup.awayTeam.wins,
+                        awayLosses = selectedMatchup.awayTeam.losses,
+                        awayConferenceRank = selectedMatchup.awayTeam.conferenceRank,
+                        awayConference = selectedMatchup.awayTeam.conference,
+                        homeWins = selectedMatchup.homeTeam.wins,
+                        homeLosses = selectedMatchup.homeTeam.losses,
+                        homeConferenceRank = selectedMatchup.homeTeam.conferenceRank,
+                        homeConference = selectedMatchup.homeTeam.conference
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
                     NBAMatchupContent(
                         matchup = selectedMatchup,
                         viewSelection = viewSelection,
@@ -224,18 +294,10 @@ fun NBAMatchupWorksheet(
                     )
                 }
 
-                // Pinned header
+                // Pinned header (only team abbreviations)
                 PinnedMatchupHeader(
                     awayTeam = selectedMatchup.awayTeam.abbreviation,
                     homeTeam = selectedMatchup.homeTeam.abbreviation,
-                    awayWins = selectedMatchup.awayTeam.wins,
-                    awayLosses = selectedMatchup.awayTeam.losses,
-                    awayConferenceRank = selectedMatchup.awayTeam.conferenceRank,
-                    awayConference = selectedMatchup.awayTeam.conference,
-                    homeWins = selectedMatchup.homeTeam.wins,
-                    homeLosses = selectedMatchup.homeTeam.losses,
-                    homeConferenceRank = selectedMatchup.homeTeam.conferenceRank,
-                    homeConference = selectedMatchup.homeTeam.conference,
                     modifier = Modifier.align(Alignment.TopCenter)
                 )
             }
@@ -696,7 +758,7 @@ private fun NBAMatchupContent(
 ) {
     Column {
         // Extra spacing below pinned team header
-        Spacer(modifier = Modifier.height(6.dp))
+        Spacer(modifier = Modifier.height(3.dp))
 
         // Betting Odds Section
         matchup.odds?.let { odds ->
@@ -706,10 +768,12 @@ private fun NBAMatchupContent(
             if (hasOdds) {
                 SectionHeader("Betting Odds")
 
-                // Spread
+                // Spread (Note: spread value is the home team's spread from the API)
                 odds.spread?.let { spread ->
-                    val awaySpread = if (spread > 0) "+$spread" else spread.toString()
-                    val homeSpread = if (spread < 0) "+${-spread}" else (-spread).toString()
+                    // spread is home team's spread (negative = favored, positive = underdog)
+                    val homeSpread = if (spread > 0) "+$spread" else spread.toString()
+                    // away team gets the opposite
+                    val awaySpread = if (spread < 0) "+${-spread}" else (-spread).toString()
                     ThreeColumnRow(
                         leftText = awaySpread,
                         centerText = "Spread",
@@ -735,12 +799,12 @@ private fun NBAMatchupContent(
                     )
                 }
 
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(6.dp))
             }
         }
 
         // View Navigation
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(4.dp))
 
         Row(
             modifier = Modifier
@@ -1010,6 +1074,121 @@ private fun PlayerStatsView(matchup: com.joebad.fastbreak.data.model.NBAMatchup)
             statsConfig = statsConfig,
             usePlayerRanks = true // Use player rank colors (1-30 green, 31-60 orange-red, 61+ dark red)
         )
+    }
+}
+
+/**
+ * Record and conference rank section that scrolls with content
+ */
+@Composable
+private fun RecordAndConferenceSection(
+    awayTeam: String,
+    homeTeam: String,
+    awayWins: Int?,
+    awayLosses: Int?,
+    awayConferenceRank: Int?,
+    awayConference: String?,
+    homeWins: Int?,
+    homeLosses: Int?,
+    homeConferenceRank: Int?,
+    homeConference: String?
+) {
+    // Helper to format conference name
+    fun formatConference(conf: String?): String {
+        return when (conf?.lowercase()) {
+            "east" -> "East"
+            "west" -> "West"
+            else -> "Conf"
+        }
+    }
+
+    // Build record strings
+    val awayRecord = if (awayWins != null && awayLosses != null && awayConferenceRank != null) {
+        "$awayWins-$awayLosses / ${formatOrdinal(awayConferenceRank)} / ${formatConference(awayConference)}"
+    } else {
+        null
+    }
+
+    val homeRecord = if (homeWins != null && homeLosses != null && homeConferenceRank != null) {
+        "$homeWins-$homeLosses / ${formatOrdinal(homeConferenceRank)} / ${formatConference(homeConference)}"
+    } else {
+        null
+    }
+
+    if (awayRecord != null || homeRecord != null) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 8.dp, vertical = 4.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Away team record with conference rank indicator
+            Row(
+                modifier = Modifier.weight(1f),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Start
+            ) {
+                if (awayConferenceRank != null) {
+                    Box(
+                        modifier = Modifier
+                            .size(6.dp)
+                            .background(
+                                color = getConferenceRankColor(awayConferenceRank),
+                                shape = androidx.compose.foundation.shape.CircleShape
+                            )
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                }
+                Text(
+                    text = awayRecord ?: "",
+                    style = MaterialTheme.typography.bodySmall.copy(lineHeight = 12.sp),
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                    maxLines = 1
+                )
+            }
+
+            // Home team record with conference rank indicator
+            Row(
+                modifier = Modifier.weight(1f),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.End
+            ) {
+                Text(
+                    text = homeRecord ?: "",
+                    style = MaterialTheme.typography.bodySmall.copy(lineHeight = 12.sp),
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                    textAlign = TextAlign.End,
+                    maxLines = 1
+                )
+                if (homeConferenceRank != null) {
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Box(
+                        modifier = Modifier
+                            .size(6.dp)
+                            .background(
+                                color = getConferenceRankColor(homeConferenceRank),
+                                shape = androidx.compose.foundation.shape.CircleShape
+                            )
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Helper function to format ordinal numbers (1st, 2nd, 3rd, etc.)
+ */
+private fun formatOrdinal(number: Int): String {
+    return when {
+        number % 100 in 11..13 -> "${number}th"
+        number % 10 == 1 -> "${number}st"
+        number % 10 == 2 -> "${number}nd"
+        number % 10 == 3 -> "${number}rd"
+        else -> "${number}th"
     }
 }
 

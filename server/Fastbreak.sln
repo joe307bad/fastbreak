@@ -11,6 +11,8 @@ Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Fastbreak.Api", "src\Fastbr
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Fastbreak.Research.Cli", "src\Fastbreak.Research.Cli\Fastbreak.Research.Cli.fsproj", "{9AE73478-BA69-4566-84BC-53D4DECDF75E}"
 EndProject
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Fastbreak.Daily", "src\Fastbreak.Daily\Fastbreak.Daily.fsproj", "{52737F9E-135C-47CD-988B-5942D47886D3}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -32,10 +34,15 @@ Global
 		{9AE73478-BA69-4566-84BC-53D4DECDF75E}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{9AE73478-BA69-4566-84BC-53D4DECDF75E}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{9AE73478-BA69-4566-84BC-53D4DECDF75E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{52737F9E-135C-47CD-988B-5942D47886D3}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{52737F9E-135C-47CD-988B-5942D47886D3}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{52737F9E-135C-47CD-988B-5942D47886D3}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{52737F9E-135C-47CD-988B-5942D47886D3}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{FBBADBFF-E72C-4C5C-AC60-68A80AF17389} = {E8EDFD0F-CB80-4146-BC6E-54D6F621B92F}
 		{E1AB727D-DD61-4374-B06F-6BE5ABD317F1} = {E8EDFD0F-CB80-4146-BC6E-54D6F621B92F}
 		{9AE73478-BA69-4566-84BC-53D4DECDF75E} = {E8EDFD0F-CB80-4146-BC6E-54D6F621B92F}
+		{52737F9E-135C-47CD-988B-5942D47886D3} = {E8EDFD0F-CB80-4146-BC6E-54D6F621B92F}
 	EndGlobalSection
 EndGlobal

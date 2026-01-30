@@ -116,15 +116,15 @@ actual fun addTitleToBitmap(bitmap: ImageBitmap, title: String, isDarkTheme: Boo
     val titlePadding = 32f
     val maxTextWidth = skiaBitmap.width - (titlePadding * 2)
 
-    // Start with a base text size and scale down if needed to fit
+    // Start with a base text size and scale down if needed to fit (ensure single line)
     var titleTextSize = 48f
     val typeface = org.jetbrains.skia.FontMgr.default.matchFamilyStyle("Courier", org.jetbrains.skia.FontStyle.NORMAL)
     var font = Font(typeface, titleTextSize)
 
-    // Measure text and scale down if it doesn't fit
+    // Measure text and scale down if it doesn't fit (ensure single line, no wrapping)
     var textLine = TextLine.make(title, font)
-    while (textLine.width > maxTextWidth && titleTextSize > 16f) {
-        titleTextSize -= 2f
+    while (textLine.width > maxTextWidth && titleTextSize > 12f) {
+        titleTextSize -= 1f
         font = Font(typeface, titleTextSize)
         textLine = TextLine.make(title, font)
     }

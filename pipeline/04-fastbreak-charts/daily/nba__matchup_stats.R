@@ -824,6 +824,33 @@ while (current_date <= end_date) {
           }
 
           if (!is.null(home_team) && !is.null(away_team)) {
+            # Extract venue/location information
+            location_data <- NULL
+            if (!is.null(competition$venue)) {
+              venue <- competition$venue
+              stadium_name <- if (!is.null(venue$fullName)) venue$fullName else NA
+              city <- if (!is.null(venue$address) && !is.null(venue$address$city)) venue$address$city else NA
+              state <- if (!is.null(venue$address) && !is.null(venue$address$state)) venue$address$state else NA
+              country <- if (!is.null(venue$address) && !is.null(venue$address$country)) venue$address$country else NA
+
+              # Build location string components
+              location_parts <- c()
+              if (!is.na(stadium_name)) location_parts <- c(location_parts, stadium_name)
+              if (!is.na(city)) location_parts <- c(location_parts, city)
+              if (!is.na(state)) location_parts <- c(location_parts, state)
+              if (!is.na(country) && country != "USA") location_parts <- c(location_parts, country)  # Only show country if not USA
+
+              location_string <- paste(location_parts, collapse = ", ")
+
+              location_data <- list(
+                stadium = stadium_name,
+                city = city,
+                state = state,
+                country = country,
+                fullLocation = if (length(location_parts) > 0) location_string else NA
+              )
+            }
+
             # Extract odds if available
             odds_data <- NULL
             if (!is.null(competition$odds) && length(competition$odds) > 0) {
@@ -863,6 +890,7 @@ while (current_date <= end_date) {
               away_team_name = away_team$team$displayName,
               away_team_abbrev = away_team$team$abbreviation,
               away_team_logo = if (!is.null(away_team$team$logo)) away_team$team$logo else NA,
+              location = location_data,
               odds = odds_data
             )
 
@@ -1530,6 +1558,17 @@ for (game in upcoming_games) {
     awayPlayers = away_players_data,
     comparisons = comparisons
   )
+
+  # Add location if available
+  if (!is.null(game$location)) {
+    matchup$location <- list(
+      stadium = game$location$stadium,
+      city = game$location$city,
+      state = game$location$state,
+      country = game$location$country,
+      fullLocation = game$location$fullLocation
+    )
+  }
 
   # Add odds if available
   if (!is.null(game$odds)) {

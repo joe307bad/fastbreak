@@ -729,6 +729,13 @@ get_current_week_info <- function(schedules_df) {
         # Only advance if ESPN's week has no events (meaning games are done)
         has_espn_events <- !is.null(scoreboard$events) && length(scoreboard$events) > 0
 
+        # Special handling: If Conference Championships (week 3) and it's Tuesday+,
+        # advance to Super Bowl (week 5) - skip Pro Bowl (week 4)
+        if (current_day_of_week >= 2 && espn_week == 3) {
+          cat("Conference Championships week detected on Tuesday+ - advancing to Super Bowl (week 5), skipping Pro Bowl\n")
+          return(list(week = 5, season_type = 3))
+        }
+
         if (has_espn_events) {
           cat(sprintf("ESPN shows events for week %d, using that week\n", espn_week))
           return(list(week = espn_week, season_type = 3))
@@ -767,6 +774,14 @@ get_current_week_info <- function(schedules_df) {
           cat(sprintf("Tuesday rollover (playoffs): Advancing from week %d to week %d\n",
                       espn_week, target_week))
           return(list(week = target_week, season_type = 3))
+        }
+
+        # Special handling: If Conference Championships (week 3) is complete and it's Tuesday+,
+        # advance to Super Bowl (week 5) even if week 5 doesn't exist in all_playoff_weeks yet
+        # This skips the Pro Bowl week (week 4)
+        if (espn_week == 3) {
+          cat("Conference Championships complete, advancing to Super Bowl (week 5) - skipping Pro Bowl\n")
+          return(list(week = 5, season_type = 3))
         }
       }
 
@@ -1951,10 +1966,13 @@ title_text <- if (is_playoffs) {
     current_week == 1 ~ "Wild Card",
     current_week == 2 ~ "Divisional Round",
     current_week == 3 ~ "Conference Championships",
-    current_week == 4 ~ "Super Bowl",
+    current_week == 4 ~ "Pro Bowl",
+    current_week == 5 ~ "Super Bowl",
     TRUE ~ paste0("Playoff Week ", current_week)
   )
-  paste0(week_label, " Matchup Worksheets")
+  # Super Bowl is singular (only one game)
+  suffix <- if (current_week == 5) " Matchup Worksheet" else " Matchup Worksheets"
+  paste0(week_label, suffix)
 } else {
   paste0("Week ", current_week, " Matchup Worksheets")
 }

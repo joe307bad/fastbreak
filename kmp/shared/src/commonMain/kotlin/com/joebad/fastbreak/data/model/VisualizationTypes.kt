@@ -542,6 +542,15 @@ data class NBAPlayerInfo(
 )
 
 @Serializable
+data class MatchupLocation(
+    val stadium: String? = null,
+    val city: String? = null,
+    val state: String? = null,
+    val country: String? = null,
+    val fullLocation: String? = null
+)
+
+@Serializable
 data class NBAMatchupOdds(
     val spread: Double? = null,
     val overUnder: Double? = null,
@@ -558,6 +567,7 @@ data class NBAMatchup(
     val awayTeam: NBATeamInfo,
     val homePlayers: List<NBAPlayerInfo> = emptyList(),
     val awayPlayers: List<NBAPlayerInfo> = emptyList(),
+    val location: MatchupLocation? = null,
     val odds: NBAMatchupOdds? = null,
     val comparisons: MatchupComparisons? = null
 )

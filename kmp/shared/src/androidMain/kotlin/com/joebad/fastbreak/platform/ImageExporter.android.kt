@@ -156,12 +156,14 @@ actual fun addTitleToBitmap(bitmap: ImageBitmap, title: String, isDarkTheme: Boo
         typeface = Typeface.create("monospace", Typeface.NORMAL)
         isAntiAlias = true
         textAlign = Paint.Align.LEFT
+        // Ensure single-line rendering - no wrapping
+        isFakeBoldText = false
     }
 
-    // Measure text and scale down if it doesn't fit
+    // Measure text and scale down if it doesn't fit (ensure single line)
     var textWidth = textPaint.measureText(title)
-    while (textWidth > maxTextWidth && titleTextSize > 16f) {
-        titleTextSize -= 2f
+    while (textWidth > maxTextWidth && titleTextSize > 12f) {
+        titleTextSize -= 1f
         textPaint.textSize = titleTextSize
         textWidth = textPaint.measureText(title)
     }

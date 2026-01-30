@@ -1,5 +1,6 @@
 package com.joebad.fastbreak.ui.visualizations
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -26,7 +27,13 @@ data class ShareGameInfo(
     val homeTeam: String,
     val eventLabel: String, // e.g., "Week 18" for NFL, "Jan 23" for NBA
     val formattedDate: String, // e.g., "Sat, Dec 28 7:00 PM"
-    val source: String = "ESPN"
+    val source: String = "ESPN",
+    val awayRecord: String? = null, // e.g., "25-15"
+    val homeRecord: String? = null,
+    val awayConferenceRank: Int? = null,
+    val homeConferenceRank: Int? = null,
+    val awayConference: String? = null, // e.g., "Eastern" or "Western"
+    val homeConference: String? = null
 )
 
 /** Generic odds information */
@@ -445,7 +452,7 @@ fun GenericMatchupShareImage(
     Column(
         modifier = modifier
             .background(backgroundColor)
-            .padding(40.dp)
+            .padding(24.dp)
     ) {
         // Compact header row with team names and odds
         Row(
@@ -493,8 +500,10 @@ fun GenericMatchupShareImage(
             ) {
                 Text(
                     text = "${gameInfo.eventLabel} • ${gameInfo.formattedDate}",
-                    fontSize = 48.sp,
-                    color = textColor.copy(alpha = 0.8f)
+                    fontSize = 42.sp,
+                    color = textColor.copy(alpha = 0.8f),
+                    maxLines = 1,
+                    softWrap = false
                 )
                 odds?.overUnder?.let { ou ->
                     Text(
@@ -540,12 +549,119 @@ fun GenericMatchupShareImage(
             }
         }
 
-        Spacer(modifier = Modifier.height(20.dp))
+        // Record and Conference Rank Row (for NBA only)
+        if (gameInfo.awayRecord != null || gameInfo.homeRecord != null ||
+            gameInfo.awayConferenceRank != null || gameInfo.homeConferenceRank != null) {
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Away team record and conference rank
+                if (gameInfo.awayRecord != null || gameInfo.awayConferenceRank != null) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // Colored rank indicator circle
+                        gameInfo.awayConferenceRank?.let { rank ->
+                            val rankColor = when {
+                                rank <= 5 -> Color(0xFF4CAF50) // Green for top 5
+                                rank <= 10 -> Color(0xFFFFC107) // Yellow for 6-10
+                                else -> Color(0xFFF44336) // Red for 11+
+                            }
+                            Canvas(
+                                modifier = Modifier.size(24.dp)
+                            ) {
+                                drawCircle(color = rankColor)
+                            }
+                        }
+
+                        // Format: "wins - losses / rank in Conference"
+                        val recordParts = gameInfo.awayRecord?.split("-")
+                        val wins = recordParts?.getOrNull(0) ?: ""
+                        val losses = recordParts?.getOrNull(1) ?: ""
+
+                        val rankText = gameInfo.awayConferenceRank?.let { rank ->
+                            val ordinal = when (rank) {
+                                1 -> "1st"
+                                2 -> "2nd"
+                                3 -> "3rd"
+                                else -> "${rank}th"
+                            }
+                            val confName = gameInfo.awayConference?.let { conf ->
+                                if (conf.startsWith("East", ignoreCase = true)) "East" else "West"
+                            } ?: ""
+                            " / $ordinal in the $confName"
+                        } ?: ""
+
+                        Text(
+                            text = "$wins - $losses$rankText",
+                            fontSize = 36.sp,
+                            color = textColor.copy(alpha = 0.8f)
+                        )
+                    }
+                }
+
+                // Center divider or empty space
+                Spacer(modifier = Modifier.width(20.dp))
+
+                // Home team record and conference rank (mirrored layout)
+                if (gameInfo.homeRecord != null || gameInfo.homeConferenceRank != null) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // Format: "rank in Conference / wins - losses" (flipped order for home team)
+                        val recordParts = gameInfo.homeRecord?.split("-")
+                        val wins = recordParts?.getOrNull(0) ?: ""
+                        val losses = recordParts?.getOrNull(1) ?: ""
+
+                        val rankText = gameInfo.homeConferenceRank?.let { rank ->
+                            val ordinal = when (rank) {
+                                1 -> "1st"
+                                2 -> "2nd"
+                                3 -> "3rd"
+                                else -> "${rank}th"
+                            }
+                            val confName = gameInfo.homeConference?.let { conf ->
+                                if (conf.startsWith("East", ignoreCase = true)) "East" else "West"
+                            } ?: ""
+                            "$ordinal in the $confName / "
+                        } ?: ""
+
+                        Text(
+                            text = "$rankText$wins - $losses",
+                            fontSize = 36.sp,
+                            color = textColor.copy(alpha = 0.8f)
+                        )
+
+                        // Colored rank indicator circle (on the right for home team)
+                        gameInfo.homeConferenceRank?.let { rank ->
+                            val rankColor = when {
+                                rank <= 5 -> Color(0xFF4CAF50) // Green for top 5
+                                rank <= 10 -> Color(0xFFFFC107) // Yellow for 6-10
+                                else -> Color(0xFFF44336) // Red for 11+
+                            }
+                            Canvas(
+                                modifier = Modifier.size(24.dp)
+                            ) {
+                                drawCircle(color = rankColor)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
 
         // 2x3 Grid of stat boxes
         Column(
             modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             // Row 1: Boxes 0-2
             Row(
@@ -710,7 +826,9 @@ private fun ShareGenericFiveColumnRow(
             fontSize = 34.sp,
             color = MaterialTheme.colorScheme.primary,
             textAlign = TextAlign.Center,
-            modifier = Modifier.weight(1.5f)
+            modifier = Modifier.weight(1.5f),
+            maxLines = 1,
+            softWrap = false
         )
 
         Spacer(modifier = Modifier.width(12.dp))
@@ -792,55 +910,9 @@ private fun ShareComparisonCard(
     Column(
         modifier = modifier
             .fillMaxHeight()
-            .background(cardBackground, RoundedCornerShape(16.dp))
-            .padding(24.dp)
+            .padding(8.dp),
+        verticalArrangement = Arrangement.SpaceBetween
     ) {
-        // Use three-label header if labels are provided, otherwise use centered title
-        if (leftLabel != null || middleLabel != null || rightLabel != null) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Left label (e.g., "DET Off")
-                Text(
-                    text = leftLabel ?: "",
-                    fontSize = 46.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Team1Color,
-                    modifier = Modifier.weight(1f),
-                    textAlign = TextAlign.Start
-                )
-                // Middle label (e.g., "vs")
-                Text(
-                    text = middleLabel ?: "",
-                    fontSize = 40.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
-                    textAlign = TextAlign.Center
-                )
-                // Right label (e.g., "HOU Def")
-                Text(
-                    text = rightLabel ?: "",
-                    fontSize = 46.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Team2Color,
-                    modifier = Modifier.weight(1f),
-                    textAlign = TextAlign.End
-                )
-            }
-        } else {
-            // Fallback to centered title
-            Text(
-                text = title,
-                fontSize = 46.sp,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onBackground,
-                modifier = Modifier.fillMaxWidth(),
-                textAlign = TextAlign.Center
-            )
-        }
-        Spacer(modifier = Modifier.height(14.dp))
         content()
     }
 }
@@ -1209,7 +1281,9 @@ private fun ShareThreeColumnRow(
             fontWeight = centerWeight,
             color = MaterialTheme.colorScheme.primary,
             textAlign = TextAlign.Center,
-            modifier = Modifier.weight(1f)
+            modifier = Modifier.weight(1f),
+            maxLines = 1,
+            softWrap = false
         )
 
         Row(
@@ -1290,7 +1364,9 @@ private fun ShareFiveColumnRow(
             fontSize = 34.sp,
             color = MaterialTheme.colorScheme.primary,
             textAlign = TextAlign.Center,
-            modifier = Modifier.weight(1.5f)
+            modifier = Modifier.weight(1.5f),
+            maxLines = 1,
+            softWrap = false
         )
 
         Spacer(modifier = Modifier.width(12.dp))

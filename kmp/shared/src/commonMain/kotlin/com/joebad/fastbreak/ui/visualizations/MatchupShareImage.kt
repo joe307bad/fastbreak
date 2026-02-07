@@ -1,5 +1,6 @@
 package com.joebad.fastbreak.ui.visualizations
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -26,7 +27,13 @@ data class ShareGameInfo(
     val homeTeam: String,
     val eventLabel: String, // e.g., "Week 18" for NFL, "Jan 23" for NBA
     val formattedDate: String, // e.g., "Sat, Dec 28 7:00 PM"
-    val source: String = "ESPN"
+    val source: String = "ESPN",
+    val awayRecord: String? = null, // e.g., "25-15"
+    val homeRecord: String? = null,
+    val awayConferenceRank: Int? = null,
+    val homeConferenceRank: Int? = null,
+    val awayConference: String? = null, // e.g., "Eastern" or "Western"
+    val homeConference: String? = null
 )
 
 /** Generic odds information */
@@ -67,7 +74,10 @@ data class ShareStatBox(
     // Three-part header for displaying team-specific labels
     val leftLabel: String? = null,   // e.g., "DET Off" in Team1Color
     val middleLabel: String? = null, // e.g., "vs" in neutral color
-    val rightLabel: String? = null   // e.g., "HOU Def" in Team2Color
+    val rightLabel: String? = null,  // e.g., "HOU Def" in Team2Color
+    // Colors for each label (defaults: left=Team1Color, right=Team2Color)
+    val leftColor: Color? = null,
+    val rightColor: Color? = null
 )
 
 /**
@@ -305,7 +315,10 @@ fun MatchupShareImage(
                 ShareComparisonCard(
                     title = "$awayTeam Off vs $homeTeam Def",
                     modifier = Modifier.weight(1f),
-                    cardBackground = cardBackground
+                    cardBackground = cardBackground,
+                    leftLabel = "$awayTeam Off",
+                    middleLabel = "vs",
+                    rightLabel = "$homeTeam Def"
                 ) {
                     if (awayTeamData != null && homeTeamData != null) {
                         ShareVersusStats(
@@ -320,7 +333,12 @@ fun MatchupShareImage(
                 ShareComparisonCard(
                     title = "$homeTeam Off vs $awayTeam Def",
                     modifier = Modifier.weight(1f),
-                    cardBackground = cardBackground
+                    cardBackground = cardBackground,
+                    leftLabel = "$homeTeam Off",
+                    middleLabel = "vs",
+                    rightLabel = "$awayTeam Def",
+                    leftColor = Team2Color,
+                    rightColor = Team1Color
                 ) {
                     if (awayTeamData != null && homeTeamData != null) {
                         ShareVersusStats(
@@ -332,16 +350,17 @@ fun MatchupShareImage(
                 }
 
                 // Block 3: QB Comparison
+                val awayQB = awayTeamData?.players?.qb
+                val homeQB = homeTeamData?.players?.qb
                 ShareComparisonCard(
                     title = "QB Comparison",
                     modifier = Modifier.weight(1f),
-                    cardBackground = cardBackground
+                    cardBackground = cardBackground,
+                    leftLabel = awayQB?.name ?: awayTeam,
+                    middleLabel = "QB",
+                    rightLabel = homeQB?.name ?: homeTeam
                 ) {
-                    val awayQB = awayTeamData?.players?.qb
-                    val homeQB = homeTeamData?.players?.qb
                     if (awayQB != null && homeQB != null) {
-                        SharePlayerHeader(awayQB.name, homeQB.name, textColor)
-                        Spacer(modifier = Modifier.height(8.dp))
                         ShareQBStats(awayQB, homeQB, textColor)
                     }
                 }
@@ -355,31 +374,33 @@ fun MatchupShareImage(
                 horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 // Block 4: RB Comparison
+                val awayRB = awayTeamData?.players?.rbs?.firstOrNull()
+                val homeRB = homeTeamData?.players?.rbs?.firstOrNull()
                 ShareComparisonCard(
                     title = "RB Comparison",
                     modifier = Modifier.weight(1f),
-                    cardBackground = cardBackground
+                    cardBackground = cardBackground,
+                    leftLabel = awayRB?.name ?: awayTeam,
+                    middleLabel = "RB",
+                    rightLabel = homeRB?.name ?: homeTeam
                 ) {
-                    val awayRB = awayTeamData?.players?.rbs?.firstOrNull()
-                    val homeRB = homeTeamData?.players?.rbs?.firstOrNull()
                     if (awayRB != null && homeRB != null) {
-                        SharePlayerHeader(awayRB.name, homeRB.name, textColor)
-                        Spacer(modifier = Modifier.height(8.dp))
                         ShareRBStats(awayRB, homeRB, textColor)
                     }
                 }
 
                 // Block 5: WR Comparison
+                val awayWR = awayTeamData?.players?.receivers?.firstOrNull()
+                val homeWR = homeTeamData?.players?.receivers?.firstOrNull()
                 ShareComparisonCard(
                     title = "WR Comparison",
                     modifier = Modifier.weight(1f),
-                    cardBackground = cardBackground
+                    cardBackground = cardBackground,
+                    leftLabel = awayWR?.name ?: awayTeam,
+                    middleLabel = "WR",
+                    rightLabel = homeWR?.name ?: homeTeam
                 ) {
-                    val awayWR = awayTeamData?.players?.receivers?.firstOrNull()
-                    val homeWR = homeTeamData?.players?.receivers?.firstOrNull()
                     if (awayWR != null && homeWR != null) {
-                        SharePlayerHeader(awayWR.name, homeWR.name, textColor)
-                        Spacer(modifier = Modifier.height(8.dp))
                         ShareWRStats(awayWR, homeWR, textColor)
                     }
                 }
@@ -445,7 +466,7 @@ fun GenericMatchupShareImage(
     Column(
         modifier = modifier
             .background(backgroundColor)
-            .padding(40.dp)
+            .padding(24.dp)
     ) {
         // Compact header row with team names and odds
         Row(
@@ -493,8 +514,10 @@ fun GenericMatchupShareImage(
             ) {
                 Text(
                     text = "${gameInfo.eventLabel} • ${gameInfo.formattedDate}",
-                    fontSize = 48.sp,
-                    color = textColor.copy(alpha = 0.8f)
+                    fontSize = 42.sp,
+                    color = textColor.copy(alpha = 0.8f),
+                    maxLines = 1,
+                    softWrap = false
                 )
                 odds?.overUnder?.let { ou ->
                     Text(
@@ -540,12 +563,119 @@ fun GenericMatchupShareImage(
             }
         }
 
-        Spacer(modifier = Modifier.height(20.dp))
+        // Record and Conference Rank Row (for NBA only)
+        if (gameInfo.awayRecord != null || gameInfo.homeRecord != null ||
+            gameInfo.awayConferenceRank != null || gameInfo.homeConferenceRank != null) {
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Away team record and conference rank
+                if (gameInfo.awayRecord != null || gameInfo.awayConferenceRank != null) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // Colored rank indicator circle
+                        gameInfo.awayConferenceRank?.let { rank ->
+                            val rankColor = when {
+                                rank <= 5 -> Color(0xFF4CAF50) // Green for top 5
+                                rank <= 10 -> Color(0xFFFFC107) // Yellow for 6-10
+                                else -> Color(0xFFF44336) // Red for 11+
+                            }
+                            Canvas(
+                                modifier = Modifier.size(24.dp)
+                            ) {
+                                drawCircle(color = rankColor)
+                            }
+                        }
+
+                        // Format: "wins - losses / rank in Conference"
+                        val recordParts = gameInfo.awayRecord?.split("-")
+                        val wins = recordParts?.getOrNull(0) ?: ""
+                        val losses = recordParts?.getOrNull(1) ?: ""
+
+                        val rankText = gameInfo.awayConferenceRank?.let { rank ->
+                            val ordinal = when (rank) {
+                                1 -> "1st"
+                                2 -> "2nd"
+                                3 -> "3rd"
+                                else -> "${rank}th"
+                            }
+                            val confName = gameInfo.awayConference?.let { conf ->
+                                if (conf.startsWith("East", ignoreCase = true)) "East" else "West"
+                            } ?: ""
+                            " / $ordinal in the $confName"
+                        } ?: ""
+
+                        Text(
+                            text = "$wins - $losses$rankText",
+                            fontSize = 36.sp,
+                            color = textColor.copy(alpha = 0.8f)
+                        )
+                    }
+                }
+
+                // Center divider or empty space
+                Spacer(modifier = Modifier.width(20.dp))
+
+                // Home team record and conference rank (mirrored layout)
+                if (gameInfo.homeRecord != null || gameInfo.homeConferenceRank != null) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // Format: "rank in Conference / wins - losses" (flipped order for home team)
+                        val recordParts = gameInfo.homeRecord?.split("-")
+                        val wins = recordParts?.getOrNull(0) ?: ""
+                        val losses = recordParts?.getOrNull(1) ?: ""
+
+                        val rankText = gameInfo.homeConferenceRank?.let { rank ->
+                            val ordinal = when (rank) {
+                                1 -> "1st"
+                                2 -> "2nd"
+                                3 -> "3rd"
+                                else -> "${rank}th"
+                            }
+                            val confName = gameInfo.homeConference?.let { conf ->
+                                if (conf.startsWith("East", ignoreCase = true)) "East" else "West"
+                            } ?: ""
+                            "$ordinal in the $confName / "
+                        } ?: ""
+
+                        Text(
+                            text = "$rankText$wins - $losses",
+                            fontSize = 36.sp,
+                            color = textColor.copy(alpha = 0.8f)
+                        )
+
+                        // Colored rank indicator circle (on the right for home team)
+                        gameInfo.homeConferenceRank?.let { rank ->
+                            val rankColor = when {
+                                rank <= 5 -> Color(0xFF4CAF50) // Green for top 5
+                                rank <= 10 -> Color(0xFFFFC107) // Yellow for 6-10
+                                else -> Color(0xFFF44336) // Red for 11+
+                            }
+                            Canvas(
+                                modifier = Modifier.size(24.dp)
+                            ) {
+                                drawCircle(color = rankColor)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
 
         // 2x3 Grid of stat boxes
         Column(
             modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             // Row 1: Boxes 0-2
             Row(
@@ -561,7 +691,9 @@ fun GenericMatchupShareImage(
                         cardBackground = cardBackground,
                         leftLabel = box.leftLabel,
                         middleLabel = box.middleLabel,
-                        rightLabel = box.rightLabel
+                        rightLabel = box.rightLabel,
+                        leftColor = box.leftColor ?: Team1Color,
+                        rightColor = box.rightColor ?: Team2Color
                     ) {
                         GenericStatBoxContent(box, textColor)
                     }
@@ -582,7 +714,9 @@ fun GenericMatchupShareImage(
                         cardBackground = cardBackground,
                         leftLabel = box.leftLabel,
                         middleLabel = box.middleLabel,
-                        rightLabel = box.rightLabel
+                        rightLabel = box.rightLabel,
+                        leftColor = box.leftColor ?: Team1Color,
+                        rightColor = box.rightColor ?: Team2Color
                     ) {
                         GenericStatBoxContent(box, textColor)
                     }
@@ -710,7 +844,9 @@ private fun ShareGenericFiveColumnRow(
             fontSize = 34.sp,
             color = MaterialTheme.colorScheme.primary,
             textAlign = TextAlign.Center,
-            modifier = Modifier.weight(1.5f)
+            modifier = Modifier.weight(1.5f),
+            maxLines = 1,
+            softWrap = false
         )
 
         Spacer(modifier = Modifier.width(12.dp))
@@ -787,60 +923,62 @@ private fun ShareComparisonCard(
     leftLabel: String? = null,
     middleLabel: String? = null,
     rightLabel: String? = null,
+    leftColor: Color = Team1Color,
+    rightColor: Color = Team2Color,
     content: @Composable ColumnScope.() -> Unit
 ) {
+    val textColor = MaterialTheme.colorScheme.onSurface
+
     Column(
         modifier = modifier
             .fillMaxHeight()
-            .background(cardBackground, RoundedCornerShape(16.dp))
-            .padding(24.dp)
+            .padding(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        // Use three-label header if labels are provided, otherwise use centered title
-        if (leftLabel != null || middleLabel != null || rightLabel != null) {
+        // Header: either three-part label or simple title
+        if (leftLabel != null && rightLabel != null) {
+            // Three-part header: left team/player far left, vs center, right team/player far right
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Left label (e.g., "DET Off")
                 Text(
-                    text = leftLabel ?: "",
-                    fontSize = 46.sp,
+                    text = leftLabel,
+                    fontSize = 36.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Team1Color,
-                    modifier = Modifier.weight(1f),
-                    textAlign = TextAlign.Start
+                    color = leftColor,
+                    modifier = Modifier.weight(1f)
                 )
-                // Middle label (e.g., "vs")
                 Text(
-                    text = middleLabel ?: "",
-                    fontSize = 40.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
+                    text = middleLabel ?: "vs",
+                    fontSize = 36.sp,
+                    fontWeight = FontWeight.Normal,
+                    color = textColor.copy(alpha = 0.6f),
                     textAlign = TextAlign.Center
                 )
-                // Right label (e.g., "HOU Def")
                 Text(
-                    text = rightLabel ?: "",
-                    fontSize = 46.sp,
+                    text = rightLabel,
+                    fontSize = 36.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Team2Color,
-                    modifier = Modifier.weight(1f),
-                    textAlign = TextAlign.End
+                    color = rightColor,
+                    textAlign = TextAlign.End,
+                    modifier = Modifier.weight(1f)
                 )
             }
         } else {
-            // Fallback to centered title
+            // Simple centered title
             Text(
                 text = title,
-                fontSize = 46.sp,
+                fontSize = 36.sp,
                 fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onBackground,
-                modifier = Modifier.fillMaxWidth(),
-                textAlign = TextAlign.Center
+                color = textColor,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth()
             )
         }
-        Spacer(modifier = Modifier.height(14.dp))
+
+        // Content
         content()
     }
 }
@@ -1209,7 +1347,9 @@ private fun ShareThreeColumnRow(
             fontWeight = centerWeight,
             color = MaterialTheme.colorScheme.primary,
             textAlign = TextAlign.Center,
-            modifier = Modifier.weight(1f)
+            modifier = Modifier.weight(1f),
+            maxLines = 1,
+            softWrap = false
         )
 
         Row(
@@ -1290,7 +1430,9 @@ private fun ShareFiveColumnRow(
             fontSize = 34.sp,
             color = MaterialTheme.colorScheme.primary,
             textAlign = TextAlign.Center,
-            modifier = Modifier.weight(1.5f)
+            modifier = Modifier.weight(1.5f),
+            maxLines = 1,
+            softWrap = false
         )
 
         Spacer(modifier = Modifier.width(12.dp))

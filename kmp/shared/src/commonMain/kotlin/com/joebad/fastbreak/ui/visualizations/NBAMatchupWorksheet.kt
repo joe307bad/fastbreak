@@ -178,8 +178,13 @@ fun NBAMatchupWorksheet(
     var isCapturing by remember { mutableStateOf(false) }
 
     // Format date and event label for share image (matching NFL format)
-    val eventLabel = remember(selectedMatchup.gameDate) {
-        "Regular Season"
+    val eventLabel = remember(selectedMatchup.gameDate, selectedMatchup.location) {
+        val location = selectedMatchup.location?.fullLocation
+        if (location != null && location.isNotBlank()) {
+            "Regular Season • $location"
+        } else {
+            "Regular Season"
+        }
     }
 
     val formattedDate = remember(selectedMatchup.gameDate) {
@@ -346,7 +351,7 @@ fun NBAMatchupWorksheet(
             Box(
                 modifier = Modifier
                     .requiredWidth(3400.dp)
-                    .requiredHeight(1800.dp)
+                    .requiredHeight(1900.dp)
                     .offset { IntOffset(-10000, 0) }  // Off-screen
                     .drawWithCache {
                         onDrawWithContent {
@@ -363,7 +368,17 @@ fun NBAMatchupWorksheet(
                     homeTeam = selectedMatchup.homeTeam.abbreviation,
                     eventLabel = eventLabel,
                     formattedDate = formattedDate,
-                    source = "ESPN"
+                    source = "hoopR / ESPN",
+                    awayRecord = selectedMatchup.awayTeam.wins?.let { w ->
+                        selectedMatchup.awayTeam.losses?.let { l -> "$w-$l" }
+                    },
+                    homeRecord = selectedMatchup.homeTeam.wins?.let { w ->
+                        selectedMatchup.homeTeam.losses?.let { l -> "$w-$l" }
+                    },
+                    awayConferenceRank = selectedMatchup.awayTeam.conferenceRank,
+                    homeConferenceRank = selectedMatchup.homeTeam.conferenceRank,
+                    awayConference = selectedMatchup.awayTeam.conference,
+                    homeConference = selectedMatchup.homeTeam.conference
                 )
 
                 val odds = selectedMatchup.odds?.let {
@@ -468,6 +483,8 @@ fun NBAMatchupWorksheet(
                         leftLabel = "${selectedMatchup.homeTeam.abbreviation} Off",
                         middleLabel = "vs",
                         rightLabel = "${selectedMatchup.awayTeam.abbreviation} Def",
+                        leftColor = Team2Color,  // Home team
+                        rightColor = Team1Color, // Away team
                         fiveColStats = selectedMatchup.comparisons?.homeOffVsAwayDef?.mapNotNull { (key, stat) ->
                             val offValue = stat.offense.value?.formatStat(2) ?: return@mapNotNull null
                             val defValue = stat.defense.value?.formatStat(2) ?: return@mapNotNull null

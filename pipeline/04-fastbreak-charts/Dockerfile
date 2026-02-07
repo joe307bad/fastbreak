@@ -28,6 +28,10 @@ COPY weekly /app/weekly
 COPY daily /app/daily
 RUN mkdir -p /app/data
 
+# Copy Fastbreak.Daily executable (built by CI)
+COPY Fastbreak.Daily /app/Fastbreak.Daily
+RUN chmod +x /app/Fastbreak.Daily
+
 # Copy cron configuration and startup script
 COPY crontab /etc/cron.d/r-cron
 COPY start.sh /app/start.sh

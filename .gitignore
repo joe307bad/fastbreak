@@ -32,3 +32,6 @@ kmp/.kotlin/*
 kmp/fastbreak.keystore
 kmp/iosApp/Pods/*
 kmp/screenshots/demos/test-output.log
+server/src/Fastbreak.Daily/publish
+server/src/Fastbreak.Daily/publish-mac
+pipeline/04-fastbreak-charts/Fastbreak.Daily

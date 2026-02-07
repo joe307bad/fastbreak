@@ -19,7 +19,7 @@ echo ""
 # Export environment variables for cron jobs (restricted permissions)
 # Include PATH so cron can find aws cli and other tools
 echo "export PATH=\"$PATH\"" > /app/env.sh
-printenv | grep -E "^(AWS_|PROD)" >> /app/env.sh
+printenv | grep -E "^(AWS_|PROD|GEMINI_)" >> /app/env.sh
 sed -i '/^AWS_\|^PROD/s/^/export /' /app/env.sh
 chmod 600 /app/env.sh
 
@@ -73,6 +73,16 @@ run_scripts() {
 run_scripts "/app/startup" "startup"
 run_scripts "/app/daily" "daily"
 run_scripts "/app/weekly" "weekly"
+
+# Run Fastbreak.Daily to generate topics
+echo -e "${BOLD}${CYAN}▶ Running Fastbreak.Daily...${NC}"
+echo -e "${CYAN}────────────────────────────────────────${NC}"
+if /app/Fastbreak.Daily; then
+  echo -e "${GREEN}  ✓ Fastbreak.Daily completed successfully${NC}"
+else
+  echo -e "${RED}  ✗ Fastbreak.Daily failed${NC}"
+fi
+echo ""
 
 echo -e "${BOLD}${BLUE}════════════════════════════════════════════════════════════${NC}"
 echo -e "${BOLD}${BLUE}                    Startup Complete                         ${NC}"

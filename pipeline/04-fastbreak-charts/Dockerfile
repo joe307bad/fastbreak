@@ -12,8 +12,10 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 # Install remaining R packages (tidyverse deps already installed)
+# Update rlang first (base image has older version)
 # hockeyR must be installed from GitHub for latest NHL API compatibility
 RUN R -e "options(repos = c(CRAN = 'https://packagemanager.posit.co/cran/__linux__/jammy/latest')); \
+    install.packages(c('rlang', 'vctrs', 'lifecycle')); \
     install.packages(c('nflreadr', 'hoopR', 'devtools')); \
     devtools::install_github('danmorse314/hockeyR'); \
     if (!require('nflreadr')) stop('nflreadr installation failed'); \
@@ -26,6 +28,7 @@ WORKDIR /app
 # Copy R scripts and data
 COPY weekly /app/weekly
 COPY daily /app/daily
+COPY utils /app/utils
 RUN mkdir -p /app/data
 
 # Copy Fastbreak.Daily executable (built by CI)

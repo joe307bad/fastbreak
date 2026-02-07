@@ -4,6 +4,7 @@ open System.Net.Http
 open System.Text
 open System.Text.Json
 open System.Text.Json.Serialization
+open Amazon
 open Amazon.S3
 open Amazon.S3.Model
 
@@ -155,7 +156,14 @@ let fetchChartData () = async {
 }
 
 let uploadToS3 (bucketName: string) (json: string) = async {
-    use s3Client = new AmazonS3Client()
+    let region =
+        match Environment.GetEnvironmentVariable "AWS_REGION" with
+        | null | "" ->
+            match Environment.GetEnvironmentVariable "AWS_DEFAULT_REGION" with
+            | null | "" -> RegionEndpoint.USEast1
+            | r -> RegionEndpoint.GetBySystemName(r)
+        | r -> RegionEndpoint.GetBySystemName(r)
+    use s3Client = new AmazonS3Client(region)
 
     let request = PutObjectRequest()
     request.BucketName <- bucketName
@@ -456,18 +464,14 @@ let main argv =
         options.WriteIndented <- true
         let json = JsonSerializer.Serialize(narratives, options)
 
-        printfn "%s" json
-        printfn ""
-        printfn "Successfully retrieved %d narratives!" narratives.Narratives.Length
+        printfn "\x1b[32m✓ Successfully retrieved %d narratives\x1b[0m" narratives.Narratives.Length
 
         // Upload to S3
-        printfn ""
-        printfn "Uploading to S3..."
         uploadToS3 s3Bucket json |> Async.RunSynchronously
 
+        printfn "\x1b[32m✓ Fastbreak.Daily completed successfully\x1b[0m"
         0 // Success
     with
     | ex ->
-        eprintfn "Error: %s" ex.Message
-        eprintfn "Stack trace: %s" ex.StackTrace
+        eprintfn "\x1b[31m✗ Error: %s\x1b[0m" ex.Message
         1 // Error

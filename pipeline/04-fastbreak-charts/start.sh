@@ -20,7 +20,7 @@ echo ""
 # Include PATH so cron can find aws cli and other tools
 echo "export PATH=\"$PATH\"" > /app/env.sh
 printenv | grep -E "^(AWS_|PROD|GEMINI_)" >> /app/env.sh
-sed -i '/^AWS_\|^PROD/s/^/export /' /app/env.sh
+sed -i '/^AWS_\|^PROD\|^GEMINI_/s/^/export /' /app/env.sh
 chmod 600 /app/env.sh
 
 run_scripts() {

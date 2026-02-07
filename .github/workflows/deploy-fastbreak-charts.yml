@@ -1,6 +1,7 @@
 name: Deploy Fastbreak Charts
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - main
@@ -25,10 +26,13 @@ jobs:
 
       - name: Build Fastbreak.Daily executable
         run: |
-          dotnet publish -c Release -r linux-x64 --self-contained true -p:PublishSingleFile=true -o ../../pipeline/04-fastbreak-charts
+          dotnet publish -c Release -r linux-x64 --self-contained true -p:PublishSingleFile=true -o ../../../pipeline/04-fastbreak-charts
         working-directory: server/src/Fastbreak.Daily
 
       - uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - name: Verify Fastbreak.Daily exists
+        run: ls -la Fastbreak.Daily
 
       - run: flyctl deploy --remote-only
         env:

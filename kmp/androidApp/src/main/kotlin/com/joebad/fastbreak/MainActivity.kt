@@ -12,6 +12,7 @@ import com.joebad.fastbreak.data.api.RegistryApi
 import com.joebad.fastbreak.data.repository.ChartDataRepository
 import com.joebad.fastbreak.data.repository.RegistryRepository
 import com.joebad.fastbreak.data.repository.TeamRosterRepository
+import com.joebad.fastbreak.data.repository.TopicsRepository
 import com.joebad.fastbreak.domain.registry.ChartDataSynchronizer
 import com.joebad.fastbreak.domain.registry.RegistryManager
 import com.joebad.fastbreak.domain.teams.TeamRosterSynchronizer
@@ -67,9 +68,13 @@ class MainActivity : ComponentActivity() {
             registryRepository = registryRepository
         )
 
+        // Create TopicsRepository
+        val topicsRepository = TopicsRepository(settings)
+
         // Create ChartDataSynchronizer (Phase 5)
         val chartDataSynchronizer = ChartDataSynchronizer(
-            chartDataRepository = chartDataRepository
+            chartDataRepository = chartDataRepository,
+            topicsRepository = topicsRepository
         )
 
         // Create TeamRosterRepository and TeamRosterSynchronizer

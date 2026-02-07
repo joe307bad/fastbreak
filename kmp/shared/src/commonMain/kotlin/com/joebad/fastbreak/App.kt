@@ -20,6 +20,7 @@ import com.joebad.fastbreak.ui.DrawerMenu
 import com.joebad.fastbreak.ui.HomeScreen
 import com.joebad.fastbreak.ui.SettingsScreen
 import com.joebad.fastbreak.ui.SplashScreen
+import com.joebad.fastbreak.ui.TopicsScreen
 import com.joebad.fastbreak.ui.theme.AppTheme
 import kotlinx.coroutines.launch
 
@@ -85,6 +86,7 @@ fun App(rootComponent: RootComponent) {
                         registryContainer = rootComponent.registryContainer,
                         onRefresh = { rootComponent.refreshRegistry() },
                         onMenuClick = { scope.launch { drawerState.open() } },
+                        onNavigateToTopics = { rootComponent.navigateToTopics() },
                         onInitialLoad = { rootComponent.loadRegistry() },
                         onRequestPermission = { rootComponent.requestNetworkPermission() },
                         onCheckPermission = { rootComponent.checkNetworkPermission() },
@@ -112,6 +114,12 @@ fun App(rootComponent: RootComponent) {
                         onUnpinTeam = { sport, teamCode ->
                             rootComponent.pinnedTeamsContainer.unpinTeam(sport, teamCode)
                         }
+                    )
+                    is RootComponent.Child.Topics -> TopicsScreen(
+                        component = child.component,
+                        topics = rootComponent.registryContainer.getCachedTopics(),
+                        topicsUpdatedAt = rootComponent.registryContainer.getTopicsUpdatedAt(),
+                        onMenuClick = { scope.launch { drawerState.open() } }
                     )
                 }
             }

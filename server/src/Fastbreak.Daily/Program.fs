@@ -5,6 +5,8 @@ open System.Text
 open System.Text.Json
 open System.Text.Json.Serialization
 open Amazon
+open Amazon.DynamoDBv2
+open Amazon.DynamoDBv2.Model
 open Amazon.S3
 open Amazon.S3.Model
 
@@ -155,24 +157,57 @@ let fetchChartData () = async {
     return chartData
 }
 
-let uploadToS3 (bucketName: string) (json: string) = async {
-    let region =
-        match Environment.GetEnvironmentVariable "AWS_REGION" with
-        | null | "" ->
-            match Environment.GetEnvironmentVariable "AWS_DEFAULT_REGION" with
-            | null | "" -> RegionEndpoint.USEast1
-            | r -> RegionEndpoint.GetBySystemName(r)
+let getAwsRegion () =
+    match Environment.GetEnvironmentVariable "AWS_REGION" with
+    | null | "" ->
+        match Environment.GetEnvironmentVariable "AWS_DEFAULT_REGION" with
+        | null | "" -> RegionEndpoint.USEast1
         | r -> RegionEndpoint.GetBySystemName(r)
+    | r -> RegionEndpoint.GetBySystemName(r)
+
+let uploadToS3 (bucketName: string) (json: string) = async {
+    let region = getAwsRegion()
+    let s3Key = "dev/topics.json"
+
     use s3Client = new AmazonS3Client(region)
 
     let request = PutObjectRequest()
     request.BucketName <- bucketName
-    request.Key <- "dev/topics.json"
+    request.Key <- s3Key
     request.ContentType <- "application/json"
     request.ContentBody <- json
 
     let! response = s3Client.PutObjectAsync(request) |> Async.AwaitTask
-    printfn "Uploaded to s3://%s/dev/topics.json (HTTP %d)" bucketName (int response.HttpStatusCode)
+    printfn "Uploaded to s3://%s/%s (HTTP %d)" bucketName s3Key (int response.HttpStatusCode)
+    return s3Key
+}
+
+let updateDynamoDB (s3Key: string) (title: string) = async {
+    let tableName =
+        match Environment.GetEnvironmentVariable "AWS_DYNAMODB_TABLE" with
+        | null | "" -> "fastbreak-file-timestamps"
+        | t -> t
+
+    let region = getAwsRegion()
+    use dynamoClient = new AmazonDynamoDBClient(region)
+
+    let timestamp = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ")
+    let interval = "daily"
+
+    let item = System.Collections.Generic.Dictionary<string, AttributeValue>()
+    item.["file_key"] <- AttributeValue(S = s3Key)
+    item.["updatedAt"] <- AttributeValue(S = timestamp)
+    item.["title"] <- AttributeValue(S = title)
+    item.["interval"] <- AttributeValue(S = interval)
+    item.["type"] <- AttributeValue(S = "topics")
+
+    let request = PutItemRequest(TableName = tableName, Item = item)
+
+    try
+        let! _ = dynamoClient.PutItemAsync(request) |> Async.AwaitTask
+        printfn "Updated DynamoDB: %s key: %s updatedAt: %s title: %s interval: %s type: topics" tableName s3Key timestamp title interval
+    with ex ->
+        eprintfn "Warning: Failed to update DynamoDB timestamp (non-fatal): %s" ex.Message
 }
 
 let getSportsNarratives () = async {
@@ -467,7 +502,11 @@ let main argv =
         printfn "\x1b[32m✓ Successfully retrieved %d narratives\x1b[0m" narratives.Narratives.Length
 
         // Upload to S3
-        uploadToS3 s3Bucket json |> Async.RunSynchronously
+        let s3Key = uploadToS3 s3Bucket json |> Async.RunSynchronously
+
+        // Update DynamoDB with timestamp
+        let title = sprintf "Sports Topics - %s" (DateTime.UtcNow.ToString("yyyy-MM-dd"))
+        updateDynamoDB s3Key title |> Async.RunSynchronously
 
         printfn "\x1b[32m✓ Fastbreak.Daily completed successfully\x1b[0m"
         0 // Success

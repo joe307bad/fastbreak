@@ -101,6 +101,10 @@ class RootComponent(
         navigation.push(Config.Settings)
     }
 
+    fun navigateToTopics() {
+        navigation.push(Config.Topics)
+    }
+
     fun navigateToChart(chartId: String, sport: Sport, vizType: VizType) {
         // First, pop any existing chart screens to avoid stacking charts
         while (stack.value.active.configuration is Config.DataViz) {
@@ -161,12 +165,19 @@ class RootComponent(
                     onNavigateBack = { navigation.pop() }
                 )
             )
+            is Config.Topics -> Child.Topics(
+                TopicsComponent(
+                    componentContext = componentContext,
+                    onNavigateBack = { navigation.pop() }
+                )
+            )
         }
 
     sealed class Child {
         data class Home(val component: HomeComponent) : Child()
         data class DataViz(val component: DataVizComponent) : Child()
         data class Settings(val component: SettingsComponent) : Child()
+        data class Topics(val component: TopicsComponent) : Child()
     }
 
     @Serializable
@@ -179,5 +190,8 @@ class RootComponent(
 
         @Serializable
         data object Settings : Config
+
+        @Serializable
+        data object Topics : Config
     }
 }

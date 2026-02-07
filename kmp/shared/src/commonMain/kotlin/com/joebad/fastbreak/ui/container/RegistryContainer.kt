@@ -205,9 +205,11 @@ class RegistryContainer(
                     )
                 }
 
-                // Sync chart data after loading registry entries (await completion)
+                // Sync chart data and topics after loading registry entries (await completion)
                 try {
                     syncChartData(entries)
+                    // Also sync topics data
+                    chartDataSynchronizer.synchronizeTopics(entries)
                 } catch (e: Exception) {
                     println("❌ Chart synchronization failed: ${e.message}")
                     // Ensure isSyncing is cleared even on exception
@@ -251,6 +253,8 @@ class RegistryContainer(
                     // Continue with chart data sync using cached entries
                     try {
                         syncChartData(cachedEntries)
+                        // Also sync topics data
+                        chartDataSynchronizer.synchronizeTopics(cachedEntries)
                     } catch (e: Exception) {
                         println("❌ Chart synchronization failed: ${e.message}")
                         // Ensure isSyncing is cleared even on exception
@@ -347,6 +351,8 @@ class RegistryContainer(
                 // Sync chart data after refresh (await completion)
                 try {
                     syncChartData(entries)
+                    // Also sync topics data
+                    chartDataSynchronizer.synchronizeTopics(entries)
                     println("✅ Chart synchronization complete")
 
                     // Also download team rosters after successful chart sync
@@ -398,6 +404,8 @@ class RegistryContainer(
                     println("📊 Starting chart data synchronization with cached entries...")
                     try {
                         syncChartData(cachedEntries)
+                        // Also sync topics data
+                        chartDataSynchronizer.synchronizeTopics(cachedEntries)
                         println("✅ Chart synchronization complete")
 
                         // Also download team rosters after successful chart sync
@@ -601,4 +609,18 @@ class RegistryContainer(
             failedCharts = currentState.syncProgress?.failedCharts ?: emptyList()
         )
     }
+
+    /**
+     * Gets the cached topics data.
+     *
+     * @return The cached topics, or null if not found
+     */
+    fun getCachedTopics() = chartDataSynchronizer.getCachedTopics()
+
+    /**
+     * Gets the timestamp when topics were last updated.
+     *
+     * @return The last update timestamp, or null if not found
+     */
+    fun getTopicsUpdatedAt() = chartDataSynchronizer.getTopicsUpdatedAt()
 }

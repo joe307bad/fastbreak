@@ -18,6 +18,7 @@ data class TopicsResponse(
 data class Narrative(
     val title: String,
     val summary: String,
+    val league: String = "",  // "nba", "nfl", "nhl", "mlb", "mls"
     val chartEvidence: List<ChartReference> = emptyList(),
     val highlights: List<ChartHighlight> = emptyList(),
     val dataPoints: List<NarrativeDataPoint> = emptyList(),

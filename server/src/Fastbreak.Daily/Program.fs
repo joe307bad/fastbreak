@@ -52,6 +52,8 @@ type Narrative = {
     Title: string
     [<JsonPropertyName("summary")>]
     Summary: string
+    [<JsonPropertyName("league")>]
+    League: string  // "nba", "nfl", "nhl", "mlb", "mls"
     [<JsonPropertyName("chartEvidence")>]
     ChartEvidence: ChartReference list
     [<JsonPropertyName("highlights")>]
@@ -131,11 +133,26 @@ let fetchChartData () = async {
     let! registryResponse = httpClient.GetStringAsync("https://d2jyizt5xogu23.cloudfront.net/registry") |> Async.AwaitTask
     let registry = JsonSerializer.Deserialize<System.Collections.Generic.Dictionary<string, JsonElement>>(registryResponse)
 
-    printfn "Found %d charts in registry" registry.Count
+    printfn "Found %d entries in registry" registry.Count
+
+    // Filter out topics entries (type = "topics")
+    let chartEntries =
+        registry
+        |> Seq.filter (fun kvp ->
+            match kvp.Value.TryGetProperty("type") with
+            | true, typeProp ->
+                let typeValue = typeProp.GetString()
+                typeValue <> "topics"
+            | false, _ -> true  // No type property means it's a chart
+        )
+        |> Seq.map (fun kvp -> kvp.Key)
+        |> Seq.toList
+
+    printfn "Found %d charts (excluding topics)" chartEntries.Length
 
     // Download all chart JSONs
     let! chartDataTasks =
-        registry.Keys
+        chartEntries
         |> Seq.map (fun chartFile ->
             async {
                 let url = sprintf "https://d2jyizt5xogu23.cloudfront.net/%s" chartFile
@@ -352,12 +369,18 @@ LINK QUALITY REQUIREMENTS:
 - Links can reference the same URL/article if discussing different aspects or teams
 - Use diverse links across all 5 narratives to provide variety and breadth of coverage
 
+LEAGUE FIELD REQUIREMENTS:
+- Each narrative MUST include a "league" field indicating which sport/league the narrative is about
+- Use lowercase values: "nba", "nfl", "nhl", "mlb", or "mls"
+- The league should match the primary sport discussed in the narrative
+
 For each narrative:
 1. Find relevant RECENT analytical articles or blog posts from ALLOWED DOMAINS ONLY (prioritize articles from the last 7-30 days)
 2. Connect the news/analysis to SPECIFIC NUMERICAL insights from the charts
 3. Extract EXACT values from the chart dataPoints (numbers, rankings, percentages)
 4. Provide links to articles with in-depth analysis, expert opinions, or unique perspectives (NOT just stat pages)
 5. Verify the team/player featured is CURRENTLY RELEVANT (not eliminated, has upcoming games, or is in current playoff round)
+6. Include the correct "league" field for the sport being discussed
 
 Return ONLY a JSON object in this exact format (no markdown, no extra text):
 {
@@ -366,6 +389,7 @@ Return ONLY a JSON object in this exact format (no markdown, no extra text):
     {
       "title": "Compelling narrative title",
       "summary": "2-3 sentence summary connecting news to specific chart insights with numerical evidence",
+      "league": "nba",
       "chartEvidence": [
         {
           "chartName": "dev/nhl__team_efficiency.json",

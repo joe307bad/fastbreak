@@ -581,4 +581,12 @@ class ChartDataSynchronizer(
     fun getTopicsUpdatedAt(): Instant? {
         return topicsRepository.getUpdatedAt()
     }
+
+    /**
+     * Clears cached topics data to force a re-download.
+     */
+    fun clearTopicsCache() {
+        println("🗑️ ChartDataSynchronizer.clearTopicsCache()")
+        topicsRepository.clear()
+    }
 }

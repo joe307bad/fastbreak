@@ -1,8 +1,11 @@
 package com.joebad.fastbreak.ui
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Menu
@@ -10,32 +13,31 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.joebad.fastbreak.data.model.Narrative
 import com.joebad.fastbreak.data.model.TopicsResponse
 import com.joebad.fastbreak.navigation.TopicsComponent
+import com.joebad.fastbreak.platform.UrlLauncher
 import kotlin.time.Clock
 import kotlin.time.Instant
 
-/**
- * Formats an Instant as relative time (e.g., "10 min ago", "2 hours ago").
- */
 private fun formatRelativeTime(instant: Instant?): String {
-    if (instant == null) return "Never"
-
+    if (instant == null) return "never"
     val now = Clock.System.now()
     val diff = now - instant
-
     val minutes = diff.inWholeMinutes
     val hours = diff.inWholeHours
     val days = diff.inWholeDays
-
     return when {
-        minutes < 1 -> "Just now"
-        minutes < 60 -> "$minutes min ago"
-        hours < 24 -> "$hours hour${if (hours > 1) "s" else ""} ago"
-        days < 7 -> "$days day${if (days > 1) "s" else ""} ago"
-        else -> "${days / 7} week${if (days / 7 > 1) "s" else ""} ago"
+        minutes < 1 -> "just now"
+        minutes < 60 -> "${minutes}m ago"
+        hours < 24 -> "${hours}h ago"
+        days < 7 -> "${days}d ago"
+        else -> "${days / 7}w ago"
     }
 }
 
@@ -52,18 +54,12 @@ fun TopicsScreen(
                 title = { Text("topics") },
                 navigationIcon = {
                     IconButton(onClick = onMenuClick) {
-                        Icon(
-                            imageVector = Icons.Default.Menu,
-                            contentDescription = "Menu"
-                        )
+                        Icon(Icons.Default.Menu, contentDescription = "Menu")
                     }
                 },
                 actions = {
                     IconButton(onClick = component.onNavigateBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back"
-                        )
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -73,62 +69,169 @@ fun TopicsScreen(
             )
         }
     ) { paddingValues ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .padding(horizontal = 16.dp)
-        ) {
-            // Last updated header
-            Text(
-                text = "Last updated: ${formatRelativeTime(topicsUpdatedAt)}",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                fontFamily = FontFamily.Monospace,
-                modifier = Modifier.padding(vertical = 8.dp)
-            )
-
-            Divider()
-
-            if (topics == null || topics.narratives.isEmpty()) {
-                // Empty state
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(16.dp),
-                    contentAlignment = Alignment.Center
-                ) {
+        if (topics == null || topics.narratives.isEmpty()) {
+            Box(
+                modifier = Modifier.fillMaxSize().padding(paddingValues),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "no topics available",
+                    style = MaterialTheme.typography.bodySmall,
+                    fontFamily = FontFamily.Monospace,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize().padding(paddingValues),
+                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                item {
                     Text(
-                        text = "No topics available",
-                        style = MaterialTheme.typography.bodyLarge,
-                        fontFamily = FontFamily.Monospace,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        text = "Last updated: ${formatRelativeTime(topicsUpdatedAt)}",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontSize = 10.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(bottom = 4.dp)
                     )
                 }
-            } else {
-                // Topics list
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                    contentPadding = PaddingValues(vertical = 8.dp)
+                itemsIndexed(topics.narratives) { index, narrative ->
+                    NarrativeItem(index + 1, narrative)
+                }
+            }
+        }
+    }
+}
+
+private fun getLeagueColor(league: String): Color {
+    return when (league.lowercase()) {
+        "nba" -> Color(0xFFC9082A)  // NBA red
+        "nfl" -> Color(0xFF013369)  // NFL blue
+        "nhl" -> Color(0xFF000000)  // NHL black
+        "mlb" -> Color(0xFF002D72)  // MLB blue
+        "mls" -> Color(0xFF5C9E31)  // MLS green
+        else -> Color(0xFF757575)   // Gray for unknown
+    }
+}
+
+@Composable
+private fun NarrativeItem(number: Int, narrative: Narrative) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp)
+    ) {
+        // League badge
+        if (narrative.league.isNotBlank()) {
+            val leagueColor = getLeagueColor(narrative.league)
+            Box(
+                modifier = Modifier
+                    .background(leagueColor.copy(alpha = 0.15f), RoundedCornerShape(6.dp))
+                    .padding(horizontal = 6.dp, vertical = 2.dp)
+            ) {
+                Text(
+                    text = narrative.league.uppercase(),
+                    color = leagueColor,
+                    fontSize = 10.sp
+                )
+            }
+            Spacer(Modifier.height(4.dp))
+        }
+
+        // Title with number
+        Text(
+            text = "$number. ${narrative.title}",
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onBackground
+        )
+
+        // Summary
+        if (narrative.summary.isNotBlank()) {
+            Text(
+                text = narrative.summary,
+                style = MaterialTheme.typography.bodySmall,
+                fontFamily = FontFamily.Monospace,
+                fontSize = 11.sp,
+                lineHeight = 13.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(vertical = 4.dp)
+            )
+        }
+
+        // Data points with context
+        if (narrative.dataPoints.isNotEmpty()) {
+            Column(
+                modifier = Modifier.padding(vertical = 4.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                // Green badge for "Statistical context"
+                val greenColor = Color(0xFF4CAF50)
+                Box(
+                    modifier = Modifier
+                        .background(greenColor.copy(alpha = 0.15f), RoundedCornerShape(6.dp))
+                        .padding(horizontal = 6.dp, vertical = 2.dp)
                 ) {
-                    items(topics.narratives) { narrative ->
-                        Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = CardDefaults.cardColors(
-                                containerColor = MaterialTheme.colorScheme.surfaceVariant
-                            )
-                        ) {
-                            Text(
-                                text = narrative.title,
-                                style = MaterialTheme.typography.bodyLarge,
-                                fontFamily = FontFamily.Monospace,
-                                modifier = Modifier.padding(16.dp)
-                            )
-                        }
+                    Text(
+                        text = "Statistical context",
+                        color = greenColor,
+                        fontSize = 10.sp
+                    )
+                }
+                narrative.dataPoints.forEach { dp ->
+                    Text(
+                        text = dp.context,
+                        style = MaterialTheme.typography.bodySmall,
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+        }
+
+        // Links
+        if (narrative.links.isNotEmpty()) {
+            Column(
+                modifier = Modifier.padding(vertical = 4.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                // Blue badge for "Relevant links"
+                val blueColor = Color(0xFF2196F3)
+                Box(
+                    modifier = Modifier
+                        .background(blueColor.copy(alpha = 0.15f), RoundedCornerShape(6.dp))
+                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                ) {
+                    Text(
+                        text = "Relevant links",
+                        color = blueColor,
+                        fontSize = 10.sp
+                    )
+                }
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    narrative.links.forEach { link ->
+                        Text(
+                            text = "[${link.type}] ${link.title}",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.tertiary,
+                            textDecoration = TextDecoration.Underline,
+                            modifier = Modifier.clickable { UrlLauncher.openUrl(link.url) }
+                        )
                     }
                 }
             }
         }
+
+        // Thin divider
+        HorizontalDivider(
+            modifier = Modifier.padding(top = 4.dp),
+            thickness = 0.5.dp,
+            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+        )
     }
 }

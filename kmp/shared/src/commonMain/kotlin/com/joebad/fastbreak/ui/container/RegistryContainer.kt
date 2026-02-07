@@ -351,7 +351,8 @@ class RegistryContainer(
                 // Sync chart data after refresh (await completion)
                 try {
                     syncChartData(entries)
-                    // Also sync topics data
+                    // Force refresh topics by clearing cache first (ensures fresh data on manual refresh)
+                    chartDataSynchronizer.clearTopicsCache()
                     chartDataSynchronizer.synchronizeTopics(entries)
                     println("✅ Chart synchronization complete")
 
@@ -623,4 +624,9 @@ class RegistryContainer(
      * @return The last update timestamp, or null if not found
      */
     fun getTopicsUpdatedAt() = chartDataSynchronizer.getTopicsUpdatedAt()
+
+    /**
+     * Clears cached topics data to force a re-download on next sync.
+     */
+    fun clearTopicsCache() = chartDataSynchronizer.clearTopicsCache()
 }

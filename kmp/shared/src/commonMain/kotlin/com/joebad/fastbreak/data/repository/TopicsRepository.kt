@@ -60,6 +60,9 @@ class TopicsRepository(
             }
             val topics = json.decodeFromString<TopicsResponse>(jsonString)
             println("   ✅ Found cached topics: ${topics.narratives.size} narratives")
+            topics.narratives.forEachIndexed { i, n ->
+                println("   [$i] league='${n.league}' title='${n.title.take(30)}'")
+            }
             topics
         } catch (e: SerializationException) {
             println("   ❌ Error reading topics: ${e.message}")

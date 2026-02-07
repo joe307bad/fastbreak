@@ -1,8 +1,11 @@
 open System
+open System.IO
 open System.Net.Http
 open System.Text
 open System.Text.Json
 open System.Text.Json.Serialization
+open Amazon.S3
+open Amazon.S3.Model
 
 // Types for structured JSON output
 type DataPoint = {
@@ -151,6 +154,19 @@ let fetchChartData () = async {
     return chartData
 }
 
+let uploadToS3 (bucketName: string) (json: string) = async {
+    use s3Client = new AmazonS3Client()
+
+    let request = PutObjectRequest()
+    request.BucketName <- bucketName
+    request.Key <- "dev/topics.json"
+    request.ContentType <- "application/json"
+    request.ContentBody <- json
+
+    let! response = s3Client.PutObjectAsync(request) |> Async.AwaitTask
+    printfn "Uploaded to s3://%s/dev/topics.json (HTTP %d)" bucketName (int response.HttpStatusCode)
+}
+
 let getSportsNarratives () = async {
     // Get API key from environment
     let apiKey = Environment.GetEnvironmentVariable "GEMINI_API_KEY"
@@ -171,6 +187,7 @@ let getSportsNarratives () = async {
 
     // Prepare the prompt for Gemini
     let today = DateTime.UtcNow.ToString("yyyy-MM-dd")
+    let timestamp = DateTime.UtcNow.ToString("o")
     let prompt =
         sprintf """Today's date is %s.
 
@@ -347,7 +364,7 @@ Focus on:
 - NHL, NBA, NFL, MLB, or Soccer depending on available charts
 - Advanced analytics insights (offensive/defensive ratings, efficiency metrics, expected goals, EPA, etc.)
 - Recent news that the SPECIFIC NUMERICAL DATA helps explain or predict
-- Quality analytics content from Substack, FiveThirtyEight, The Ringer, PFF, team blogs, etc.""" today chartsContext today allowedDomainsString today
+- Quality analytics content from Substack, FiveThirtyEight, The Ringer, PFF, team blogs, etc.""" today chartsContext today allowedDomainsString timestamp
 
     // Create request for Gemini with grounded search
     let request = {
@@ -424,6 +441,11 @@ Focus on:
 [<EntryPoint>]
 let main argv =
     try
+        // Get S3 bucket from environment
+        let s3Bucket = Environment.GetEnvironmentVariable "AWS_S3_BUCKET"
+        if String.IsNullOrEmpty s3Bucket then
+            failwith "S3_BUCKET environment variable not set"
+
         printfn "Fetching sports narratives using chart data and Gemini with grounded search..."
         printfn ""
 
@@ -437,6 +459,11 @@ let main argv =
         printfn "%s" json
         printfn ""
         printfn "Successfully retrieved %d narratives!" narratives.Narratives.Length
+
+        // Upload to S3
+        printfn ""
+        printfn "Uploading to S3..."
+        uploadToS3 s3Bucket json |> Async.RunSynchronously
 
         0 // Success
     with

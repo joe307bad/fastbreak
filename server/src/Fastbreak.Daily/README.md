@@ -48,11 +48,9 @@ dotnet build
 ## Run
 
 ```bash
-# If using .env file, source it first
-set -a && source .env && set +a
-
 # Run the application
-dotnet run --project server/src/Fastbreak.Daily/Fastbreak.Daily.fsproj
+cd server/src/Fastbreak.Daily
+set -a && source .env && set +a && dotnet run
 ```
 
 ## Output Format

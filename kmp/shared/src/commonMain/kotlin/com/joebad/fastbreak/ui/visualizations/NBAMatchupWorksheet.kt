@@ -483,6 +483,8 @@ fun NBAMatchupWorksheet(
                         leftLabel = "${selectedMatchup.homeTeam.abbreviation} Off",
                         middleLabel = "vs",
                         rightLabel = "${selectedMatchup.awayTeam.abbreviation} Def",
+                        leftColor = Team2Color,  // Home team
+                        rightColor = Team1Color, // Away team
                         fiveColStats = selectedMatchup.comparisons?.homeOffVsAwayDef?.mapNotNull { (key, stat) ->
                             val offValue = stat.offense.value?.formatStat(2) ?: return@mapNotNull null
                             val defValue = stat.defense.value?.formatStat(2) ?: return@mapNotNull null

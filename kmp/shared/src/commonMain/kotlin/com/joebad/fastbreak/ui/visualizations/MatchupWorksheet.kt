@@ -807,6 +807,8 @@ fun MatchupWorksheet(
                         leftLabel = "$homeTeam Off",
                         middleLabel = "vs",
                         rightLabel = "$awayTeam Def",
+                        leftColor = Team2Color,  // Home team
+                        rightColor = Team1Color, // Away team
                         fiveColStats = if (awayTeamData != null && homeTeamData != null) {
                             buildNFLVersusStats(
                                 homeTeamData.team_stats.current.offense,
@@ -830,9 +832,9 @@ fun MatchupWorksheet(
                         } else emptyList()
                     ))
 
-                    // Box 4: RB Comparison
-                    val awayRB = awayTeamData?.players?.rbs?.firstOrNull()
-                    val homeRB = homeTeamData?.players?.rbs?.firstOrNull()
+                    // Box 4: RB Comparison (sorted by rushing yards via sortOrder)
+                    val awayRB = awayTeamData?.players?.rbs?.minByOrNull { it.sortOrder }
+                    val homeRB = homeTeamData?.players?.rbs?.minByOrNull { it.sortOrder }
                     add(ShareStatBox(
                         title = if (awayRB != null && homeRB != null) {
                             "${awayRB.name} vs ${homeRB.name}"
@@ -845,9 +847,9 @@ fun MatchupWorksheet(
                         } else emptyList()
                     ))
 
-                    // Box 5: WR Comparison
-                    val awayWR = awayTeamData?.players?.receivers?.firstOrNull()
-                    val homeWR = homeTeamData?.players?.receivers?.firstOrNull()
+                    // Box 5: WR Comparison (sorted by receiving yards via sortOrder)
+                    val awayWR = awayTeamData?.players?.receivers?.minByOrNull { it.sortOrder }
+                    val homeWR = homeTeamData?.players?.receivers?.minByOrNull { it.sortOrder }
                     add(ShareStatBox(
                         title = if (awayWR != null && homeWR != null) {
                             "${awayWR.name} vs ${homeWR.name}"
@@ -1191,9 +1193,9 @@ private fun StatsTab(
                 add(RowData.Spacer("qb_spacer", 4.dp))
             }
 
-            // RB Comparisons
-            val awayRBs = awayTeamData.players.rbs
-            val homeRBs = homeTeamData.players.rbs
+            // RB Comparisons (sorted by rushing yards via sortOrder)
+            val awayRBs = awayTeamData.players.rbs.sortedBy { it.sortOrder }
+            val homeRBs = homeTeamData.players.rbs.sortedBy { it.sortOrder }
             val rbCount = minOf(awayRBs.size, homeRBs.size)
 
             val rbStatsConfig = listOf(
@@ -1235,9 +1237,9 @@ private fun StatsTab(
                 add(RowData.Spacer("rb${i}_spacer", 4.dp))
             }
 
-            // Receiver Comparisons
-            val awayWRs = awayTeamData.players.receivers
-            val homeWRs = homeTeamData.players.receivers
+            // Receiver Comparisons (sorted by receiving yards via sortOrder)
+            val awayWRs = awayTeamData.players.receivers.sortedBy { it.sortOrder }
+            val homeWRs = homeTeamData.players.receivers.sortedBy { it.sortOrder }
             val wrCount = minOf(awayWRs.size, homeWRs.size)
 
             val receiverStatsConfig = listOf(
@@ -1778,10 +1780,10 @@ private fun PlayerStatsComparison(
             PlayerComparison(awayQBName, homeQBName, "QB", stats)
         }
 
-        // RB Comparisons
+        // RB Comparisons (sorted by rushing yards via sortOrder)
         val rbComparisons = run {
-            val awayRBs = awayPlayers.rbs
-            val homeRBs = homePlayers.rbs
+            val awayRBs = awayPlayers.rbs.sortedBy { it.sortOrder }
+            val homeRBs = homePlayers.rbs.sortedBy { it.sortOrder }
 
             val rbStatsConfig = listOf(
                 Triple({ rb: RBPlayerStats -> rb.rushing_epa }, "Rush EPA", 2),
@@ -1821,10 +1823,10 @@ private fun PlayerStatsComparison(
             }
         }
 
-        // Receiver Comparisons
+        // Receiver Comparisons (sorted by receiving yards via sortOrder)
         val receiverComparisons = run {
-            val awayWRs = awayPlayers.receivers
-            val homeWRs = homePlayers.receivers
+            val awayWRs = awayPlayers.receivers.sortedBy { it.sortOrder }
+            val homeWRs = homePlayers.receivers.sortedBy { it.sortOrder }
 
             val receiverStatsConfig = listOf(
                 Triple({ rec: ReceiverPlayerStats -> rec.receiving_epa }, "Rec EPA", 2),

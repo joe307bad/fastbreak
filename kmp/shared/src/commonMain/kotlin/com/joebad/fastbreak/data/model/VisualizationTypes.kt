@@ -349,6 +349,7 @@ data class PlayerStatValue(
 @Serializable
 data class QBPlayerStats(
     val name: String,
+    val sortOrder: Int = 1,  // Sorted by passing_yards
     val total_epa: PlayerStatValue,
     val passing_yards: PlayerStatValue,
     val passing_tds: PlayerStatValue,
@@ -362,6 +363,7 @@ data class QBPlayerStats(
 @Serializable
 data class RBPlayerStats(
     val name: String,
+    val sortOrder: Int = 1,  // Sorted by rushing_yards
     val rushing_epa: PlayerStatValue,
     val rushing_yards: PlayerStatValue,
     val rushing_tds: PlayerStatValue,
@@ -377,6 +379,7 @@ data class RBPlayerStats(
 @Serializable
 data class ReceiverPlayerStats(
     val name: String,
+    val sortOrder: Int = 1,  // Sorted by receiving_yards
     val receiving_epa: PlayerStatValue,
     val receiving_yards: PlayerStatValue,
     val receiving_tds: PlayerStatValue,

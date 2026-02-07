@@ -41,6 +41,29 @@ tied_rank <- function(x) {
   return(list(rank = numeric_ranks, rankDisplay = display_ranks))
 }
 
+# Helper function to convert integer to Roman numeral
+to_roman <- function(num) {
+  if (num <= 0) return("")
+
+  values <- c(1000, 900, 500, 400, 100, 90, 50, 40, 10, 9, 5, 4, 1)
+  symbols <- c("M", "CM", "D", "CD", "C", "XC", "L", "XL", "X", "IX", "V", "IV", "I")
+
+  result <- ""
+  for (i in seq_along(values)) {
+    while (num >= values[i]) {
+      result <- paste0(result, symbols[i])
+      num <- num - values[i]
+    }
+  }
+  return(result)
+}
+
+# Calculate Super Bowl number from season year
+# Super Bowl I was after the 1966 season
+get_super_bowl_number <- function(season_year) {
+  season_year - 1965
+}
+
 cat("=== Loading NFL data for", CURRENT_SEASON, "season ===\n")
 
 # ============================================================================
@@ -361,6 +384,25 @@ player_stats <- tryCatch({
 
 cat("Loaded", nrow(player_stats), "player stat rows\n")
 
+# Load snap counts to prioritize players by playing time
+snap_counts <- tryCatch({
+  load_snap_counts(seasons = CURRENT_SEASON) %>%
+    filter(game_type == "REG") %>%
+    group_by(player, team, position) %>%
+    summarise(
+      total_offense_snaps = sum(offense_snaps, na.rm = TRUE),
+      .groups = "drop"
+    )
+}, error = function(e) {
+  cat("Warning: Could not load snap counts:", e$message, "\n")
+  cat("Will fall back to stat-based player selection\n")
+  NULL
+})
+
+if (!is.null(snap_counts)) {
+  cat("Loaded snap counts for", nrow(snap_counts), "players\n")
+}
+
 # Calculate season totals and filter by games played
 player_stats_filtered <- player_stats %>%
   group_by(player_id, player_name, team, position) %>%
@@ -429,7 +471,23 @@ player_stats_filtered <- player_stats %>%
   ) %>%
   mutate(team = ifelse(team == "LA", "LAR", team))
 
-cat("Filtered to", nrow(player_stats_filtered), "players meeting snap thresholds\n")
+cat("Filtered to", nrow(player_stats_filtered), "players meeting game thresholds\n")
+
+# Join snap counts if available
+if (!is.null(snap_counts)) {
+  player_stats_filtered <- player_stats_filtered %>%
+    left_join(
+      snap_counts %>% mutate(team = ifelse(team == "LA", "LAR", team)),
+      by = c("player_name" = "player", "team", "position")
+    ) %>%
+    mutate(total_offense_snaps = coalesce(total_offense_snaps, 0L))
+
+  cat("Joined snap counts - players with snap data:", sum(player_stats_filtered$total_offense_snaps > 0), "\n")
+} else {
+  # If snap counts not available, use a proxy (games played * estimated snaps)
+  player_stats_filtered <- player_stats_filtered %>%
+    mutate(total_offense_snaps = games * 50)  # Rough estimate
+}
 
 # Rank players by position for each stat (with tie handling)
 # Process each position separately to properly handle tied_rank() list return
@@ -577,22 +635,40 @@ player_stats_ranked <- player_stats_ranked %>%
     target_share_rankDisplay = target_share_ranks$rankDisplay
   )
 
-# Select top players per team
-top_players <- player_stats_ranked %>%
-  group_by(team, position) %>%
-  arrange(desc(case_when(
-    position == "QB" ~ passing_epa,
-    position == "RB" ~ rushing_epa,
-    position %in% c("WR", "TE") ~ wopr,
-    TRUE ~ 0
-  ))) %>%
-  mutate(player_rank = row_number()) %>%
-  filter(
-    (position == "QB" & player_rank <= 1) |
-    (position == "RB" & player_rank <= 2) |
-    (position %in% c("WR", "TE") & player_rank <= 3)
-  ) %>%
+# Select top players per team - prioritize by primary stat for each position
+# QBs by passing yards, RBs by rushing yards, WR/TE by receiving yards
+# league_rank = rank among ALL players at that position (for sortOrder)
+# team_rank = rank within team (for selecting top N per team)
+
+# First calculate league-wide ranks, then select top per team
+top_qbs <- player_stats_ranked %>%
+  filter(position == "QB") %>%
+  arrange(desc(passing_yards)) %>%
+  mutate(league_rank = row_number()) %>%
+  group_by(team) %>%
+  mutate(team_rank = row_number()) %>%
+  filter(team_rank <= 1) %>%
   ungroup()
+
+top_rbs <- player_stats_ranked %>%
+  filter(position == "RB") %>%
+  arrange(desc(rushing_yards)) %>%
+  mutate(league_rank = row_number()) %>%
+  group_by(team) %>%
+  mutate(team_rank = row_number()) %>%
+  filter(team_rank <= 2) %>%
+  ungroup()
+
+top_receivers <- player_stats_ranked %>%
+  filter(position %in% c("WR", "TE")) %>%
+  arrange(desc(receiving_yards)) %>%
+  mutate(league_rank = row_number()) %>%
+  group_by(team) %>%
+  mutate(team_rank = row_number()) %>%
+  filter(team_rank <= 3) %>%
+  ungroup()
+
+top_players <- bind_rows(top_qbs, top_rbs, top_receivers)
 
 cat("Selected top players:", nrow(top_players), "total\n")
 
@@ -1494,13 +1570,15 @@ build_team_json <- function(team_abbr, cum_epa_df, season_totals, top_players_df
   team_players <- top_players_df %>%
     filter(team == team_abbr)
 
-  qb <- team_players %>% filter(position == "QB")
-  rbs <- team_players %>% filter(position == "RB")
-  receivers <- team_players %>% filter(position %in% c("WR", "TE"))
+  # Use team_rank from top_players selection (sorted by primary stat within team)
+  qb <- team_players %>% filter(position == "QB") %>% arrange(team_rank)
+  rbs <- team_players %>% filter(position == "RB") %>% arrange(team_rank)
+  receivers <- team_players %>% filter(position %in% c("WR", "TE")) %>% arrange(team_rank)
 
   qb_json <- if (nrow(qb) > 0) {
     list(
       name = qb$player_name[1],
+      sortOrder = as.integer(qb$team_rank[1]),  # Rank by passing_yards within team
       total_epa = list(value = na_to_null(round(qb$qb_epa_per_play[1], 2)), rank = na_to_null(as.integer(qb$qb_epa_per_play_rank[1])), rankDisplay = na_to_null(qb$qb_epa_per_play_rankDisplay[1])),
       passing_yards = list(value = na_to_null(as.integer(qb$passing_yards[1])), rank = na_to_null(as.integer(qb$passing_yards_rank[1])), rankDisplay = na_to_null(qb$passing_yards_rankDisplay[1])),
       passing_tds = list(value = na_to_null(as.integer(qb$passing_tds[1])), rank = na_to_null(as.integer(qb$passing_tds_rank[1])), rankDisplay = na_to_null(qb$passing_tds_rankDisplay[1])),
@@ -1515,6 +1593,7 @@ build_team_json <- function(team_abbr, cum_epa_df, season_totals, top_players_df
   rbs_json <- lapply(1:nrow(rbs), function(i) {
     list(
       name = rbs$player_name[i],
+      sortOrder = as.integer(rbs$team_rank[i]),  # Rank by rushing_yards within team
       rushing_epa = list(value = na_to_null(round(rbs$rushing_epa[i], 2)), rank = na_to_null(as.integer(rbs$rushing_epa_rank[i])), rankDisplay = na_to_null(rbs$rushing_epa_rankDisplay[i])),
       rushing_yards = list(value = na_to_null(as.integer(rbs$rushing_yards[i])), rank = na_to_null(as.integer(rbs$rushing_yards_rank[i])), rankDisplay = na_to_null(rbs$rushing_yards_rankDisplay[i])),
       rushing_tds = list(value = na_to_null(as.integer(rbs$rushing_tds[i])), rank = na_to_null(as.integer(rbs$rushing_tds_rank[i])), rankDisplay = na_to_null(rbs$rushing_tds_rankDisplay[i])),
@@ -1531,6 +1610,7 @@ build_team_json <- function(team_abbr, cum_epa_df, season_totals, top_players_df
   receivers_json <- lapply(1:nrow(receivers), function(i) {
     list(
       name = receivers$player_name[i],
+      sortOrder = as.integer(receivers$team_rank[i]),  # Rank by receiving_yards within team
       receiving_epa = list(value = na_to_null(round(receivers$receiving_epa[i], 2)), rank = na_to_null(as.integer(receivers$receiving_epa_rank[i])), rankDisplay = na_to_null(receivers$receiving_epa_rankDisplay[i])),
       receiving_yards = list(value = na_to_null(as.integer(receivers$receiving_yards[i])), rank = na_to_null(as.integer(receivers$receiving_yards_rank[i])), rankDisplay = na_to_null(receivers$receiving_yards_rankDisplay[i])),
       receiving_tds = list(value = na_to_null(as.integer(receivers$receiving_tds[i])), rank = na_to_null(as.integer(receivers$receiving_tds_rank[i])), rankDisplay = na_to_null(receivers$receiving_tds_rankDisplay[i])),
@@ -1958,23 +2038,29 @@ for (i in 1:nrow(current_week_games)) {
 cat("\n11. Writing output and uploading to S3...\n")
 
 # Wrap matchups in metadata structure
-current_week <- current_week_games$week[1]
+# Use the original current_week from week_info for title generation (ESPN-based 1-5 playoff weeks)
+# current_week_games$week may have different numbering from nflreadr
+title_week <- current_week
 
 # Determine title based on season type
 title_text <- if (is_playoffs) {
+  # Calculate Super Bowl number with Roman numerals (e.g., "Super Bowl LX")
+  super_bowl_label <- paste0("Super Bowl ", to_roman(get_super_bowl_number(CURRENT_SEASON)))
+
   week_label <- case_when(
-    current_week == 1 ~ "Wild Card",
-    current_week == 2 ~ "Divisional Round",
-    current_week == 3 ~ "Conference Championships",
-    current_week == 4 ~ "Pro Bowl",
-    current_week == 5 ~ "Super Bowl",
-    TRUE ~ paste0("Playoff Week ", current_week)
+    title_week == 1 ~ "Wild Card",
+    title_week == 2 ~ "Divisional Round",
+    title_week == 3 ~ "Conference Championships",
+    # Note: Pro Bowl (week 4) is skipped in get_current_week_info(), so this case shouldn't trigger
+    title_week == 4 ~ "Pro Bowl",
+    title_week == 5 ~ super_bowl_label,
+    TRUE ~ paste0("Playoff Week ", title_week)
   )
   # Super Bowl is singular (only one game)
-  suffix <- if (current_week == 5) " Matchup Worksheet" else " Matchup Worksheets"
+  suffix <- if (title_week == 5) " Matchup Worksheet" else " Matchup Worksheets"
   paste0(week_label, suffix)
 } else {
-  paste0("Week ", current_week, " Matchup Worksheets")
+  paste0("Week ", title_week, " Matchup Worksheets")
 }
 
 # Determine tags based on season type - matchups show both team and player stats

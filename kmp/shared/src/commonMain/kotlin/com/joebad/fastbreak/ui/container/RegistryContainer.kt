@@ -361,9 +361,31 @@ class RegistryContainer(
                 // Sync chart data after refresh
                 try {
                     syncChartData(entries)
+
                     // Force refresh topics by clearing cache first
                     chartDataSynchronizer.clearTopicsCache()
+                    val topicsUpdatedAtBefore = chartDataSynchronizer.getTopicsUpdatedAt()
                     chartDataSynchronizer.synchronizeTopics(entries)
+                    val topicsUpdatedAtAfter = chartDataSynchronizer.getTopicsUpdatedAt()
+                    val topicsWereUpdated = topicsUpdatedAtAfter != topicsUpdatedAtBefore
+
+                    // Show topics sync result briefly if topics were updated
+                    if (topicsWereUpdated) {
+                        reduce {
+                            state.copy(
+                                syncProgress = com.joebad.fastbreak.ui.diagnostics.SyncProgress(
+                                    current = 0,
+                                    total = 0,
+                                    currentChart = "",
+                                    syncedChartIds = emptySet(),
+                                    syncingChartIds = emptySet(),
+                                    failedCharts = emptyList(),
+                                    topicsSynced = true
+                                ),
+                                isSyncing = true
+                            )
+                        }
+                    }
 
                     // All done - clear sync state
                     reduce {
@@ -420,7 +442,28 @@ class RegistryContainer(
                     // Continue with chart data sync using cached entries
                     try {
                         syncChartData(cachedEntries)
+
+                        val topicsUpdatedAtBefore = chartDataSynchronizer.getTopicsUpdatedAt()
                         chartDataSynchronizer.synchronizeTopics(cachedEntries)
+                        val topicsUpdatedAtAfter = chartDataSynchronizer.getTopicsUpdatedAt()
+                        val topicsWereUpdated = topicsUpdatedAtAfter != topicsUpdatedAtBefore
+
+                        if (topicsWereUpdated) {
+                            reduce {
+                                state.copy(
+                                    syncProgress = com.joebad.fastbreak.ui.diagnostics.SyncProgress(
+                                        current = 0,
+                                        total = 0,
+                                        currentChart = "",
+                                        syncedChartIds = emptySet(),
+                                        syncingChartIds = emptySet(),
+                                        failedCharts = emptyList(),
+                                        topicsSynced = true
+                                    ),
+                                    isSyncing = true
+                                )
+                            }
+                        }
 
                         // All done - clear sync state
                         reduce {

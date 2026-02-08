@@ -201,16 +201,13 @@ private fun NarrativeItem(number: Int, narrative: Narrative) {
 
         // Links
         if (narrative.links.isNotEmpty()) {
-            Column(
-                modifier = Modifier.padding(top = 4.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
+            Column(modifier = Modifier.padding(top = 4.dp)) {
                 // Blue badge for "relevant links"
                 val blueColor = Color(0xFF2196F3)
                 Box(
                     modifier = Modifier
                         .background(blueColor.copy(alpha = 0.15f), RoundedCornerShape(6.dp))
-                        .padding(start = 6.dp, end = 6.dp, top = 2.dp, bottom = 2.dp)
+                        .padding(horizontal = 6.dp, vertical = 2.dp)
                 ) {
                     Text(
                         text = "relevant links",
@@ -218,26 +215,29 @@ private fun NarrativeItem(number: Int, narrative: Narrative) {
                         fontSize = 10.sp
                     )
                 }
-                Spacer(Modifier.height(2.dp))
-                narrative.links.forEach { link ->
-                    Row(
-                        modifier = Modifier.clickable { UrlLauncher.openUrl(link.url) }
-                    ) {
-                        Text(
-                            text = "• ",
-                            style = MaterialTheme.typography.bodySmall,
-                            fontFamily = FontFamily.Monospace,
-                            fontSize = 11.sp,
-                            color = MaterialTheme.colorScheme.tertiary
-                        )
-                        Text(
-                            text = "[${link.type}] ${link.title}",
-                            style = MaterialTheme.typography.labelSmall,
-                            fontFamily = FontFamily.Monospace,
-                            fontSize = 11.sp,
-                            color = MaterialTheme.colorScheme.tertiary,
-                            textDecoration = TextDecoration.Underline
-                        )
+                Spacer(Modifier.height(10.dp))
+                // Links with spacing between them
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    narrative.links.forEach { link ->
+                        Row(
+                            modifier = Modifier.clickable { UrlLauncher.openUrl(link.url) }
+                        ) {
+                            Text(
+                                text = "• ",
+                                style = MaterialTheme.typography.bodySmall,
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.tertiary
+                            )
+                            Text(
+                                text = "[${link.type}] ${link.title}",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.tertiary,
+                                textDecoration = TextDecoration.Underline
+                            )
+                        }
                     }
                 }
             }

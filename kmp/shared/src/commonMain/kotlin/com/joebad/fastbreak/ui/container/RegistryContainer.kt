@@ -205,9 +205,20 @@ class RegistryContainer(
                     )
                 }
 
-                // Sync chart data after loading registry entries (await completion)
+                // Sync chart data and topics after loading registry entries (await completion)
                 try {
                     syncChartData(entries)
+                    // Also sync topics data
+                    chartDataSynchronizer.synchronizeTopics(entries)
+
+                    // Update progress to show topics synced and clear sync state
+                    reduce {
+                        state.copy(
+                            syncProgress = null,
+                            isSyncing = false,
+                            diagnostics = state.diagnostics.copy(isSyncing = false)
+                        )
+                    }
                 } catch (e: Exception) {
                     println("❌ Chart synchronization failed: ${e.message}")
                     // Ensure isSyncing is cleared even on exception
@@ -251,6 +262,17 @@ class RegistryContainer(
                     // Continue with chart data sync using cached entries
                     try {
                         syncChartData(cachedEntries)
+                        // Also sync topics data
+                        chartDataSynchronizer.synchronizeTopics(cachedEntries)
+
+                        // Clear sync state
+                        reduce {
+                            state.copy(
+                                syncProgress = null,
+                                isSyncing = false,
+                                diagnostics = state.diagnostics.copy(isSyncing = false)
+                            )
+                        }
                     } catch (e: Exception) {
                         println("❌ Chart synchronization failed: ${e.message}")
                         // Ensure isSyncing is cleared even on exception
@@ -289,12 +311,9 @@ class RegistryContainer(
     /**
      * Forces a registry refresh regardless of staleness.
      * Prevents concurrent refresh operations.
-     * Adds minimum display time for loading indicator (0.5s before + 0.5s after).
      */
     fun refreshRegistry() = intent {
-        println("═══════════════════════════════════════════════════════")
-        println("🔄 REFRESH BUTTON CLICKED - Starting refresh flow")
-        println("═══════════════════════════════════════════════════════")
+        println("🔄 REFRESH - Starting refresh flow")
 
         // Guard: prevent concurrent refresh operations
         if (container.stateFlow.value.isSyncing) {
@@ -302,15 +321,16 @@ class RegistryContainer(
             return@intent
         }
 
-        println("✓ Setting isSyncing = true and showing initial sync progress")
+        // Set initial sync state - syncProgress with total=1 keeps charts disabled
+        // until sync completes (isChartReady returns false when chart not in syncedChartIds)
         reduce {
             state.copy(
                 isSyncing = true,
                 error = null,
                 syncProgress = com.joebad.fastbreak.ui.diagnostics.SyncProgress(
                     current = 0,
-                    total = 1,
-                    currentChart = "Preparing to sync...",
+                    total = 1,  // Non-zero so charts stay disabled
+                    currentChart = "Syncing...",
                     syncedChartIds = emptySet(),
                     syncingChartIds = emptySet(),
                     failedCharts = emptyList()
@@ -321,11 +341,6 @@ class RegistryContainer(
                 )
             )
         }
-
-        // Show loading indicator for minimum 0.5 seconds before starting
-        println("⏳ Waiting 500ms before starting refresh...")
-        delay(500)
-        println("✓ Delay complete, calling forceRefreshRegistry()")
 
         val refreshResult = registryManager.forceRefreshRegistry()
 
@@ -343,16 +358,46 @@ class RegistryContainer(
                     )
                 }
 
-                println("📊 Starting chart data synchronization...")
-                // Sync chart data after refresh (await completion)
+                // Sync chart data after refresh
                 try {
                     syncChartData(entries)
-                    println("✅ Chart synchronization complete")
 
-                    // Also download team rosters after successful chart sync
-                    println("🏈 Downloading team rosters...")
+                    // Force refresh topics by clearing cache first
+                    chartDataSynchronizer.clearTopicsCache()
+                    val topicsUpdatedAtBefore = chartDataSynchronizer.getTopicsUpdatedAt()
+                    chartDataSynchronizer.synchronizeTopics(entries)
+                    val topicsUpdatedAtAfter = chartDataSynchronizer.getTopicsUpdatedAt()
+                    val topicsWereUpdated = topicsUpdatedAtAfter != topicsUpdatedAtBefore
+
+                    // Show topics sync result briefly if topics were updated
+                    if (topicsWereUpdated) {
+                        reduce {
+                            state.copy(
+                                syncProgress = com.joebad.fastbreak.ui.diagnostics.SyncProgress(
+                                    current = 0,
+                                    total = 0,
+                                    currentChart = "",
+                                    syncedChartIds = emptySet(),
+                                    syncingChartIds = emptySet(),
+                                    failedCharts = emptyList(),
+                                    topicsSynced = true
+                                ),
+                                isSyncing = true
+                            )
+                        }
+                    }
+
+                    // All done - clear sync state
+                    reduce {
+                        state.copy(
+                            syncProgress = null,
+                            isSyncing = false,
+                            diagnostics = state.diagnostics.copy(isSyncing = false)
+                        )
+                    }
+
+                    // Download team rosters in background
                     pinnedTeamsContainer?.downloadTeamRosters()
-                    println("✅ Team rosters download initiated")
                 } catch (e: Exception) {
                     println("❌ Chart synchronization failed: ${e.message}")
                     // Ensure isSyncing is cleared even on exception
@@ -395,15 +440,41 @@ class RegistryContainer(
                     postSideEffect(RegistrySideEffect.ShowError(errorMsg))
 
                     // Continue with chart data sync using cached entries
-                    println("📊 Starting chart data synchronization with cached entries...")
                     try {
                         syncChartData(cachedEntries)
-                        println("✅ Chart synchronization complete")
 
-                        // Also download team rosters after successful chart sync
-                        println("🏈 Downloading team rosters...")
+                        val topicsUpdatedAtBefore = chartDataSynchronizer.getTopicsUpdatedAt()
+                        chartDataSynchronizer.synchronizeTopics(cachedEntries)
+                        val topicsUpdatedAtAfter = chartDataSynchronizer.getTopicsUpdatedAt()
+                        val topicsWereUpdated = topicsUpdatedAtAfter != topicsUpdatedAtBefore
+
+                        if (topicsWereUpdated) {
+                            reduce {
+                                state.copy(
+                                    syncProgress = com.joebad.fastbreak.ui.diagnostics.SyncProgress(
+                                        current = 0,
+                                        total = 0,
+                                        currentChart = "",
+                                        syncedChartIds = emptySet(),
+                                        syncingChartIds = emptySet(),
+                                        failedCharts = emptyList(),
+                                        topicsSynced = true
+                                    ),
+                                    isSyncing = true
+                                )
+                            }
+                        }
+
+                        // All done - clear sync state
+                        reduce {
+                            state.copy(
+                                syncProgress = null,
+                                isSyncing = false,
+                                diagnostics = state.diagnostics.copy(isSyncing = false)
+                            )
+                        }
+
                         pinnedTeamsContainer?.downloadTeamRosters()
-                        println("✅ Team rosters download initiated")
                     } catch (e: Exception) {
                         println("❌ Chart synchronization failed: ${e.message}")
                         // Ensure isSyncing is cleared even on exception
@@ -419,31 +490,19 @@ class RegistryContainer(
                         }
                     }
                 } else {
-                    println("❌ No cached registry available")
-
-                    val diagnostics = container.stateFlow.value.diagnostics.copy(
-                        isSyncing = false,
-                        failedSyncs = container.stateFlow.value.diagnostics.failedSyncs + 1,
-                        lastError = errorMsg
-                    )
-
-                    // Keep loading indicator visible for 0.5s even on error
-                    println("⏳ Waiting 500ms before hiding loading indicator...")
-                    delay(500)
-
-                    println("✓ Setting error state and isSyncing = false")
                     reduce {
                         state.copy(
                             isSyncing = false,
                             syncProgress = null,
                             error = errorMsg,
-                            diagnostics = diagnostics
+                            diagnostics = state.diagnostics.copy(
+                                isSyncing = false,
+                                failedSyncs = state.diagnostics.failedSyncs + 1,
+                                lastError = errorMsg
+                            )
                         )
                     }
                     postSideEffect(RegistrySideEffect.ShowError(errorMsg))
-                    println("═══════════════════════════════════════════════════════")
-                    println("❌ REFRESH FLOW COMPLETE (WITH ERROR)")
-                    println("═══════════════════════════════════════════════════════")
                 }
             }
         }
@@ -453,61 +512,43 @@ class RegistryContainer(
      * Synchronizes chart data based on registry entries.
      * Compares timestamps and downloads charts that need updating.
      * Builds Registry from cached data after sync completes.
-     * Adds 0.5s delay after completion before hiding loading indicator.
-     *
-     * Note: This is a regular suspend function, not wrapped in intent{},
-     * so it can be properly awaited when called from other intent blocks.
+     * Keeps isSyncing = true - caller is responsible for clearing sync state.
      */
     private suspend fun syncChartData(entries: Map<String, RegistryEntry>) {
         try {
             chartDataSynchronizer.synchronizeCharts(entries).collect { progress ->
             // Skip showing progress if nothing needs syncing (everything cached)
             if (progress.total == 0) {
-                // Everything is already cached, build registry from cache and finish
+                // Everything is already cached, build registry from cache
+                // Keep isSyncing = true - caller will clear after topics sync
                 val registry = buildRegistryFromCache()
                 intent {
                     reduce {
                         state.copy(
                             registry = registry,
-                            isSyncing = false,
+                            isSyncing = true,  // Keep true - caller handles final state
                             lastSyncTime = Clock.System.now(),
-                            syncProgress = null,
-                            diagnostics = loadDiagnostics().copy(
-                                isSyncing = false  // Explicitly set to false
-                            )
+                            syncProgress = null
                         )
                     }
                 }.join()
                 return@collect
             }
 
-            // When complete, keep loading visible for 0.5s before hiding
             if (progress.isComplete) {
-                // Update progress but keep syncing state
-                intent {
-                    reduce {
-                        state.copy(
-                            syncProgress = progress,
-                            isSyncing = true  // Keep true during delay
-                        )
-                    }
-                }.join()
-
-                // Keep loading indicator visible for minimum 0.5 seconds after completion
-                delay(500)
-
                 // Build registry from cached chart data
                 val registry = buildRegistryFromCache()
 
-                // Update state with registry and diagnostics
+                // Update state with registry - keep isSyncing true for caller
                 intent {
                     reduce {
                         state.copy(
                             registry = registry,
-                            isSyncing = true,  // Keep true until we clear syncProgress
+                            syncProgress = null,
+                            isSyncing = true,  // Caller clears this after topics sync
                             lastSyncTime = Clock.System.now(),
                             diagnostics = loadDiagnostics().copy(
-                                isSyncing = true,  // Keep true until we clear syncProgress
+                                isSyncing = true,
                                 lastError = if (progress.hasFailures) {
                                     "Failed to sync ${progress.failedCharts.size} charts"
                                 } else null,
@@ -518,20 +559,6 @@ class RegistryContainer(
                         )
                     }
                     postSideEffect(RegistrySideEffect.SyncCompleted)
-                }.join()
-
-                // Keep the completion message visible for 0.5 seconds
-                delay(500)
-
-                // Now clear syncProgress and unlock buttons
-                intent {
-                    reduce {
-                        state.copy(
-                            syncProgress = null,
-                            isSyncing = false,
-                            diagnostics = state.diagnostics.copy(isSyncing = false)
-                        )
-                    }
                 }.join()
             } else {
                 // Normal progress update
@@ -601,4 +628,23 @@ class RegistryContainer(
             failedCharts = currentState.syncProgress?.failedCharts ?: emptyList()
         )
     }
+
+    /**
+     * Gets the cached topics data.
+     *
+     * @return The cached topics, or null if not found
+     */
+    fun getCachedTopics() = chartDataSynchronizer.getCachedTopics()
+
+    /**
+     * Gets the timestamp when topics were last updated.
+     *
+     * @return The last update timestamp, or null if not found
+     */
+    fun getTopicsUpdatedAt() = chartDataSynchronizer.getTopicsUpdatedAt()
+
+    /**
+     * Clears cached topics data to force a re-download on next sync.
+     */
+    fun clearTopicsCache() = chartDataSynchronizer.clearTopicsCache()
 }

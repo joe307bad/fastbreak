@@ -84,7 +84,8 @@ class RegistryApi(
                     val entry = RegistryEntry(
                         title = titleStr,
                         updatedAt = updatedAtInstant,
-                        interval = entryObject["interval"]?.jsonPrimitive?.contentOrNull
+                        interval = entryObject["interval"]?.jsonPrimitive?.contentOrNull,
+                        type = entryObject["type"]?.jsonPrimitive?.contentOrNull
                     )
                     key to entry
                 } catch (e: Exception) {

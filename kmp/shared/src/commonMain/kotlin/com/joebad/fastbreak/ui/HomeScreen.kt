@@ -10,6 +10,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.Newspaper
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -39,6 +40,7 @@ fun HomeScreen(
     registryContainer: com.joebad.fastbreak.ui.container.RegistryContainer,
     onRefresh: () -> Unit,
     onMenuClick: () -> Unit = {},
+    onNavigateToTopics: () -> Unit = {},
     onInitialLoad: () -> Unit,
     onRequestPermission: () -> Unit,
     onCheckPermission: () -> Unit,
@@ -133,6 +135,12 @@ fun HomeScreen(
                     }
                 },
                 actions = {
+                    IconButton(onClick = onNavigateToTopics) {
+                        Icon(
+                            imageVector = Icons.Default.Newspaper,
+                            contentDescription = "Topics"
+                        )
+                    }
                     IconButton(
                         onClick = onRefresh,
                         enabled = !isRefreshing

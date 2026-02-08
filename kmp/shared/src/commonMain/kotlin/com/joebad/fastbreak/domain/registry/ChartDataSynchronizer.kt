@@ -13,8 +13,10 @@ import com.joebad.fastbreak.data.model.RegistryEntry
 import com.joebad.fastbreak.data.model.ScatterPlotVisualization
 import com.joebad.fastbreak.data.model.Sport
 import com.joebad.fastbreak.data.model.TableVisualization
+import com.joebad.fastbreak.data.model.TopicsResponse
 import com.joebad.fastbreak.data.model.VizType
 import com.joebad.fastbreak.data.repository.ChartDataRepository
+import com.joebad.fastbreak.data.repository.TopicsRepository
 import com.joebad.fastbreak.logging.SentryLogger
 import com.joebad.fastbreak.logging.SpanStatus
 import com.joebad.fastbreak.ui.diagnostics.SyncProgress
@@ -43,6 +45,7 @@ import kotlinx.serialization.json.jsonPrimitive
  */
 class ChartDataSynchronizer(
     private val chartDataRepository: ChartDataRepository,
+    private val topicsRepository: TopicsRepository,
     private val httpClient: HttpClient = HttpClientFactory.create()
 ) {
     private val json = Json {
@@ -68,9 +71,13 @@ class ChartDataSynchronizer(
      */
     suspend fun synchronizeCharts(registryEntries: Map<String, RegistryEntry>): Flow<SyncProgress> = channelFlow {
         println("📊 ChartDataSynchronizer.synchronizeCharts() - Starting")
-        println("   Total charts in registry: ${registryEntries.size}")
+        println("   Total entries in registry: ${registryEntries.size}")
 
-        val chartsNeedingUpdate = registryEntries.filter { (fileKey, entry) ->
+        // Filter to only chart entries (exclude topics and other non-chart types)
+        val chartEntries = registryEntries.filter { (_, entry) -> entry.isChart }
+        println("   Chart entries (excluding topics): ${chartEntries.size}")
+
+        val chartsNeedingUpdate = chartEntries.filter { (fileKey, entry) ->
             needsUpdate(fileKey, entry)
         }
 
@@ -83,12 +90,12 @@ class ChartDataSynchronizer(
             println("✓ All charts already synced, nothing to update")
 
             // Clean up orphaned charts even when nothing needs updating
-            println("🔧 SYNC: About to call cleanupOrphanedCharts() with ${registryEntries.size} registry entries (early path)")
-            cleanupOrphanedCharts(registryEntries)
+            println("🔧 SYNC: About to call cleanupOrphanedCharts() with ${chartEntries.size} chart entries (early path)")
+            cleanupOrphanedCharts(chartEntries)
             println("🔧 SYNC: cleanupOrphanedCharts() completed (early path)")
 
             // Nothing to update - all charts already synced
-            val allChartIds = registryEntries.keys.map { fileKeyToChartId(it) }.toSet()
+            val allChartIds = chartEntries.keys.map { fileKeyToChartId(it) }.toSet()
             send(
                 SyncProgress(
                     current = 0,
@@ -113,7 +120,7 @@ class ChartDataSynchronizer(
         val stateMutex = Mutex()
 
         // Add already-cached charts to synced set
-        registryEntries.forEach { (fileKey, _) ->
+        chartEntries.forEach { (fileKey, _) ->
             val chartId = fileKeyToChartId(fileKey)
             if (!chartsNeedingUpdate.containsKey(fileKey)) {
                 syncedCharts.add(chartId)
@@ -198,8 +205,8 @@ class ChartDataSynchronizer(
         println("   Failed: ${failedCharts.size}")
 
         // Clean up cached charts that are no longer in the registry
-        println("🔧 SYNC: About to call cleanupOrphanedCharts() with ${registryEntries.size} registry entries")
-        cleanupOrphanedCharts(registryEntries)
+        println("🔧 SYNC: About to call cleanupOrphanedCharts() with ${chartEntries.size} chart entries")
+        cleanupOrphanedCharts(chartEntries)
         println("🔧 SYNC: cleanupOrphanedCharts() completed")
 
         // Emit final progress with all results
@@ -495,5 +502,91 @@ class ChartDataSynchronizer(
 
         println("✅ CLEANUP: Complete - removed ${orphanedChartIds.size} orphaned chart(s)")
         println("═══════════════════════════════════════════════════════")
+    }
+
+    /**
+     * Synchronizes topics data from registry entries.
+     * Finds entries with type="topics" and downloads if needed.
+     *
+     * @param registryEntries Map of file_key to RegistryEntry
+     */
+    suspend fun synchronizeTopics(registryEntries: Map<String, RegistryEntry>) {
+        println("📰 ChartDataSynchronizer.synchronizeTopics() - Starting")
+
+        // Find topics entries
+        val topicsEntries = registryEntries.filter { (_, entry) -> entry.isTopics }
+        println("   Topics entries found: ${topicsEntries.size}")
+
+        if (topicsEntries.isEmpty()) {
+            println("   No topics entries in registry, skipping")
+            return
+        }
+
+        // Process each topics entry (usually just one)
+        topicsEntries.forEach { (fileKey, entry) ->
+            println("   Processing: $fileKey (${entry.title})")
+
+            // Check if we need to update
+            if (!topicsRepository.needsUpdate(entry.updatedAt)) {
+                println("   ✅ Topics already up to date, skipping download")
+                return@forEach
+            }
+
+            // Download topics data
+            try {
+                val topicsUrl = "${RegistryApi.BASE_URL}/$fileKey"
+                println("   🌐 Fetching topics from: $topicsUrl")
+
+                val startTime = Clock.System.now()
+                val rawJson = httpClient.get(topicsUrl).bodyAsText()
+                val requestDurationMs = (Clock.System.now() - startTime).toDouble(DurationUnit.MILLISECONDS)
+
+                println("   Request duration: ${requestDurationMs.toLong()}ms")
+
+                val topicsResponse = json.decodeFromString<TopicsResponse>(rawJson)
+                println("   ✅ Parsed topics: ${topicsResponse.narratives.size} narratives")
+
+                // Save to repository
+                topicsRepository.saveTopics(topicsResponse, entry.updatedAt)
+                println("   ✅ Topics saved to cache")
+            } catch (e: Exception) {
+                println("   ❌ Failed to sync topics: ${e.message}")
+                SentryLogger.captureException(
+                    throwable = e,
+                    extras = mapOf(
+                        "fileKey" to fileKey,
+                        "action" to "sync_topics"
+                    )
+                )
+            }
+        }
+
+        println("📰 ChartDataSynchronizer.synchronizeTopics() - Complete")
+    }
+
+    /**
+     * Gets the cached topics data.
+     *
+     * @return The cached topics, or null if not found
+     */
+    fun getCachedTopics(): TopicsResponse? {
+        return topicsRepository.getTopics()
+    }
+
+    /**
+     * Gets the timestamp when topics were last updated.
+     *
+     * @return The last update timestamp, or null if not found
+     */
+    fun getTopicsUpdatedAt(): Instant? {
+        return topicsRepository.getUpdatedAt()
+    }
+
+    /**
+     * Clears cached topics data to force a re-download.
+     */
+    fun clearTopicsCache() {
+        println("🗑️ ChartDataSynchronizer.clearTopicsCache()")
+        topicsRepository.clear()
     }
 }

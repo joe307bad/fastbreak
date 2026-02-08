@@ -34,7 +34,12 @@ data class SyncProgress(
     /**
      * List of charts that failed to sync (chartId to error message)
      */
-    val failedCharts: List<Pair<String, String>> = emptyList()
+    val failedCharts: List<Pair<String, String>> = emptyList(),
+
+    /**
+     * Whether topics have been synced successfully
+     */
+    val topicsSynced: Boolean = false
 ) {
     /**
      * Calculates the progress percentage (0-100)
@@ -61,19 +66,26 @@ data class SyncProgress(
         get() = failedCharts.isNotEmpty()
 
     /**
-     * Returns the number of successful syncs
+     * Returns the number of successful syncs (charts + topics if synced)
      */
     val successfulCount: Int
-        get() = current - failedCharts.size
+        get() = current - failedCharts.size + (if (topicsSynced) 1 else 0)
+
+    /**
+     * Returns the total count including topics if synced
+     */
+    val totalWithTopics: Int
+        get() = total + (if (topicsSynced) 1 else 0)
 
     /**
      * Returns a human-readable status message
      */
     val statusMessage: String
         get() = when {
-            total == 0 -> "No charts to sync"
-            isComplete && !hasFailures -> "Sync complete: $total charts"
-            isComplete && hasFailures -> "Sync complete: $successfulCount/$total successful"
+            total == 0 && !topicsSynced -> "No charts to sync"
+            total == 0 && topicsSynced -> "Sync complete: 1/1"
+            isComplete && !hasFailures -> "Sync complete: $totalWithTopics/$totalWithTopics"
+            isComplete && hasFailures -> "Sync complete: $successfulCount/$totalWithTopics successful"
             else -> "Syncing $currentChart ($current/$total)"
         }
 

@@ -89,7 +89,7 @@ fun TopicsScreen(
             ) {
                 item {
                     Text(
-                        text = "Last updated: ${formatRelativeTime(topicsUpdatedAt)}",
+                        text = "updated ${formatRelativeTime(topicsUpdatedAt)}",
                         style = MaterialTheme.typography.labelSmall,
                         fontSize = 10.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -106,11 +106,11 @@ fun TopicsScreen(
 
 private fun getLeagueColor(league: String): Color {
     return when (league.lowercase()) {
-        "nba" -> Color(0xFFC9082A)  // NBA red
-        "nfl" -> Color(0xFF013369)  // NFL blue
-        "nhl" -> Color(0xFF000000)  // NHL black
-        "mlb" -> Color(0xFF002D72)  // MLB blue
-        "mls" -> Color(0xFF5C9E31)  // MLS green
+        "nba" -> Color(0xFFE31837)  // NBA red (vivid)
+        "nfl" -> Color(0xFF0066CC)  // NFL blue (vivid)
+        "nhl" -> Color(0xFFFC4C02)  // NHL orange (visible in dark mode)
+        "mlb" -> Color(0xFF0052A5)  // MLB blue (vivid)
+        "mls" -> Color(0xFF00B140)  // MLS green (vivid)
         else -> Color(0xFF757575)   // Gray for unknown
     }
 }
@@ -121,13 +121,14 @@ private fun NarrativeItem(number: Int, narrative: Narrative) {
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 4.dp)
+            .padding(bottom = 40.dp)
     ) {
-        // League badge
+        // League badge above title
         if (narrative.league.isNotBlank()) {
             val leagueColor = getLeagueColor(narrative.league)
             Box(
                 modifier = Modifier
-                    .background(leagueColor.copy(alpha = 0.15f), RoundedCornerShape(6.dp))
+                    .background(leagueColor.copy(alpha = 0.2f), RoundedCornerShape(6.dp))
                     .padding(horizontal = 6.dp, vertical = 2.dp)
             ) {
                 Text(
@@ -138,8 +139,6 @@ private fun NarrativeItem(number: Int, narrative: Narrative) {
             }
             Spacer(Modifier.height(4.dp))
         }
-
-        // Title with number
         Text(
             text = "$number. ${narrative.title}",
             style = MaterialTheme.typography.titleMedium,
@@ -153,19 +152,19 @@ private fun NarrativeItem(number: Int, narrative: Narrative) {
                 style = MaterialTheme.typography.bodySmall,
                 fontFamily = FontFamily.Monospace,
                 fontSize = 11.sp,
-                lineHeight = 13.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(vertical = 4.dp)
+                lineHeight = 18.sp,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(vertical = 8.dp)
             )
         }
 
         // Data points with context
         if (narrative.dataPoints.isNotEmpty()) {
             Column(
-                modifier = Modifier.padding(vertical = 4.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
+                modifier = Modifier.padding(top = 4.dp, bottom = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                // Green badge for "Statistical context"
+                // Green badge for "statistical context"
                 val greenColor = Color(0xFF4CAF50)
                 Box(
                     modifier = Modifier
@@ -173,19 +172,29 @@ private fun NarrativeItem(number: Int, narrative: Narrative) {
                         .padding(horizontal = 6.dp, vertical = 2.dp)
                 ) {
                     Text(
-                        text = "Statistical context",
+                        text = "statistical context",
                         color = greenColor,
                         fontSize = 10.sp
                     )
                 }
+                Spacer(Modifier.height(2.dp))
                 narrative.dataPoints.forEach { dp ->
-                    Text(
-                        text = dp.context,
-                        style = MaterialTheme.typography.bodySmall,
-                        fontFamily = FontFamily.Monospace,
-                        fontSize = 11.sp,
-                        color = MaterialTheme.colorScheme.primary
-                    )
+                    Row {
+                        Text(
+                            text = "• ",
+                            style = MaterialTheme.typography.bodySmall,
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Text(
+                            text = dp.context,
+                            style = MaterialTheme.typography.bodySmall,
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
                 }
             }
         }
@@ -193,45 +202,45 @@ private fun NarrativeItem(number: Int, narrative: Narrative) {
         // Links
         if (narrative.links.isNotEmpty()) {
             Column(
-                modifier = Modifier.padding(vertical = 4.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
+                modifier = Modifier.padding(top = 4.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                // Blue badge for "Relevant links"
+                // Blue badge for "relevant links"
                 val blueColor = Color(0xFF2196F3)
                 Box(
                     modifier = Modifier
                         .background(blueColor.copy(alpha = 0.15f), RoundedCornerShape(6.dp))
-                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                        .padding(start = 6.dp, end = 6.dp, top = 2.dp, bottom = 2.dp)
                 ) {
                     Text(
-                        text = "Relevant links",
+                        text = "relevant links",
                         color = blueColor,
                         fontSize = 10.sp
                     )
                 }
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    narrative.links.forEach { link ->
+                Spacer(Modifier.height(2.dp))
+                narrative.links.forEach { link ->
+                    Row(
+                        modifier = Modifier.clickable { UrlLauncher.openUrl(link.url) }
+                    ) {
+                        Text(
+                            text = "• ",
+                            style = MaterialTheme.typography.bodySmall,
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.tertiary
+                        )
                         Text(
                             text = "[${link.type}] ${link.title}",
                             style = MaterialTheme.typography.labelSmall,
                             fontFamily = FontFamily.Monospace,
                             fontSize = 11.sp,
                             color = MaterialTheme.colorScheme.tertiary,
-                            textDecoration = TextDecoration.Underline,
-                            modifier = Modifier.clickable { UrlLauncher.openUrl(link.url) }
+                            textDecoration = TextDecoration.Underline
                         )
                     }
                 }
             }
         }
-
-        // Thin divider
-        HorizontalDivider(
-            modifier = Modifier.padding(top = 4.dp),
-            thickness = 0.5.dp,
-            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
-        )
     }
 }

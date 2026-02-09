@@ -215,12 +215,12 @@ let findDataPointsForNarrative (httpClient: HttpClient) (apiKey: string) (chartD
         printfn "    No charts found for league: %s" narrative.league
         return []
     else
-        // Build a condensed version of chart data for the prompt
+        // Build chart data for the prompt - use full JSON (no truncation)
         let chartSummary =
             relevantCharts
             |> List.map (fun (key, json) ->
                 let chartName = key.Replace("dev/", "").Replace(".json", "")
-                sprintf "--- Chart: %s ---\n%s" chartName (json.Substring(0, min 3000 json.Length)))
+                sprintf "--- Chart: %s ---\n%s" chartName json)
             |> String.concat "\n\n"
 
         let prompt =
@@ -241,6 +241,11 @@ let findDataPointsForNarrative (httpClient: HttpClient) (apiKey: string) (chartD
             "1. Identify the team(s) or player(s) mentioned in the narrative, then find their ABBREVIATION in the data\n" +
             "2. Find 3 DIFFERENT statistics from the chart data - DO NOT repeat similar metrics\n" +
             "3. For each stat, provide metric name, value, and context\n\n" +
+            "⚠️ CRITICAL - NEVER CLAIM DATA IS MISSING ⚠️\n" +
+            "- ALL teams are present in the chart data. Search thoroughly.\n" +
+            "- If you cannot find a specific stat, use a DIFFERENT stat from the same team.\n" +
+            "- NEVER say 'data is missing' or 'not found' - find something that IS there.\n" +
+            "- Search the ENTIRE chart, not just the beginning.\n\n" +
             "CONTEXT REQUIREMENTS:\n" +
             "- 2-3 sentences: First sentence explains the stat with league ranking. Second sentence connects it to the narrative.\n" +
             "- ALWAYS include league-wide ranking (e.g., 'top 5 in the league', 'bottom third', 'middle of the pack', 'leads the league')\n" +
@@ -348,17 +353,21 @@ You MUST verify that each event happened between %s and %s.
 - Example: If today is Feb 9, a game from Feb 6 or earlier is TOO OLD
 
 NARRATIVE REQUIREMENTS:
-- VERIFIED RECENT: Every narrative must be about an event from the last 72 hours. Verify the date.
+- NO SINGLE GAME RECAPS: Do NOT make a narrative about one specific game result. Instead focus on:
+  * Season-long trends (e.g., "Thunder's historic pace continues")
+  * Player storylines (e.g., "Mahomes' MVP case after another clutch performance")
+  * Team narratives (e.g., "Lakers' trade deadline moves signal championship push")
+  * Analysis/opinions (e.g., "Why the Oilers' defensive improvements matter")
+- VERIFIED RECENT: The underlying events must be from the last 72 hours, but frame them as part of bigger stories.
 - NO REPETITION: Each narrative must cover a different team, player, or storyline. No overlap.
-- STATS REQUIRED: Every summary MUST include at least 1-2 specific statistics (points, yards, percentages, records, etc.)
+- STATS REQUIRED: Every summary MUST include at least 1-2 specific statistics.
 - AUTHENTIC VOICE: Write like a sports journalist, not an AI. Be specific, opinionated, and direct.
-- UNIQUE ANGLES: Find the interesting story within the story.
 
-BAD EXAMPLE (old news - REJECT):
-"The Oilers defeated the Golden Knights 4-3..." (if this game was from December)
+BAD EXAMPLE (single game recap - REJECT):
+"The Oilers defeated the Golden Knights 4-3 last night. McDavid scored twice."
 
-GOOD EXAMPLE (verified recent):
-"Last night's thriller saw the Oilers edge Vegas 3-2 in overtime, with McDavid's 35th goal of the season..."
+GOOD EXAMPLE (trend/analysis):
+"Connor McDavid's 35th goal of the season extends his league lead, cementing his case for a third straight Hart Trophy as the Oilers push for home-ice advantage."
 
 IMPORTANT: Return ONLY valid JSON, no other text. No preamble, no explanation.
 
@@ -375,6 +384,10 @@ IMPORTANT: Return ONLY valid JSON, no other text. No preamble, no explanation.
 
 // Find articles for a specific narrative (single attempt)
 let tryFindArticles (httpClient: HttpClient) (apiKey: string) (narrative: ParsedNarrative) (attempt: int) = async {
+    let now = DateTime.UtcNow
+    let today = now.ToString("MMMM d, yyyy")
+    let threeDaysAgo = now.AddDays(-3.0).ToString("MMMM d, yyyy")
+
     // Use different search strategies on retries
     let searchQuery =
         match attempt with
@@ -383,7 +396,9 @@ let tryFindArticles (httpClient: HttpClient) (apiKey: string) (narrative: Parsed
         | _ -> narrative.league + " " + narrative.title + " analysis opinion"
 
     let prompt =
-        "Search for and cite 3 recent sports articles related to: " + searchQuery + "\n\n" +
+        "Search the web for the latest online sources to find 3 sports articles.\n\n" +
+        "⚠️ TIME CONSTRAINT: As of " + today + ", find articles published between " + threeDaysAgo + " and " + today + " (last 72 hours ONLY).\n\n" +
+        "SEARCH TOPIC: " + searchQuery + "\n" +
         "Context: " + narrative.summary + "\n\n" +
         "CRITICAL - EACH ARTICLE MUST BE ABOUT A DIFFERENT TOPIC:\n" +
         "Only 1 article can be about the specific event in the narrative. The other 2 MUST be about DIFFERENT topics.\n\n" +
@@ -397,8 +412,9 @@ let tryFindArticles (httpClient: HttpClient) (apiKey: string) (narrative: Parsed
         "GOOD EXAMPLE (diverse topics):\n" +
         "1. 'SGA Invests in Hamilton Arena' 2. 'Thunder Lead West with League-Best Record' 3. 'SGA MVP Case: Breaking Down His Historic Numbers'\n\n" +
         "REQUIREMENTS:\n" +
-        "- Find REAL articles from sports news sites (ESPN, The Athletic, CBS Sports, SI, etc.)\n" +
-        "- Articles must be from the last 7 days\n" +
+        "- Use the latest online sources from ESPN, The Athletic, CBS Sports, SI, etc.\n" +
+        "- Articles MUST be published in the last 72 hours (between " + threeDaysAgo + " and " + today + ")\n" +
+        "- REJECT any article older than 3 days - check the publication date\n" +
         "- Provide the EXACT article titles as they appear on the source\n\n" +
         "Return ONLY valid JSON:\n" +
         """{"articles": [{"title": "Exact Article Title 1"}, {"title": "Exact Article Title 2"}, {"title": "Exact Article Title 3"}]}"""
@@ -406,7 +422,7 @@ let tryFindArticles (httpClient: HttpClient) (apiKey: string) (narrative: Parsed
     let request = {
         contents = [ { parts = [ { text = prompt } ] } ]
         tools = [ { google_search = obj() } ]
-        generationConfig = { temperature = 0.3 + (float attempt * 0.2); maxOutputTokens = 1000 }
+        generationConfig = { temperature = 1.0; maxOutputTokens = 1000 }  // temp=1.0 recommended for grounding
     }
 
     let requestJson = JsonSerializer.Serialize request
@@ -451,14 +467,26 @@ let tryFindArticles (httpClient: HttpClient) (apiKey: string) (narrative: Parsed
                 []
 
         // Extract URLs from grounding metadata
+        let groundingMetadata = candidate |> Option.bind (fun c -> c.groundingMetadata)
+        let groundingChunks = groundingMetadata |> Option.bind (fun gm -> gm.groundingChunks) |> Option.defaultValue []
+
+        // Debug: print raw grounding info if no chunks
+        if List.isEmpty groundingChunks then
+            // Check if groundingMetadata exists at all
+            match groundingMetadata with
+            | Some gm ->
+                printfn "    DEBUG: groundingMetadata exists but groundingChunks is empty/null"
+            | None ->
+                printfn "    DEBUG: No groundingMetadata in response"
+                // Print a snippet of raw response to see structure
+                let snippet = if responseBody.Length > 500 then responseBody.Substring(0, 500) + "..." else responseBody
+                printfn "    Response snippet: %s" snippet
+
         let groundingUrls =
-            candidate
-            |> Option.bind (fun c -> c.groundingMetadata)
-            |> Option.bind (fun gm -> gm.groundingChunks)
-            |> Option.defaultValue []
+            groundingChunks
             |> List.choose (fun chunk -> chunk.web |> Option.map (fun web -> web.uri))
 
-        printfn "    Attempt %d: Found %d titles, %d URLs" attempt titles.Length groundingUrls.Length
+        printfn "    Attempt %d: Found %d titles, %d URLs (chunks: %d)" attempt titles.Length groundingUrls.Length groundingChunks.Length
 
         // Pair titles with URLs - only pair up to the minimum of both lists
         let minCount = min (min titles.Length groundingUrls.Length) 3
@@ -480,13 +508,9 @@ let findArticlesForNarrative (httpClient: HttpClient) (apiKey: string) (narrativ
     let rec tryWithRetry attempt lastTitles =
         async {
             if attempt > 3 then
-                // Fallback: if we have titles but no URLs, return titles with empty URLs
-                if List.length lastTitles >= 3 then
-                    printfn "    Using titles without URLs as fallback"
-                    return lastTitles |> List.truncate 3 |> List.map (fun t -> { title = t; url = ""; linkType = "news" })
-                else
-                    printfn "    Failed to get 3 links after 3 attempts"
-                    return []
+                // No URLs found after 3 attempts - return empty (don't use titles without URLs)
+                printfn "    Failed to get links with URLs after 3 attempts - skipping links"
+                return []
             else
                 let! (links, titles) = tryFindArticles httpClient apiKey narrative attempt
                 if List.length links >= 3 then

@@ -90,6 +90,12 @@ type GeminiRequest = {
     generationConfig: GeminiGenerationConfig
 }
 
+// Request without tools (for non-grounded calls)
+type GeminiRequestNoTools = {
+    contents: GeminiContent list
+    generationConfig: GeminiGenerationConfig
+}
+
 // Grounding metadata types for extracting URLs
 type WebChunk = { uri: string; title: string }
 type GroundingChunk = { web: WebChunk option }
@@ -105,23 +111,33 @@ type GeminiCandidate = {
 type GeminiResponse = { candidates: GeminiCandidate list }
 
 // Output types
-type RelevantLink = { title: string; url: string }
+type RelevantLink = {
+    title: string
+    url: string
+    [<JsonPropertyName("type")>]
+    linkType: string
+}
+type DataPoint = { metric: string; value: string; context: string }
 type Narrative = {
     title: string
     summary: string
     league: string
     tier: int
     links: RelevantLink list
+    dataPoints: DataPoint list
 }
-type TopicsOutput = { narratives: Narrative list }
+type TopicsOutput = { date: string; narratives: Narrative list }
 
-// Intermediate type for parsing (without links)
+// Intermediate type for parsing (without links/dataPoints)
 type ParsedNarrative = {
     title: string
     summary: string
     league: string
     tier: int
 }
+
+// Chart registry types
+type ChartRegistryItem = { key: string }
 
 let phaseToString = function
     | Playoffs -> "Postseason"
@@ -143,15 +159,172 @@ let getLeaguesByTier () =
 
     tier1, tier2, tier3
 
+// Download chart registry and all chart data
+let downloadChartData (httpClient: HttpClient) = async {
+    let baseUrl = "https://d2jyizt5xogu23.cloudfront.net/"
+    let registryUrl = baseUrl + "registry"
+
+    printfn "Downloading chart registry..."
+    let! registryResponse = httpClient.GetStringAsync(registryUrl) |> Async.AwaitTask
+
+    // Parse registry to get all chart keys
+    let registryDoc = JsonDocument.Parse(registryResponse)
+    let chartKeys =
+        [ for prop in registryDoc.RootElement.EnumerateObject() do
+            // Skip topics.json, we only want chart data
+            if not (prop.Name.Contains("topics")) then
+                yield prop.Name ]
+
+    printfn "Found %d charts in registry" chartKeys.Length
+
+    // Download each chart
+    let! charts =
+        chartKeys
+        |> List.map (fun key -> async {
+            try
+                let chartUrl = baseUrl + key
+                let! chartJson = httpClient.GetStringAsync(chartUrl) |> Async.AwaitTask
+                printfn "  Downloaded: %s" key
+                return Some (key, chartJson)
+            with ex ->
+                printfn "  Failed to download %s: %s" key ex.Message
+                return None
+        })
+        |> Async.Sequential
+
+    let chartData =
+        charts
+        |> Array.choose id
+        |> Array.toList
+
+    printfn "Downloaded %d charts successfully" chartData.Length
+    return chartData
+}
+
+// Find data points for a narrative using chart data
+let findDataPointsForNarrative (httpClient: HttpClient) (apiKey: string) (chartData: (string * string) list) (narrative: ParsedNarrative) = async {
+    printfn "  Finding data points for: %s" narrative.title
+
+    // Filter charts relevant to this league
+    let leagueLower = narrative.league.ToLower()
+    let relevantCharts =
+        chartData
+        |> List.filter (fun (key, _) -> key.ToLower().Contains(leagueLower))
+
+    if List.isEmpty relevantCharts then
+        printfn "    No charts found for league: %s" narrative.league
+        return []
+    else
+        // Build a condensed version of chart data for the prompt
+        let chartSummary =
+            relevantCharts
+            |> List.map (fun (key, json) ->
+                let chartName = key.Replace("dev/", "").Replace(".json", "")
+                sprintf "--- Chart: %s ---\n%s" chartName (json.Substring(0, min 3000 json.Length)))
+            |> String.concat "\n\n"
+
+        let prompt =
+            "Analyze this sports narrative and the available chart data to find 3 relevant data points.\n\n" +
+            "NARRATIVE:\n" +
+            "Title: " + narrative.title + "\n" +
+            "Summary: " + narrative.summary + "\n" +
+            "League: " + narrative.league + "\n\n" +
+            "IMPORTANT - TEAM ABBREVIATIONS:\n" +
+            "Teams in the chart data use 3-letter abbreviations. Examples:\n" +
+            "- Seattle Seahawks = SEA, Kansas City Chiefs = KC, Philadelphia Eagles = PHI\n" +
+            "- Los Angeles Lakers = LAL, Boston Celtics = BOS, Golden State Warriors = GSW\n" +
+            "- New York Yankees = NYY, Los Angeles Dodgers = LAD, Atlanta Braves = ATL\n" +
+            "- Colorado Avalanche = COL, Edmonton Oilers = EDM, Florida Panthers = FLA\n" +
+            "You MUST look up the team by its abbreviation, not its full name.\n\n" +
+            "AVAILABLE CHART DATA:\n" + chartSummary + "\n\n" +
+            "TASK:\n" +
+            "1. Identify the team(s) or player(s) mentioned in the narrative, then find their ABBREVIATION in the data\n" +
+            "2. Find 3 DIFFERENT statistics from the chart data - DO NOT repeat similar metrics\n" +
+            "3. For each stat, provide metric name, value, and context\n\n" +
+            "CONTEXT REQUIREMENTS:\n" +
+            "- 2-3 sentences: First sentence explains the stat with league ranking. Second sentence connects it to the narrative.\n" +
+            "- ALWAYS include league-wide ranking (e.g., 'top 5 in the league', 'bottom third', 'middle of the pack', 'leads the league')\n" +
+            "- Be direct and specific - no filler words or verbose explanations\n" +
+            "- Each data point must offer a UNIQUE insight - no redundancy\n\n" +
+            "BAD: 'The team has an offensive rating of 117.7 which is a very good rating and shows they are efficient.'\n" +
+            "GOOD: 'Ranks 3rd in offensive efficiency. Their spacing and ball movement create open looks, which showed in their playoff dominance.'\n\n" +
+            "Return ONLY valid JSON (value must be a STRING):\n" +
+            """{"dataPoints": [{"metric": "Stat Name", "value": "123.4", "context": "League ranking context. How it connects to the narrative."}]}"""
+
+        let request = {
+            contents = [ { parts = [ { text = prompt } ] } ]
+            generationConfig = { temperature = 0.3; maxOutputTokens = 1500 }
+        }
+
+        let requestJson = JsonSerializer.Serialize request
+        let apiUrl = sprintf "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=%s" apiKey
+        let content = new StringContent(requestJson, Encoding.UTF8, "application/json")
+
+        let! response = httpClient.PostAsync(apiUrl, content) |> Async.AwaitTask
+        let! responseBody = response.Content.ReadAsStringAsync() |> Async.AwaitTask
+
+        if not response.IsSuccessStatusCode then
+            printfn "    Data point search failed: %d" (int response.StatusCode)
+            return []
+        else
+            let options = JsonSerializerOptions()
+            options.PropertyNameCaseInsensitive <- true
+            let geminiResponse = JsonSerializer.Deserialize<GeminiResponse>(responseBody, options)
+
+            let responseText =
+                geminiResponse.candidates
+                |> List.tryHead
+                |> Option.bind (fun c -> c.content.parts |> List.tryHead)
+                |> Option.map (fun p -> p.text)
+                |> Option.defaultValue ""
+
+            let cleanedResponse =
+                responseText
+                    .Replace("```json", "")
+                    .Replace("```", "")
+                    .Trim()
+
+            try
+                let dataPointsJson = JsonDocument.Parse cleanedResponse
+                let dataPointsArray = dataPointsJson.RootElement.GetProperty("dataPoints")
+                let dataPoints =
+                    [ for i in 0 .. min 2 (dataPointsArray.GetArrayLength() - 1) do
+                        let dp = dataPointsArray.[i]
+                        // Handle value as either string or number
+                        let valueProp = dp.GetProperty("value")
+                        let valueStr =
+                            match valueProp.ValueKind with
+                            | JsonValueKind.String -> valueProp.GetString()
+                            | JsonValueKind.Number -> valueProp.GetRawText()
+                            | _ -> valueProp.GetRawText()
+                        yield {
+                            metric = dp.GetProperty("metric").GetString()
+                            value = valueStr
+                            context = dp.GetProperty("context").GetString()
+                        } ]
+                printfn "    Found %d data points" dataPoints.Length
+                for dp in dataPoints do
+                    printfn "      - %s: %s" dp.metric dp.value
+                return dataPoints
+            with ex ->
+                printfn "    Failed to parse data points: %s" ex.Message
+                return []
+}
+
 let buildPrompt () =
     let tier1, tier2, tier3 = getLeaguesByTier ()
-    let today = DateTime.UtcNow.ToString("yyyy-MM-dd")
+    let now = DateTime.UtcNow
+    let today = now.ToString("yyyy-MM-dd")
+    let threeDaysAgo = now.AddDays(-3.0).ToString("yyyy-MM-dd")
 
     let formatLeagues leagues =
         if List.isEmpty leagues then "None"
         else leagues |> String.concat ", "
 
-    sprintf """Today's date is %s.
+    sprintf """⚠️ CRITICAL DATE CONSTRAINT ⚠️
+TODAY IS: %s
+ONLY cover events from %s to %s (the last 72 hours).
+ANY event before %s is TOO OLD - DO NOT USE IT.
 
 Current status of the four major North American sports leagues:
 
@@ -166,20 +339,26 @@ TIER RULES:
 - Tier 2 leagues (Regular Season) get NEXT priority
 - Tier 3 leagues (Offseason) get LOWEST priority - only if slots remain
 
+⚠️ ABSOLUTE RECENCY REQUIREMENT - READ CAREFULLY ⚠️
+You MUST verify that each event happened between %s and %s.
+- Search query MUST include the current date or "today" or "yesterday"
+- If an article is from December, January, or early February - REJECT IT
+- If a game happened more than 3 days ago - REJECT IT
+- When you find search results, CHECK THE DATE before using them
+- Example: If today is Feb 9, a game from Feb 6 or earlier is TOO OLD
+
 NARRATIVE REQUIREMENTS:
-- RECENCY: Must be about events from the last 7 days. Search for what happened THIS WEEK.
+- VERIFIED RECENT: Every narrative must be about an event from the last 72 hours. Verify the date.
 - NO REPETITION: Each narrative must cover a different team, player, or storyline. No overlap.
 - STATS REQUIRED: Every summary MUST include at least 1-2 specific statistics (points, yards, percentages, records, etc.)
-- AUTHENTIC VOICE: Write like a sports journalist, not an AI. Be specific, opinionated, and direct. Avoid generic phrases like "continues to impress" or "showing their dominance".
-- NO REDUNDANCY: Don't state the obvious. If a team won, tell us WHY it matters or what was surprising.
-- UNIQUE ANGLES: Find the interesting story within the story. What's the narrative that casual fans might miss?
-- GROUNDED: Stay focused on real, recent events. Don't speculate or make predictions.
+- AUTHENTIC VOICE: Write like a sports journalist, not an AI. Be specific, opinionated, and direct.
+- UNIQUE ANGLES: Find the interesting story within the story.
 
-BAD EXAMPLE (generic, no stats, AI-sounding):
-"The Chiefs continue their impressive run as they prepare for another championship appearance."
+BAD EXAMPLE (old news - REJECT):
+"The Oilers defeated the Golden Knights 4-3..." (if this game was from December)
 
-GOOD EXAMPLE (specific, stats, authentic):
-"Patrick Mahomes threw for 245 yards and 2 TDs in the AFC Championship, but it was his 3rd-down scramble with 2:47 left that sealed Kansas City's fifth straight conference title."
+GOOD EXAMPLE (verified recent):
+"Last night's thriller saw the Oilers edge Vegas 3-2 in overtime, with McDavid's 35th goal of the season..."
 
 IMPORTANT: Return ONLY valid JSON, no other text. No preamble, no explanation.
 
@@ -192,7 +371,7 @@ IMPORTANT: Return ONLY valid JSON, no other text. No preamble, no explanation.
       "tier": 1|2|3
     }
   ]
-}""" today (formatLeagues tier1) (formatLeagues tier2) (formatLeagues tier3)
+}""" today threeDaysAgo today threeDaysAgo (formatLeagues tier1) (formatLeagues tier2) (formatLeagues tier3) threeDaysAgo today
 
 // Find articles for a specific narrative (single attempt)
 let tryFindArticles (httpClient: HttpClient) (apiKey: string) (narrative: ParsedNarrative) (attempt: int) = async {
@@ -204,11 +383,21 @@ let tryFindArticles (httpClient: HttpClient) (apiKey: string) (narrative: Parsed
         | _ -> narrative.league + " " + narrative.title + " analysis opinion"
 
     let prompt =
-        "Search for and cite 3 recent sports articles about: " + searchQuery + "\n\n" +
+        "Search for and cite 3 recent sports articles related to: " + searchQuery + "\n\n" +
         "Context: " + narrative.summary + "\n\n" +
+        "CRITICAL - EACH ARTICLE MUST BE ABOUT A DIFFERENT TOPIC:\n" +
+        "Only 1 article can be about the specific event in the narrative. The other 2 MUST be about DIFFERENT topics.\n\n" +
+        "REQUIRED MIX (choose the pattern that fits):\n" +
+        "- For a TRADE: 1 trade article, 1 about the team's season/outlook, 1 about another player on the team\n" +
+        "- For a GAME: 1 recap, 1 about a key player's season stats, 1 about playoff race/standings\n" +
+        "- For PLAYER NEWS (investment, injury, award): 1 about the news, 1 about their on-court performance, 1 about their team\n" +
+        "- For any story: Article 2 and 3 should be about the TEAM or PLAYER more broadly, NOT the same headline\n\n" +
+        "BAD EXAMPLE (all same story):\n" +
+        "1. 'SGA Invests in Hamilton Arena' 2. 'SGA Becomes Part-Owner of Arena' 3. 'Thunder Star Buys Into Coliseum'\n\n" +
+        "GOOD EXAMPLE (diverse topics):\n" +
+        "1. 'SGA Invests in Hamilton Arena' 2. 'Thunder Lead West with League-Best Record' 3. 'SGA MVP Case: Breaking Down His Historic Numbers'\n\n" +
         "REQUIREMENTS:\n" +
         "- Find REAL articles from sports news sites (ESPN, The Athletic, CBS Sports, SI, etc.)\n" +
-        "- Each article should cover a DIFFERENT angle (news, analysis, opinion)\n" +
         "- Articles must be from the last 7 days\n" +
         "- Provide the EXACT article titles as they appear on the source\n\n" +
         "Return ONLY valid JSON:\n" +
@@ -278,7 +467,7 @@ let tryFindArticles (httpClient: HttpClient) (apiKey: string) (narrative: Parsed
                 []
             else
                 [ for i in 0 .. minCount - 1 do
-                    yield { title = titles.[i]; url = groundingUrls.[i] } ]
+                    yield { title = titles.[i]; url = groundingUrls.[i]; linkType = "news" } ]
 
         // Return both links and titles (for fallback if URLs never come)
         return (links, titles)
@@ -294,7 +483,7 @@ let findArticlesForNarrative (httpClient: HttpClient) (apiKey: string) (narrativ
                 // Fallback: if we have titles but no URLs, return titles with empty URLs
                 if List.length lastTitles >= 3 then
                     printfn "    Using titles without URLs as fallback"
-                    return lastTitles |> List.truncate 3 |> List.map (fun t -> { title = t; url = "" })
+                    return lastTitles |> List.truncate 3 |> List.map (fun t -> { title = t; url = ""; linkType = "news" })
                 else
                     printfn "    Failed to get 3 links after 3 attempts"
                     return []
@@ -318,6 +507,14 @@ let generateTopics () = async {
     if String.IsNullOrEmpty apiKey then
         failwith "GEMINI_API_KEY environment variable not set"
 
+    use httpClient = new HttpClient()
+    httpClient.Timeout <- TimeSpan.FromMinutes 2.0
+
+    // Step 1: Download all chart data
+    let! chartData = downloadChartData httpClient
+    printfn ""
+
+    // Step 2: Generate narratives
     let prompt = buildPrompt ()
 
     let request = {
@@ -327,9 +524,6 @@ let generateTopics () = async {
     }
 
     let requestJson = JsonSerializer.Serialize request
-
-    use httpClient = new HttpClient()
-    httpClient.Timeout <- TimeSpan.FromMinutes 2.0
 
     let apiUrl = sprintf "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=%s" apiKey
     let content = new StringContent(requestJson, Encoding.UTF8, "application/json")
@@ -375,24 +569,29 @@ let generateTopics () = async {
 
         printfn "Generated %d narratives" parsedNarratives.Length
         printfn ""
-        printfn "Finding relevant articles for each narrative..."
+        printfn "Enriching narratives with links and data points..."
 
-        // Find articles for each narrative
-        let! narrativesWithLinks =
+        // Step 3: Find articles and data points for each narrative
+        let! narrativesWithData =
             parsedNarratives
             |> List.map (fun n -> async {
                 let! links = findArticlesForNarrative httpClient apiKey n
+                let! dataPoints = findDataPointsForNarrative httpClient apiKey chartData n
                 return {
                     title = n.title
                     summary = n.summary
                     league = n.league
                     tier = n.tier
                     links = links
+                    dataPoints = dataPoints
                 }
             })
             |> Async.Sequential
 
-        let output = { narratives = narrativesWithLinks |> Array.toList }
+        let output = {
+            date = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ")
+            narratives = narrativesWithData |> Array.toList
+        }
         let outputOptions = JsonSerializerOptions()
         outputOptions.WriteIndented <- true
         return JsonSerializer.Serialize(output, outputOptions)

@@ -23,6 +23,7 @@ class TopicsRepository(
     companion object {
         private const val KEY_TOPICS_DATA = "topics_data"
         private const val KEY_TOPICS_UPDATED_AT = "topics_updated_at"
+        private const val KEY_TOPICS_VIEWED = "topics_viewed"
     }
 
     /**
@@ -111,6 +112,32 @@ class TopicsRepository(
         println("🗑️ TopicsRepository.clear()")
         settings.remove(KEY_TOPICS_DATA)
         settings.remove(KEY_TOPICS_UPDATED_AT)
+        settings.remove(KEY_TOPICS_VIEWED)
         println("   ✅ Cleared topics data")
+    }
+
+    /**
+     * Checks if topics have been viewed by the user.
+     *
+     * @return true if topics have been viewed, false otherwise
+     */
+    fun hasBeenViewed(): Boolean {
+        return settings.getBoolean(KEY_TOPICS_VIEWED, false)
+    }
+
+    /**
+     * Marks topics as viewed by the user.
+     */
+    fun markAsViewed() {
+        println("👁️ TopicsRepository.markAsViewed()")
+        settings.putBoolean(KEY_TOPICS_VIEWED, true)
+    }
+
+    /**
+     * Resets the viewed state (called when new topics are downloaded).
+     */
+    fun resetViewed() {
+        println("🔄 TopicsRepository.resetViewed()")
+        settings.putBoolean(KEY_TOPICS_VIEWED, false)
     }
 }

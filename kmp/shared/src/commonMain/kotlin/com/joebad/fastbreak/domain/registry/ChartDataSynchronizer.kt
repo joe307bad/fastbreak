@@ -307,17 +307,17 @@ class ChartDataSynchronizer(
 
             val chartId = fileKeyToChartId(fileKey)
 
-            // Check if there's existing cached data to preserve the viewed status
+            // When a chart is downloaded, it's because there's NEW data (needsUpdate returned true)
+            // So we mark it as unviewed so the user sees the unread indicator
             val existingCached = chartDataRepository.getChartData(chartId)
-            val preserveViewed = existingCached?.viewed ?: false
 
             if (existingCached != null) {
-                println("   📌 Preserving viewed status for $chartId: viewed=${existingCached.viewed}")
+                println("   🔄 Updated chart $chartId: resetting viewed=false (was viewed=${existingCached.viewed})")
             } else {
                 println("   🆕 New chart $chartId: viewed=false")
             }
 
-            // Create cached data entry, preserving viewed status if chart was already viewed
+            // Create cached data entry with viewed=false since this is new/updated data
             val cachedData = CachedChartData(
                 chartId = chartId,
                 lastUpdated = entry.updatedAt,
@@ -325,10 +325,10 @@ class ChartDataSynchronizer(
                 cachedAt = Clock.System.now(),
                 dataJson = rawJson,
                 interval = entry.interval,
-                viewed = preserveViewed
+                viewed = false
             )
 
-            println("💾 Caching chart $chartId with timestamp: ${entry.updatedAt} (viewed=${cachedData.viewed})")
+            println("💾 Caching chart $chartId with timestamp: ${entry.updatedAt} (viewed=false, marking as unread)")
 
             // Save to repository
             chartDataRepository.saveChartData(chartId, cachedData)
@@ -546,9 +546,10 @@ class ChartDataSynchronizer(
                 val topicsResponse = json.decodeFromString<TopicsResponse>(rawJson)
                 println("   ✅ Parsed topics: ${topicsResponse.narratives.size} narratives")
 
-                // Save to repository
+                // Save to repository and reset viewed state since we have new topics
                 topicsRepository.saveTopics(topicsResponse, entry.updatedAt)
-                println("   ✅ Topics saved to cache")
+                topicsRepository.resetViewed()
+                println("   ✅ Topics saved to cache (marked as unviewed)")
             } catch (e: Exception) {
                 println("   ❌ Failed to sync topics: ${e.message}")
                 SentryLogger.captureException(
@@ -588,5 +589,21 @@ class ChartDataSynchronizer(
     fun clearTopicsCache() {
         println("🗑️ ChartDataSynchronizer.clearTopicsCache()")
         topicsRepository.clear()
+    }
+
+    /**
+     * Checks if topics have been viewed by the user.
+     *
+     * @return true if topics have been viewed, false otherwise
+     */
+    fun hasTopicsBeenViewed(): Boolean {
+        return topicsRepository.hasBeenViewed()
+    }
+
+    /**
+     * Marks topics as viewed by the user.
+     */
+    fun markTopicsAsViewed() {
+        topicsRepository.markAsViewed()
     }
 }

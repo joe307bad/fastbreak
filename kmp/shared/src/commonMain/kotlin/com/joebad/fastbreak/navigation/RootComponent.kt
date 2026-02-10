@@ -102,6 +102,8 @@ class RootComponent(
     }
 
     fun navigateToTopics() {
+        // Mark topics as viewed when navigating to topics screen
+        registryContainer.markTopicsAsViewed()
         navigation.push(Config.Topics)
     }
 

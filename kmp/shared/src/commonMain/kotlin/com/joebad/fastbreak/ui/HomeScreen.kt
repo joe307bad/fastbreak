@@ -136,10 +136,25 @@ fun HomeScreen(
                 },
                 actions = {
                     IconButton(onClick = onNavigateToTopics) {
-                        Icon(
-                            imageVector = Icons.Default.Newspaper,
-                            contentDescription = "Topics"
-                        )
+                        Box {
+                            Icon(
+                                imageVector = Icons.Default.Newspaper,
+                                contentDescription = "Topics"
+                            )
+                            // Show blue dot indicator for unviewed topics
+                            if (!registryState.topicsViewed) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(8.dp)
+                                        .align(Alignment.TopEnd)
+                                        .offset(x = 2.dp, y = (-2).dp)
+                                        .background(
+                                            color = Color(0xFF2196F3), // Material Blue
+                                            shape = CircleShape
+                                        )
+                                )
+                            }
+                        }
                     }
                     IconButton(
                         onClick = onRefresh,

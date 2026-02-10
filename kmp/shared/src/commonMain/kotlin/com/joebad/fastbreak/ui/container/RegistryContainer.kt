@@ -44,10 +44,14 @@ class RegistryContainer(
             println("   📝 Updating state with cached data")
             println("   - registryEntries: ${cachedEntries?.size ?: 0} entries")
             println("   - registry: ${registry?.charts?.size ?: 0} charts")
+            // Also load topics viewed state
+            val topicsViewed = chartDataSynchronizer.hasTopicsBeenViewed()
+            println("   - topicsViewed: $topicsViewed")
             reduce {
                 state.copy(
                     registryEntries = cachedEntries,
-                    registry = registry
+                    registry = registry,
+                    topicsViewed = topicsViewed
                 )
             }
             // Now that registry is in state, load diagnostics
@@ -212,10 +216,12 @@ class RegistryContainer(
                     chartDataSynchronizer.synchronizeTopics(entries)
 
                     // Update progress to show topics synced and clear sync state
+                    // Also update topicsViewed state (may have been reset if new topics were downloaded)
                     reduce {
                         state.copy(
                             syncProgress = null,
                             isSyncing = false,
+                            topicsViewed = chartDataSynchronizer.hasTopicsBeenViewed(),
                             diagnostics = state.diagnostics.copy(isSyncing = false)
                         )
                     }
@@ -265,11 +271,12 @@ class RegistryContainer(
                         // Also sync topics data
                         chartDataSynchronizer.synchronizeTopics(cachedEntries)
 
-                        // Clear sync state
+                        // Clear sync state and update topicsViewed
                         reduce {
                             state.copy(
                                 syncProgress = null,
                                 isSyncing = false,
+                                topicsViewed = chartDataSynchronizer.hasTopicsBeenViewed(),
                                 diagnostics = state.diagnostics.copy(isSyncing = false)
                             )
                         }
@@ -362,8 +369,8 @@ class RegistryContainer(
                 try {
                     syncChartData(entries)
 
-                    // Force refresh topics by clearing cache first
-                    chartDataSynchronizer.clearTopicsCache()
+                    // Sync topics - only downloads if server has newer data
+                    // (synchronizeTopics compares timestamps internally)
                     val topicsUpdatedAtBefore = chartDataSynchronizer.getTopicsUpdatedAt()
                     chartDataSynchronizer.synchronizeTopics(entries)
                     val topicsUpdatedAtAfter = chartDataSynchronizer.getTopicsUpdatedAt()
@@ -387,11 +394,12 @@ class RegistryContainer(
                         }
                     }
 
-                    // All done - clear sync state
+                    // All done - clear sync state and update topicsViewed
                     reduce {
                         state.copy(
                             syncProgress = null,
                             isSyncing = false,
+                            topicsViewed = chartDataSynchronizer.hasTopicsBeenViewed(),
                             diagnostics = state.diagnostics.copy(isSyncing = false)
                         )
                     }
@@ -465,11 +473,12 @@ class RegistryContainer(
                             }
                         }
 
-                        // All done - clear sync state
+                        // All done - clear sync state and update topicsViewed
                         reduce {
                             state.copy(
                                 syncProgress = null,
                                 isSyncing = false,
+                                topicsViewed = chartDataSynchronizer.hasTopicsBeenViewed(),
                                 diagnostics = state.diagnostics.copy(isSyncing = false)
                             )
                         }
@@ -647,4 +656,22 @@ class RegistryContainer(
      * Clears cached topics data to force a re-download on next sync.
      */
     fun clearTopicsCache() = chartDataSynchronizer.clearTopicsCache()
+
+    /**
+     * Marks topics as viewed by the user.
+     * Updates both the cache and the UI state.
+     */
+    fun markTopicsAsViewed() = intent {
+        chartDataSynchronizer.markTopicsAsViewed()
+        reduce {
+            state.copy(topicsViewed = true)
+        }
+    }
+
+    /**
+     * Checks if topics have been viewed.
+     *
+     * @return true if topics have been viewed
+     */
+    fun hasTopicsBeenViewed(): Boolean = chartDataSynchronizer.hasTopicsBeenViewed()
 }

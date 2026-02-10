@@ -57,7 +57,13 @@ data class RegistryState(
     /**
      * Diagnostics information for the UI
      */
-    val diagnostics: DiagnosticsInfo = DiagnosticsInfo()
+    val diagnostics: DiagnosticsInfo = DiagnosticsInfo(),
+
+    /**
+     * Whether topics have been viewed by the user.
+     * Used to show "new" indicator on topics icon.
+     */
+    val topicsViewed: Boolean = true
 )
 
 /**

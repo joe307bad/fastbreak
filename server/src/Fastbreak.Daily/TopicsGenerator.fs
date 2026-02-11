@@ -134,6 +134,7 @@ type ParsedNarrative = {
     summary: string
     league: string
     tier: int
+    searchQuery: string
 }
 
 // Chart registry types
@@ -377,7 +378,8 @@ IMPORTANT: Return ONLY valid JSON, no other text. No preamble, no explanation.
       "title": "string",
       "summary": "string (2-3 sentences with specific stats)",
       "league": "NFL|NBA|NHL|MLB",
-      "tier": 1|2|3
+      "tier": 1|2|3,
+      "searchQuery": "string (should be 2 keywords from the narrative)"
     }
   ]
 }""" today threeDaysAgo today threeDaysAgo (formatLeagues tier1) (formatLeagues tier2) (formatLeagues tier3) threeDaysAgo today
@@ -527,9 +529,13 @@ let findArticlesForNarrative (httpClient: HttpClient) (apiKey: string) (narrativ
 
 let generateTopics () = async {
     let apiKey = Environment.GetEnvironmentVariable "GEMINI_API_KEY"
+    let newsApiKey = Environment.GetEnvironmentVariable "NEWS_API_KEY"
 
     if String.IsNullOrEmpty apiKey then
         failwith "GEMINI_API_KEY environment variable not set"
+
+    if String.IsNullOrEmpty newsApiKey then
+        printfn "WARNING: NEWS_API_KEY environment variable not set - NewsAPI links will be skipped"
 
     use httpClient = new HttpClient()
     httpClient.Timeout <- TimeSpan.FromMinutes 2.0
@@ -574,6 +580,11 @@ let generateTopics () = async {
         responseText
             .Replace("```json", "")
             .Replace("```", "")
+            // Replace smart/curly quotes with regular quotes
+            .Replace("\u201C", "\"")  // Left double quote "
+            .Replace("\u201D", "\"")  // Right double quote "
+            .Replace("\u2018", "'")   // Left single quote '
+            .Replace("\u2019", "'")   // Right single quote '
             .Trim()
 
     try
@@ -583,11 +594,15 @@ let generateTopics () = async {
         let parsedNarratives =
             [ for i in 0 .. narrativesArray.GetArrayLength() - 1 do
                 let n = narrativesArray.[i]
+                let searchQuery =
+                    try n.GetProperty("searchQuery").GetString()
+                    with _ -> n.GetProperty("title").GetString() + " " + n.GetProperty("league").GetString()
                 {
                     title = n.GetProperty("title").GetString()
                     summary = n.GetProperty("summary").GetString()
                     league = n.GetProperty("league").GetString()
                     tier = n.GetProperty("tier").GetInt32()
+                    searchQuery = searchQuery
                 }
             ]
 
@@ -599,14 +614,32 @@ let generateTopics () = async {
         let! narrativesWithData =
             parsedNarratives
             |> List.map (fun n -> async {
-                let! links = findArticlesForNarrative httpClient apiKey n
+                // Get Gemini grounded links
+                let! geminiLinks = findArticlesForNarrative httpClient apiKey n
+
+                // Get NewsAPI links (3 additional articles)
+                let! newsApiLinks =
+                    if String.IsNullOrEmpty newsApiKey then
+                        async { return [] }
+                    else
+                        NewsApiOrg.searchTopHeadlines httpClient newsApiKey n.searchQuery n.league 3
+
+                // Convert NewsAPI links to our RelevantLink type
+                let convertedNewsApiLinks =
+                    newsApiLinks
+                    |> List.map (fun (link: NewsApiOrg.NewsSearchResult) ->
+                        { title = link.title; url = link.url; linkType = "news" })
+
+                // Combine links: Gemini first, then NewsAPI
+                let allLinks = geminiLinks @ convertedNewsApiLinks
+
                 let! dataPoints = findDataPointsForNarrative httpClient apiKey chartData n
                 return {
                     title = n.title
                     summary = n.summary
                     league = n.league
                     tier = n.tier
-                    links = links
+                    links = allLinks
                     dataPoints = dataPoints
                 }
             })

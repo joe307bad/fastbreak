@@ -1,42 +1,50 @@
 {
   "nfl": [
     {
-      "title": "NFL Offseason Quarterback Carousel and Schedule Expansion",
-      "analysis": "The 2026 NFL offseason is shaping up to be one of the most unpredictable in recent memory, with nearly a third of the teams searching for new quarterbacks amid a weak draft class. This scarcity of top-tier quarterback talent will likely drive up the price for available free agents and trade targets. Teams like the Arizona Cardinals may look to move on from Kyler Murray, potentially via trade, to avoid a $19.5 million guarantee for his 2027 base salary. The Atlanta Falcons are expected to release Kirk Cousins. The Seattle Seahawks are coming off a Super Bowl LX victory against the New England Patriots 29-13. The NFL Combine opens February 23, and the NFL draft is set for late April in Pittsburgh. The legal tampering period begins March 8, and free agency officially begins March 11."
+      "title": "Seahawks Win Super Bowl LX",
+      "analysis": "The Seattle Seahawks defeated the New England Patriots 29-13 in Super Bowl LX. The Seahawks\u0027 defense dominated, sacking Patriots rookie quarterback Drake Maye six times and forcing three turnovers. Kenneth Walker III led the Seahawks\u0027 offense with over 100 yards from scrimmage, and Jason Myers set a Super Bowl record with five field goals.",
+      "statisticalContext": "The Seahawks\u0027 defensive dominance aligns with their ranking as the 2nd best defense in the league based on Defensive EPA/Play (-0.124). This strong defensive performance is further supported by their 3rd ranked status in sacks made (56) and interceptions made (21), contributing to a low 16.3 points allowed per game, the best in the league."
     },
     {
-      "title": "Potential NFL Schedule Expansion and Cap Casualties",
-      "analysis": "The NFL is considering expanding to an 18-game regular season starting in 2027, contingent on negotiations with the NFL Players Association. The date for Super Bowl LXII, which will cap the 2027 season, remains unannounced, with a February 20, 2028 date signaling the expanded schedule. Several players are in danger of becoming salary cap casualties. James Conner of the Arizona Cardinals could be released, saving the team around $7.6 million in cap space. D\u0027Andre Swift of the Chicago Bears is scheduled for $7.5 million in non-guaranteed compensation in 2026, potentially making him a trade or release candidate. Michael Jones of the Minnesota Vikings has a $2 million guarantee for his $9 million base salary in 2026 and could be released for a committee role on a team with better playoff odds."
+      "title": "Offseason Trade Market Expected to Be Active",
+      "analysis": "NFL Insider Adam Schefter anticipates a higher volume of trades this offseason due to a perceived lack of depth in the upcoming free agency and draft classes. Potential trade targets include players like A.J. Brown (Philadelphia Eagles) and Maxx Crosby (Las Vegas Raiders). Several teams have already begun making moves, including the Dallas Cowboys signing QB Will Grier and the Kansas City Chiefs signing QB Jake Haener. The Patriots signed T Sebastian Gutierrez and RB Elijah Mitchell.",
+      "statisticalContext": "The Cumulative EPA Trend chart shows the Patriots finished the season strong, ending with a Net EPA of 206.38, indicating significant improvement in both offensive and defensive performance. The Team Snaps chart shows the Patriots with 1297 defensive snaps and 1363 offensive snaps, a relatively balanced number suggesting competitive games. The Patriots also had a positive turnover differential of 3."
     }
   ],
   "nba": [
     {
-      "title": "NBA All-Star Weekend and Format Changes",
-      "analysis": "The 2026 NBA All-Star Game will take place on February 15, 2026, at the Intuit Dome in Inglewood, California, marking the venue\u0027s first time hosting the event. All-Star Weekend will run from February 13-15 and include events like the Rising Stars game and the Celebrity Game. This year\u0027s All-Star Game will feature a new USA vs. The World format, where two U.S. teams and one World team compete in a round-robin tournament. The top two teams will then compete in the All-Star Championship game. Each game will be one standard NBA quarter, or 12 minutes long."
+      "title": "High-Scoring Games Dominate Recent NBA Action",
+      "analysis": "Recent games have seen some high-scoring performances. On February 5th, the New York Knicks survived a double-overtime thriller against the Denver Nuggets, winning 134-127, with Jalen Brunson exploding for 42 points, 8 rebounds, and 9 assists. Also on February 5th, Anthony Edwards led the Minnesota Timberwolves to a 128-126 victory over the Toronto Raptors with 30 points, while Ryan Rollins had 27 points in the Milwaukee Bucks\u0027 141-137 OT win against the New Orleans Pelicans. In another game that day, Donovan Mitchell\u0027s 29 points helped the Cleveland Cavaliers dominate the Los Angeles Clippers 124-91. The San Antonio Spurs defeated the Oklahoma City Thunder 116-106, led by Keldon Johnson\u0027s 25 points.",
+      "statisticalContext": "The high scores align with the fact that the Denver Nuggets and Oklahoma City Thunder are among the league\u0027s top offensive teams, with offensive ratings of 121 and 118.1 respectively.  The upcoming Milwaukee Bucks at Oklahoma City Thunder game pits the Thunder\u0027s second-ranked offense (120.2 points per game) against a Bucks team allowing 115.6 opponent points per game, suggesting the potential for another high-scoring affair."
     },
     {
-      "title": "Potential Star Player Trades in the 2026 Offseason",
-      "analysis": "Several NBA superstars are rumored to be potential trade candidates in the 2026 offseason. Giannis Antetokounmpo is considered the most likely star to move, with teams like the Heat, Warriors, Knicks, and Timberwolves showing interest. Ja Morant, Domantas Sabonis, Draymond Green, Karl-Anthony Towns, and Zion Williamson are also among the top potential trade targets. The Clippers traded James Harden to the Cavaliers for Darius Garland and a second-round pick. They also moved Ivica Zubac to the Pacers for Bennedict Mathurin, Isaiah Jackson, and multiple picks."
+      "title": "Conference Standings, Trade Deadline, and Injury Updates",
+      "analysis": "The Detroit Pistons hold the top spot in the Eastern Conference with a 40-13 record. They are followed by the Boston Celtics (35-19) and the New York Knicks (35-20). In the Western Conference, the Oklahoma City Thunder lead with a 42-13 record, closely followed by the San Antonio Spurs (38-16). The trade deadline was busy, with several significant moves, including Anthony Davis being traded to the Washington Wizards, James Harden going to the Cleveland Cavaliers, and Jaren Jackson Jr. landing with the Utah Jazz. Several players are currently dealing with injuries; Giannis Antetokounmpo is out with a right calf strain, Luka Don\u010Di\u0107 has a left hamstring strain, and Shai Gilgeous-Alexander is sidelined with an abdominal strain.",
+      "statisticalContext": "The Detroit Pistons\u0027 strong record is supported by their league-leading defensive rating of 108.3, while the Oklahoma City Thunder boast the best defensive rating in the Western Conference at 106.1. The Boston Celtics and New York Knicks also showcase strong offensive efficiency, with offensive ratings of 120.2 and 118.9 respectively, placing them among the league\u0027s top offenses."
     }
   ],
   "nhl": [
     {
-      "title": "NHL Outdoor Games and Olympic Participation in 2026",
-      "analysis": "The NHL\u0027s 2026 calendar year will start with an outdoor game in Miami on January 2 between the Florida Panthers and New York Rangers, marking the first outdoor NHL game ever held in Florida. A second outdoor game, the 2026 Navy Federal Credit Union NHL Stadium Series, will be played in Tampa on February 1. NHL players will participate in the Olympic Winter Games Milano Cortina 2026, with the men\u0027s tournament running from February 11-22. This marks the first time since 2014 that NHL players have participated in the Winter Games."
+      "title": "Olympic Hockey Highlights",
+      "analysis": "Several NHL players are currently participating in the 2026 Winter Olympics in Milano Cortina. In the opening men\u0027s hockey game, Juraj Slafkovsky of the Montreal Canadiens scored twice as Slovakia upset Finland 4-1 on Wednesday, February 11. Also on February 11, Sweden defeated Italy 5-2, with William Nylander scoring the tie-breaking goal in the second period. Rasmus Dahlin contributed three assists for Sweden in the same game.",
+      "statisticalContext": "Juraj Slafkovsky\u0027s teammate, Nick Suzuki of the Montreal Canadiens, has 18 goals and 47 assists, totaling 65 points, showcasing his offensive contribution to the Canadiens. William Nylander of the Toronto Maple Leafs has 18 goals and 34 assists for 52 points. Nylander\u0027s Toronto Maple Leafs have a goals for per game of 3.28 and a goals against per game of 3.39."
     },
     {
-      "title": "Oilers\u0027 Offseason Strategy and Potential Trades",
-      "analysis": "The Edmonton Oilers\u0027 upcoming offseason is crucial, especially with Connor McDavid potentially entering his final contract year. The team may have approximately $13 million in projected cap space for the 2026-27 season, potentially increasing to $16.6 million if Andrew Mangiapane is not retained. The Oilers acquired Tristan Jarry from the Pittsburgh Penguins for Stuart Skinner, Brett Kulak, and a 2029 second-round pick. A potential trade involving Owen Power from the Buffalo Sabres could bring in a high-end forward."
+      "title": "Eastern Conference Playoff Race and Trade Rumors",
+      "analysis": "The Eastern Conference playoff race is very tight, with several teams in contention. The Tampa Bay Lightning have established a significant lead in the Atlantic Division, while other teams are battling for wildcard spots. There are rumors circulating about potential trades as the Olympic trade freeze approaches, with Artemi Panarin\u0027s availability being a key topic. Josh Norris of the Ottawa Senators is out with an injury, impacting their playoff push.",
+      "statisticalContext": "The Tampa Bay Lightning are a strong offensive team, scoring 3.55 goals per game while allowing 2.51, resulting in a goal differential of 1.04. Artemi Panarin of the New York Rangers has 19 goals and 38 assists for 57 points, making him a valuable offensive asset. The Ottawa Senators score 3.3 goals per game, but allow 3.23, resulting in a low goal differential of 0.07."
     }
   ],
   "mlb": [
     {
-      "title": "MLB Offseason Spending and Key Player Movements",
-      "analysis": "The 2026 MLB offseason has been marked by significant spending, particularly by teams like the Los Angeles Dodgers. The Dodgers acquired Kyle Tucker on a four-year, $240 million deal. The Chicago Cubs signed Alex Bregman to a five-year, $175 million contract. The Baltimore Orioles acquired Pete Alonso on a five-year, $155 million contract and Ryan Helsley for two years and $28 million. The New York Mets traded for Freddy Peralta and signed Marcus Semien and Bo Bichette. Tarik Skubal remains with the Detroit Tigers."
+      "title": "Spring Training Preparations",
+      "analysis": "Recent MLB action has been overshadowed by Spring Training preparations, with teams focusing on evaluating players and solidifying their rosters. Although specific game scores aren\u0027t available from the past week, teams are engaging in simulated games and early exhibition matchups to assess their talent. Standout performances are emerging from these early contests, but detailed statistics are still limited as players ramp up for the regular season.",
+      "statisticalContext": ""
     },
     {
-      "title": "Dodgers\u0027 Championship Aspirations and World Baseball Classic",
-      "analysis": "The Los Angeles Dodgers are favored to win the World Series in 2026, with odds shifting from \u002B350 to \u002B230 after acquiring Kyle Tucker. The World Baseball Classic (WBC) will take place in 2026, featuring 20 national teams. Shohei Ohtani is expected to return for Team Japan. The 96th All-Star Game is scheduled for July 14 at Citizens Bank Park in Philadelphia. The regular season will begin on March 25 with the San Francisco Giants hosting the New York Yankees."
+      "title": "Player Moves and Injuries",
+      "analysis": "Several significant player moves and injury updates have impacted team outlooks. The Los Angeles Dodgers extended Max Muncy\u0027s contract through 2027, solidifying their infield. However, multiple players are dealing with injuries, including Corbin Carroll (Diamondbacks) and Jackson Holliday (Orioles), both sidelined with broken hamate bones. The Baltimore Orioles signed Pete Alonso to a massive five-year, $155 million contract. Tarik Skubal of the Detroit Tigers won his arbitration case, setting a record, but the team may consider trading him.",
+      "statisticalContext": ""
     }
   ]
 }

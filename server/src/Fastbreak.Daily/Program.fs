@@ -1,11 +1,11 @@
 open System.IO
 open System.Text.Json
-open Fastbreak.Daily.NarrativeGenerator
+open Fastbreak.Daily.Main
 
 [<EntryPoint>]
 let main _ =
     try
-        let narratives = generate() |> Async.RunSynchronously
+        let narratives = run() |> Async.RunSynchronously
 
         let options = JsonSerializerOptions(WriteIndented = true)
         let json = JsonSerializer.Serialize(narratives, options)

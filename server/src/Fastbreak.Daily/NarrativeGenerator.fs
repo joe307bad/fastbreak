@@ -50,9 +50,16 @@ type ResponseContent = {
     Parts: ResponsePart[]
 }
 
+type WebInfo = {
+    [<JsonPropertyName("uri")>]
+    Uri: string
+    [<JsonPropertyName("title")>]
+    Title: string
+}
+
 type GroundingChunk = {
     [<JsonPropertyName("web")>]
-    Web: JsonElement option
+    Web: WebInfo option
 }
 
 type GroundingMetadata = {
@@ -75,77 +82,216 @@ type GeminiResponse = {
 }
 
 // Output types
-type NarrativeItem = {
+type RelevantLink = {
     [<JsonPropertyName("title")>]
     Title: string
-    [<JsonPropertyName("analysis")>]
-    Analysis: string
-    [<JsonPropertyName("statisticalContext")>]
-    StatisticalContext: string
+    [<JsonPropertyName("url")>]
+    Url: string
+    [<JsonPropertyName("type")>]
+    LinkType: string
 }
 
-type NarrativeOutput = {
-    [<JsonPropertyName("nfl")>]
-    Nfl: NarrativeItem[]
-    [<JsonPropertyName("nba")>]
-    Nba: NarrativeItem[]
-    [<JsonPropertyName("nhl")>]
-    Nhl: NarrativeItem[]
-    [<JsonPropertyName("mlb")>]
-    Mlb: NarrativeItem[]
+type DataPoint = {
+    [<JsonPropertyName("metric")>]
+    Metric: string
+    [<JsonPropertyName("value")>]
+    Value: string
+    [<JsonPropertyName("chartName")>]
+    ChartName: string
+    [<JsonPropertyName("team")>]
+    Team: string
+}
+
+type Narrative = {
+    [<JsonPropertyName("title")>]
+    Title: string
+    [<JsonPropertyName("summary")>]
+    Summary: string
+    [<JsonPropertyName("league")>]
+    League: string
+    [<JsonPropertyName("links")>]
+    Links: RelevantLink list
+    [<JsonPropertyName("dataPoints")>]
+    DataPoints: DataPoint list
 }
 
 // Intermediate types
 type InitialNarrativeItem = {
     [<JsonPropertyName("title")>]
     Title: string
-    [<JsonPropertyName("analysis")>]
-    Analysis: string
+    [<JsonPropertyName("summary")>]
+    Summary: string
 }
 
-// Step 1: Get raw grounded text (NOT JSON)
-let private buildGroundedPrompt (league: string) =
+type DataPointsResponse = {
+    [<JsonPropertyName("dataPoints")>]
+    DataPoints: DataPoint[]
+}
+
+// Grounded search result with links
+type GroundedResult = {
+    Text: string
+    Links: RelevantLink list
+}
+
+// Topic prompts - each gets its own grounded search
+let private buildTopicPrompt (league: string) (topic: string) =
     let today = DateTime.Now.ToString("MMMM d, yyyy")
-    $"""Today is {today}. Search for the latest {league} news from the past week.
+    $"""Today is {today}. Search for the latest {league} news about: {topic}
 
-Write two paragraphs (2-3 sentences each) covering:
-1. Recent game results, scores, and standout performances from this week
-2. Current standings, playoff implications, or breaking news (trades, injuries, signings)
+Write one paragraph (2-3 sentences) with specific facts, names, dates, scores and statistics from your search results. Prioritize relevance, current events, future analysis. Make the narrative hard hitting about data and results.
 
-Use specific names, dates, scores, and statistics from your search results."""
+IMPORTANT: Start directly with the content. Do not include any preamble like "Okay, I will search" or "Here is" - just write the paragraph immediately."""
 
-// Step 2: Structure the grounded text into JSON
-let private buildStructurePrompt (league: string) (rawText: string) =
-    $"""Convert the following {league} analysis into JSON format.
+// Structure a single narrative from grounded text
+let private buildStructurePrompt (league: string) (topic: string) (rawText: string) =
+    $"""Convert this {league} analysis into JSON.
 
-Raw analysis:
-{rawText}
+Topic: {topic}
+Analysis: {rawText}
 
-Extract exactly 2 narrative items. Each should have a concise title and the analysis text.
+Create a one sentence title that summarizes the summary and keep the summary text.
 
 Respond with JSON only, no markdown:
-[{{"title": "title here", "analysis": "analysis text here"}}, {{"title": "title here", "analysis": "analysis text here"}}]"""
+{{"title": "title", "summary": "the analysis text"}}"""
 
-// Step 3: Add statistical context from chart data
-let private buildContextPrompt (league: string) (narrativeItems: InitialNarrativeItem[]) (chartSummaries: string) =
-    let narrativesJson = JsonSerializer.Serialize(narrativeItems)
-    $"""Add statistical context to these {league} narratives using the chart data.
+// Step 3: Extract relevant data points from chart data
+let private buildDataPointsPrompt (league: string) (narrativeTitle: string) (narrativeSummary: string) (chartSummaries: string) =
+    $"""Given this {league} narrative and chart data, extract 3-5 relevant data points.
 
-Narratives:
-{narrativesJson}
+Narrative:
+Title: {narrativeTitle}
+Summary: {narrativeSummary}
 
-Chart data for {league}:
+IMPORTANT: Look for any team names or player names mentioned in the narrative. Teams are often abbreviated to 3 letters (e.g., NYK, LAL, BOS, CHI, KC, PHI, DET, SEA, NE, etc.). Find data points for these specific teams/players from the charts.
+
+Chart data:
 {chartSummaries}
 
-For each narrative, add a "statisticalContext" field with 2-3 sentences referencing specific numbers from the charts.
+Find specific metrics and values from the charts that are relevant to this narrative. For each data point, include the 3-letter team abbreviation.
 
 Respond with JSON only, no markdown:
-[{{"title": "original title", "analysis": "original analysis", "statisticalContext": "context using chart data"}}, ...]"""
+{{"dataPoints": [{{"metric": "metric name", "value": "value with units", "chartName": "name of chart this came from", "team": "ABC"}}, ...]}}"""
 
 let getApiKey () =
     Environment.GetEnvironmentVariable("GEMINI_API_KEY")
     |> Option.ofObj
     |> Option.defaultWith (fun () -> failwith "GEMINI_API_KEY environment variable not set")
+
+let private extractLinks (candidate: Candidate option) : RelevantLink list =
+    candidate
+    |> Option.bind (fun c -> c.GroundingMetadata)
+    |> Option.bind (fun m -> m.GroundingChunks)
+    |> Option.map (fun chunks ->
+        chunks
+        |> Array.choose (fun chunk ->
+            chunk.Web |> Option.map (fun web -> {
+                Title = web.Title
+                Url = web.Uri
+                LinkType = "source"
+            }))
+        |> Array.toList)
+    |> Option.defaultValue []
+
+// Extract page title from HTML content
+let private extractTitleFromHtml (html: string) : string option =
+    let titleStart = html.IndexOf("<title>", StringComparison.OrdinalIgnoreCase)
+    if titleStart >= 0 then
+        let contentStart = titleStart + 7
+        let titleEnd = html.IndexOf("</title>", contentStart, StringComparison.OrdinalIgnoreCase)
+        if titleEnd > contentStart then
+            let title = html.Substring(contentStart, titleEnd - contentStart).Trim()
+            // Clean up HTML entities
+            let cleaned =
+                title
+                    .Replace("&amp;", "&")
+                    .Replace("&quot;", "\"")
+                    .Replace("&#39;", "'")
+                    .Replace("&lt;", "<")
+                    .Replace("&gt;", ">")
+                    .Replace("&#x27;", "'")
+                    .Replace("&nbsp;", " ")
+            if String.IsNullOrWhiteSpace(cleaned) then None else Some cleaned
+        else None
+    else None
+
+// Fetch page and extract title
+let private fetchPageTitle (url: string) = async {
+    try
+        // Create a dedicated client for fetching page titles with proper settings
+        use handler = new System.Net.Http.HttpClientHandler()
+        handler.AllowAutoRedirect <- true
+        handler.MaxAutomaticRedirections <- 5
+        use titleClient = new HttpClient(handler)
+        titleClient.Timeout <- TimeSpan.FromSeconds(10.0)
+        titleClient.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (compatible; FastbreakBot/1.0)")
+
+        let! html = titleClient.GetStringAsync(url) |> Async.AwaitTask
+        return extractTitleFromHtml html
+    with ex ->
+        printfn "      [Title fetch failed for %s: %s]" (url.Substring(0, min 50 url.Length)) ex.Message
+        return None
+}
+
+// Check if a title looks like just a domain name (not a real page title)
+let private isDomainOnlyTitle (title: string) =
+    if String.IsNullOrWhiteSpace(title) then true
+    else
+        let normalized = title.Trim().ToLowerInvariant()
+        // Domain-only titles typically have no spaces and end with a TLD
+        let hasNoSpaces = not (normalized.Contains(" "))
+        let looksLikeDomain =
+            normalized.EndsWith(".com") ||
+            normalized.EndsWith(".org") ||
+            normalized.EndsWith(".net") ||
+            normalized.EndsWith(".tv") ||
+            normalized.EndsWith(".io") ||
+            normalized.EndsWith(".co") ||
+            normalized.EndsWith(".edu") ||
+            normalized.EndsWith(".gov")
+        hasNoSpaces && looksLikeDomain
+
+// Extract site name from URL
+let private extractSiteName (url: string) =
+    try
+        let uri = Uri(url)
+        let host = uri.Host.ToLowerInvariant()
+        // Remove www. prefix and get the domain name
+        let domain = if host.StartsWith("www.") then host.Substring(4) else host
+        // Capitalize first letter of each part
+        domain.Split('.')
+        |> Array.head
+        |> fun s -> if s.Length > 0 then s.Substring(0, 1).ToUpperInvariant() + s.Substring(1) else s
+    with _ -> ""
+
+// Add site name to title if not already present
+let private addSiteNameToTitle (title: string) (url: string) =
+    let siteName = extractSiteName url
+    if String.IsNullOrWhiteSpace(siteName) then title
+    elif title.ToLowerInvariant().Contains(siteName.ToLowerInvariant()) then title
+    else $"{title} | {siteName}"
+
+// Enrich links with fetched page titles and site names
+let private enrichLinksWithTitles (links: RelevantLink list) = async {
+    let! enrichedLinks =
+        links
+        |> List.map (fun link -> async {
+            // Fetch if title is empty, very short, or looks like just a domain name
+            if String.IsNullOrWhiteSpace(link.Title) || link.Title.Length < 10 || isDomainOnlyTitle link.Title then
+                let! fetchedTitle = fetchPageTitle link.Url
+                match fetchedTitle with
+                | Some title ->
+                    let titleWithSite = addSiteNameToTitle title link.Url
+                    return { link with Title = titleWithSite }
+                | None -> return link
+            else
+                // Even if we have a good title, add site name if not present
+                let titleWithSite = addSiteNameToTitle link.Title link.Url
+                return { link with Title = titleWithSite }
+        })
+        |> Async.Parallel
+    return enrichedLinks |> Array.toList
+}
 
 let private callGeminiWithSearch (client: HttpClient) (apiKey: string) (prompt: string) = async {
     let url = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={apiKey}"
@@ -173,11 +319,8 @@ let private callGeminiWithSearch (client: HttpClient) (apiKey: string) (prompt: 
 
     let candidate = geminiResponse.Candidates |> Array.tryHead
 
-    // Check if grounding was actually used
-    let hasMetadata =
-        candidate
-        |> Option.bind (fun c -> c.GroundingMetadata)
-        |> Option.isSome
+    // Extract links from grounding metadata
+    let links = extractLinks candidate
 
     let searchQueries =
         candidate
@@ -185,18 +328,14 @@ let private callGeminiWithSearch (client: HttpClient) (apiKey: string) (prompt: 
         |> Option.bind (fun m -> m.WebSearchQueries)
         |> Option.defaultValue [||]
 
-    let wasGrounded = searchQueries.Length > 0
-
-    printfn "    [Grounding metadata: %b, queries: %d]" hasMetadata searchQueries.Length
-    if wasGrounded then
-        searchQueries |> Array.iter (fun q -> printfn "      Query: %s" q)
+    printfn "    [Grounding: %d queries, %d links]" searchQueries.Length links.Length
 
     let text =
         candidate
         |> Option.map (fun c -> c.Content.Parts |> Array.map (fun p -> p.Text) |> String.concat "")
         |> Option.defaultValue ""
 
-    return text
+    return { Text = text; Links = links }
 }
 
 let private callGemini (client: HttpClient) (apiKey: string) (prompt: string) = async {
@@ -244,40 +383,119 @@ let private parseJsonArray<'T> (text: string) =
     else
         failwithf "Could not find JSON array in response: %s" text
 
+let private parseJson (text: string) : InitialNarrativeItem =
+    let startIdx = text.IndexOf('{')
+    let endIdx = text.LastIndexOf('}')
+    if startIdx >= 0 && endIdx > startIdx then
+        let jsonPart = text.Substring(startIdx, endIdx - startIdx + 1)
+        let cleaned = jsonPart.Replace("\\$", "$").Replace("\\'", "'")
+        let options = JsonSerializerOptions()
+        options.AllowTrailingCommas <- true
+        JsonSerializer.Deserialize<InitialNarrativeItem>(cleaned, options)
+    else
+        { Title = "News Update"; Summary = text }
+
+let private parseDataPoints (text: string) =
+    let startIdx = text.IndexOf('{')
+    let endIdx = text.LastIndexOf('}')
+    if startIdx >= 0 && endIdx > startIdx then
+        let jsonPart = text.Substring(startIdx, endIdx - startIdx + 1)
+        let cleaned = jsonPart.Replace("\\$", "$").Replace("\\'", "'")
+        let options = JsonSerializerOptions()
+        options.AllowTrailingCommas <- true
+        try
+            let response = JsonSerializer.Deserialize<DataPointsResponse>(cleaned, options)
+            response.DataPoints |> Array.toList
+        with _ -> []
+    else
+        []
+
+// Topics for each league - each becomes a separate narrative with its own grounded search
+let private getTopics (league: string) =
+    match league with
+    | "NFL" -> ["recent game results and standout performances"; "trades, free agency, or draft news"]
+    | "NBA" -> ["recent game results and standout performances"; "standings and playoff race implications"]
+    | "NHL" -> ["recent game results and standout performances"; "standings and playoff race implications"]
+    | "MLB" -> ["recent game results or spring training news"; "trades, signings, or roster moves"]
+    | _ -> ["recent news"; "upcoming events"]
+
+let private generateNarrative (client: HttpClient) (apiKey: string) (league: string) (topic: string) (chartSummaries: string) = async {
+    // Step 1: Get grounded search for this specific topic
+    let groundedPrompt = buildTopicPrompt league topic
+    let! groundedResult = callGeminiWithSearch client apiKey groundedPrompt
+    printfn "    [%s] Got %d chars, %d links" topic groundedResult.Text.Length groundedResult.Links.Length
+
+    // Step 2: Structure into title + summary
+    let structurePrompt = buildStructurePrompt league topic groundedResult.Text
+    let! structuredResponse = callGemini client apiKey structurePrompt
+    let parsed = parseJson structuredResponse
+
+    // Step 3: Extract data points from charts
+    let! dataPoints = async {
+        if String.IsNullOrWhiteSpace chartSummaries then
+            return []
+        else
+            let dpPrompt = buildDataPointsPrompt league parsed.Title parsed.Summary chartSummaries
+            let! dpResponse = callGemini client apiKey dpPrompt
+            return parseDataPoints dpResponse
+    }
+
+    // Step 4: Enrich links with fetched page titles
+    let! enrichedLinks = enrichLinksWithTitles groundedResult.Links
+
+    return {
+        Title = parsed.Title
+        Summary = parsed.Summary
+        League = league
+        Links = enrichedLinks
+        DataPoints = dataPoints
+    }
+}
+
 let generateForLeague (client: HttpClient) (apiKey: string) (league: string) (charts: ChartData list) = async {
     printfn "  Generating narratives for %s..." league
 
-    // Step 1: Get grounded raw text (NOT JSON)
-    let groundedPrompt = buildGroundedPrompt league
-    let! rawText = callGeminiWithSearch client apiKey groundedPrompt
-    printfn "    Got grounded text (%d chars)" rawText.Length
-
-    // Step 2: Structure into JSON (non-grounded)
-    let structurePrompt = buildStructurePrompt league rawText
-    let! structuredResponse = callGemini client apiKey structurePrompt
-    let initialNarratives = parseJsonArray<InitialNarrativeItem> structuredResponse
-    printfn "    Structured into %d narratives" (Array.length initialNarratives)
-
-    // Step 3: Add statistical context using chart data
     let chartSummaries =
         charts
         |> List.map summarizeChartData
         |> String.concat "\n\n---\n\n"
 
-    if String.IsNullOrWhiteSpace chartSummaries then
-        printfn "    No chart data available for %s" league
-        return initialNarratives |> Array.map (fun n -> {
-            Title = n.Title
-            Analysis = n.Analysis
-            StatisticalContext = ""
-        })
-    else
-        let contextPrompt = buildContextPrompt league initialNarratives chartSummaries
-        let! contextResponse = callGemini client apiKey contextPrompt
-        let enrichedNarratives = parseJsonArray<NarrativeItem> contextResponse
-        printfn "    Added statistical context"
-        return enrichedNarratives
+    let topics = getTopics league
+
+    let! narratives =
+        topics
+        |> List.map (fun topic -> generateNarrative client apiKey league topic chartSummaries)
+        |> Async.Sequential
+
+    printfn "    Done with %s" league
+    return narratives |> Array.toList
 }
+
+// Simple deduplication - remove narratives with very similar titles
+let private deduplicateNarratives (narratives: Narrative list) =
+    let normalize (s: string) =
+        s.ToLowerInvariant()
+            .Replace("the ", "")
+            .Replace("a ", "")
+            .Trim()
+
+    let isSimilar (a: string) (b: string) =
+        let na = normalize a
+        let nb = normalize b
+        na = nb || na.Contains(nb) || nb.Contains(na)
+
+    narratives
+    |> List.fold (fun acc narrative ->
+        let isDuplicate =
+            acc |> List.exists (fun existing ->
+                existing.League = narrative.League && isSimilar existing.Title narrative.Title)
+        if isDuplicate then
+            printfn "    Removing duplicate: %s" narrative.Title
+            acc
+        else
+            narrative :: acc
+    ) []
+    |> List.rev
 
 let generate (charts: ChartData list) = async {
     printfn "Generating sports narratives..."
@@ -292,19 +510,13 @@ let generate (charts: ChartData list) = async {
         |> List.map (fun league -> async {
             let leagueCharts = getChartsForLeague league charts
             let! narratives = generateForLeague client apiKey league leagueCharts
-            return (league, narratives)
+            return narratives
         })
         |> Async.Sequential
 
-    let resultsMap = results |> Array.toList |> Map.ofList
+    let allNarratives = results |> Array.toList |> List.concat
+    let deduplicated = deduplicateNarratives allNarratives
 
-    let output = {
-        Nfl = resultsMap |> Map.tryFind "NFL" |> Option.defaultValue [||]
-        Nba = resultsMap |> Map.tryFind "NBA" |> Option.defaultValue [||]
-        Nhl = resultsMap |> Map.tryFind "NHL" |> Option.defaultValue [||]
-        Mlb = resultsMap |> Map.tryFind "MLB" |> Option.defaultValue [||]
-    }
-
-    printfn "Done generating narratives!"
-    return output
+    printfn "Done generating narratives! Total: %d (removed %d duplicates)" deduplicated.Length (allNarratives.Length - deduplicated.Length)
+    return deduplicated
 }

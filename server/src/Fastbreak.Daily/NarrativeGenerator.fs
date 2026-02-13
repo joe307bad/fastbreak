@@ -55,6 +55,8 @@ type WebInfo = {
     Uri: string
     [<JsonPropertyName("title")>]
     Title: string
+    [<JsonPropertyName("domain")>]
+    Domain: string
 }
 
 type GroundingChunk = {
@@ -206,6 +208,37 @@ let getApiKey () =
     |> Option.ofObj
     |> Option.defaultWith (fun () -> failwith "GEMINI_API_KEY environment variable not set")
 
+// Capitalize domain name nicely (e.g., "espn.com" -> "ESPN", "foxsports.com.au" -> "Fox Sports")
+let private formatDomainAsTitle (domain: string) =
+    if String.IsNullOrWhiteSpace(domain) then ""
+    else
+        // Remove TLD suffixes
+        let baseDomain =
+            domain.ToLowerInvariant()
+                .Replace(".com", "").Replace(".org", "").Replace(".net", "")
+                .Replace(".au", "").Replace(".ca", "").Replace(".co.uk", "")
+                .Replace(".tv", "").Replace(".io", "")
+        // Handle common abbreviations
+        match baseDomain with
+        | "espn" -> "ESPN"
+        | "nba" -> "NBA"
+        | "nfl" -> "NFL"
+        | "nhl" -> "NHL"
+        | "mlb" -> "MLB"
+        | "cbs" | "cbssports" -> "CBS Sports"
+        | "foxsports" -> "Fox Sports"
+        | "si" -> "Sports Illustrated"
+        | "tsn" -> "TSN"
+        | "cbc" -> "CBC"
+        | "yahoo" | "yahoosports" -> "Yahoo Sports"
+        | "bleacherreport" -> "Bleacher Report"
+        | "theathletic" -> "The Athletic"
+        | s ->
+            // Capitalize first letter of each word
+            s.Split([|'-'; '_'|])
+            |> Array.map (fun word -> if word.Length > 0 then word.[0].ToString().ToUpperInvariant() + word.Substring(1) else "")
+            |> String.concat " "
+
 let private extractLinks (candidate: Candidate option) : RelevantLink list =
     candidate
     |> Option.bind (fun c -> c.GroundingMetadata)
@@ -213,135 +246,22 @@ let private extractLinks (candidate: Candidate option) : RelevantLink list =
     |> Option.map (fun chunks ->
         chunks
         |> Array.choose (fun chunk ->
-            chunk.Web |> Option.map (fun web -> {
-                Title = web.Title
-                Url = web.Uri
-                LinkType = "source"
-            }))
+            chunk.Web |> Option.map (fun web ->
+                // Use domain field for title, fall back to title field, then format domain from URI
+                let displayTitle =
+                    if not (String.IsNullOrWhiteSpace(web.Domain)) then
+                        formatDomainAsTitle web.Domain
+                    elif not (String.IsNullOrWhiteSpace(web.Title)) then
+                        formatDomainAsTitle web.Title
+                    else
+                        "News"
+                {
+                    Title = displayTitle
+                    Url = web.Uri  // Keep the redirect URL - it should work when clicked
+                    LinkType = "source"
+                }))
         |> Array.toList)
     |> Option.defaultValue []
-
-// Extract page title from HTML content
-let private extractTitleFromHtml (html: string) : string option =
-    let titleStart = html.IndexOf("<title>", StringComparison.OrdinalIgnoreCase)
-    if titleStart >= 0 then
-        let contentStart = titleStart + 7
-        let titleEnd = html.IndexOf("</title>", contentStart, StringComparison.OrdinalIgnoreCase)
-        if titleEnd > contentStart then
-            let title = html.Substring(contentStart, titleEnd - contentStart).Trim()
-            // Clean up HTML entities
-            let cleaned =
-                title
-                    .Replace("&amp;", "&")
-                    .Replace("&quot;", "\"")
-                    .Replace("&#39;", "'")
-                    .Replace("&lt;", "<")
-                    .Replace("&gt;", ">")
-                    .Replace("&#x27;", "'")
-                    .Replace("&nbsp;", " ")
-            if String.IsNullOrWhiteSpace(cleaned) then None else Some cleaned
-        else None
-    else None
-
-// Fetch page and extract title, returning (title, finalUrl) after following redirects
-let private fetchPageTitleAndUrl (url: string) = async {
-    try
-        // Create a dedicated client for fetching page titles with proper settings
-        use handler = new System.Net.Http.HttpClientHandler()
-        handler.AllowAutoRedirect <- true
-        handler.MaxAutomaticRedirections <- 5
-        use titleClient = new HttpClient(handler)
-        titleClient.Timeout <- TimeSpan.FromSeconds(10.0)
-        titleClient.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (compatible; FastbreakBot/1.0)")
-
-        use! response = titleClient.GetAsync(url) |> Async.AwaitTask
-        let finalUrl = response.RequestMessage.RequestUri.ToString()
-        let! html = response.Content.ReadAsStringAsync() |> Async.AwaitTask
-        let title = extractTitleFromHtml html
-        return (title, Some finalUrl)
-    with ex ->
-        printfn "      [Title fetch failed for %s: %s]" (url.Substring(0, min 50 url.Length)) ex.Message
-        return (None, None)
-}
-
-// Check if a title is bad and needs to be refetched
-let private isBadTitle (title: string) =
-    if String.IsNullOrWhiteSpace(title) then true
-    else
-        let normalized = title.Trim().ToLowerInvariant()
-        // Domain-only titles typically have no spaces and end with a TLD
-        let hasNoSpaces = not (normalized.Contains(" "))
-        let looksLikeDomain =
-            normalized.EndsWith(".com") ||
-            normalized.EndsWith(".org") ||
-            normalized.EndsWith(".net") ||
-            normalized.EndsWith(".tv") ||
-            normalized.EndsWith(".io") ||
-            normalized.EndsWith(".co") ||
-            normalized.EndsWith(".edu") ||
-            normalized.EndsWith(".gov") ||
-            normalized.EndsWith(".ca")
-        let isDomainOnly = hasNoSpaces && looksLikeDomain
-        // Also check for generic/useless titles
-        let isGenericTitle =
-            normalized.Contains("share on") ||
-            normalized.Contains("vertexaisearch") ||
-            normalized.Contains("grounding-api") ||
-            normalized = "home" ||
-            normalized = "news" ||
-            normalized = "sports" ||
-            normalized.StartsWith("http")
-        isDomainOnly || isGenericTitle
-
-// Extract site name from URL
-let private extractSiteName (url: string) =
-    try
-        let uri = Uri(url)
-        let host = uri.Host.ToLowerInvariant()
-        // Remove www. prefix and get the domain name
-        let domain = if host.StartsWith("www.") then host.Substring(4) else host
-        // Capitalize first letter of each part
-        domain.Split('.')
-        |> Array.head
-        |> fun s -> if s.Length > 0 then s.Substring(0, 1).ToUpperInvariant() + s.Substring(1) else s
-    with _ -> ""
-
-// Add site name to title if not already present
-let private addSiteNameToTitle (title: string) (url: string) =
-    let siteName = extractSiteName url
-    if String.IsNullOrWhiteSpace(siteName) then title
-    elif title.ToLowerInvariant().Contains(siteName.ToLowerInvariant()) then title
-    else $"{title} | {siteName}"
-
-// Enrich links with fetched page titles and site names
-let private enrichLinksWithTitles (links: RelevantLink list) = async {
-    let! enrichedLinks =
-        links
-        |> List.map (fun link -> async {
-            // Always fetch to get the final URL after redirects (for proper site name)
-            let! (fetchedTitle, finalUrl) = fetchPageTitleAndUrl link.Url
-            let urlForSiteName = finalUrl |> Option.defaultValue link.Url
-
-            // Determine the best title to use
-            let needsNewTitle = String.IsNullOrWhiteSpace(link.Title) || link.Title.Length < 10 || isBadTitle link.Title
-            let siteName = extractSiteName urlForSiteName
-            let bestTitle =
-                if needsNewTitle then
-                    match fetchedTitle with
-                    | Some title -> title
-                    | None -> siteName  // Fallback to just site name if fetch failed
-                else
-                    link.Title
-
-            // Add site name from the final URL (not the redirect URL) if not already the site name
-            let titleWithSite =
-                if bestTitle = siteName then bestTitle
-                else addSiteNameToTitle bestTitle urlForSiteName
-            return { link with Title = titleWithSite }
-        })
-        |> Async.Parallel
-    return enrichedLinks |> Array.toList
-}
 
 let private callGeminiWithSearch (client: HttpClient) (apiKey: string) (prompt: string) = async {
     let url = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={apiKey}"
@@ -544,14 +464,11 @@ let private generateNarrative (client: HttpClient) (apiKey: string) (league: str
             return contextResponse.Trim()
     }
 
-    // Step 5: Enrich links with fetched page titles
-    let! enrichedLinks = enrichLinksWithTitles groundedResult.Links
-
     return {
         Title = parsed.Title
         Summary = parsed.Summary
         League = league
-        Links = enrichedLinks
+        Links = groundedResult.Links
         DataPoints = dataPoints
         StatisticalContext = statisticalContext
     }

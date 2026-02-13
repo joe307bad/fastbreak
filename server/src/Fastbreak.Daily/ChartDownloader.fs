@@ -89,4 +89,4 @@ let getChartsForLeague (league: string) (charts: ChartData list) =
     charts |> List.filter (fun c -> c.League.Equals(league, StringComparison.OrdinalIgnoreCase))
 
 let summarizeChartData (chart: ChartData) =
-    $"Chart: {chart.Title}\nData:\n{chart.RawJson}"
+    $"Chart: {chart.Title}\nChart ID: {chart.Name}\nData:\n{chart.RawJson}"

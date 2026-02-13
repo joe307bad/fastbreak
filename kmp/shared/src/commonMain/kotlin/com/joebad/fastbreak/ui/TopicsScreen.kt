@@ -18,7 +18,20 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.text.BasicText
+import androidx.compose.foundation.text.ClickableText
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.Placeholder
+import androidx.compose.ui.text.PlaceholderVerticalAlign
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.style.BaselineShift
+import androidx.compose.ui.text.withStyle
+import androidx.compose.foundation.text.InlineTextContent
+import androidx.compose.foundation.text.appendInlineContent
+import androidx.compose.material3.LocalContentColor
 import com.joebad.fastbreak.data.model.Narrative
+import com.joebad.fastbreak.data.model.TextSegment
 import com.joebad.fastbreak.data.model.TopicsResponse
 import com.joebad.fastbreak.navigation.TopicsComponent
 import com.joebad.fastbreak.platform.UrlLauncher
@@ -89,7 +102,7 @@ fun TopicsScreen(
             ) {
                 item {
                     Text(
-                        text = "updated ${formatRelativeTime(topicsUpdatedAt)}",
+                        text = "Daily at 10am ET - updated ${formatRelativeTime(topicsUpdatedAt)}",
                         style = MaterialTheme.typography.labelSmall,
                         fontSize = 10.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -113,6 +126,56 @@ private fun getLeagueColor(league: String): Color {
         "mls" -> Color(0xFF00B140)  // MLS green (vivid)
         else -> Color(0xFF757575)   // Gray for unknown
     }
+}
+
+@Composable
+private fun SegmentedText(
+    segments: List<TextSegment>,
+    textColor: Color,
+    accentColor: Color,
+    modifier: Modifier = Modifier
+) {
+    val linkIconColor = MaterialTheme.colorScheme.onBackground
+
+    val annotatedString = buildAnnotatedString {
+        segments.forEach { segment ->
+            when (segment.type) {
+                "link" -> {
+                    val startIndex = length
+                    pushStringAnnotation(tag = "URL", annotation = segment.url ?: "")
+                    withStyle(SpanStyle(color = textColor, textDecoration = TextDecoration.Underline)) {
+                        append(segment.value)
+                    }
+                    // Include the icon in the clickable area
+                    withStyle(SpanStyle(color = linkIconColor, fontSize = 10.sp)) {
+                        append(" ↗")
+                    }
+                    pop()
+                }
+                else -> {
+                    withStyle(SpanStyle(color = textColor)) {
+                        append(segment.value)
+                    }
+                }
+            }
+        }
+    }
+
+    ClickableText(
+        text = annotatedString,
+        modifier = modifier,
+        style = MaterialTheme.typography.bodySmall.copy(
+            fontFamily = FontFamily.Monospace,
+            fontSize = 11.sp,
+            lineHeight = 18.sp
+        ),
+        onClick = { offset ->
+            annotatedString.getStringAnnotations(tag = "URL", start = offset, end = offset)
+                .firstOrNull()?.let { annotation ->
+                    UrlLauncher.openUrl(annotation.item)
+                }
+        }
+    )
 }
 
 @Composable
@@ -146,20 +209,27 @@ private fun NarrativeItem(number: Int, narrative: Narrative) {
         )
 
         // Summary
-        if (narrative.summary.isNotBlank()) {
+        if (narrative.summarySegments.isNotEmpty()) {
+            SegmentedText(
+                segments = narrative.summarySegments,
+                textColor = MaterialTheme.colorScheme.onSurface,
+                accentColor = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(vertical = 8.dp)
+            )
+        } else if (narrative.summary.isNotBlank()) {
             Text(
                 text = narrative.summary,
                 style = MaterialTheme.typography.bodySmall,
                 fontFamily = FontFamily.Monospace,
                 fontSize = 11.sp,
                 lineHeight = 18.sp,
-                color = MaterialTheme.colorScheme.primary,
+                color = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.padding(vertical = 8.dp)
             )
         }
 
         // Statistical context prose
-        if (narrative.statisticalContext.isNotBlank()) {
+        if (narrative.statisticalContextSegments.isNotEmpty() || narrative.statisticalContext.isNotBlank()) {
             Column(
                 modifier = Modifier.padding(top = 4.dp, bottom = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(6.dp)
@@ -178,14 +248,22 @@ private fun NarrativeItem(number: Int, narrative: Narrative) {
                     )
                 }
                 Spacer(Modifier.height(2.dp))
-                Text(
-                    text = narrative.statisticalContext,
-                    style = MaterialTheme.typography.bodySmall,
-                    fontFamily = FontFamily.Monospace,
-                    fontSize = 11.sp,
-                    lineHeight = 18.sp,
-                    color = MaterialTheme.colorScheme.primary
-                )
+                if (narrative.statisticalContextSegments.isNotEmpty()) {
+                    SegmentedText(
+                        segments = narrative.statisticalContextSegments,
+                        textColor = MaterialTheme.colorScheme.onSurface,
+                        accentColor = MaterialTheme.colorScheme.primary
+                    )
+                } else {
+                    Text(
+                        text = narrative.statisticalContext,
+                        style = MaterialTheme.typography.bodySmall,
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 11.sp,
+                        lineHeight = 18.sp,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
             }
         }
 
@@ -219,7 +297,7 @@ private fun NarrativeItem(number: Int, narrative: Narrative) {
                             style = MaterialTheme.typography.bodySmall,
                             fontFamily = FontFamily.Monospace,
                             fontSize = 11.sp,
-                            color = MaterialTheme.colorScheme.primary
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                         val teamPrefix = if (dp.team.isNotBlank()) "${dp.team}: " else ""
                         Text(
@@ -227,7 +305,7 @@ private fun NarrativeItem(number: Int, narrative: Narrative) {
                             style = MaterialTheme.typography.bodySmall,
                             fontFamily = FontFamily.Monospace,
                             fontSize = 11.sp,
-                            color = MaterialTheme.colorScheme.primary
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                     }
                 }
@@ -255,22 +333,28 @@ private fun NarrativeItem(number: Int, narrative: Narrative) {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     narrative.links.forEach { link ->
                         Row(
-                            modifier = Modifier.clickable { UrlLauncher.openUrl(link.url) }
+                            modifier = Modifier.clickable { UrlLauncher.openUrl(link.url) },
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
                                 text = "• ",
                                 style = MaterialTheme.typography.bodySmall,
                                 fontFamily = FontFamily.Monospace,
                                 fontSize = 11.sp,
-                                color = MaterialTheme.colorScheme.tertiary
+                                color = MaterialTheme.colorScheme.onSurface
                             )
                             Text(
                                 text = "[${link.type}] ${link.title}",
                                 style = MaterialTheme.typography.labelSmall,
                                 fontFamily = FontFamily.Monospace,
                                 fontSize = 11.sp,
-                                color = MaterialTheme.colorScheme.tertiary,
+                                color = MaterialTheme.colorScheme.onSurface,
                                 textDecoration = TextDecoration.Underline
+                            )
+                            Text(
+                                text = " ↗",
+                                fontSize = 10.sp,
+                                color = MaterialTheme.colorScheme.onBackground
                             )
                         }
                     }

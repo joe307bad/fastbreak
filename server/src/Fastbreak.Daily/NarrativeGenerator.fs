@@ -6,92 +6,10 @@ open System.Text
 open System.Text.Json
 open System.Text.Json.Serialization
 open Fastbreak.Daily.ChartDownloader
+open Fastbreak.Daily.CallGemini
 
-// Request types
-type Part = {
-    [<JsonPropertyName("text")>]
-    text: string
-}
-type Content = {
-    [<JsonPropertyName("parts")>]
-    parts: Part[]
-}
-type GoogleSearchTool = {
-    [<JsonPropertyName("google_search")>]
-    google_search: obj
-}
-type GenerationConfig = {
-    [<JsonPropertyName("temperature")>]
-    temperature: float
-}
-type GeminiRequestWithTools = {
-    [<JsonPropertyName("contents")>]
-    contents: Content[]
-    [<JsonPropertyName("tools")>]
-    tools: GoogleSearchTool[]
-    [<JsonPropertyName("generationConfig")>]
-    generationConfig: GenerationConfig
-}
-type GeminiRequest = {
-    [<JsonPropertyName("contents")>]
-    contents: Content[]
-    [<JsonPropertyName("generationConfig")>]
-    generationConfig: GenerationConfig
-}
-
-// Response types
-type ResponsePart = {
-    [<JsonPropertyName("text")>]
-    Text: string
-}
-
-type ResponseContent = {
-    [<JsonPropertyName("parts")>]
-    Parts: ResponsePart[]
-}
-
-type WebInfo = {
-    [<JsonPropertyName("uri")>]
-    Uri: string
-    [<JsonPropertyName("title")>]
-    Title: string
-    [<JsonPropertyName("domain")>]
-    Domain: string
-}
-
-type GroundingChunk = {
-    [<JsonPropertyName("web")>]
-    Web: WebInfo option
-}
-
-type GroundingMetadata = {
-    [<JsonPropertyName("groundingChunks")>]
-    GroundingChunks: GroundingChunk[] option
-    [<JsonPropertyName("webSearchQueries")>]
-    WebSearchQueries: string[] option
-}
-
-type Candidate = {
-    [<JsonPropertyName("content")>]
-    Content: ResponseContent
-    [<JsonPropertyName("groundingMetadata")>]
-    GroundingMetadata: GroundingMetadata option
-}
-
-type GeminiResponse = {
-    [<JsonPropertyName("candidates")>]
-    Candidates: Candidate[]
-}
-
-// Output types
-type RelevantLink = {
-    [<JsonPropertyName("title")>]
-    Title: string
-    [<JsonPropertyName("url")>]
-    Url: string
-    [<JsonPropertyName("type")>]
-    LinkType: string
-}
+// Re-export RelevantLink for use by other modules
+type RelevantLink = CallGemini.RelevantLink
 
 type DataPoint = {
     [<JsonPropertyName("metric")>]
@@ -102,6 +20,8 @@ type DataPoint = {
     ChartName: string
     [<JsonPropertyName("team")>]
     Team: string
+    [<JsonPropertyName("id")>]
+    Id: string
 }
 
 type Narrative = {
@@ -130,12 +50,6 @@ type InitialNarrativeItem = {
 type DataPointsResponse = {
     [<JsonPropertyName("dataPoints")>]
     DataPoints: DataPoint[]
-}
-
-// Grounded search result with links
-type GroundedResult = {
-    Text: string
-    Links: RelevantLink list
 }
 
 // Topic prompts - each gets its own grounded search
@@ -172,10 +86,10 @@ IMPORTANT: Look for any team names or player names mentioned in the narrative. T
 Chart data:
 {chartSummaries}
 
-Find specific metrics and values from the charts that are relevant to this narrative. For each data point, include the 3-letter team abbreviation.
+Find specific metrics and values from the charts that are relevant to this narrative. For each data point, include the 3-letter team abbreviation and the chart id.
 
 Respond with JSON only, no markdown:
-{{"dataPoints": [{{"metric": "metric name", "value": "value with units", "chartName": "name of chart this came from", "team": "ABC"}}, ...]}}"""
+{{"dataPoints": [{{"metric": "metric name", "value": "value with units", "chartName": "name of chart this came from", "team": "ABC", "id": "chart_id"}}, ...]}}"""
 
 // Step 4: Generate statistical context prose from data points
 let private buildStatisticalContextPrompt (league: string) (narrativeTitle: string) (narrativeSummary: string) (dataPoints: DataPoint list) =
@@ -203,139 +117,10 @@ Example good output: "The Celtics lead the league with a 45-12 record and rank f
 
 Start directly with the content. No preamble."""
 
-let getApiKey () =
-    Environment.GetEnvironmentVariable("GEMINI_API_KEY")
-    |> Option.ofObj
-    |> Option.defaultWith (fun () -> failwith "GEMINI_API_KEY environment variable not set")
+let getApiKey () = CallGemini.getApiKey()
 
-// Capitalize domain name nicely (e.g., "espn.com" -> "ESPN", "foxsports.com.au" -> "Fox Sports")
-let private formatDomainAsTitle (domain: string) =
-    if String.IsNullOrWhiteSpace(domain) then ""
-    else
-        // Remove TLD suffixes
-        let baseDomain =
-            domain.ToLowerInvariant()
-                .Replace(".com", "").Replace(".org", "").Replace(".net", "")
-                .Replace(".au", "").Replace(".ca", "").Replace(".co.uk", "")
-                .Replace(".tv", "").Replace(".io", "")
-        // Handle common abbreviations
-        match baseDomain with
-        | "espn" -> "ESPN"
-        | "nba" -> "NBA"
-        | "nfl" -> "NFL"
-        | "nhl" -> "NHL"
-        | "mlb" -> "MLB"
-        | "cbs" | "cbssports" -> "CBS Sports"
-        | "foxsports" -> "Fox Sports"
-        | "si" -> "Sports Illustrated"
-        | "tsn" -> "TSN"
-        | "cbc" -> "CBC"
-        | "yahoo" | "yahoosports" -> "Yahoo Sports"
-        | "bleacherreport" -> "Bleacher Report"
-        | "theathletic" -> "The Athletic"
-        | s ->
-            // Capitalize first letter of each word
-            s.Split([|'-'; '_'|])
-            |> Array.map (fun word -> if word.Length > 0 then word.[0].ToString().ToUpperInvariant() + word.Substring(1) else "")
-            |> String.concat " "
-
-let private extractLinks (candidate: Candidate option) : RelevantLink list =
-    candidate
-    |> Option.bind (fun c -> c.GroundingMetadata)
-    |> Option.bind (fun m -> m.GroundingChunks)
-    |> Option.map (fun chunks ->
-        chunks
-        |> Array.choose (fun chunk ->
-            chunk.Web |> Option.map (fun web ->
-                // Use domain field for title, fall back to title field, then format domain from URI
-                let displayTitle =
-                    if not (String.IsNullOrWhiteSpace(web.Domain)) then
-                        formatDomainAsTitle web.Domain
-                    elif not (String.IsNullOrWhiteSpace(web.Title)) then
-                        formatDomainAsTitle web.Title
-                    else
-                        "News"
-                {
-                    Title = displayTitle
-                    Url = web.Uri  // Keep the redirect URL - it should work when clicked
-                    LinkType = "source"
-                }))
-        |> Array.toList)
-    |> Option.defaultValue []
-
-let private callGeminiWithSearch (client: HttpClient) (apiKey: string) (prompt: string) = async {
-    let url = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key={apiKey}"
-
-    // Temperature 1.0 recommended for grounded search per Google docs
-    let request: GeminiRequestWithTools = {
-        contents = [| { parts = [| { text = prompt } |] } |]
-        tools = [| { google_search = obj() } |]
-        generationConfig = { temperature = 1.0 }
-    }
-
-    let jsonOptions = JsonSerializerOptions()
-    jsonOptions.PropertyNamingPolicy <- JsonNamingPolicy.CamelCase
-
-    let json = JsonSerializer.Serialize(request, jsonOptions)
-    use content = new StringContent(json, Encoding.UTF8, "application/json")
-
-    let! response = client.PostAsync(url, content) |> Async.AwaitTask
-    let! responseBody = response.Content.ReadAsStringAsync() |> Async.AwaitTask
-
-    if not response.IsSuccessStatusCode then
-        failwithf "Gemini API error: %s" responseBody
-
-    let geminiResponse = JsonSerializer.Deserialize<GeminiResponse>(responseBody)
-
-    let candidate = geminiResponse.Candidates |> Array.tryHead
-
-    // Extract links from grounding metadata
-    let links = extractLinks candidate
-
-    let searchQueries =
-        candidate
-        |> Option.bind (fun c -> c.GroundingMetadata)
-        |> Option.bind (fun m -> m.WebSearchQueries)
-        |> Option.defaultValue [||]
-
-    printfn "    [Grounding: %d queries, %d links]" searchQueries.Length links.Length
-
-    let text =
-        candidate
-        |> Option.map (fun c -> c.Content.Parts |> Array.map (fun p -> p.Text) |> String.concat "")
-        |> Option.defaultValue ""
-
-    return { Text = text; Links = links }
-}
-
-let private callGemini (client: HttpClient) (apiKey: string) (prompt: string) = async {
-    let url = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={apiKey}"
-
-    let request: GeminiRequest = {
-        contents = [| { parts = [| { text = prompt } |] } |]
-        generationConfig = { temperature = 0.2 }
-    }
-
-    let jsonOptions = JsonSerializerOptions()
-    jsonOptions.PropertyNamingPolicy <- JsonNamingPolicy.CamelCase
-
-    let json = JsonSerializer.Serialize(request, jsonOptions)
-    use content = new StringContent(json, Encoding.UTF8, "application/json")
-
-    let! response = client.PostAsync(url, content) |> Async.AwaitTask
-    let! responseBody = response.Content.ReadAsStringAsync() |> Async.AwaitTask
-
-    if not response.IsSuccessStatusCode then
-        failwithf "Gemini API error: %s" responseBody
-
-    let geminiResponse = JsonSerializer.Deserialize<GeminiResponse>(responseBody)
-
-    return
-        geminiResponse.Candidates
-        |> Array.tryHead
-        |> Option.map (fun c -> c.Content.Parts |> Array.map (fun p -> p.Text) |> String.concat "")
-        |> Option.defaultValue ""
-}
+let private callGemini (client: HttpClient) (apiKey: string) (prompt: string) =
+    CallGemini.callGeminiOrFail client apiKey prompt 0.2
 
 let private parseJsonArray<'T> (text: string) =
     let startIdx = text.IndexOf('[')
@@ -429,16 +214,16 @@ let private parseDataPoints (text: string) =
 // Topics for each league - each becomes a separate narrative with its own grounded search
 let private getTopics (league: string) =
     match league with
-    | "NFL" -> ["recent game results and standout performances and league wide news"; "trades, free agency, or draft news"]
-    | "NBA" -> ["recent game results and standout performances and league wide news"; "standings and playoff race implications"]
-    | "NHL" -> ["recent game results and standout performances and league wide news"; "standings and playoff race implications"]
-    | "MLB" -> ["recent game results and standout performances and league wide news"; "trades, signings, or roster moves"]
+    | "NFL" -> ["recent game results and standout performances and league wide news"; "trades, free agency, draft news or playoff race"]
+    | "NBA" -> ["recent game results and standout performances and league wide news"; "trades, free agency, draft news or playoff race"]
+    | "NHL" -> ["recent game results and standout performances and league wide news"; "trades, free agency, draft news or playoff race"]
+    | "MLB" -> ["recent game results and standout performances and league wide news"; "trades, free agency, draft news or playoff race"]
     | _ -> ["recent news"; "upcoming events"]
 
 let private generateNarrative (client: HttpClient) (apiKey: string) (league: string) (topic: string) (chartSummaries: string) = async {
     // Step 1: Get grounded search for this specific topic
     let groundedPrompt = buildTopicPrompt league topic
-    let! groundedResult = callGeminiWithSearch client apiKey groundedPrompt
+    let! groundedResult = CallGemini.callGeminiWithSearch client apiKey groundedPrompt
     printfn "    [%s] Got %d chars, %d links" topic groundedResult.Text.Length groundedResult.Links.Length
 
     // Step 2: Structure into title + summary

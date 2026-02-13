@@ -18,12 +18,14 @@ data class TopicsResponse(
 data class Narrative(
     val title: String,
     val summary: String,
+    val summarySegments: List<TextSegment> = emptyList(),
     val league: String = "",  // "nba", "nfl", "nhl", "mlb", "mls"
     val chartEvidence: List<ChartReference> = emptyList(),
     val highlights: List<ChartHighlight> = emptyList(),
     val dataPoints: List<NarrativeDataPoint> = emptyList(),
     val links: List<LinkReference> = emptyList(),
-    val statisticalContext: String = ""
+    val statisticalContext: String = "",
+    val statisticalContextSegments: List<TextSegment> = emptyList()
 )
 
 /**
@@ -54,7 +56,8 @@ data class NarrativeDataPoint(
     val metric: String,
     val value: String,
     val chartName: String = "",
-    val team: String = ""
+    val team: String = "",
+    val id: String = ""  // Chart ID for navigation
 )
 
 /**
@@ -65,4 +68,14 @@ data class LinkReference(
     val title: String,
     val url: String,
     val type: String  // "news" or "blog"
+)
+
+/**
+ * A text segment that can be plain text or a clickable link.
+ */
+@Serializable
+data class TextSegment(
+    val type: String,  // "text" or "link"
+    val value: String,
+    val url: String? = null
 )

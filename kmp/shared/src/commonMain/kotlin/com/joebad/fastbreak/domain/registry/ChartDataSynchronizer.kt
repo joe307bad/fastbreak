@@ -226,10 +226,15 @@ class ChartDataSynchronizer(
 
     /**
      * Converts a file key to a chart ID.
-     * e.g., "dev/nfl__team_tier_list.json" -> "dev_nfl__team_tier_list"
+     * e.g., "dev/nfl__team_tier_list.json" -> "nfl__team_tier_list"
+     * Note: We remove the dev/ prefix to match the F# server's chart ID format,
+     * which is used in Topics data points.
      */
     private fun fileKeyToChartId(fileKey: String): String {
-        return fileKey.removeSuffix(".json").replace("/", "_")
+        return fileKey
+            .removePrefix("dev/")
+            .removeSuffix(".json")
+            .replace("/", "_")
     }
 
     /**

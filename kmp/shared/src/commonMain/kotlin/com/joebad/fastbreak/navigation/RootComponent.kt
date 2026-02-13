@@ -107,7 +107,13 @@ class RootComponent(
         navigation.push(Config.Topics)
     }
 
-    fun navigateToChart(chartId: String, sport: Sport, vizType: VizType) {
+    fun navigateToChart(
+        chartId: String,
+        sport: Sport,
+        vizType: VizType,
+        initialFilters: Map<String, String>? = null,
+        fromTopics: Boolean = false
+    ) {
         // First, pop any existing chart screens to avoid stacking charts
         while (stack.value.active.configuration is Config.DataViz) {
             navigation.pop()
@@ -120,7 +126,7 @@ class RootComponent(
         }
 
         // Now push the new chart
-        navigation.push(Config.DataViz(chartId, sport, vizType))
+        navigation.push(Config.DataViz(chartId, sport, vizType, initialFilters, fromTopics))
     }
 
     fun navigateBackToHome() {
@@ -158,7 +164,15 @@ class RootComponent(
                     vizType = config.vizType,
                     chartDataRepository = chartDataRepository,
                     registryContainer = registryContainer,
-                    onNavigateBack = { navigateBackToHome() }
+                    onNavigateBack = {
+                        if (config.fromTopics) {
+                            // Just pop back to Topics
+                            navigation.pop()
+                        } else {
+                            navigateBackToHome()
+                        }
+                    },
+                    initialFilters = config.initialFilters
                 )
             )
             is Config.Settings -> Child.Settings(
@@ -170,7 +184,10 @@ class RootComponent(
             is Config.Topics -> Child.Topics(
                 TopicsComponent(
                     componentContext = componentContext,
-                    onNavigateBack = { navigation.pop() }
+                    onNavigateBack = { navigation.pop() },
+                    onNavigateToChart = { chartId, sport, vizType, filters ->
+                        navigateToChart(chartId, sport, vizType, filters, fromTopics = true)
+                    }
                 )
             )
         }
@@ -188,7 +205,13 @@ class RootComponent(
         data object Home : Config
 
         @Serializable
-        data class DataViz(val chartId: String, val sport: Sport, val vizType: VizType) : Config
+        data class DataViz(
+            val chartId: String,
+            val sport: Sport,
+            val vizType: VizType,
+            val initialFilters: Map<String, String>? = null,
+            val fromTopics: Boolean = false
+        ) : Config
 
         @Serializable
         data object Settings : Config

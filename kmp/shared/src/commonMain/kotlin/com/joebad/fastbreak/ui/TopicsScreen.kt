@@ -6,8 +6,11 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -31,8 +34,11 @@ import androidx.compose.foundation.text.InlineTextContent
 import androidx.compose.foundation.text.appendInlineContent
 import androidx.compose.material3.LocalContentColor
 import com.joebad.fastbreak.data.model.Narrative
+import com.joebad.fastbreak.data.model.NarrativeDataPoint
+import com.joebad.fastbreak.data.model.Sport
 import com.joebad.fastbreak.data.model.TextSegment
 import com.joebad.fastbreak.data.model.TopicsResponse
+import com.joebad.fastbreak.data.model.VizType
 import com.joebad.fastbreak.navigation.TopicsComponent
 import com.joebad.fastbreak.platform.UrlLauncher
 import kotlin.time.Clock
@@ -54,6 +60,7 @@ private fun formatRelativeTime(instant: Instant?): String {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TopicsScreen(
     component: TopicsComponent,
@@ -61,6 +68,9 @@ fun TopicsScreen(
     topicsUpdatedAt: Instant?,
     onMenuClick: () -> Unit = {}
 ) {
+    val sheetState = rememberModalBottomSheetState()
+    var showInfoSheet by remember { mutableStateOf(false) }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -71,6 +81,11 @@ fun TopicsScreen(
                     }
                 },
                 actions = {
+                    if (topics?.descriptionSegments?.isNotEmpty() == true || topics?.description?.isNotBlank() == true) {
+                        IconButton(onClick = { showInfoSheet = true }) {
+                            Icon(Icons.Default.Info, contentDescription = "Topics Info")
+                        }
+                    }
                     IconButton(onClick = component.onNavigateBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
@@ -110,7 +125,46 @@ fun TopicsScreen(
                     )
                 }
                 itemsIndexed(topics.narratives) { index, narrative ->
-                    NarrativeItem(index + 1, narrative)
+                    NarrativeItem(
+                        number = index + 1,
+                        narrative = narrative,
+                        onNavigateToChart = component.onNavigateToChart
+                    )
+                }
+            }
+        }
+    }
+
+    // Info bottom sheet
+    if (showInfoSheet && (topics?.descriptionSegments?.isNotEmpty() == true || topics?.description?.isNotBlank() == true)) {
+        ModalBottomSheet(
+            onDismissRequest = { showInfoSheet = false },
+            sheetState = sheetState
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+                    .padding(16.dp)
+                    .padding(bottom = 32.dp)
+            ) {
+                Text(
+                    text = "About Topics",
+                    style = MaterialTheme.typography.titleLarge,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+                if (topics?.descriptionSegments?.isNotEmpty() == true) {
+                    SegmentedText(
+                        segments = topics.descriptionSegments,
+                        textColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        accentColor = MaterialTheme.colorScheme.primary
+                    )
+                } else if (topics?.description?.isNotBlank() == true) {
+                    Text(
+                        text = topics.description,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
             }
         }
@@ -178,8 +232,48 @@ private fun SegmentedText(
     )
 }
 
+/**
+ * Maps a league string to Sport enum.
+ */
+private fun leagueToSport(league: String): Sport? {
+    return when (league.uppercase()) {
+        "NBA" -> Sport.NBA
+        "NFL" -> Sport.NFL
+        "NHL" -> Sport.NHL
+        "MLB" -> Sport.MLB
+        else -> null
+    }
+}
+
+/**
+ * Maps a vizType string to VizType enum.
+ */
+private fun stringToVizType(vizType: String): VizType? {
+    return try {
+        VizType.valueOf(vizType.uppercase())
+    } catch (e: IllegalArgumentException) {
+        null
+    }
+}
+
+/**
+ * Builds a filters map from a data point's team/player values.
+ */
+private fun buildFiltersFromDataPoint(dataPoint: NarrativeDataPoint): Map<String, String>? {
+    val filters = mutableMapOf<String, String>()
+    if (dataPoint.team.isNotBlank()) {
+        filters["team"] = dataPoint.team
+    }
+    // Player filter could be added here if needed in the future
+    return filters.takeIf { it.isNotEmpty() }
+}
+
 @Composable
-private fun NarrativeItem(number: Int, narrative: Narrative) {
+private fun NarrativeItem(
+    number: Int,
+    narrative: Narrative,
+    onNavigateToChart: (chartId: String, sport: Sport, vizType: VizType, filters: Map<String, String>?) -> Unit = { _, _, _, _ -> }
+) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -267,11 +361,9 @@ private fun NarrativeItem(number: Int, narrative: Narrative) {
             }
         }
 
-        // Data points (show 5 random)
+        // Data points (show first 5)
         if (narrative.dataPoints.isNotEmpty()) {
-            val randomDataPoints = remember(narrative.dataPoints) {
-                narrative.dataPoints.shuffled().take(5)
-            }
+            val displayedDataPoints = narrative.dataPoints.take(5)
             Column(
                 modifier = Modifier.padding(top = 4.dp, bottom = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(6.dp)
@@ -290,23 +382,62 @@ private fun NarrativeItem(number: Int, narrative: Narrative) {
                     )
                 }
                 Spacer(Modifier.height(2.dp))
-                randomDataPoints.forEach { dp ->
-                    Row {
-                        Text(
-                            text = "• ",
-                            style = MaterialTheme.typography.bodySmall,
-                            fontFamily = FontFamily.Monospace,
-                            fontSize = 11.sp,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        val teamPrefix = if (dp.team.isNotBlank()) "${dp.team}: " else ""
-                        Text(
-                            text = "$teamPrefix${dp.metric} = ${dp.value}",
-                            style = MaterialTheme.typography.bodySmall,
-                            fontFamily = FontFamily.Monospace,
-                            fontSize = 11.sp,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
+                displayedDataPoints.forEach { dp ->
+                    val sport = leagueToSport(narrative.league)
+                    val vizType = stringToVizType(dp.vizType)
+                    val isClickable = dp.id.isNotBlank() && sport != null && vizType != null
+                    val filters = buildFiltersFromDataPoint(dp)
+
+                    Column {
+                        Row(
+                            modifier = if (isClickable) {
+                                Modifier.clickable {
+                                    onNavigateToChart(
+                                        dp.id,
+                                        sport!!,
+                                        vizType!!,
+                                        filters
+                                    )
+                                }
+                            } else {
+                                Modifier
+                            },
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "• ",
+                                style = MaterialTheme.typography.bodySmall,
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            val teamPrefix = if (dp.team.isNotBlank()) "${dp.team}: " else ""
+                            Text(
+                                text = "$teamPrefix${dp.metric} = ${dp.value}",
+                                style = MaterialTheme.typography.bodySmall,
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                textDecoration = if (isClickable) TextDecoration.Underline else TextDecoration.None
+                            )
+                            if (isClickable) {
+                                Text(
+                                    text = " →",
+                                    fontSize = 10.sp,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        }
+                        // Chart ID below the stat
+                        if (dp.id.isNotBlank()) {
+                            Text(
+                                text = "  [${dp.id}]",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 9.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                            )
+                        }
                     }
                 }
             }

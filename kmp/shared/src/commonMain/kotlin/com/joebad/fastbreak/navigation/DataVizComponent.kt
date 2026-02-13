@@ -13,5 +13,6 @@ class DataVizComponent(
     val vizType: VizType,
     val chartDataRepository: ChartDataRepository,
     val registryContainer: RegistryContainer,
-    val onNavigateBack: () -> Unit
+    val onNavigateBack: () -> Unit,
+    val initialFilters: Map<String, String>? = null
 ) : ComponentContext by componentContext

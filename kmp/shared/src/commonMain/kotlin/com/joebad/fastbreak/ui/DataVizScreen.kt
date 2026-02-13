@@ -43,6 +43,12 @@ fun DataVizScreen(
 
     // Load cached data when component is first displayed or when refresh is triggered
     LaunchedEffect(component.chartId, refreshTrigger) {
+        println("📊 [DataVizScreen] Loading chart:")
+        println("   chartId: ${component.chartId}")
+        println("   sport: ${component.sport}")
+        println("   vizType: ${component.vizType}")
+        println("   initialFilters: ${component.initialFilters}")
+
         state = DataVizState.Loading
 
         try {
@@ -51,21 +57,40 @@ fun DataVizScreen(
             val failedChart = syncProgress?.failedCharts?.find { it.first == component.chartId }
             if (failedChart != null) {
                 val (_, errorMessage) = failedChart
+                println("📊 [DataVizScreen] Chart failed during sync: $errorMessage")
                 state = DataVizState.Error("Failed to sync chart data: $errorMessage")
                 return@LaunchedEffect
             }
 
+            // Log available chart IDs for debugging
+            val allChartIds = component.chartDataRepository.getAllChartIds()
+            val requestedId = component.chartId
+            val isInList = allChartIds.contains(requestedId)
+            println("📊 [DataVizScreen] Requested chartId: '$requestedId'")
+            println("📊 [DataVizScreen] ChartId in available list: $isInList")
+            println("📊 [DataVizScreen] Available chart IDs (${allChartIds.size}): $allChartIds")
+
             // Load from cache using chartId
             val cachedData = component.chartDataRepository.getChartData(component.chartId)
+            println("📊 [DataVizScreen] Cache lookup result: ${if (cachedData != null) "FOUND" else "NOT FOUND"}")
+
             if (cachedData != null) {
                 // Data is cached, deserialize and show immediately
+                println("📊 [DataVizScreen] Deserializing cached data (vizType: ${cachedData.visualizationType})")
                 val visualization = cachedData.deserialize()
                 state = DataVizState.Success(visualization)
             } else {
-                // No cached data available
+                // No cached data available - check if there's a dev_ prefix issue
+                val hasDevPrefix = allChartIds.any { it == "dev_$requestedId" }
+                val hasWithoutDevPrefix = allChartIds.any { it == requestedId.removePrefix("dev_") }
+                println("📊 [DataVizScreen] Chart data not found in cache")
+                println("📊 [DataVizScreen] Has dev_ prefixed version: $hasDevPrefix")
+                println("📊 [DataVizScreen] Has non-dev_ version: $hasWithoutDevPrefix")
                 state = DataVizState.Error("Chart data not available. Please refresh.")
             }
         } catch (e: Exception) {
+            println("📊 [DataVizScreen] Error loading chart: ${e.message}")
+            e.printStackTrace()
             state = DataVizState.Error(e.message ?: "Unknown error")
         }
     }
@@ -160,6 +185,7 @@ fun DataVizScreen(
                 is DataVizState.Success -> SuccessContent(
                     visualization = currentState.data,
                     pinnedTeams = pinnedTeams,
+                    initialFilters = component.initialFilters,
                     onChartShareHandlerChanged = { handler ->
                         chartShareHandler = handler
                     },
@@ -262,11 +288,12 @@ private fun LoadingContent() {
 private fun SuccessContent(
     visualization: VisualizationType,
     pinnedTeams: List<PinnedTeam>,
+    initialFilters: Map<String, String>? = null,
     onChartShareHandlerChanged: ((() -> Unit)?) -> Unit,
     onScheduleToggleHandlerChanged: ((ScheduleToggleHandler?) -> Unit)? = null
 ) {
-    // State for filters and team highlighting
-    var selectedFilters by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
+    // State for filters and team highlighting - initialize from deep link filters if provided
+    var selectedFilters by remember { mutableStateOf(initialFilters ?: emptyMap()) }
     var selectedTeamCodes by remember { mutableStateOf<Set<String>>(emptySet()) }
     var selectedPlayerLabels by remember { mutableStateOf<Set<String>>(emptySet()) }
 
@@ -456,6 +483,7 @@ private fun RenderVisualization(
             visualization = visualization,
             modifier = Modifier.fillMaxSize(),
             pinnedTeams = pinnedTeams,
+            highlightedTeamCodes = highlightedTeamCodes,
             onScheduleToggleHandlerChanged = onScheduleToggleHandlerChanged
         )
     } else {
@@ -638,6 +666,11 @@ private fun extractFiltersAndCalculateHighlights(
             // Matchups still use filtering, not highlighting
             filters to emptySet()
         }
+        is NBAMatchupVisualization -> {
+            // For NBAMatchup, calculate highlighted teams from the "team" filter
+            val highlights = selectedFilters["team"]?.let { setOf(it.uppercase()) } ?: emptySet()
+            emptyList<FilterOption>() to highlights
+        }
         else -> emptyList<FilterOption>() to emptySet()
     }
 }
@@ -645,6 +678,12 @@ private fun extractFiltersAndCalculateHighlights(
 // Bar Graph filtering
 private fun extractBarGraphFilters(dataPoints: List<BarGraphDataPoint>): List<FilterOption> {
     val filters = mutableListOf<FilterOption>()
+
+    // Extract team codes from labels (first word, e.g., "DAL Mavericks" -> "DAL")
+    val teams = dataPoints.mapNotNull { it.label.split(" ").firstOrNull() }.distinct().sorted()
+    if (teams.isNotEmpty()) {
+        filters.add(FilterOption("team", "Team", teams))
+    }
 
     val divisions = dataPoints.mapNotNull { it.division }.distinct().sorted()
     if (divisions.isNotEmpty()) {
@@ -675,7 +714,12 @@ private fun calculateBarGraphHighlights(
                 when (key) {
                     "division" -> point.division?.equals(value, ignoreCase = true) == true
                     "conference" -> point.conference?.equals(value, ignoreCase = true) == true
-                    else -> true
+                    "team" -> {
+                        // Match team code from label (first word, e.g., "DAL Mavericks" -> "DAL")
+                        val labelTeamCode = point.label.split(" ").firstOrNull() ?: ""
+                        labelTeamCode.equals(value, ignoreCase = true)
+                    }
+                    else -> false
                 }
             }
         }
@@ -769,6 +813,12 @@ private fun calculateScatterPlotHighlights(
 private fun extractLineChartFilters(series: List<LineChartSeries>): List<FilterOption> {
     val filters = mutableListOf<FilterOption>()
 
+    // Extract team codes from labels (first word, e.g., "DAL Mavericks" -> "DAL")
+    val teams = series.mapNotNull { it.label.split(" ").firstOrNull() }.distinct().sorted()
+    if (teams.isNotEmpty()) {
+        filters.add(FilterOption("team", "Team", teams))
+    }
+
     val divisions = series.mapNotNull { it.division }.distinct().sorted()
     if (divisions.isNotEmpty()) {
         filters.add(FilterOption("division", "Division", divisions))
@@ -798,7 +848,12 @@ private fun calculateLineChartHighlights(
                 when (key) {
                     "division" -> s.division?.equals(value, ignoreCase = true) == true
                     "conference" -> s.conference?.equals(value, ignoreCase = true) == true
-                    else -> true
+                    "team" -> {
+                        // Match team code from label (first word, e.g., "DAL Mavericks" -> "DAL")
+                        val labelTeamCode = s.label.split(" ").firstOrNull() ?: ""
+                        labelTeamCode.equals(value, ignoreCase = true)
+                    }
+                    else -> false
                 }
             }
         }

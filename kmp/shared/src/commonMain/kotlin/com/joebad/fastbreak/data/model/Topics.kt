@@ -8,6 +8,8 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class TopicsResponse(
     val date: String,
+    val description: String = "",
+    val descriptionSegments: List<TextSegment> = emptyList(),
     val narratives: List<Narrative>
 )
 
@@ -21,7 +23,6 @@ data class Narrative(
     val summarySegments: List<TextSegment> = emptyList(),
     val league: String = "",  // "nba", "nfl", "nhl", "mlb", "mls"
     val chartEvidence: List<ChartReference> = emptyList(),
-    val highlights: List<ChartHighlight> = emptyList(),
     val dataPoints: List<NarrativeDataPoint> = emptyList(),
     val links: List<LinkReference> = emptyList(),
     val statisticalContext: String = "",
@@ -39,17 +40,8 @@ data class ChartReference(
 )
 
 /**
- * Highlight specification for a chart.
- */
-@Serializable
-data class ChartHighlight(
-    val chartName: String,
-    val highlightType: String,  // "player", "team", "conference", "division"
-    val values: List<String>    // e.g., ["BOS", "MIL"] for teams
-)
-
-/**
  * A specific data point cited in the narrative.
+ * Can be clicked to navigate to a chart with team/player filter pre-populated.
  */
 @Serializable
 data class NarrativeDataPoint(
@@ -57,7 +49,9 @@ data class NarrativeDataPoint(
     val value: String,
     val chartName: String = "",
     val team: String = "",
-    val id: String = ""  // Chart ID for navigation
+    val player: String = "",
+    val id: String = "",  // Chart ID for navigation
+    val vizType: String = ""  // Visualization type (e.g., "SCATTER_PLOT", "BAR_GRAPH")
 )
 
 /**
@@ -71,11 +65,18 @@ data class LinkReference(
 )
 
 /**
- * A text segment that can be plain text or a clickable link.
+ * A text segment that can be plain text, a clickable link, or a chart deep link.
+ *
+ * Types:
+ * - "text": Plain text
+ * - "link": External URL link (uses url field)
+ * - "chart": Deep link to a chart (uses chartId and filters fields)
  */
 @Serializable
 data class TextSegment(
-    val type: String,  // "text" or "link"
+    val type: String,  // "text", "link", or "chart"
     val value: String,
-    val url: String? = null
+    val url: String? = null,
+    val chartId: String? = null,
+    val filters: Map<String, String>? = null
 )

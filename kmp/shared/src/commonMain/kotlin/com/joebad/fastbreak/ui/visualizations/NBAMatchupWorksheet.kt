@@ -86,11 +86,13 @@ fun NBAMatchupWorksheet(
     visualization: NBAMatchupVisualization,
     modifier: Modifier = Modifier,
     pinnedTeams: List<com.joebad.fastbreak.data.model.PinnedTeam> = emptyList(),
+    highlightedTeamCodes: Set<String> = emptySet(),
     onScheduleToggleHandlerChanged: ((ScheduleToggleHandler?) -> Unit)? = null
 ) {
-    // Get NBA pinned teams only
-    val nbaPinnedTeamCodes = remember(pinnedTeams) {
-        pinnedTeams.filter { it.sport == "NBA" }.map { it.teamCode }.toSet()
+    // Combine NBA pinned teams with highlighted team codes from deep links
+    val nbaPinnedTeamCodes = remember(pinnedTeams, highlightedTeamCodes) {
+        val pinned = pinnedTeams.filter { it.sport == "NBA" }.map { it.teamCode }.toSet()
+        pinned + highlightedTeamCodes
     }
 
     // Group matchups by date in Eastern timezone and sort dates chronologically

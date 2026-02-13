@@ -52,21 +52,11 @@ class TopicsRepository(
      * @return The cached topics, or null if not found or corrupted
      */
     fun getTopics(): TopicsResponse? {
-        println("📖 TopicsRepository.getTopics()")
         return try {
-            val jsonString = settings.getStringOrNull(KEY_TOPICS_DATA)
-            if (jsonString == null) {
-                println("   No cached topics found")
-                return null
-            }
-            val topics = json.decodeFromString<TopicsResponse>(jsonString)
-            println("   ✅ Found cached topics: ${topics.narratives.size} narratives")
-            topics.narratives.forEachIndexed { i, n ->
-                println("   [$i] league='${n.league}' title='${n.title.take(30)}'")
-            }
-            topics
+            val jsonString = settings.getStringOrNull(KEY_TOPICS_DATA) ?: return null
+            json.decodeFromString<TopicsResponse>(jsonString)
         } catch (e: SerializationException) {
-            println("   ❌ Error reading topics: ${e.message}")
+            println("❌ TopicsRepository: Error reading topics: ${e.message}")
             null
         }
     }

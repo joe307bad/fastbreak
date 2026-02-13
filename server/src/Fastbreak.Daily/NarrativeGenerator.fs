@@ -20,8 +20,12 @@ type DataPoint = {
     ChartName: string
     [<JsonPropertyName("team")>]
     Team: string
+    [<JsonPropertyName("player")>]
+    Player: string
     [<JsonPropertyName("id")>]
     Id: string
+    [<JsonPropertyName("vizType")>]
+    VizType: string
 }
 
 type Narrative = {
@@ -65,13 +69,18 @@ IMPORTANT: Start directly with the content. Do not include any preamble like "Ok
 let private buildStructurePrompt (league: string) (topic: string) (rawText: string) =
     $"""Convert this {league} analysis into JSON.
 
-Topic: {topic}
+Topic focus: {topic}
 Analysis: {rawText}
 
-Create a one sentence title that summarizes the summary and keep the summary text.
+Create a specific, unique title that captures the main story from this analysis. The title should:
+- Be specific to what's covered (mention team names, player names, or specific events)
+- NOT be generic like "NBA News Update" or "Latest {league} News"
+- Reflect the topic focus ({topic})
+
+Keep the summary text as provided.
 
 Respond with JSON only, no markdown:
-{{"title": "title", "summary": "the analysis text"}}"""
+{{"title": "specific title about the main story", "summary": "the analysis text"}}"""
 
 // Step 3: Extract relevant data points from chart data
 let private buildDataPointsPrompt (league: string) (narrativeTitle: string) (narrativeSummary: string) (chartSummaries: string) =
@@ -86,10 +95,14 @@ IMPORTANT: Look for any team names or player names mentioned in the narrative. T
 Chart data:
 {chartSummaries}
 
-Find specific metrics and values from the charts that are relevant to this narrative. For each data point, include the 3-letter team abbreviation and the chart id.
+Find exactly 5 specific metrics and values from the a mix of visualization types/charts that are relevant to this narrative. For each data point:
+- Include the 3-letter team abbreviation in "team"
+- If the data point is about a specific player, include their name in "player" (otherwise leave empty string)
+- Include the chart id in "id"
+- Include the visualization type in "vizType" (one of: SCATTER_PLOT, BAR_GRAPH, LINE_CHART, TABLE)
 
 Respond with JSON only, no markdown:
-{{"dataPoints": [{{"metric": "metric name", "value": "value with units", "chartName": "name of chart this came from", "team": "ABC", "id": "chart_id"}}, ...]}}"""
+{{"dataPoints": [{{"metric": "metric name", "value": "value with units", "chartName": "name of chart", "team": "ABC", "player": "", "id": "chart_id", "vizType": "SCATTER_PLOT"}}, ...]}}"""
 
 // Step 4: Generate statistical context prose from data points
 let private buildStatisticalContextPrompt (league: string) (narrativeTitle: string) (narrativeSummary: string) (dataPoints: DataPoint list) =
@@ -214,10 +227,10 @@ let private parseDataPoints (text: string) =
 // Topics for each league - each becomes a separate narrative with its own grounded search
 let private getTopics (league: string) =
     match league with
-    | "NFL" -> ["recent game results and standout performances and league wide news"; "trades, free agency, draft news or playoff race"]
-    | "NBA" -> ["recent game results and standout performances and league wide news"; "trades, free agency, draft news or playoff race"]
-    | "NHL" -> ["recent game results and standout performances and league wide news"; "trades, free agency, draft news or playoff race"]
-    | "MLB" -> ["recent game results and standout performances and league wide news"; "trades, free agency, draft news or playoff race"]
+    | "NFL" -> ["game results, scores, and standout player performances from recent games"; "roster moves, trades, injuries, and playoff implications"]
+    | "NBA" -> ["game results, scores, and standout player performances from recent games"; "roster moves, trades, injuries, and playoff race standings"]
+    | "NHL" -> ["game results, scores, and standout player performances from recent games"; "roster moves, trades, injuries, and playoff race standings"]
+    | "MLB" -> ["game results, scores, and standout player performances from recent games"; "roster moves, trades, injuries, and division race standings"]
     | _ -> ["recent news"; "upcoming events"]
 
 let private generateNarrative (client: HttpClient) (apiKey: string) (league: string) (topic: string) (chartSummaries: string) = async {

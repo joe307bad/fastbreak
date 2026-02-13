@@ -48,14 +48,31 @@ class ChartDataRepository(
 
     /**
      * Retrieves cached chart data from local storage.
+     * Handles migration from legacy dev_ prefixed keys to new format.
      *
      * @param chartId The ID of the chart to retrieve
      * @return The cached chart data, or null if not found or corrupted
      */
     fun getChartData(chartId: String): CachedChartData? {
         return try {
-            val jsonString = settings.getStringOrNull("$PREFIX_CHART$chartId") ?: return null
-            json.decodeFromString<CachedChartData>(jsonString)
+            // First try the new key format
+            val jsonString = settings.getStringOrNull("$PREFIX_CHART$chartId")
+            if (jsonString != null) {
+                return json.decodeFromString<CachedChartData>(jsonString)
+            }
+
+            // Check for legacy dev_ prefixed key and migrate if found
+            val legacyChartId = "dev_$chartId"
+            val legacyJsonString = settings.getStringOrNull("$PREFIX_CHART$legacyChartId")
+            if (legacyJsonString != null) {
+                val data = json.decodeFromString<CachedChartData>(legacyJsonString)
+                // Migrate: save with new key and delete legacy key
+                saveChartData(chartId, data)
+                deleteChartData(legacyChartId)
+                return data
+            }
+
+            null
         } catch (e: SerializationException) {
             println("Error reading chart data for $chartId: ${e.message}")
             null

@@ -8,12 +8,14 @@ type RegistryEntry = {
     interval: string
     updatedAt: string
     title: string
+    visualizationType: string
 }
 
 type ChartData = {
     Name: string
     League: string
     Title: string
+    VizType: string
     RawJson: string
 }
 
@@ -60,12 +62,14 @@ let downloadCharts () = async {
                 let url = $"{baseUrl}/{path}"
                 let! json = client.GetStringAsync(url) |> Async.AwaitTask
                 let league = extractLeague path
+                // Remove dev/ prefix and .json suffix (dev/nba__foo.json -> nba__foo)
                 let name = path.Replace("dev/", "").Replace(".json", "")
                 printfn "  Downloaded: %s (%s)" name league
                 return Some {
                     Name = name
                     League = league
                     Title = entry.title
+                    VizType = entry.visualizationType
                     RawJson = json
                 }
             with ex ->
@@ -89,4 +93,4 @@ let getChartsForLeague (league: string) (charts: ChartData list) =
     charts |> List.filter (fun c -> c.League.Equals(league, StringComparison.OrdinalIgnoreCase))
 
 let summarizeChartData (chart: ChartData) =
-    $"Chart: {chart.Title}\nChart ID: {chart.Name}\nData:\n{chart.RawJson}"
+    $"Chart: {chart.Title}\nChart ID: {chart.Name}\nVisualization Type: {chart.VizType}\nData:\n{chart.RawJson}"

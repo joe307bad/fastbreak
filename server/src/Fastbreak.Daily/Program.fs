@@ -41,8 +41,22 @@ let main _ =
     try
         let narratives = run() |> Async.RunSynchronously
 
+        // Description as text segments with links
+        let descriptionSegments = [|
+            {| ``type`` = "text"; value = "Daily sports aggregation powered by Google Gemini with "; url = Option<string>.None |}
+            {| ``type`` = "link"; value = "grounded search"; url = Some "https://cloud.google.com/vertex-ai/generative-ai/docs/grounding/grounding-with-google-search" |}
+            {| ``type`` = "text"; value = " and Vertex AI to achieve accuracy and up-to-date information. Statistical analysis uses Fastbreak charts built with open source packages including "; url = Option<string>.None |}
+            {| ``type`` = "link"; value = "nflfastR"; url = Some "https://www.nflfastr.com/" |}
+            {| ``type`` = "text"; value = " (NFL play-by-play), "; url = Option<string>.None |}
+            {| ``type`` = "link"; value = "hoopR"; url = Some "https://hoopr.sportsdataverse.org/" |}
+            {| ``type`` = "text"; value = " (NBA stats), and the "; url = Option<string>.None |}
+            {| ``type`` = "link"; value = "NHL Stats API"; url = Some "https://github.com/Zmalski/NHL-API-Reference" |}
+            {| ``type`` = "text"; value = "."; url = Option<string>.None |}
+        |]
+
         let output = {|
             date = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ")
+            descriptionSegments = descriptionSegments
             narratives = narratives
         |}
 

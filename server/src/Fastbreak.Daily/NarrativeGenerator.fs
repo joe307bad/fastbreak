@@ -264,7 +264,7 @@ let private extractLinks (candidate: Candidate option) : RelevantLink list =
     |> Option.defaultValue []
 
 let private callGeminiWithSearch (client: HttpClient) (apiKey: string) (prompt: string) = async {
-    let url = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={apiKey}"
+    let url = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key={apiKey}"
 
     // Temperature 1.0 recommended for grounded search per Google docs
     let request: GeminiRequestWithTools = {
@@ -400,20 +400,28 @@ let private parseDataPoints (text: string) =
             else
                 []
     else
-        // No array found, try object format
+        // No array found - Gemini sometimes returns comma-separated objects without brackets
         let objStartIdx = text.IndexOf('{')
         let objEndIdx = text.LastIndexOf('}')
         if objStartIdx >= 0 && objEndIdx > objStartIdx then
             let jsonPart = text.Substring(objStartIdx, objEndIdx - objStartIdx + 1)
             let cleaned = jsonPart.Replace("\\$", "$").Replace("\\'", "'")
+            // First, try wrapping in array brackets (handles comma-separated objects)
             try
-                let response = JsonSerializer.Deserialize<DataPointsResponse>(cleaned, options)
-                printfn "      [ParseDataPoints] Parsed as object: %d items" response.DataPoints.Length
-                response.DataPoints |> Array.toList
-            with ex ->
-                printfn "      [ParseDataPoints] JSON parse failed: %s" ex.Message
-                printfn "      [ParseDataPoints] JSON attempted: %s..." (cleaned.Substring(0, min 300 cleaned.Length))
-                []
+                let asArray = "[" + cleaned + "]"
+                let dataPoints = JsonSerializer.Deserialize<DataPoint[]>(asArray, options)
+                printfn "      [ParseDataPoints] Parsed as wrapped array: %d items" dataPoints.Length
+                dataPoints |> Array.toList
+            with _ ->
+                // Fall back to trying as DataPointsResponse object
+                try
+                    let response = JsonSerializer.Deserialize<DataPointsResponse>(cleaned, options)
+                    printfn "      [ParseDataPoints] Parsed as object: %d items" response.DataPoints.Length
+                    response.DataPoints |> Array.toList
+                with ex ->
+                    printfn "      [ParseDataPoints] JSON parse failed: %s" ex.Message
+                    printfn "      [ParseDataPoints] JSON attempted: %s..." (cleaned.Substring(0, min 300 cleaned.Length))
+                    []
         else
             printfn "      [ParseDataPoints] No JSON found in response"
             []

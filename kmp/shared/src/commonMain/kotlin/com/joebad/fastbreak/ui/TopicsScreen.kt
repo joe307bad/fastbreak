@@ -189,8 +189,11 @@ private fun NarrativeItem(number: Int, narrative: Narrative) {
             }
         }
 
-        // Data points (show up to 3)
+        // Data points (show 5 random)
         if (narrative.dataPoints.isNotEmpty()) {
+            val randomDataPoints = remember(narrative.dataPoints) {
+                narrative.dataPoints.shuffled().take(5)
+            }
             Column(
                 modifier = Modifier.padding(top = 4.dp, bottom = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(6.dp)
@@ -209,7 +212,7 @@ private fun NarrativeItem(number: Int, narrative: Narrative) {
                     )
                 }
                 Spacer(Modifier.height(2.dp))
-                narrative.dataPoints.take(3).forEach { dp ->
+                randomDataPoints.forEach { dp ->
                     Row {
                         Text(
                             text = "• ",

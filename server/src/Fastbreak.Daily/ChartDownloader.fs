@@ -21,9 +21,23 @@ let private baseUrl = "https://d2jyizt5xogu23.cloudfront.net"
 
 let private extractLeague (chartPath: string) =
     // Pattern: dev/nfl__chart_name.json -> nfl
+    // Also handle: dev/nfl-chart-name.json -> nfl
     let fileName = chartPath.Replace("dev/", "").Replace(".json", "")
+    // Try double underscore first
     let parts = fileName.Split("__")
-    if parts.Length >= 1 then parts.[0].ToUpperInvariant() else "UNKNOWN"
+    if parts.Length >= 2 then
+        parts.[0].ToUpperInvariant()
+    else
+        // Try single dash or underscore - check if first part is a known league
+        let firstPart =
+            if fileName.Contains("-") then fileName.Split("-").[0]
+            elif fileName.Contains("_") then fileName.Split("_").[0]
+            else fileName
+        let upper = firstPart.ToUpperInvariant()
+        if upper = "NFL" || upper = "NBA" || upper = "NHL" || upper = "MLB" || upper = "MLS" then
+            upper
+        else
+            "UNKNOWN"
 
 let downloadCharts () = async {
     use client = new HttpClient()
@@ -62,6 +76,11 @@ let downloadCharts () = async {
 
     let validCharts = charts |> Array.choose id |> Array.toList
     printfn "Downloaded %d charts successfully" (List.length validCharts)
+
+    // Log charts by league for debugging
+    let chartsByLeague = validCharts |> List.groupBy (fun c -> c.League)
+    chartsByLeague |> List.iter (fun (league, charts) ->
+        printfn "  %s: %d charts" league (List.length charts))
 
     return validCharts
 }

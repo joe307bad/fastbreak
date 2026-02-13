@@ -22,7 +22,8 @@ data class Narrative(
     val chartEvidence: List<ChartReference> = emptyList(),
     val highlights: List<ChartHighlight> = emptyList(),
     val dataPoints: List<NarrativeDataPoint> = emptyList(),
-    val links: List<LinkReference> = emptyList()
+    val links: List<LinkReference> = emptyList(),
+    val statisticalContext: String = ""
 )
 
 /**
@@ -52,7 +53,8 @@ data class ChartHighlight(
 data class NarrativeDataPoint(
     val metric: String,
     val value: String,
-    val context: String
+    val chartName: String = "",
+    val team: String = ""
 )
 
 /**

@@ -158,8 +158,8 @@ private fun NarrativeItem(number: Int, narrative: Narrative) {
             )
         }
 
-        // Data points with context
-        if (narrative.dataPoints.isNotEmpty()) {
+        // Statistical context prose
+        if (narrative.statisticalContext.isNotBlank()) {
             Column(
                 modifier = Modifier.padding(top = 4.dp, bottom = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(6.dp)
@@ -172,13 +172,44 @@ private fun NarrativeItem(number: Int, narrative: Narrative) {
                         .padding(horizontal = 6.dp, vertical = 2.dp)
                 ) {
                     Text(
-                        text = "statistical context",
+                        text = "statistical analysis",
                         color = greenColor,
                         fontSize = 10.sp
                     )
                 }
                 Spacer(Modifier.height(2.dp))
-                narrative.dataPoints.forEach { dp ->
+                Text(
+                    text = narrative.statisticalContext,
+                    style = MaterialTheme.typography.bodySmall,
+                    fontFamily = FontFamily.Monospace,
+                    fontSize = 11.sp,
+                    lineHeight = 18.sp,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+        }
+
+        // Data points (show up to 3)
+        if (narrative.dataPoints.isNotEmpty()) {
+            Column(
+                modifier = Modifier.padding(top = 4.dp, bottom = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                // Orange badge for "data points"
+                val orangeColor = Color(0xFFFF9800)
+                Box(
+                    modifier = Modifier
+                        .background(orangeColor.copy(alpha = 0.15f), RoundedCornerShape(6.dp))
+                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                ) {
+                    Text(
+                        text = "data points",
+                        color = orangeColor,
+                        fontSize = 10.sp
+                    )
+                }
+                Spacer(Modifier.height(2.dp))
+                narrative.dataPoints.take(3).forEach { dp ->
                     Row {
                         Text(
                             text = "• ",
@@ -187,8 +218,9 @@ private fun NarrativeItem(number: Int, narrative: Narrative) {
                             fontSize = 11.sp,
                             color = MaterialTheme.colorScheme.primary
                         )
+                        val teamPrefix = if (dp.team.isNotBlank()) "${dp.team}: " else ""
                         Text(
-                            text = dp.context,
+                            text = "$teamPrefix${dp.metric} = ${dp.value}",
                             style = MaterialTheme.typography.bodySmall,
                             fontFamily = FontFamily.Monospace,
                             fontSize = 11.sp,
@@ -202,7 +234,7 @@ private fun NarrativeItem(number: Int, narrative: Narrative) {
         // Links
         if (narrative.links.isNotEmpty()) {
             Column(modifier = Modifier.padding(top = 4.dp)) {
-                // Blue badge for "relevant links"
+                // Blue badge for "source links"
                 val blueColor = Color(0xFF2196F3)
                 Box(
                     modifier = Modifier
@@ -210,7 +242,7 @@ private fun NarrativeItem(number: Int, narrative: Narrative) {
                         .padding(horizontal = 6.dp, vertical = 2.dp)
                 ) {
                     Text(
-                        text = "relevant links",
+                        text = "source links",
                         color = blueColor,
                         fontSize = 10.sp
                     )

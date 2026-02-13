@@ -113,6 +113,8 @@ type Narrative = {
     Links: RelevantLink list
     [<JsonPropertyName("dataPoints")>]
     DataPoints: DataPoint list
+    [<JsonPropertyName("statisticalContext")>]
+    StatisticalContext: string
 }
 
 // Intermediate types
@@ -173,6 +175,32 @@ Find specific metrics and values from the charts that are relevant to this narra
 Respond with JSON only, no markdown:
 {{"dataPoints": [{{"metric": "metric name", "value": "value with units", "chartName": "name of chart this came from", "team": "ABC"}}, ...]}}"""
 
+// Step 4: Generate statistical context prose from data points
+let private buildStatisticalContextPrompt (league: string) (narrativeTitle: string) (narrativeSummary: string) (dataPoints: DataPoint list) =
+    let dataPointsText =
+        dataPoints
+        |> List.map (fun dp -> $"- {dp.Team}: {dp.Metric} = {dp.Value}")
+        |> String.concat "\n"
+    $"""Given this {league} narrative and its supporting data points, write a brief 2-3 sentence statistical context that references specific teams and their statistics.
+
+Narrative:
+Title: {narrativeTitle}
+Summary: {narrativeSummary}
+
+Data Points:
+{dataPointsText}
+
+IMPORTANT REQUIREMENTS:
+1. You MUST mention specific team names (use full names like "the Celtics" or "Boston" not abbreviations)
+2. You MUST include actual numbers and statistics from the data points
+3. Try to connect stats to the narrative but don't try to stretch the analysis too much. We don't want to be too verbose.
+5. Read the description of the chart, it has important context for the stats. For instance, for some stats, lower means better
+6. When mentioning stats, mention the team's positioning across the league. e.g. Team X is in the top third/bottom quarter in stat Y
+
+Example good output: "The Celtics lead the league with a 45-12 record and rank first in offensive rating at 118.2, while the Lakers sit at 32-25 with the 8th-ranked defense."
+
+Start directly with the content. No preamble."""
+
 let getApiKey () =
     Environment.GetEnvironmentVariable("GEMINI_API_KEY")
     |> Option.ofObj
@@ -215,8 +243,8 @@ let private extractTitleFromHtml (html: string) : string option =
         else None
     else None
 
-// Fetch page and extract title
-let private fetchPageTitle (url: string) = async {
+// Fetch page and extract title, returning (title, finalUrl) after following redirects
+let private fetchPageTitleAndUrl (url: string) = async {
     try
         // Create a dedicated client for fetching page titles with proper settings
         use handler = new System.Net.Http.HttpClientHandler()
@@ -226,15 +254,18 @@ let private fetchPageTitle (url: string) = async {
         titleClient.Timeout <- TimeSpan.FromSeconds(10.0)
         titleClient.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (compatible; FastbreakBot/1.0)")
 
-        let! html = titleClient.GetStringAsync(url) |> Async.AwaitTask
-        return extractTitleFromHtml html
+        use! response = titleClient.GetAsync(url) |> Async.AwaitTask
+        let finalUrl = response.RequestMessage.RequestUri.ToString()
+        let! html = response.Content.ReadAsStringAsync() |> Async.AwaitTask
+        let title = extractTitleFromHtml html
+        return (title, Some finalUrl)
     with ex ->
         printfn "      [Title fetch failed for %s: %s]" (url.Substring(0, min 50 url.Length)) ex.Message
-        return None
+        return (None, None)
 }
 
-// Check if a title looks like just a domain name (not a real page title)
-let private isDomainOnlyTitle (title: string) =
+// Check if a title is bad and needs to be refetched
+let private isBadTitle (title: string) =
     if String.IsNullOrWhiteSpace(title) then true
     else
         let normalized = title.Trim().ToLowerInvariant()
@@ -248,8 +279,19 @@ let private isDomainOnlyTitle (title: string) =
             normalized.EndsWith(".io") ||
             normalized.EndsWith(".co") ||
             normalized.EndsWith(".edu") ||
-            normalized.EndsWith(".gov")
-        hasNoSpaces && looksLikeDomain
+            normalized.EndsWith(".gov") ||
+            normalized.EndsWith(".ca")
+        let isDomainOnly = hasNoSpaces && looksLikeDomain
+        // Also check for generic/useless titles
+        let isGenericTitle =
+            normalized.Contains("share on") ||
+            normalized.Contains("vertexaisearch") ||
+            normalized.Contains("grounding-api") ||
+            normalized = "home" ||
+            normalized = "news" ||
+            normalized = "sports" ||
+            normalized.StartsWith("http")
+        isDomainOnly || isGenericTitle
 
 // Extract site name from URL
 let private extractSiteName (url: string) =
@@ -276,18 +318,21 @@ let private enrichLinksWithTitles (links: RelevantLink list) = async {
     let! enrichedLinks =
         links
         |> List.map (fun link -> async {
-            // Fetch if title is empty, very short, or looks like just a domain name
-            if String.IsNullOrWhiteSpace(link.Title) || link.Title.Length < 10 || isDomainOnlyTitle link.Title then
-                let! fetchedTitle = fetchPageTitle link.Url
-                match fetchedTitle with
-                | Some title ->
-                    let titleWithSite = addSiteNameToTitle title link.Url
-                    return { link with Title = titleWithSite }
-                | None -> return link
-            else
-                // Even if we have a good title, add site name if not present
-                let titleWithSite = addSiteNameToTitle link.Title link.Url
-                return { link with Title = titleWithSite }
+            // Always fetch to get the final URL after redirects (for proper site name)
+            let! (fetchedTitle, finalUrl) = fetchPageTitleAndUrl link.Url
+            let urlForSiteName = finalUrl |> Option.defaultValue link.Url
+
+            // Determine the best title to use
+            let needsNewTitle = String.IsNullOrWhiteSpace(link.Title) || link.Title.Length < 10 || isBadTitle link.Title
+            let bestTitle =
+                if needsNewTitle then
+                    fetchedTitle |> Option.defaultValue link.Title
+                else
+                    link.Title
+
+            // Add site name from the final URL (not the redirect URL)
+            let titleWithSite = addSiteNameToTitle bestTitle urlForSiteName
+            return { link with Title = titleWithSite }
         })
         |> Async.Parallel
     return enrichedLinks |> Array.toList
@@ -413,10 +458,10 @@ let private parseDataPoints (text: string) =
 // Topics for each league - each becomes a separate narrative with its own grounded search
 let private getTopics (league: string) =
     match league with
-    | "NFL" -> ["recent game results and standout performances"; "trades, free agency, or draft news"]
-    | "NBA" -> ["recent game results and standout performances"; "standings and playoff race implications"]
-    | "NHL" -> ["recent game results and standout performances"; "standings and playoff race implications"]
-    | "MLB" -> ["recent game results or spring training news"; "trades, signings, or roster moves"]
+    | "NFL" -> ["recent game results and standout performances and league wide news"; "trades, free agency, or draft news"]
+    | "NBA" -> ["recent game results and standout performances and league wide news"; "standings and playoff race implications"]
+    | "NHL" -> ["recent game results and standout performances and league wide news"; "standings and playoff race implications"]
+    | "MLB" -> ["recent game results and standout performances and league wide news"; "trades, signings, or roster moves"]
     | _ -> ["recent news"; "upcoming events"]
 
 let private generateNarrative (client: HttpClient) (apiKey: string) (league: string) (topic: string) (chartSummaries: string) = async {
@@ -440,7 +485,17 @@ let private generateNarrative (client: HttpClient) (apiKey: string) (league: str
             return parseDataPoints dpResponse
     }
 
-    // Step 4: Enrich links with fetched page titles
+    // Step 4: Generate statistical context from data points (only if we have chart data)
+    let! statisticalContext = async {
+        if List.isEmpty dataPoints then
+            return ""
+        else
+            let contextPrompt = buildStatisticalContextPrompt league parsed.Title parsed.Summary dataPoints
+            let! contextResponse = callGemini client apiKey contextPrompt
+            return contextResponse.Trim()
+    }
+
+    // Step 5: Enrich links with fetched page titles
     let! enrichedLinks = enrichLinksWithTitles groundedResult.Links
 
     return {
@@ -449,11 +504,14 @@ let private generateNarrative (client: HttpClient) (apiKey: string) (league: str
         League = league
         Links = enrichedLinks
         DataPoints = dataPoints
+        StatisticalContext = statisticalContext
     }
 }
 
 let generateForLeague (client: HttpClient) (apiKey: string) (league: string) (charts: ChartData list) = async {
-    printfn "  Generating narratives for %s..." league
+    printfn "  Generating narratives for %s (%d charts available)..." league (List.length charts)
+    if List.isEmpty charts then
+        printfn "    WARNING: No charts found for %s - data points will be empty" league
 
     let chartSummaries =
         charts
@@ -503,7 +561,7 @@ let generate (charts: ChartData list) = async {
     use client = new HttpClient()
     client.Timeout <- TimeSpan.FromMinutes(3.0)
 
-    let leagues = ["NFL"; "NBA"; "NHL"; "MLB"]
+    let leagues = ["NBA"; "NHL"; "MLB"; "NFL"]
 
     let! results =
         leagues

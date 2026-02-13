@@ -324,14 +324,19 @@ let private enrichLinksWithTitles (links: RelevantLink list) = async {
 
             // Determine the best title to use
             let needsNewTitle = String.IsNullOrWhiteSpace(link.Title) || link.Title.Length < 10 || isBadTitle link.Title
+            let siteName = extractSiteName urlForSiteName
             let bestTitle =
                 if needsNewTitle then
-                    fetchedTitle |> Option.defaultValue link.Title
+                    match fetchedTitle with
+                    | Some title -> title
+                    | None -> siteName  // Fallback to just site name if fetch failed
                 else
                     link.Title
 
-            // Add site name from the final URL (not the redirect URL)
-            let titleWithSite = addSiteNameToTitle bestTitle urlForSiteName
+            // Add site name from the final URL (not the redirect URL) if not already the site name
+            let titleWithSite =
+                if bestTitle = siteName then bestTitle
+                else addSiteNameToTitle bestTitle urlForSiteName
             return { link with Title = titleWithSite }
         })
         |> Async.Parallel
@@ -441,19 +446,57 @@ let private parseJson (text: string) : InitialNarrativeItem =
         { Title = "News Update"; Summary = text }
 
 let private parseDataPoints (text: string) =
-    let startIdx = text.IndexOf('{')
-    let endIdx = text.LastIndexOf('}')
-    if startIdx >= 0 && endIdx > startIdx then
-        let jsonPart = text.Substring(startIdx, endIdx - startIdx + 1)
+    let options = JsonSerializerOptions()
+    options.AllowTrailingCommas <- true
+
+    // First, try to find a JSON array (Gemini sometimes returns bare arrays)
+    let arrayStartIdx = text.IndexOf('[')
+    let arrayEndIdx = text.LastIndexOf(']')
+
+    if arrayStartIdx >= 0 && arrayEndIdx > arrayStartIdx then
+        let jsonPart = text.Substring(arrayStartIdx, arrayEndIdx - arrayStartIdx + 1)
         let cleaned = jsonPart.Replace("\\$", "$").Replace("\\'", "'")
-        let options = JsonSerializerOptions()
-        options.AllowTrailingCommas <- true
         try
-            let response = JsonSerializer.Deserialize<DataPointsResponse>(cleaned, options)
-            response.DataPoints |> Array.toList
-        with _ -> []
+            // Try parsing as a bare array of DataPoints
+            let dataPoints = JsonSerializer.Deserialize<DataPoint[]>(cleaned, options)
+            printfn "      [ParseDataPoints] Parsed as array: %d items" dataPoints.Length
+            dataPoints |> Array.toList
+        with ex ->
+            printfn "      [ParseDataPoints] Array parse failed: %s" ex.Message
+            // Fall back to trying object format
+            let objStartIdx = text.IndexOf('{')
+            let objEndIdx = text.LastIndexOf('}')
+            if objStartIdx >= 0 && objEndIdx > objStartIdx then
+                let objJsonPart = text.Substring(objStartIdx, objEndIdx - objStartIdx + 1)
+                let objCleaned = objJsonPart.Replace("\\$", "$").Replace("\\'", "'")
+                try
+                    let response = JsonSerializer.Deserialize<DataPointsResponse>(objCleaned, options)
+                    printfn "      [ParseDataPoints] Parsed as object: %d items" response.DataPoints.Length
+                    response.DataPoints |> Array.toList
+                with ex2 ->
+                    printfn "      [ParseDataPoints] Object parse also failed: %s" ex2.Message
+                    printfn "      [ParseDataPoints] JSON attempted: %s..." (objCleaned.Substring(0, min 300 objCleaned.Length))
+                    []
+            else
+                []
     else
-        []
+        // No array found, try object format
+        let objStartIdx = text.IndexOf('{')
+        let objEndIdx = text.LastIndexOf('}')
+        if objStartIdx >= 0 && objEndIdx > objStartIdx then
+            let jsonPart = text.Substring(objStartIdx, objEndIdx - objStartIdx + 1)
+            let cleaned = jsonPart.Replace("\\$", "$").Replace("\\'", "'")
+            try
+                let response = JsonSerializer.Deserialize<DataPointsResponse>(cleaned, options)
+                printfn "      [ParseDataPoints] Parsed as object: %d items" response.DataPoints.Length
+                response.DataPoints |> Array.toList
+            with ex ->
+                printfn "      [ParseDataPoints] JSON parse failed: %s" ex.Message
+                printfn "      [ParseDataPoints] JSON attempted: %s..." (cleaned.Substring(0, min 300 cleaned.Length))
+                []
+        else
+            printfn "      [ParseDataPoints] No JSON found in response"
+            []
 
 // Topics for each league - each becomes a separate narrative with its own grounded search
 let private getTopics (league: string) =
@@ -478,11 +521,17 @@ let private generateNarrative (client: HttpClient) (apiKey: string) (league: str
     // Step 3: Extract data points from charts
     let! dataPoints = async {
         if String.IsNullOrWhiteSpace chartSummaries then
+            printfn "      [DataPoints] No chart summaries available"
             return []
         else
+            printfn "      [DataPoints] Chart summaries size: %d chars" chartSummaries.Length
             let dpPrompt = buildDataPointsPrompt league parsed.Title parsed.Summary chartSummaries
+            printfn "      [DataPoints] Full prompt size: %d chars" dpPrompt.Length
             let! dpResponse = callGemini client apiKey dpPrompt
-            return parseDataPoints dpResponse
+            printfn "      [DataPoints] Gemini response size: %d chars" dpResponse.Length
+            let parsed = parseDataPoints dpResponse
+            printfn "      [DataPoints] Parsed %d data points" (List.length parsed)
+            return parsed
     }
 
     // Step 4: Generate statistical context from data points (only if we have chart data)

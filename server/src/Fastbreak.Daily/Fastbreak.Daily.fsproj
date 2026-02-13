@@ -6,8 +6,9 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="NewsApiOrg.fs" />
-    <Compile Include="TopicsGenerator.fs" />
+    <Compile Include="ChartDownloader.fs" />
+    <Compile Include="NarrativeGenerator.fs" />
+    <Compile Include="Main.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 

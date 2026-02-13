@@ -1,70 +1,71 @@
 open System
-open System.IO
-open System.Collections.Generic
+open System.Text.Json
 open Amazon.S3
 open Amazon.S3.Model
 open Amazon.DynamoDBv2
 open Amazon.DynamoDBv2.Model
+open Fastbreak.Daily.Main
 
-let bucketName = "fb-ch-def"
-let dynamoTableName = "fastbreak-file-timestamps"
-let s3Key = "dev/topics.json"
-
-let uploadToS3 (json: string) = async {
-    use s3Client = new AmazonS3Client(Amazon.RegionEndpoint.USEast1)
-
-    let request = PutObjectRequest()
-    request.BucketName <- bucketName
-    request.Key <- s3Key
-    request.ContentType <- "application/json"
-    request.ContentBody <- json
-
-    let! response = s3Client.PutObjectAsync(request) |> Async.AwaitTask
-    printfn "Uploaded to S3: %s/%s (Status: %d)" bucketName s3Key (int response.HttpStatusCode)
+let uploadToS3 (bucket: string) (key: string) (json: string) = async {
+    use client = new AmazonS3Client()
+    let request = PutObjectRequest(
+        BucketName = bucket,
+        Key = key,
+        ContentBody = json,
+        ContentType = "application/json"
+    )
+    let! _ = client.PutObjectAsync(request) |> Async.AwaitTask
+    printfn "Uploaded to S3: s3://%s/%s" bucket key
 }
 
-let insertDynamoDbRow () = async {
-    use dynamoClient = new AmazonDynamoDBClient(Amazon.RegionEndpoint.USEast1)
+let updateDynamoDB (tableName: string) (fileKey: string) (title: string) = async {
+    use client = new AmazonDynamoDBClient()
+    let utcTimestamp = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ")
+    let item = Collections.Generic.Dictionary<string, AttributeValue>()
+    item.["file_key"] <- AttributeValue(S = fileKey)
+    item.["updatedAt"] <- AttributeValue(S = utcTimestamp)
+    item.["title"] <- AttributeValue(S = title)
+    item.["interval"] <- AttributeValue(S = "daily")
+    item.["type"] <- AttributeValue(S = "topics")
 
-    let now = DateTime.UtcNow
-    let updatedAt = now.ToString("yyyy-MM-ddTHH:mm:ssZ")
-    let title = sprintf "Sports Topics - %s" (now.ToString("yyyy-MM-dd"))
-
-    let item = Dictionary<string, AttributeValue>()
-    item.["file_key"] <- AttributeValue(s3Key)
-    item.["interval"] <- AttributeValue("daily")
-    item.["updatedAt"] <- AttributeValue(updatedAt)
-    item.["title"] <- AttributeValue(title)
-    item.["type"] <- AttributeValue("topics")
-
-    let request = PutItemRequest()
-    request.TableName <- dynamoTableName
-    request.Item <- item
-
-    let! response = dynamoClient.PutItemAsync(request) |> Async.AwaitTask
-    printfn "Inserted DynamoDB row: %s (Status: %d)" s3Key (int response.HttpStatusCode)
+    let request = PutItemRequest(
+        TableName = tableName,
+        Item = item
+    )
+    let! _ = client.PutItemAsync(request) |> Async.AwaitTask
+    printfn "Updated DynamoDB: %s key: %s updatedAt: %s title: %s" tableName fileKey utcTimestamp title
 }
 
 [<EntryPoint>]
 let main _ =
     try
-        printfn "Generating topics..."
-        printfn ""
+        let narratives = run() |> Async.RunSynchronously
 
-        let result = TopicsGenerator.generateTopics () |> Async.RunSynchronously
+        let output = {|
+            date = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ")
+            narratives = narratives
+        |}
 
-        // Upload to S3
-        printfn ""
-        printfn "Uploading to S3..."
-        uploadToS3 result |> Async.RunSynchronously
+        let options = JsonSerializerOptions(WriteIndented = true)
+        let json = JsonSerializer.Serialize(output, options)
 
-        // Insert DynamoDB row
-        printfn "Inserting DynamoDB row..."
-        insertDynamoDbRow () |> Async.RunSynchronously
+        // Get environment variables
+        let bucket = Environment.GetEnvironmentVariable("AWS_S3_BUCKET")
+        if String.IsNullOrEmpty(bucket) then
+            failwith "AWS_S3_BUCKET environment variable is not set"
 
-        printfn ""
-        printfn "Done!"
+        let isProd = String.Equals(Environment.GetEnvironmentVariable("PROD"), "true", StringComparison.OrdinalIgnoreCase)
+        let s3Key = if isProd then "topics.json" else "dev/topics.json"
+        let tableName = Environment.GetEnvironmentVariable("AWS_DYNAMODB_TABLE") |> Option.ofObj |> Option.defaultValue "fastbreak-file-timestamps"
+        let title = "Daily Sports Narratives"
 
+        // Upload to S3 and update DynamoDB
+        async {
+            do! uploadToS3 bucket s3Key json
+            do! updateDynamoDB tableName s3Key title
+        } |> Async.RunSynchronously
+
+        printfn "Done! Uploaded %d narratives" (List.length narratives)
         0
     with
     | ex ->

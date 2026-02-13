@@ -1,0 +1,657 @@
+[
+  {
+    "title": "Seattle Seahawks defeat New England Patriots in Super Bowl LX with standout performance from Kenneth Walker III.",
+    "summary": "On February 8, 2026, the Seattle Seahawks defeated the New England Patriots 29-13 in Super Bowl LX, held in Santa Clara, California. Seahawks running back Kenneth Walker III was named Super Bowl MVP, rushing for 135 yards. Seattle\u0027s dominant \u0022Dark Side\u0022 defense recorded 6 sacks and 3 turnovers, disrupting Patriots quarterback Drake Maye and holding New England scoreless for the first three quarters.",
+    "league": "NFL",
+    "links": [
+      {
+        "title": "The Thunderword - Official Newspaper of Highline College",
+        "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQHSuAwY-zGrmDXMcIKsqrUYow5Gu9woc2Gvilp7nZcdTTs2OA86XzSKNvmpK212dyv1LXNxrxxlG3W4e4FF6vnItgbvNqd8HnpmVJ6w2gTXJDywbXoq5UdbUo4vYv4cItmbsqMkmWuAyF0xmOd0_J9kYALaRCB5K52Lds6gMw_UVdM-lGaNbafB_fQ=",
+        "type": "source"
+      },
+      {
+        "title": "2026 NFL Scores - Live Updates for Today\u0027s Games | FOX Sports",
+        "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQHM2UFXrYXiJQECQdZ6K7Ax29bbPa4GuPm85nB43YNocduAQbenRuh0o3rQkOKRsSHyYpqdX_vCf4ebpxGToEVZ-h2v7Gq5I_9TTvjoThnFIrYy1AshKnra-niPpkV3gA==",
+        "type": "source"
+      }
+    ],
+    "dataPoints": [
+      {
+        "metric": "Rushing Yards",
+        "value": "1340 yards",
+        "chartName": "NFL Matchup Worksheets - Super Bowl LX Matchup Worksheet",
+        "team": "SEA"
+      },
+      {
+        "metric": "Def EPA/Play",
+        "value": "-0.124",
+        "chartName": "NFL Matchup Worksheets - Super Bowl LX Matchup Worksheet",
+        "team": "SEA"
+      },
+      {
+        "metric": "Sacks Made",
+        "value": "56",
+        "chartName": "NFL Matchup Worksheets - Super Bowl LX Matchup Worksheet",
+        "team": "SEA"
+      },
+      {
+        "metric": "Interceptions Made",
+        "value": "21",
+        "chartName": "NFL Matchup Worksheets - Super Bowl LX Matchup Worksheet",
+        "team": "SEA"
+      },
+      {
+        "metric": "Def EPA/Play",
+        "value": "-0.091",
+        "chartName": "NFL Matchup Worksheets - Super Bowl LX Matchup Worksheet",
+        "team": "NE"
+      },
+      {
+        "metric": "Sacks Allowed",
+        "value": "69",
+        "chartName": "NFL Matchup Worksheets - Super Bowl LX Matchup Worksheet",
+        "team": "NE"
+      },
+      {
+        "metric": "Interceptions Thrown",
+        "value": "12",
+        "chartName": "NFL Matchup Worksheets - Super Bowl LX Matchup Worksheet",
+        "team": "NE"
+      },
+      {
+        "metric": "Cumulative EPA Trend - Week 18",
+        "value": "157.19",
+        "chartName": "Cumulative EPA Trend - Week 18",
+        "team": "SEA"
+      },
+      {
+        "metric": "Cumulative EPA Trend - Week 18",
+        "value": "206.38",
+        "chartName": "Cumulative EPA Trend - Week 18",
+        "team": "NE"
+      },
+      {
+        "metric": "Defensive Snaps",
+        "value": "1404",
+        "chartName": "NFL Team Snaps - Week 18",
+        "team": "SEA"
+      },
+      {
+        "metric": "Offensive Snaps",
+        "value": "1337",
+        "chartName": "NFL Team Snaps - Week 18",
+        "team": "SEA"
+      },
+      {
+        "metric": "Defensive Snaps",
+        "value": "1297",
+        "chartName": "NFL Team Snaps - Week 18",
+        "team": "NE"
+      },
+      {
+        "metric": "Offensive Snaps",
+        "value": "1363",
+        "chartName": "NFL Team Snaps - Week 18",
+        "team": "NE"
+      },
+      {
+        "metric": "Offensive EPA per Play",
+        "value": "0.0465",
+        "chartName": "NFL Team Tier List - Week 18",
+        "team": "SEA"
+      },
+      {
+        "metric": "Defensive EPA per Play",
+        "value": "-0.121",
+        "chartName": "NFL Team Tier List - Week 18",
+        "team": "SEA"
+      },
+      {
+        "metric": "Offensive EPA per Play",
+        "value": "0.1087",
+        "chartName": "NFL Team Tier List - Week 18",
+        "team": "NE"
+      },
+      {
+        "metric": "Defensive EPA per Play",
+        "value": "-0.0356",
+        "chartName": "NFL Team Tier List - Week 18",
+        "team": "NE"
+      },
+      {
+        "metric": "Turnover Differential",
+        "value": "-1",
+        "chartName": "Turnover Differential - Week 18",
+        "team": "SEA"
+      },
+      {
+        "metric": "Turnover Differential",
+        "value": "3",
+        "chartName": "Turnover Differential - Week 18",
+        "team": "NE"
+      }
+    ]
+  },
+  {
+    "title": "NFL teams strategize for free agency and the draft as the 2026 league year approaches.",
+    "summary": "As the 2026 NFL league year approaches on March 11, teams are strategizing for free agency and the upcoming draft. The New England Patriots, despite their Super Bowl LX loss to the Seattle Seahawks, are projected to select Utah offensive lineman Caleb Lomu with the 31st pick to bolster Drake Maye\u0027s protection, according to ESPN\u0027s Field Yates. Meanwhile, the Dallas Cowboys face a tough decision with running back Javonte Williams, who is coming off a career year but is entering free agency with Super Bowl MVP Kenneth Walker and other top backs also available.",
+    "league": "NFL",
+    "links": [
+      {
+        "title": "Jaguars 2026 Free Agents",
+        "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQHZopiDI4geTYtuvBdFMSZLGrqQNY_N1SL37B0JwBu5K6BOupJcG_sW04VmH6mnyjNqMRMrumXXAOP6xzFrnHq8UJuPa3Uyduw8mYeemMu8hS8-e8dJKDGFoeQe3ewrFB8twVa50fuN4Ka0yPF0f2GwMxEZvasjUEtYBBcdWR1McrtzOiln9qEWP9zQ",
+        "type": "source"
+      },
+      {
+        "title": "NFL 2026 offseason calendar: When is the draft and free agency? | NFL News - The Times of India",
+        "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQFcxzLUCpGuCrc1rJ3jcD5I2kuSusix9aMAd9tS8p-twwvDmbvGt0Hz-91vNcg9C5t09U3P9zm6szpVDHhSqEPH5WOIvLdUHRkn1KyYDxlXwc1Hm-WZQmk36d4XjRbeKBHXfSoJLi7a1MqyCnTOOs4c4XGrJK3zT_XHd_r1boz_tdhZvQSb1oCB03DpR1WWbvSIodLr4vrhQoU3gd8VepGcy7_Z44q1e0PdyJ6WDxLt2fQg9So5legNog217b_vAKfe52aD39U=",
+        "type": "source"
+      },
+      {
+        "title": "Which Giants players are set to become NFL free agents?",
+        "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQGavsETlVv9HESpKRt2ClKOGzKCJ0hCJlnjVYbT2Otlnb2Wt-vkz6U905mkvcOuQHUPzEpCfl9JmAp7YJvz1UkGS80ywcx-PMvnPmPYUCBwyFzkdgs_PtugZDg8SH1o9yujXqsAQIVrUfR_Hv99nouzRJq6614sat4UgZc_ekkMWCIyypPoFD1Q5aUq_SHPvtqUbSoOnizxEHJ0btwlhcaUqtYvu4IXXVMpzMrjAibr",
+        "type": "source"
+      },
+      {
+        "title": "2026 New England Patriots NFL Mock Draft Tracker",
+        "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQGR1L8Eyltoz4VjF5REYYdtf2ShNYycuP6GTy3hs9AxZ5eQTVl7FSm7hM5b1QlE_6WFnsCIRhIwfKTCt2-dL5eV7t40Pdg0Sf6N0MAAggqnXCbnIDAcL828TuNxtu1WP_NDFBfAyRpVJWaMXDIsT0EJKJoTNaiJcn4=",
+        "type": "source"
+      },
+      {
+        "title": "atozsports.com",
+        "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQEevCbVTqgOEbPqWqhSzOAGBNYxkibJyN7Z21cxXvAkwew8ELmizFGg9ijDpbG68y2NW6riJcxT6HMzwCE9v6HoMoJUjVD099JKjmST4CQh5POPSf7pzu3mFCG2QkIbote-FcEgojp-UoMCemltZrYbdrsJy5uKT9Q5wlbvyQXhybevEhHOKyFv6XOKtOT_ZQ4HMWN5WTjDSOvVh3X_KBzj2nZj94feqSkL0kHs6ioLqr_AnwbvqQMMY0MuIsAzWSpR2bs=",
+        "type": "source"
+      }
+    ],
+    "dataPoints": [
+      {
+        "metric": "Cumulative EPA Trend - Week 18",
+        "value": "206.38",
+        "chartName": "Cumulative EPA Trend - Week 18",
+        "team": "NE"
+      },
+      {
+        "metric": "Cumulative EPA Trend - Week 18",
+        "value": "157.19",
+        "chartName": "Cumulative EPA Trend - Week 18",
+        "team": "SEA"
+      },
+      {
+        "metric": "Def EPA/Play",
+        "value": "-0.124",
+        "chartName": "Super Bowl LX Matchup Worksheet",
+        "team": "SEA"
+      },
+      {
+        "metric": "Sacks Allowed",
+        "value": "69",
+        "chartName": "Super Bowl LX Matchup Worksheet",
+        "team": "NE"
+      },
+      {
+        "metric": "Total EPA",
+        "value": "0.19",
+        "chartName": "Super Bowl LX Matchup Worksheet",
+        "team": "NE"
+      },
+      {
+        "metric": "Passing Yards",
+        "value": "5222",
+        "chartName": "Super Bowl LX Matchup Worksheet",
+        "team": "NE"
+      },
+      {
+        "metric": "Passing TDs",
+        "value": "37",
+        "chartName": "Super Bowl LX Matchup Worksheet",
+        "team": "NE"
+      },
+      {
+        "metric": "Rushing Yards",
+        "value": "1340",
+        "chartName": "Super Bowl LX Matchup Worksheet",
+        "team": "SEA"
+      },
+      {
+        "metric": "Rushing TDs",
+        "value": "9",
+        "chartName": "Super Bowl LX Matchup Worksheet",
+        "team": "SEA"
+      },
+      {
+        "metric": "Defensive Snaps",
+        "value": "1297",
+        "chartName": "NFL Team Snaps - Week 18",
+        "team": "NE"
+      },
+      {
+        "metric": "Offensive Snaps",
+        "value": "1363",
+        "chartName": "NFL Team Snaps - Week 18",
+        "team": "NE"
+      },
+      {
+        "metric": "Defensive Snaps",
+        "value": "1404",
+        "chartName": "NFL Team Snaps - Week 18",
+        "team": "SEA"
+      },
+      {
+        "metric": "Offensive Snaps",
+        "value": "1337",
+        "chartName": "NFL Team Snaps - Week 18",
+        "team": "SEA"
+      },
+      {
+        "metric": "Offensive EPA per Play",
+        "value": "0.1087",
+        "chartName": "NFL Team Tier List - Week 18",
+        "team": "NE"
+      },
+      {
+        "metric": "Defensive EPA per Play",
+        "value": "-0.0356",
+        "chartName": "NFL Team Tier List - Week 18",
+        "team": "NE"
+      },
+      {
+        "metric": "Offensive EPA per Play",
+        "value": "0.0465",
+        "chartName": "NFL Team Tier List - Week 18",
+        "team": "SEA"
+      },
+      {
+        "metric": "Defensive EPA per Play",
+        "value": "-0.121",
+        "chartName": "NFL Team Tier List - Week 18",
+        "team": "SEA"
+      },
+      {
+        "metric": "Turnover Differential",
+        "value": "3",
+        "chartName": "Turnover Differential - Week 18",
+        "team": "NE"
+      },
+      {
+        "metric": "Turnover Differential",
+        "value": "-1",
+        "chartName": "Turnover Differential - Week 18",
+        "team": "SEA"
+      },
+      {
+        "metric": "Rush Yards/Game",
+        "value": "125.3",
+        "chartName": "Super Bowl LX Matchup Worksheet",
+        "team": "SEA"
+      },
+      {
+        "metric": "Rushing EPA",
+        "value": "-0.067",
+        "chartName": "Super Bowl LX Matchup Worksheet",
+        "team": "SEA"
+      },
+      {
+        "metric": "Turnover Differential",
+        "value": "-11",
+        "chartName": "Turnover Differential - Week 18",
+        "team": "DAL"
+      }
+    ]
+  },
+  {
+    "title": "NBA games on February 12, 2026 featured standout performances and decisive victories.",
+    "summary": "On February 12, 2026, several NBA games took place, including the Charlotte Hornets defeating the Atlanta Hawks 110-107, with Brandon Miller scoring 31 points for the Hornets. The Cleveland Cavaliers triumphed over the Washington Wizards 138-13, led by Donovan Mitchell\u0027s 30 points. In other action, the New York Knicks dominated the Philadelphia 76ers 138-89, where Jose Alvarado scored 26 points, and the San Antonio Spurs continued their winning streak by defeating the Golden State Warriors 126-113, with Dearan Fox contributing 27 points.",
+    "league": "NBA",
+    "links": [
+      {
+        "title": "NBA STANDINGS TODAY as of February 12, 2026 | GAME RESULTS | NBA SCHEDULE February 13, 2026 - YouTube",
+        "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQHos9SQYxMzKrEus51FyYntcrl93O2r8ge1r5z36sLJudOG43kmIPxXEG2WkrRrtfnIHBjol7NtsL4dsMeogP2znlSVVnvMstyGpffHfLWj5PKbzLRxTT0wPDJr6rIKvuGvhORvGQ==",
+        "type": "source"
+      },
+      {
+        "title": "NBA STANDINGS TODAY as of February 12, 2026 | GAMES RESULTS | NBA GAME SCHEDULE  FEBRUARY 13, 2026 - YouTube",
+        "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQHiwSrrkkfUbZOGZ9GiOZyJSfVD2iRjBBDW7jPf9Evm39YQVqff2dmOO29C1aJiXX6r8Z9l9rXp-okFkvYTxhNXWgtmXwsljyataunSGiJKw2iPrusK7nYnOzAbFZSxhuomVpxSDw==",
+        "type": "source"
+      }
+    ],
+    "dataPoints": []
+  },
+  {
+    "title": "NBA Standings and Playoff Race Update on February 12, 2026.",
+    "summary": "As of February 12, 2026, the Eastern Conference standings are led by the Detroit Pistons with a 40-13 record, followed by the Boston Celtics at 35-19. In the Western Conference, the Oklahoma City Thunder hold the top spot with a 42-13 record, closely pursued by the San Antonio Spurs at 38-16. Several teams are battling for playoff positioning, including the Charlotte Hornets who defeated the Atlanta Hawks 110-107, a result that has implications for the tightly contested Eastern Conference playoff race.",
+    "league": "NBA",
+    "links": [
+      {
+        "title": "NBA STANDINGS TODAY as of February 12, 2026 | GAME RESULTS | NBA SCHEDULE February 13, 2026 - YouTube",
+        "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQGtwMfy98wuxYBMNRjs0WNHwMp7JZyOjqJ68NrWRNF6FHyQjlLY2mFB5TPi-LboJtWQ3awxk6AQQetbSBpSHlPk8zAY1FVVOeVZ70ay09QZKiANDDGfDRky-wS6LwovR3vfxcMbYEY=",
+        "type": "source"
+      },
+      {
+        "title": "NBA STANDINGS TODAY as of February 12, 2026 | GAMES RESULTS | NBA GAME SCHEDULE  FEBRUARY 13, 2026 - YouTube",
+        "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQEoPQtkCH5-cOkTPbinm_18kXtMDkl7H8SR60zn1MSaJlOXzH3EUCtXSiMP4CSWPv6Qqo7IHUOk__PnJITdEdQKSHNlD6bX-mfodSgQjWHPHmMFCfJ_7p0sUqkdhknJEqREIvXKJr8=",
+        "type": "source"
+      },
+      {
+        "title": "Hornets And Hawks Battle For Playoff Position In Charlotte Showdown - Grand Pinnacle Tribune",
+        "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQHTLK14B08VePf180s60hRnBJFvS2GEsu6C-ilO5eInU3iIz27dNHyNBXQbxyJjAvshNqqI7unrGTe5cgpjnopnhBPW7OraoY6d1LLUP9ByFMcuPZN5XgqRyxy_-Cs9YTLMmNlpOM1oQ-3ANT1-g0vSBiLQ5jzlGpYLb2WXaXyTwZ7lOW3NXtS3nFZD_0YIG0UbfSkaLn3sxSCcJ5256ewQ",
+        "type": "source"
+      }
+    ],
+    "dataPoints": []
+  },
+  {
+    "title": "Team Canada showcased a dominant performance in their opening Olympic game against Czechia, securing a 5-0 victory.",
+    "summary": "Team Canada dominated Czechia in their opening Olympic game on February 12, 2026, with a 5-0 victory, led by Macklin Celebrini\u0027s opening goal and Jordan Binnington\u0027s 26-save shutout. Other goals came from Mark Stone, Bo Horvat, Nathan MacKinnon, and Nick Suzuki, while Connor McDavid contributed three assists. The NHL\u0027s return to the Olympics after a 12-year absence saw Canada\u0027s strong performance, with Celebrini becoming the first teenager to score a game-winning goal in an Olympics involving NHL players.",
+    "league": "NHL",
+    "links": [
+      {
+        "title": "Binnington, Canada shut out Czechia in Olympic opener | NHL.com",
+        "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQGVkqbBmVI8mFCunt4-MPDndaJChiEKyRa9a3hWUNjRiO_ncrufD4lkxNR0l-a6RabpvXKZBpQBeKgA8jgfTJ_g6FszGzpUQtLszRRdW9DOvaLp1Tt2xNgQSw9FkA_0iUiysV23R2AN9EY2h2_bQADAf3joWWQHo2HPzgmxVJ-PUCNd4DNF638=",
+        "type": "source"
+      },
+      {
+        "title": "Canada opens preliminary round at Milano Cortina 2026 with dominant win over Czechia",
+        "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQFvOW-NfWJllCR9RF4GhRP9cqepMPglhEhWE_1UOk8DbjkGhYOeQUcqqKX5h0iKs4alQAmYX-YUPPAprfv0hNGY6kBMR19WGSEMA0dbHTPE31A5gn-4zHQdN6LeMtwBbg9PztWflt46416qAbTMwESA-6BaRNzbD4dVcH_U84JTjirHYX-BtP1Wi8m0XLQizEGqzy8WkvimHWnW3UbnJEHNaGYL5JpTOElZ0VPvTg7_4lMq97Y=",
+        "type": "source"
+      },
+      {
+        "title": "Canada - Czechia - Feb 12, 2026 | NHL.com",
+        "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQFG8rhMk32TKmFYwu1n6CM_KWUUlkTYX_TnF2n05rWBd5AC62j4mKngBenw19cKGclvWcr4CxBvTKQfwv0RB9_kGRtbndG8FFuLwjYrOSkQ7y7EoZecJEwYgG1l3wv8yQ5Cq6okiRI80NgfFgdBR6TFcpSocUEOmP--Hw==",
+        "type": "source"
+      },
+      {
+        "title": "globalnews.ca",
+        "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQHIoTe4fn_fNwJgQgzePV7vlXGT43pqzwokqUH-qfiI6JsGgQ85CIknOGsSOqMlmqukxz3WkPcC4_1qxiY2prfRI08FJ9qPJ1qsogNcOrDyme1Y5DLzpogIDUlIV-3zNcNgMLZnlCYoIDxfdguogPR6PfP0OEC10tF9WYGjYeqAqlwG1cRC98v0IelX3ms=",
+        "type": "source"
+      }
+    ],
+    "dataPoints": [
+      {
+        "metric": "Goals",
+        "value": "34",
+        "chartName": "NHL Scoring Leaders - 2025-26",
+        "team": "EDM"
+      },
+      {
+        "metric": "Assists",
+        "value": "62",
+        "chartName": "NHL Scoring Leaders - 2025-26",
+        "team": "EDM"
+      },
+      {
+        "metric": "Total Points",
+        "value": "96",
+        "chartName": "NHL Scoring Leaders - 2025-26",
+        "team": "EDM"
+      },
+      {
+        "metric": "Goals",
+        "value": "40",
+        "chartName": "NHL Scoring Leaders - 2025-26",
+        "team": "COL"
+      },
+      {
+        "metric": "Assists",
+        "value": "53",
+        "chartName": "NHL Scoring Leaders - 2025-26",
+        "team": "COL"
+      },
+      {
+        "metric": "Total Points",
+        "value": "93",
+        "chartName": "NHL Scoring Leaders - 2025-26",
+        "team": "COL"
+      },
+      {
+        "metric": "Goals",
+        "value": "28",
+        "chartName": "NHL Scoring Leaders - 2025-26",
+        "team": "SJS"
+      },
+      {
+        "metric": "Assists",
+        "value": "53",
+        "chartName": "NHL Scoring Leaders - 2025-26",
+        "team": "SJS"
+      },
+      {
+        "metric": "Total Points",
+        "value": "81",
+        "chartName": "NHL Scoring Leaders - 2025-26",
+        "team": "SJS"
+      },
+      {
+        "metric": "Goals",
+        "value": "21",
+        "chartName": "NHL Scoring Leaders - 2025-26",
+        "team": "VGK"
+      },
+      {
+        "metric": "Assists",
+        "value": "39",
+        "chartName": "NHL Scoring Leaders - 2025-26",
+        "team": "VGK"
+      },
+      {
+        "metric": "Total Points",
+        "value": "60",
+        "chartName": "NHL Scoring Leaders - 2025-26",
+        "team": "VGK"
+      },
+      {
+        "metric": "Goals",
+        "value": "18",
+        "chartName": "NHL Scoring Leaders - 2025-26",
+        "team": "MTL"
+      },
+      {
+        "metric": "Assists",
+        "value": "47",
+        "chartName": "NHL Scoring Leaders - 2025-26",
+        "team": "MTL"
+      },
+      {
+        "metric": "Total Points",
+        "value": "65",
+        "chartName": "NHL Scoring Leaders - 2025-26",
+        "team": "MTL"
+      },
+      {
+        "metric": "Goals For / Game",
+        "value": "3.84",
+        "chartName": "NHL Team Efficiency - 2025-26",
+        "team": "COL"
+      },
+      {
+        "metric": "Goals Against / Game",
+        "value": "2.42",
+        "chartName": "NHL Team Efficiency - 2025-26",
+        "team": "COL"
+      },
+      {
+        "metric": "Goal Differential",
+        "value": "1.42",
+        "chartName": "NHL Team Efficiency - 2025-26",
+        "team": "COL"
+      },
+      {
+        "metric": "Goals For / Game",
+        "value": "3.41",
+        "chartName": "NHL Team Efficiency - 2025-26",
+        "team": "EDM"
+      },
+      {
+        "metric": "Goals Against / Game",
+        "value": "3.29",
+        "chartName": "NHL Team Efficiency - 2025-26",
+        "team": "EDM"
+      },
+      {
+        "metric": "Goal Differential",
+        "value": "0.12",
+        "chartName": "NHL Team Efficiency - 2025-26",
+        "team": "EDM"
+      },
+      {
+        "metric": "Goals For / Game",
+        "value": "3.33",
+        "chartName": "NHL Team Efficiency - 2025-26",
+        "team": "VGK"
+      },
+      {
+        "metric": "Goals Against / Game",
+        "value": "3.04",
+        "chartName": "NHL Team Efficiency - 2025-26",
+        "team": "VGK"
+      },
+      {
+        "metric": "Goal Differential",
+        "value": "0.3",
+        "chartName": "NHL Team Efficiency - 2025-26",
+        "team": "VGK"
+      },
+      {
+        "metric": "Goals For / Game",
+        "value": "3.46",
+        "chartName": "NHL Team Efficiency - 2025-26",
+        "team": "MTL"
+      },
+      {
+        "metric": "Goals Against / Game",
+        "value": "3.21",
+        "chartName": "NHL Team Efficiency - 2025-26",
+        "team": "MTL"
+      },
+      {
+        "metric": "Goal Differential",
+        "value": "0.25",
+        "chartName": "NHL Team Efficiency - 2025-26",
+        "team": "MTL"
+      }
+    ]
+  },
+  {
+    "title": "Canada\u0027s dominant Olympic win and NHL\u0027s increased Olympic content access highlight recent hockey developments.",
+    "summary": "Canada dominated Czechia with a 5-0 victory in their opening Olympic game, led by Connor McDavid\u0027s three assists and a strong performance from goalie Jordan Binnington. Macklin Celebrini, at 19 years old, became the youngest Canadian to score a game-winning goal in the Olympics with NHL players. In other Olympic action, Juraj Slafkovsky had a standout performance for Slovakia, while Sweden overcame Italy 5-2. Commissioner Gary Bettman is in Milan, working to increase the NHL\u0027s access to Olympic content.",
+    "league": "NHL",
+    "links": [
+      {
+        "title": "Binnington, Canada shut out Czechia in Olympic opener | NHL.com",
+        "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQH3hTwr3MMl5OYrdRyV4JTbqNJQo8DhwgrGM0rvaxiMMdqEcoLNA4SkvufkMI6D9rR3ajcGJ8wKgbSQcTioCJWmlCysfKp4ju89jJO578c8Dmu5SnfAmTltbBCgQA05HBUpxQSvOK7nef5XqvfEy8rvblb4ib9ZeB8uuVCkUDzzz09vbt9za_Y=",
+        "type": "source"
+      },
+      {
+        "title": "globalnews.ca",
+        "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQGZhgsjOzhHeGpqrxOVunNotipngBNUbHzN_vJoFLFRO4LFrNOsj5utpiKXsvV3KY5dNe6msdweW6HUqUNrSjPj5bWshdJk-d_H_UJrjVcMHwVAXRrgKJYI41LfF3xXKL8dm8710M9aRS4F1GPmFzFQpVP21Dx1WM6H_4DyCQrqHR0VN3qh9lFaQCX1a_A=",
+        "type": "source"
+      },
+      {
+        "title": "NHL.com Media Site",
+        "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQFAz3vCJcRK_n66N9XIeVLK15G_Qr5fCvMevSOUpVvyqhJBrAp2cUAmUxF_9mLVRqmE5jR_l2TDMvXumYIJfqXvFEKFljpPSvfBFQdyFFdnWUNF-cCf0DzMzuhW1e7RGRaLVQ==",
+        "type": "source"
+      },
+      {
+        "title": "NHL Morning Coffee Headlines \u0026#8211; February 12, 2026 | Spectors Hockey",
+        "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQGMp9BKCb_ltlnc8Qlm8j2thpY-P4nDPm7y9LrEFyw9NVQ0wlUuQJuoyC9nmt9BHJb_pYRnPcK7RImlWJRMGxKNtNXKeqMw6cdJV9ieWlQd04LsVAW7ea6yBg0q0_shxUpGLZ2JPunjY6TywDVrBQjkrJH5fVwPOYdwn2Nu97a14faY95WzXA2QtdZhWPdt6nM=",
+        "type": "source"
+      },
+      {
+        "title": "ctinsider.com",
+        "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQGq30FN3Hc31qvx5imWENDq8A5XEFcnxNP8OnWbX-lbKmsPJ10cWBMN-AKnQTo3PXhciY5Dtb1-YdiGZ54MIRTAxGVmEFJAtmVpiMBPhJ7sdpzutC9JtK1mY1pVWP6RP72BGqgxWYhqU8e_S5HBGF_O-LUvCcffB_XBNskVYbJ80sxGQc2vkDmsWEurGVpVL6hnK_S4hDjJ4LIhmQPODw==",
+        "type": "source"
+      }
+    ],
+    "dataPoints": [
+      {
+        "metric": "Points",
+        "value": "96",
+        "chartName": "NHL Scoring Leaders - 2025-26",
+        "team": "EDM"
+      },
+      {
+        "metric": "Goals",
+        "value": "34",
+        "chartName": "NHL Scoring Leaders - 2025-26",
+        "team": "EDM"
+      },
+      {
+        "metric": "Assists",
+        "value": "62",
+        "chartName": "NHL Scoring Leaders - 2025-26",
+        "team": "EDM"
+      },
+      {
+        "metric": "Points",
+        "value": "81",
+        "chartName": "NHL Scoring Leaders - 2025-26",
+        "team": "SJS"
+      },
+      {
+        "metric": "Goals",
+        "value": "28",
+        "chartName": "NHL Scoring Leaders - 2025-26",
+        "team": "SJS"
+      },
+      {
+        "metric": "Assists",
+        "value": "53",
+        "chartName": "NHL Scoring Leaders - 2025-26",
+        "team": "SJS"
+      },
+      {
+        "metric": "Goals For / Game",
+        "value": "3.41",
+        "chartName": "NHL Team Efficiency - 2025-26",
+        "team": "EDM"
+      },
+      {
+        "metric": "Goals Against / Game",
+        "value": "3.29",
+        "chartName": "NHL Team Efficiency - 2025-26",
+        "team": "EDM"
+      },
+      {
+        "metric": "Goal Differential per Game",
+        "value": "0.12",
+        "chartName": "NHL Team Efficiency - 2025-26",
+        "team": "EDM"
+      }
+    ]
+  },
+  {
+    "title": "MLB Spring Training is underway with the introduction of the Automated Ball-Strike Challenge System.",
+    "summary": "As of February 12, 2026, MLB Spring Training is underway with pitchers and catchers reporting to camps in Florida and Arizona. The Los Angeles Dodgers\u0027 pitchers and catchers will have their first official workout on Friday at Camelback Ranch. Meanwhile, the Automated Ball-Strike (ABS) Challenge System, also known as \u0022Robot Umpires,\u0022 is officially live for the 2026 season, allowing pitchers, catchers, and batters two challenges per game, with the results displayed on the stadium video board.",
+    "league": "MLB",
+    "links": [
+      {
+        "title": "Share on Facebook",
+        "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQFuQBl7F4shO1r1i2za-hdxqZ9m4HswAMs3KNbQB6uEVWRcuN7UkKakFZAS3rAZc9wu5kAJ1rQ9BpHJXqf9u1r8jk8jVQ6q8KuLwbCWwO8zfnLdqCh9FIY5Zp4icHa6t522412fH0d0tmPQJC5wkxDlMiadMLzV11vNn-bh_Mo8z7nYB1itdltCLUYSy7Dki_xCx8O6oKC0vwSwbkTggguQk3plyzH4384S5w==",
+        "type": "source"
+      },
+      {
+        "title": "ngscsports.com",
+        "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQE0nlY74-u6_Mw_yJ0rWgusc7tCopJvFn5twlpVVxNZTmRmGxDGZowUNkTGkm7oc9CC6mvkDGV0K_JbFmF1uBoWt_kxJ-5II4tvUNjRbnkNg3JuUpKSm_y68njQfWV_ULyKTQYeOPvUslhIH57hWCNwJmDr2oADn1pki2F7cqvascv84Ow1AZewnU1siAshFMwgs6-8jHq8td2OcVZxQkL-aUebkg==",
+        "type": "source"
+      }
+    ],
+    "dataPoints": []
+  },
+  {
+    "title": "MLB teams make key roster moves through trades, signings, and releases.",
+    "summary": "Tarik Skubal\u0027s future with the Detroit Tigers is in question after the team signed Framber Valdez to a three-year, $115 million contract. The move comes after Skubal won a salary arbitration hearing, securing a $32 million salary for the 2025 season. On February 12, 2026, the Los Angeles Dodgers signed free agent Enrique Hernandez, while the Philadelphia Phillies released RF Nick Castellanos.",
+    "league": "MLB",
+    "links": [
+      {
+        "title": "5 Tarik Skubal Trade Packages That Could Shake Up The 2026 MLB Season",
+        "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQGNWqPVG56E5tGiX-M8ozuhoUv_NPUN7dd7rl0cL-Da_641bDy4VXkOKgcqKj9BOlF7bmFIKwRCZdZFTHYmQpTEqkPsMpAA47glXY9ILKtvBU1LMVEYEKJZkI8H9-ZWP96tv1OyAJ6WAWnY3k6P-Lusn4b76hFFTe1Z4qOJGxEmA4mDxpSAhPNb0zuDnLtZQ4MceIgClvFpO8ZWiCTv2j8-rNKhhsvodrtm",
+        "type": "source"
+      },
+      {
+        "title": "MLB Transactions",
+        "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQENrW-kIlpq-k64A8yownVUVNgjKew71NHunyRDC_MlN0t4fyTht7kj6pULZr5svdS5HmmzvCcyibMOeh13vt7nE6--dw9YqdYNPFV34XQammBZrM7P4mGWkuEar1_jpXTYEYc=",
+        "type": "source"
+      }
+    ],
+    "dataPoints": []
+  }
+]

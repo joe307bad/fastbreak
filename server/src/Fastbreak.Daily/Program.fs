@@ -1,13 +1,20 @@
 open System
 open System.Text.Json
+open Amazon
 open Amazon.S3
 open Amazon.S3.Model
 open Amazon.DynamoDBv2
 open Amazon.DynamoDBv2.Model
 open Fastbreak.Daily.Main
 
+let getRegion () =
+    let regionStr = Environment.GetEnvironmentVariable("AWS_REGION")
+                    |> Option.ofObj
+                    |> Option.defaultValue "us-east-1"
+    RegionEndpoint.GetBySystemName(regionStr)
+
 let uploadToS3 (bucket: string) (key: string) (json: string) = async {
-    use client = new AmazonS3Client()
+    use client = new AmazonS3Client(getRegion())
     let request = PutObjectRequest(
         BucketName = bucket,
         Key = key,
@@ -19,7 +26,7 @@ let uploadToS3 (bucket: string) (key: string) (json: string) = async {
 }
 
 let updateDynamoDB (tableName: string) (fileKey: string) (title: string) = async {
-    use client = new AmazonDynamoDBClient()
+    use client = new AmazonDynamoDBClient(getRegion())
     let utcTimestamp = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ")
     let item = Collections.Generic.Dictionary<string, AttributeValue>()
     item.["file_key"] <- AttributeValue(S = fileKey)

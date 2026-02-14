@@ -551,10 +551,11 @@ class ChartDataSynchronizer(
                 val topicsResponse = json.decodeFromString<TopicsResponse>(rawJson)
                 println("   ✅ Parsed topics: ${topicsResponse.narratives.size} narratives")
 
-                // Save to repository and reset viewed state since we have new topics
+                // Save to repository and reset viewed/collapsed state since we have new topics
                 topicsRepository.saveTopics(topicsResponse, entry.updatedAt)
                 topicsRepository.resetViewed()
-                println("   ✅ Topics saved to cache (marked as unviewed)")
+                topicsRepository.clearCollapsedAndReadState()
+                println("   ✅ Topics saved to cache (marked as unviewed, collapsed state cleared)")
             } catch (e: Exception) {
                 println("   ❌ Failed to sync topics: ${e.message}")
                 SentryLogger.captureException(
@@ -610,5 +611,57 @@ class ChartDataSynchronizer(
      */
     fun markTopicsAsViewed() {
         topicsRepository.markAsViewed()
+    }
+
+    /**
+     * Gets the collapsed narrative indices for the current topics.
+     *
+     * @return Set of collapsed indices, or empty set if none
+     */
+    fun getCollapsedIndices(): Set<Int> {
+        val topics = topicsRepository.getTopics() ?: return emptySet()
+        return topicsRepository.getCollapsedIndices(topics.date)
+    }
+
+    /**
+     * Saves the collapsed narrative indices for the current topics.
+     *
+     * @param indices The set of collapsed indices
+     */
+    fun saveCollapsedIndices(indices: Set<Int>) {
+        val topics = topicsRepository.getTopics() ?: return
+        topicsRepository.saveCollapsedIndices(indices, topics.date)
+    }
+
+    /**
+     * Gets the set of narratives that have been read (collapsed at least once).
+     *
+     * @return Set of read indices, or empty set if none
+     */
+    fun getReadIndices(): Set<Int> {
+        val topics = topicsRepository.getTopics() ?: return emptySet()
+        return topicsRepository.getReadIndices(topics.date)
+    }
+
+    /**
+     * Saves the set of narratives that have been read (collapsed at least once).
+     *
+     * @param indices The set of read indices
+     */
+    fun saveReadIndices(indices: Set<Int>) {
+        val topics = topicsRepository.getTopics() ?: return
+        topicsRepository.saveReadIndices(indices, topics.date)
+    }
+
+    /**
+     * Checks if all narratives have been read (collapsed at least once).
+     *
+     * @return true if all narratives have been read
+     */
+    fun areAllNarrativesRead(): Boolean {
+        val topics = topicsRepository.getTopics() ?: return true
+        if (topics.narratives.isEmpty()) return true
+        val readIndices = topicsRepository.getReadIndices(topics.date)
+        return readIndices.size >= topics.narratives.size
     }
 }

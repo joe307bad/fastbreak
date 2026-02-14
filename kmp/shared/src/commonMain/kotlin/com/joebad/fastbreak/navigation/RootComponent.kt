@@ -102,8 +102,8 @@ class RootComponent(
     }
 
     fun navigateToTopics() {
-        // Mark topics as viewed when navigating to topics screen
-        registryContainer.markTopicsAsViewed()
+        // Don't mark topics as viewed here - they're only marked as viewed
+        // when all narratives have been collapsed at least once
         navigation.push(Config.Topics)
     }
 
@@ -187,7 +187,11 @@ class RootComponent(
                     onNavigateBack = { navigation.pop() },
                     onNavigateToChart = { chartId, sport, vizType, filters ->
                         navigateToChart(chartId, sport, vizType, filters, fromTopics = true)
-                    }
+                    },
+                    getCollapsedIndices = { registryContainer.getCollapsedIndices() },
+                    saveCollapsedIndices = { indices -> registryContainer.saveCollapsedIndices(indices) },
+                    getReadIndices = { registryContainer.getReadIndices() },
+                    saveReadIndices = { indices -> registryContainer.saveReadIndices(indices) }
                 )
             )
         }

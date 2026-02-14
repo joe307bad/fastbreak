@@ -674,4 +674,39 @@ class RegistryContainer(
      * @return true if topics have been viewed
      */
     fun hasTopicsBeenViewed(): Boolean = chartDataSynchronizer.hasTopicsBeenViewed()
+
+    /**
+     * Gets the collapsed narrative indices for the current topics.
+     */
+    fun getCollapsedIndices(): Set<Int> = chartDataSynchronizer.getCollapsedIndices()
+
+    /**
+     * Saves the collapsed narrative indices for the current topics.
+     */
+    fun saveCollapsedIndices(indices: Set<Int>) = chartDataSynchronizer.saveCollapsedIndices(indices)
+
+    /**
+     * Gets the set of narratives that have been read (collapsed at least once).
+     */
+    fun getReadIndices(): Set<Int> = chartDataSynchronizer.getReadIndices()
+
+    /**
+     * Saves the set of narratives that have been read (collapsed at least once).
+     * Also checks if all narratives have been read and updates topicsViewed state.
+     */
+    fun saveReadIndices(indices: Set<Int>) = intent {
+        chartDataSynchronizer.saveReadIndices(indices)
+        // Check if all narratives have been read and update topicsViewed state
+        if (chartDataSynchronizer.areAllNarrativesRead() && !state.topicsViewed) {
+            chartDataSynchronizer.markTopicsAsViewed()
+            reduce {
+                state.copy(topicsViewed = true)
+            }
+        }
+    }
+
+    /**
+     * Checks if all narratives have been read.
+     */
+    fun areAllNarrativesRead(): Boolean = chartDataSynchronizer.areAllNarrativesRead()
 }

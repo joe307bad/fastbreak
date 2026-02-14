@@ -13,8 +13,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowRight
-import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -319,11 +317,12 @@ private fun NarrativeItem(
                     .clickable { onToggleCollapse() },
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(
-                    imageVector = Icons.Default.KeyboardArrowRight,
-                    contentDescription = "Expand",
-                    modifier = Modifier.size(20.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                Text(
+                    text = "[read]",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontFamily = FontFamily.Monospace,
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Spacer(Modifier.width(4.dp))
                 Text(
@@ -577,20 +576,20 @@ private fun NarrativeItem(
                 }
             }
 
-            // Collapse caret at bottom right
+            // "Mark as read" text button at bottom right
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 8.dp),
                 contentAlignment = Alignment.CenterEnd
             ) {
-                Icon(
-                    imageVector = Icons.Default.KeyboardArrowUp,
-                    contentDescription = "Collapse",
-                    modifier = Modifier
-                        .size(20.dp)
-                        .clickable { onCollapseFromBottom() },
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                Text(
+                    text = "[mark as read]",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontFamily = FontFamily.Monospace,
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.clickable { onCollapseFromBottom() }
                 )
             }
         }

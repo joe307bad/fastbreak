@@ -14,7 +14,6 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowRight
-import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -77,9 +76,25 @@ fun TopicsScreen(
 ) {
     val sheetState = rememberModalBottomSheetState()
     var showInfoSheet by remember { mutableStateOf(false) }
-    val collapsedIndices = remember { mutableStateListOf<Int>() }
     val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
+
+    // Load persisted collapsed and read indices on first composition
+    val initialCollapsedIndices = remember { component.getCollapsedIndices() }
+    val initialReadIndices = remember { component.getReadIndices() }
+
+    val collapsedIndices = remember { mutableStateListOf<Int>().apply { addAll(initialCollapsedIndices) } }
+    val readIndices = remember { mutableStateListOf<Int>().apply { addAll(initialReadIndices) } }
+
+    // Save collapsed indices whenever they change
+    LaunchedEffect(collapsedIndices.toList()) {
+        component.saveCollapsedIndices(collapsedIndices.toSet())
+    }
+
+    // Save read indices whenever they change
+    LaunchedEffect(readIndices.toList()) {
+        component.saveReadIndices(readIndices.toSet())
+    }
 
     Scaffold(
         topBar = {
@@ -127,8 +142,10 @@ fun TopicsScreen(
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 item {
+                    val totalNarratives = topics.narratives.size
+                    val readCount = readIndices.size
                     Text(
-                        text = "Daily at 10am ET - updated ${formatRelativeTime(topicsUpdatedAt)}",
+                        text = "Daily at 10am ET - updated ${formatRelativeTime(topicsUpdatedAt)} - $readCount/$totalNarratives read",
                         style = MaterialTheme.typography.labelSmall,
                         fontSize = 10.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -145,10 +162,18 @@ fun TopicsScreen(
                                 collapsedIndices.remove(index)
                             } else {
                                 collapsedIndices.add(index)
+                                // Mark as read when collapsed
+                                if (index !in readIndices) {
+                                    readIndices.add(index)
+                                }
                             }
                         },
                         onCollapseFromBottom = {
                             collapsedIndices.add(index)
+                            // Mark as read when collapsed
+                            if (index !in readIndices) {
+                                readIndices.add(index)
+                            }
                             // Scroll to next item (index + 2 because of header item at index 0)
                             val nextItemIndex = index + 2
                             coroutineScope.launch {
@@ -577,20 +602,20 @@ private fun NarrativeItem(
                 }
             }
 
-            // Collapse caret at bottom right
+            // "Mark as read" text button at bottom right
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 8.dp),
                 contentAlignment = Alignment.CenterEnd
             ) {
-                Icon(
-                    imageVector = Icons.Default.KeyboardArrowUp,
-                    contentDescription = "Collapse",
-                    modifier = Modifier
-                        .size(20.dp)
-                        .clickable { onCollapseFromBottom() },
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                Text(
+                    text = "[mark as read]",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontFamily = FontFamily.Monospace,
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.clickable { onCollapseFromBottom() }
                 )
             }
         }

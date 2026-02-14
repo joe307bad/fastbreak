@@ -119,8 +119,23 @@ fun NBAMatchupWorksheet(
 
     val dates = remember(matchupsByDate) { matchupsByDate.keys.toList() }
 
+    // Calculate initial date index based on highlighted teams (from deep links)
+    // Find the first date that contains a matchup with the highlighted team
+    val initialDateIndex = remember(dates, matchupsByDate, highlightedTeamCodes) {
+        if (highlightedTeamCodes.isEmpty()) {
+            0
+        } else {
+            dates.indexOfFirst { date ->
+                matchupsByDate[date]?.any { matchup ->
+                    highlightedTeamCodes.contains(matchup.awayTeam.abbreviation) ||
+                    highlightedTeamCodes.contains(matchup.homeTeam.abbreviation)
+                } == true
+            }.takeIf { it >= 0 } ?: 0
+        }
+    }
+
     // State for selected date and matchup
-    var selectedDateIndex by remember { mutableStateOf(0) }
+    var selectedDateIndex by remember { mutableStateOf(initialDateIndex) }
     var selectedMatchupIndex by remember { mutableStateOf(0) }
 
     // State for collapsing/expanding schedule selection

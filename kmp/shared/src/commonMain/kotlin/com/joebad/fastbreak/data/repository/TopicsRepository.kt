@@ -24,6 +24,9 @@ class TopicsRepository(
         private const val KEY_TOPICS_DATA = "topics_data"
         private const val KEY_TOPICS_UPDATED_AT = "topics_updated_at"
         private const val KEY_TOPICS_VIEWED = "topics_viewed"
+        private const val KEY_COLLAPSED_INDICES = "topics_collapsed_indices"
+        private const val KEY_READ_INDICES = "topics_read_indices"
+        private const val KEY_TOPICS_DATE = "topics_date"
     }
 
     /**
@@ -103,6 +106,9 @@ class TopicsRepository(
         settings.remove(KEY_TOPICS_DATA)
         settings.remove(KEY_TOPICS_UPDATED_AT)
         settings.remove(KEY_TOPICS_VIEWED)
+        settings.remove(KEY_COLLAPSED_INDICES)
+        settings.remove(KEY_READ_INDICES)
+        settings.remove(KEY_TOPICS_DATE)
         println("   ✅ Cleared topics data")
     }
 
@@ -129,5 +135,73 @@ class TopicsRepository(
     fun resetViewed() {
         println("🔄 TopicsRepository.resetViewed()")
         settings.putBoolean(KEY_TOPICS_VIEWED, false)
+    }
+
+    /**
+     * Saves the collapsed narrative indices.
+     *
+     * @param indices The set of collapsed narrative indices
+     * @param topicsDate The date of the current topics (used to invalidate on refresh)
+     */
+    fun saveCollapsedIndices(indices: Set<Int>, topicsDate: String) {
+        val indicesStr = indices.joinToString(",")
+        settings.putString(KEY_COLLAPSED_INDICES, indicesStr)
+        settings.putString(KEY_TOPICS_DATE, topicsDate)
+    }
+
+    /**
+     * Retrieves the collapsed narrative indices.
+     *
+     * @param topicsDate The date of the current topics
+     * @return The set of collapsed indices, or empty set if none or date mismatch
+     */
+    fun getCollapsedIndices(topicsDate: String): Set<Int> {
+        val savedDate = settings.getStringOrNull(KEY_TOPICS_DATE) ?: return emptySet()
+        if (savedDate != topicsDate) {
+            // Topics changed, clear old state
+            clearCollapsedAndReadState()
+            return emptySet()
+        }
+        val indicesStr = settings.getStringOrNull(KEY_COLLAPSED_INDICES) ?: return emptySet()
+        return indicesStr.split(",").mapNotNull { it.toIntOrNull() }.toSet()
+    }
+
+    /**
+     * Saves the set of narratives that have been "read" (collapsed at least once).
+     *
+     * @param indices The set of read narrative indices
+     * @param topicsDate The date of the current topics
+     */
+    fun saveReadIndices(indices: Set<Int>, topicsDate: String) {
+        val indicesStr = indices.joinToString(",")
+        settings.putString(KEY_READ_INDICES, indicesStr)
+        settings.putString(KEY_TOPICS_DATE, topicsDate)
+    }
+
+    /**
+     * Retrieves the set of narratives that have been "read" (collapsed at least once).
+     *
+     * @param topicsDate The date of the current topics
+     * @return The set of read indices, or empty set if none or date mismatch
+     */
+    fun getReadIndices(topicsDate: String): Set<Int> {
+        val savedDate = settings.getStringOrNull(KEY_TOPICS_DATE) ?: return emptySet()
+        if (savedDate != topicsDate) {
+            // Topics changed, clear old state
+            clearCollapsedAndReadState()
+            return emptySet()
+        }
+        val indicesStr = settings.getStringOrNull(KEY_READ_INDICES) ?: return emptySet()
+        return indicesStr.split(",").mapNotNull { it.toIntOrNull() }.toSet()
+    }
+
+    /**
+     * Clears collapsed and read state (called when new topics are downloaded).
+     */
+    fun clearCollapsedAndReadState() {
+        println("🗑️ TopicsRepository.clearCollapsedAndReadState()")
+        settings.remove(KEY_COLLAPSED_INDICES)
+        settings.remove(KEY_READ_INDICES)
+        settings.remove(KEY_TOPICS_DATE)
     }
 }

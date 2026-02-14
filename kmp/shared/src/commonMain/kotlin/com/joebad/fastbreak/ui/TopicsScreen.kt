@@ -5,20 +5,27 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.snapshots.SnapshotStateList
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.text.BasicText
@@ -70,6 +77,9 @@ fun TopicsScreen(
 ) {
     val sheetState = rememberModalBottomSheetState()
     var showInfoSheet by remember { mutableStateOf(false) }
+    val collapsedIndices = remember { mutableStateListOf<Int>() }
+    val listState = rememberLazyListState()
+    val coroutineScope = rememberCoroutineScope()
 
     Scaffold(
         topBar = {
@@ -111,6 +121,7 @@ fun TopicsScreen(
             }
         } else {
             LazyColumn(
+                state = listState,
                 modifier = Modifier.fillMaxSize().padding(paddingValues),
                 contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp)
@@ -128,6 +139,22 @@ fun TopicsScreen(
                     NarrativeItem(
                         number = index + 1,
                         narrative = narrative,
+                        isCollapsed = index in collapsedIndices,
+                        onToggleCollapse = {
+                            if (index in collapsedIndices) {
+                                collapsedIndices.remove(index)
+                            } else {
+                                collapsedIndices.add(index)
+                            }
+                        },
+                        onCollapseFromBottom = {
+                            collapsedIndices.add(index)
+                            // Scroll to next item (index + 2 because of header item at index 0)
+                            val nextItemIndex = index + 2
+                            coroutineScope.launch {
+                                listState.scrollToItem(nextItemIndex)
+                            }
+                        },
                         onNavigateToChart = component.onNavigateToChart
                     )
                 }
@@ -174,7 +201,7 @@ fun TopicsScreen(
 private fun getLeagueColor(league: String): Color {
     return when (league.lowercase()) {
         "nba" -> Color(0xFFE31837)  // NBA red (vivid)
-        "nfl" -> Color(0xFF0066CC)  // NFL blue (vivid)
+        "nfl" -> Color(0xFF00B140)  // NFL green
         "nhl" -> Color(0xFFFC4C02)  // NHL orange (visible in dark mode)
         "mlb" -> Color(0xFF0052A5)  // MLB blue (vivid)
         "mls" -> Color(0xFF00B140)  // MLS green (vivid)
@@ -272,224 +299,299 @@ private fun buildFiltersFromDataPoint(dataPoint: NarrativeDataPoint): Map<String
 private fun NarrativeItem(
     number: Int,
     narrative: Narrative,
+    isCollapsed: Boolean,
+    onToggleCollapse: () -> Unit,
+    onCollapseFromBottom: () -> Unit,
     onNavigateToChart: (chartId: String, sport: Sport, vizType: VizType, filters: Map<String, String>?) -> Unit = { _, _, _, _ -> }
 ) {
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 4.dp)
-            .padding(bottom = 40.dp)
+            .padding(bottom = if (isCollapsed) 0.dp else 40.dp)
     ) {
-        // League badge above title
-        if (narrative.league.isNotBlank()) {
-            val leagueColor = getLeagueColor(narrative.league)
-            Box(
+        if (isCollapsed) {
+            // Collapsed view: single line with caret, title, and league badge on right
+            Row(
                 modifier = Modifier
-                    .background(leagueColor.copy(alpha = 0.2f), RoundedCornerShape(6.dp))
-                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                    .fillMaxWidth()
+                    .clickable { onToggleCollapse() },
+                verticalAlignment = Alignment.CenterVertically
             ) {
+                Icon(
+                    imageVector = Icons.Default.KeyboardArrowRight,
+                    contentDescription = "Expand",
+                    modifier = Modifier.size(20.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.width(4.dp))
                 Text(
-                    text = narrative.league.uppercase(),
-                    color = leagueColor,
-                    fontSize = 10.sp
+                    text = "$number. ${narrative.title}",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onBackground,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f)
+                )
+                if (narrative.league.isNotBlank()) {
+                    Spacer(Modifier.width(8.dp))
+                    val leagueColor = getLeagueColor(narrative.league)
+                    Box(
+                        modifier = Modifier
+                            .background(leagueColor.copy(alpha = 0.2f), RoundedCornerShape(6.dp))
+                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                    ) {
+                        Text(
+                            text = narrative.league.uppercase(),
+                            color = leagueColor,
+                            fontSize = 10.sp
+                        )
+                    }
+                }
+            }
+        } else {
+            // Expanded view: original layout with collapse caret
+            // League badge above title
+            if (narrative.league.isNotBlank()) {
+                val leagueColor = getLeagueColor(narrative.league)
+                Box(
+                    modifier = Modifier
+                        .background(leagueColor.copy(alpha = 0.2f), RoundedCornerShape(6.dp))
+                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                ) {
+                    Text(
+                        text = narrative.league.uppercase(),
+                        color = leagueColor,
+                        fontSize = 10.sp
+                    )
+                }
+                Spacer(Modifier.height(4.dp))
+            }
+            Row(
+                modifier = Modifier.clickable { onToggleCollapse() },
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Default.KeyboardArrowDown,
+                    contentDescription = "Collapse",
+                    modifier = Modifier.size(20.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.width(4.dp))
+                Text(
+                    text = "$number. ${narrative.title}",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onBackground
                 )
             }
-            Spacer(Modifier.height(4.dp))
-        }
-        Text(
-            text = "$number. ${narrative.title}",
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onBackground
-        )
 
-        // Summary
-        if (narrative.summarySegments.isNotEmpty()) {
-            SegmentedText(
-                segments = narrative.summarySegments,
-                textColor = MaterialTheme.colorScheme.onSurface,
-                accentColor = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(vertical = 8.dp)
-            )
-        } else if (narrative.summary.isNotBlank()) {
-            Text(
-                text = narrative.summary,
-                style = MaterialTheme.typography.bodySmall,
-                fontFamily = FontFamily.Monospace,
-                fontSize = 11.sp,
-                lineHeight = 18.sp,
-                color = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.padding(vertical = 8.dp)
-            )
-        }
+            // Summary
+            if (narrative.summarySegments.isNotEmpty()) {
+                SegmentedText(
+                    segments = narrative.summarySegments,
+                    textColor = MaterialTheme.colorScheme.onSurface,
+                    accentColor = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(vertical = 8.dp)
+                )
+            } else if (narrative.summary.isNotBlank()) {
+                Text(
+                    text = narrative.summary,
+                    style = MaterialTheme.typography.bodySmall,
+                    fontFamily = FontFamily.Monospace,
+                    fontSize = 11.sp,
+                    lineHeight = 18.sp,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.padding(vertical = 8.dp)
+                )
+            }
 
-        // Statistical context prose
-        if (narrative.statisticalContextSegments.isNotEmpty() || narrative.statisticalContext.isNotBlank()) {
-            Column(
-                modifier = Modifier.padding(top = 4.dp, bottom = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                // Green badge for "statistical context"
-                val greenColor = Color(0xFF4CAF50)
-                Box(
-                    modifier = Modifier
-                        .background(greenColor.copy(alpha = 0.15f), RoundedCornerShape(6.dp))
-                        .padding(horizontal = 6.dp, vertical = 2.dp)
+            // Statistical context prose
+            if (narrative.statisticalContextSegments.isNotEmpty() || narrative.statisticalContext.isNotBlank()) {
+                Column(
+                    modifier = Modifier.padding(top = 4.dp, bottom = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    Text(
-                        text = "statistical analysis",
-                        color = greenColor,
-                        fontSize = 10.sp
-                    )
-                }
-                Spacer(Modifier.height(2.dp))
-                if (narrative.statisticalContextSegments.isNotEmpty()) {
-                    SegmentedText(
-                        segments = narrative.statisticalContextSegments,
-                        textColor = MaterialTheme.colorScheme.onSurface,
-                        accentColor = MaterialTheme.colorScheme.primary
-                    )
-                } else {
-                    Text(
-                        text = narrative.statisticalContext,
-                        style = MaterialTheme.typography.bodySmall,
-                        fontFamily = FontFamily.Monospace,
-                        fontSize = 11.sp,
-                        lineHeight = 18.sp,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
+                    // Green badge for "statistical context"
+                    val greenColor = Color(0xFF4CAF50)
+                    Box(
+                        modifier = Modifier
+                            .background(greenColor.copy(alpha = 0.15f), RoundedCornerShape(6.dp))
+                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                    ) {
+                        Text(
+                            text = "statistical analysis",
+                            color = greenColor,
+                            fontSize = 10.sp
+                        )
+                    }
+                    Spacer(Modifier.height(2.dp))
+                    if (narrative.statisticalContextSegments.isNotEmpty()) {
+                        SegmentedText(
+                            segments = narrative.statisticalContextSegments,
+                            textColor = MaterialTheme.colorScheme.onSurface,
+                            accentColor = MaterialTheme.colorScheme.primary
+                        )
+                    } else {
+                        Text(
+                            text = narrative.statisticalContext,
+                            style = MaterialTheme.typography.bodySmall,
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 11.sp,
+                            lineHeight = 18.sp,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
                 }
             }
-        }
 
-        // Data points (show first 5)
-        if (narrative.dataPoints.isNotEmpty()) {
-            val displayedDataPoints = narrative.dataPoints.take(5)
-            Column(
-                modifier = Modifier.padding(top = 4.dp, bottom = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                // Orange badge for "data points"
-                val orangeColor = Color(0xFFFF9800)
-                Box(
-                    modifier = Modifier
-                        .background(orangeColor.copy(alpha = 0.15f), RoundedCornerShape(6.dp))
-                        .padding(horizontal = 6.dp, vertical = 2.dp)
+            // Data points (show first 5)
+            if (narrative.dataPoints.isNotEmpty()) {
+                val displayedDataPoints = narrative.dataPoints.take(5)
+                Column(
+                    modifier = Modifier.padding(top = 4.dp, bottom = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    Text(
-                        text = "data points",
-                        color = orangeColor,
-                        fontSize = 10.sp
-                    )
-                }
-                Spacer(Modifier.height(2.dp))
-                displayedDataPoints.forEach { dp ->
-                    val sport = leagueToSport(narrative.league)
-                    val vizType = stringToVizType(dp.vizType)
-                    val isClickable = dp.id.isNotBlank() && sport != null && vizType != null
-                    val filters = buildFiltersFromDataPoint(dp)
+                    // Orange badge for "data points"
+                    val orangeColor = Color(0xFFFF9800)
+                    Box(
+                        modifier = Modifier
+                            .background(orangeColor.copy(alpha = 0.15f), RoundedCornerShape(6.dp))
+                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                    ) {
+                        Text(
+                            text = "data points",
+                            color = orangeColor,
+                            fontSize = 10.sp
+                        )
+                    }
+                    Spacer(Modifier.height(2.dp))
+                    displayedDataPoints.forEach { dp ->
+                        val sport = leagueToSport(narrative.league)
+                        val vizType = stringToVizType(dp.vizType)
+                        val isClickable = dp.id.isNotBlank() && sport != null && vizType != null
+                        val filters = buildFiltersFromDataPoint(dp)
 
-                    Column {
-                        Row(
-                            modifier = if (isClickable) {
-                                Modifier.clickable {
-                                    onNavigateToChart(
-                                        dp.id,
-                                        sport!!,
-                                        vizType!!,
-                                        filters
+                        Column {
+                            Row(
+                                modifier = if (isClickable) {
+                                    Modifier.clickable {
+                                        onNavigateToChart(
+                                            dp.id,
+                                            sport!!,
+                                            vizType!!,
+                                            filters
+                                        )
+                                    }
+                                } else {
+                                    Modifier
+                                },
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "• ",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = 11.sp,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                val teamPrefix = if (dp.team.isNotBlank()) "${dp.team}: " else ""
+                                Text(
+                                    text = "$teamPrefix${dp.metric} = ${dp.value}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = 11.sp,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    textDecoration = if (isClickable) TextDecoration.Underline else TextDecoration.None
+                                )
+                                if (isClickable) {
+                                    Text(
+                                        text = " →",
+                                        fontSize = 10.sp,
+                                        color = MaterialTheme.colorScheme.primary
                                     )
                                 }
-                            } else {
-                                Modifier
-                            },
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = "• ",
-                                style = MaterialTheme.typography.bodySmall,
-                                fontFamily = FontFamily.Monospace,
-                                fontSize = 11.sp,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            val teamPrefix = if (dp.team.isNotBlank()) "${dp.team}: " else ""
-                            Text(
-                                text = "$teamPrefix${dp.metric} = ${dp.value}",
-                                style = MaterialTheme.typography.bodySmall,
-                                fontFamily = FontFamily.Monospace,
-                                fontSize = 11.sp,
-                                color = MaterialTheme.colorScheme.onSurface,
-                                textDecoration = if (isClickable) TextDecoration.Underline else TextDecoration.None
-                            )
-                            if (isClickable) {
+                            }
+                            // Chart ID below the stat
+                            if (dp.id.isNotBlank()) {
                                 Text(
-                                    text = " →",
-                                    fontSize = 10.sp,
-                                    color = MaterialTheme.colorScheme.primary
+                                    text = "  [${dp.id}]",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = 9.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                                 )
                             }
                         }
-                        // Chart ID below the stat
-                        if (dp.id.isNotBlank()) {
-                            Text(
-                                text = "  [${dp.id}]",
-                                style = MaterialTheme.typography.labelSmall,
-                                fontFamily = FontFamily.Monospace,
-                                fontSize = 9.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-                            )
+                    }
+                }
+            }
+
+            // Links
+            if (narrative.links.isNotEmpty()) {
+                Column(modifier = Modifier.padding(top = 4.dp)) {
+                    // Blue badge for "source links"
+                    val blueColor = Color(0xFF2196F3)
+                    Box(
+                        modifier = Modifier
+                            .background(blueColor.copy(alpha = 0.15f), RoundedCornerShape(6.dp))
+                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                    ) {
+                        Text(
+                            text = "source links",
+                            color = blueColor,
+                            fontSize = 10.sp
+                        )
+                    }
+                    Spacer(Modifier.height(10.dp))
+                    // Links with spacing between them
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        narrative.links.forEach { link ->
+                            Row(
+                                modifier = Modifier.clickable { UrlLauncher.openUrl(link.url) },
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "• ",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = 11.sp,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Text(
+                                    text = "[${link.type}] ${link.title}",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = 11.sp,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    textDecoration = TextDecoration.Underline
+                                )
+                                Text(
+                                    text = " ↗",
+                                    fontSize = 10.sp,
+                                    color = MaterialTheme.colorScheme.onBackground
+                                )
+                            }
                         }
                     }
                 }
             }
-        }
 
-        // Links
-        if (narrative.links.isNotEmpty()) {
-            Column(modifier = Modifier.padding(top = 4.dp)) {
-                // Blue badge for "source links"
-                val blueColor = Color(0xFF2196F3)
-                Box(
+            // Collapse caret at bottom right
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp),
+                contentAlignment = Alignment.CenterEnd
+            ) {
+                Icon(
+                    imageVector = Icons.Default.KeyboardArrowUp,
+                    contentDescription = "Collapse",
                     modifier = Modifier
-                        .background(blueColor.copy(alpha = 0.15f), RoundedCornerShape(6.dp))
-                        .padding(horizontal = 6.dp, vertical = 2.dp)
-                ) {
-                    Text(
-                        text = "source links",
-                        color = blueColor,
-                        fontSize = 10.sp
-                    )
-                }
-                Spacer(Modifier.height(10.dp))
-                // Links with spacing between them
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    narrative.links.forEach { link ->
-                        Row(
-                            modifier = Modifier.clickable { UrlLauncher.openUrl(link.url) },
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = "• ",
-                                style = MaterialTheme.typography.bodySmall,
-                                fontFamily = FontFamily.Monospace,
-                                fontSize = 11.sp,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            Text(
-                                text = "[${link.type}] ${link.title}",
-                                style = MaterialTheme.typography.labelSmall,
-                                fontFamily = FontFamily.Monospace,
-                                fontSize = 11.sp,
-                                color = MaterialTheme.colorScheme.onSurface,
-                                textDecoration = TextDecoration.Underline
-                            )
-                            Text(
-                                text = " ↗",
-                                fontSize = 10.sp,
-                                color = MaterialTheme.colorScheme.onBackground
-                            )
-                        }
-                    }
-                }
+                        .size(20.dp)
+                        .clickable { onCollapseFromBottom() },
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
         }
     }

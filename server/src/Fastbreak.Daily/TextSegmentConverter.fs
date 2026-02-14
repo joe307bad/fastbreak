@@ -40,8 +40,8 @@ Text to convert:
 
 Rules for creating segments:
 1. For player names, create a link segment with URL to their Wikipedia page (https://en.wikipedia.org/wiki/Player_Name with underscores)
-2. For team names (full names like "Boston Celtics" or city names like "Boston" when referring to a team), create a link segment with URL pattern: {leagueTeamUrlPattern}
-   - Use lowercase team abbreviations (e.g., bos, lal, nyy, dal)
+2. For team names (full names like "Boston Celtics" or city names like "Boston" when referring to a team), create a link segment with URL pattern: {leagueTeamUrlPattern}/{{team-slug}}
+   - Use lowercase team abbreviations and slugs (e.g., bos/boston-celtics, lal/los-angeles-lakers, utah/utah-jazz)
 3. All other text should be plain text segments
 4. Preserve the exact wording and punctuation
 5. Keep segments logically grouped - don't split mid-sentence unnecessarily
@@ -49,9 +49,9 @@ Rules for creating segments:
 Return JSON in this exact format:
 {{"segments": [
   {{"type": "text", "value": "The "}},
-  {{"type": "link", "value": "Boston Celtics", "url": "https://www.espn.com/nba/team/_/name/bos"}},
+  {{"type": "link", "value": "Boston Celtics", "url": "https://www.espn.com/nba/team/_/name/bos/boston-celtics"}},
   {{"type": "text", "value": " defeated the "}},
-  {{"type": "link", "value": "Los Angeles Lakers", "url": "https://www.espn.com/nba/team/_/name/lal"}},
+  {{"type": "link", "value": "Utah Jazz", "url": "https://www.espn.com/nba/team/_/name/utah/utah-jazz"}},
   {{"type": "text", "value": ". "}},
   {{"type": "link", "value": "LeBron James", "url": "https://en.wikipedia.org/wiki/LeBron_James"}},
   {{"type": "text", "value": " scored 30 points."}}

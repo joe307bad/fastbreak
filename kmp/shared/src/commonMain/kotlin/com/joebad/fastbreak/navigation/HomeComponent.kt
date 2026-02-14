@@ -12,7 +12,7 @@ class HomeComponent(
     val onNavigateToDataViz: (String, Sport, VizType) -> Unit
 ) : ComponentContext by componentContext {
 
-    private val _selectedSport = MutableValue(Sport.NFL)
+    private val _selectedSport = MutableValue(Sport.NBA)
     val selectedSport: Value<Sport> = _selectedSport
 
     private val _selectedTags = MutableValue<Set<String>>(emptySet())

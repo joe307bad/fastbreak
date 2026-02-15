@@ -4,5 +4,6 @@ enum class Sport(val displayName: String) {
     NBA("NBA"),
     NHL("NHL"),
     MLB("MLB"),
-    NFL("NFL")
+    NFL("NFL"),
+    CBB("CBB")
 }

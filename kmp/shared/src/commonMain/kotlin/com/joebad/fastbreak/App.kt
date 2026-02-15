@@ -21,6 +21,7 @@ import com.joebad.fastbreak.ui.HomeScreen
 import com.joebad.fastbreak.ui.SettingsScreen
 import com.joebad.fastbreak.ui.SplashScreen
 import com.joebad.fastbreak.ui.TopicsScreen
+import com.joebad.fastbreak.ui.bracket.BracketScreen
 import com.joebad.fastbreak.ui.theme.AppTheme
 import kotlinx.coroutines.launch
 
@@ -91,7 +92,8 @@ fun App(rootComponent: RootComponent) {
                         onRequestPermission = { rootComponent.requestNetworkPermission() },
                         onCheckPermission = { rootComponent.checkNetworkPermission() },
                         onClearSyncProgress = { rootComponent.clearSyncProgress() },
-                        onMarkChartAsViewed = { chartId -> rootComponent.markChartAsViewed(chartId) }
+                        onMarkChartAsViewed = { chartId -> rootComponent.markChartAsViewed(chartId) },
+                        onNavigateToBracket = { rootComponent.navigateToBracket() }
                     )
                     is RootComponent.Child.DataViz -> DataVizScreen(
                         component = child.component,
@@ -120,6 +122,9 @@ fun App(rootComponent: RootComponent) {
                         topics = rootComponent.registryContainer.getCachedTopics(),
                         topicsUpdatedAt = rootComponent.registryContainer.getTopicsUpdatedAt(),
                         onMenuClick = { scope.launch { drawerState.open() } }
+                    )
+                    is RootComponent.Child.Bracket -> BracketScreen(
+                        onNavigateBack = { child.component.onNavigateBack() }
                     )
                 }
             }

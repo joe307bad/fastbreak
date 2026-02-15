@@ -45,7 +45,8 @@ fun HomeScreen(
     onRequestPermission: () -> Unit,
     onCheckPermission: () -> Unit,
     onClearSyncProgress: () -> Unit,
-    onMarkChartAsViewed: (String) -> Unit = {}
+    onMarkChartAsViewed: (String) -> Unit = {},
+    onNavigateToBracket: () -> Unit = {}
 ) {
     val selectedSport by component.selectedSport.subscribeAsState()
     val selectedTags by component.selectedTags.subscribeAsState()
@@ -251,6 +252,41 @@ fun HomeScreen(
                 color = MaterialTheme.colorScheme.outline,
                 thickness = 1.dp
             )
+
+            // CBB tab shows bracket prototype link instead of charts
+            if (selectedSport == Sport.CBB) {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 16.dp)
+                ) {
+                    item {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable(onClick = onNavigateToBracket)
+                                .padding(vertical = 12.dp)
+                        ) {
+                            Text(
+                                text = "NCAA Tournament Bracket",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.onBackground
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "3D bracket visualization prototype (Filament)",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(modifier = Modifier.height(12.dp))
+                            HorizontalDivider(
+                                color = MaterialTheme.colorScheme.outline,
+                                thickness = 1.dp
+                            )
+                        }
+                    }
+                }
+                return@Column
+            }
 
             // Filter charts for selected sport and sort by sortOrder (nulls last), then alphabetically by title
             // Hide NFL Playoff Bracket until it's ready for production

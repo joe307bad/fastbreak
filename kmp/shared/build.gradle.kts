@@ -102,6 +102,8 @@ kotlin {
             implementation(libs.androidx.activity.compose)
             implementation(libs.ktor.client.okhttp)
             implementation(libs.sentry.android)
+            implementation(libs.filament.android)
+            implementation(libs.filament.utils.android)
         }
 
         iosMain.dependencies {

@@ -101,6 +101,10 @@ class RootComponent(
         navigation.push(Config.Settings)
     }
 
+    fun navigateToBracket() {
+        navigation.push(Config.Bracket)
+    }
+
     fun navigateToTopics() {
         // Don't mark topics as viewed here - they're only marked as viewed
         // when all narratives have been collapsed at least once
@@ -194,6 +198,12 @@ class RootComponent(
                     saveReadIndices = { indices -> registryContainer.saveReadIndices(indices) }
                 )
             )
+            is Config.Bracket -> Child.Bracket(
+                BracketComponent(
+                    componentContext = componentContext,
+                    onNavigateBack = { navigation.pop() }
+                )
+            )
         }
 
     sealed class Child {
@@ -201,6 +211,7 @@ class RootComponent(
         data class DataViz(val component: DataVizComponent) : Child()
         data class Settings(val component: SettingsComponent) : Child()
         data class Topics(val component: TopicsComponent) : Child()
+        data class Bracket(val component: BracketComponent) : Child()
     }
 
     @Serializable
@@ -222,5 +233,8 @@ class RootComponent(
 
         @Serializable
         data object Topics : Config
+
+        @Serializable
+        data object Bracket : Config
     }
 }

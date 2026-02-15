@@ -3,9 +3,4 @@
     <!-- Base app theme -->
     <style name="Theme.Fastbreak" parent="android:Theme.Material.Light.NoActionBar">
     </style>
-
-    <!-- Splash screen theme (base for pre-Android 12) -->
-    <style name="Theme.Fastbreak.Splash" parent="Theme.Fastbreak">
-        <item name="android:windowBackground">@android:color/white</item>
-    </style>
 </resources>

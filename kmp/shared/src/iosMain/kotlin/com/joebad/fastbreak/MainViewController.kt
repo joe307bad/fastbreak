@@ -20,9 +20,15 @@ import com.russhwolf.settings.Settings
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import platform.UIKit.UIView
 import platform.UIKit.UIViewController
 
-fun MainViewController(): UIViewController {
+fun MainViewController(
+    bracketViewFactory: (() -> UIView)? = null
+): UIViewController {
+    // Store the bracket view factory for use by the Filament composable
+    com.joebad.fastbreak.ui.bracket.BracketViewFactory.createView = bracketViewFactory
+
     val settings = Settings()
     val themeRepository = ThemeRepository(
         settings = settings,

@@ -11,6 +11,8 @@
 		2152FB042600AC8F00CF470E /* iOSApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2152FB032600AC8F00CF470E /* iOSApp.swift */; };
 		7555FF83242A565900829871 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7555FF82242A565900829871 /* ContentView.swift */; };
 		95E860F1011A4C6DD1E15EA6 /* Pods_iosApp.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 843FE2F16431F2E7F5B1E346 /* Pods_iosApp.framework */; };
+		F11A000300000000000BA003 /* FilamentBracketView.mm in Sources */ = {isa = PBXBuildFile; fileRef = F11A000200000000000BA002 /* FilamentBracketView.mm */; };
+		F11A000500000000000BA005 /* bracket_material.filamat in Resources */ = {isa = PBXBuildFile; fileRef = F11A000400000000000BA004 /* bracket_material.filamat */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -33,6 +35,10 @@
 		843FE2F16431F2E7F5B1E346 /* Pods_iosApp.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_iosApp.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		91D641370268E0089D1C5CA1 /* Pods-iosApp.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-iosApp.release.xcconfig"; path = "Target Support Files/Pods-iosApp/Pods-iosApp.release.xcconfig"; sourceTree = "<group>"; };
 		9B7C49AEF6D6747B02FCE700 /* Pods-iosApp.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-iosApp.debug.xcconfig"; path = "Target Support Files/Pods-iosApp/Pods-iosApp.debug.xcconfig"; sourceTree = "<group>"; };
+		F11A000100000000000BA001 /* FilamentBracketView.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = FilamentBracketView.h; sourceTree = "<group>"; };
+		F11A000200000000000BA002 /* FilamentBracketView.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = FilamentBracketView.mm; sourceTree = "<group>"; };
+		F11A000400000000000BA004 /* bracket_material.filamat */ = {isa = PBXFileReference; lastKnownFileType = file; path = bracket_material.filamat; sourceTree = "<group>"; };
+		F11A000600000000000BA006 /* iosApp-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "iosApp-Bridging-Header.h"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -90,6 +96,10 @@
 			children = (
 				058557BA273AAA24004C7B11 /* Assets.xcassets */,
 				7555FF82242A565900829871 /* ContentView.swift */,
+				F11A000100000000000BA001 /* FilamentBracketView.h */,
+				F11A000200000000000BA002 /* FilamentBracketView.mm */,
+				F11A000400000000000BA004 /* bracket_material.filamat */,
+				F11A000600000000000BA006 /* iosApp-Bridging-Header.h */,
 				7555FF8C242A565B00829871 /* Info.plist */,
 				2152FB032600AC8F00CF470E /* iOSApp.swift */,
 				058557D7273AAEEB004C7B11 /* Preview Content */,
@@ -210,6 +220,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				058557BB273AAA24004C7B11 /* Assets.xcassets in Resources */,
+				F11A000500000000000BA005 /* bracket_material.filamat in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -289,6 +300,7 @@
 			files = (
 				2152FB042600AC8F00CF470E /* iOSApp.swift in Sources */,
 				7555FF83242A565900829871 /* ContentView.swift in Sources */,
+				F11A000300000000000BA003 /* FilamentBracketView.mm in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -357,7 +369,7 @@
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
-				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++17";
 				CLANG_CXX_LIBRARY = "libc++";
 				CLANG_ENABLE_MODULES = YES;
 				CLANG_ENABLE_OBJC_ARC = YES;
@@ -418,7 +430,7 @@
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
-				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++17";
 				CLANG_CXX_LIBRARY = "libc++";
 				CLANG_ENABLE_MODULES = YES;
 				CLANG_ENABLE_OBJC_ARC = YES;
@@ -472,6 +484,7 @@
 			baseConfigurationReference = 9B7C49AEF6D6747B02FCE700 /* Pods-iosApp.debug.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++17";
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_ASSET_PATHS = "\"iosApp/Preview Content\"";
@@ -498,6 +511,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.joebad.fastbreak;
 				PRODUCT_NAME = fastbreak;
 				PROVISIONING_PROFILE_SPECIFIER = "";
+				SWIFT_OBJC_BRIDGING_HEADER = "iosApp/iosApp-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
@@ -508,6 +522,7 @@
 			baseConfigurationReference = 91D641370268E0089D1C5CA1 /* Pods-iosApp.release.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++17";
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_ASSET_PATHS = "\"iosApp/Preview Content\"";
@@ -534,6 +549,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.joebad.fastbreak;
 				PRODUCT_NAME = fastbreak;
 				PROVISIONING_PROFILE_SPECIFIER = "";
+				SWIFT_OBJC_BRIDGING_HEADER = "iosApp/iosApp-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};

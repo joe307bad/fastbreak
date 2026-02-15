@@ -7,8 +7,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Info
@@ -46,6 +44,7 @@ import com.joebad.fastbreak.data.model.TextSegment
 import com.joebad.fastbreak.data.model.TopicsResponse
 import com.joebad.fastbreak.data.model.VizType
 import com.joebad.fastbreak.navigation.TopicsComponent
+import com.joebad.fastbreak.ui.components.InfoBottomSheet
 import com.joebad.fastbreak.platform.UrlLauncher
 import kotlin.time.Clock
 import kotlin.time.Instant
@@ -74,7 +73,6 @@ fun TopicsScreen(
     topicsUpdatedAt: Instant?,
     onMenuClick: () -> Unit = {}
 ) {
-    val sheetState = rememberModalBottomSheetState()
     var showInfoSheet by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
@@ -189,35 +187,22 @@ fun TopicsScreen(
 
     // Info bottom sheet
     if (showInfoSheet && (topics?.descriptionSegments?.isNotEmpty() == true || topics?.description?.isNotBlank() == true)) {
-        ModalBottomSheet(
-            onDismissRequest = { showInfoSheet = false },
-            sheetState = sheetState
+        InfoBottomSheet(
+            onDismiss = { showInfoSheet = false },
+            title = "about topics"
         ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .verticalScroll(rememberScrollState())
-                    .padding(16.dp)
-                    .padding(bottom = 32.dp)
-            ) {
-                Text(
-                    text = "About Topics",
-                    style = MaterialTheme.typography.titleLarge,
-                    modifier = Modifier.padding(bottom = 8.dp)
+            if (topics?.descriptionSegments?.isNotEmpty() == true) {
+                SegmentedText(
+                    segments = topics.descriptionSegments,
+                    textColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    accentColor = MaterialTheme.colorScheme.primary
                 )
-                if (topics?.descriptionSegments?.isNotEmpty() == true) {
-                    SegmentedText(
-                        segments = topics.descriptionSegments,
-                        textColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                        accentColor = MaterialTheme.colorScheme.primary
-                    )
-                } else if (topics?.description?.isNotBlank() == true) {
-                    Text(
-                        text = topics.description,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
+            } else if (topics?.description?.isNotBlank() == true) {
+                Text(
+                    text = topics.description,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
         }
     }

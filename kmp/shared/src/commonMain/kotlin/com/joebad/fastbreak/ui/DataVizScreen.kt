@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.joebad.fastbreak.data.model.*
 import com.joebad.fastbreak.navigation.DataVizComponent
+import com.joebad.fastbreak.ui.components.InfoBottomSheet
 import com.joebad.fastbreak.ui.visualizations.*
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -35,7 +36,6 @@ fun DataVizScreen(
     var state by remember { mutableStateOf<DataVizState>(DataVizState.Loading) }
     var refreshTrigger by remember { mutableStateOf(0) }
     val scope = rememberCoroutineScope()
-    val sheetState = rememberModalBottomSheetState()
     var showInfoSheet by remember { mutableStateOf(false) }
 
     // Observe registry state for sync failures
@@ -242,28 +242,15 @@ fun DataVizScreen(
     // Bottom sheet for chart description
     if (showInfoSheet && state is DataVizState.Success) {
         val visualization = (state as DataVizState.Success).data
-        ModalBottomSheet(
-            onDismissRequest = { showInfoSheet = false },
-            sheetState = sheetState
+        InfoBottomSheet(
+            onDismiss = { showInfoSheet = false },
+            title = visualization.title
         ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .verticalScroll(rememberScrollState())
-                    .padding(16.dp)
-                    .padding(bottom = 32.dp)
-            ) {
-                Text(
-                    text = visualization.title,
-                    style = MaterialTheme.typography.titleLarge,
-                    modifier = Modifier.padding(bottom = 8.dp)
-                )
-                Text(
-                    text = visualization.description,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
+            Text(
+                text = visualization.description,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }

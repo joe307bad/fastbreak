@@ -148,30 +148,9 @@ fun NCAABracket(
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
         val isLandscape = maxWidth > maxHeight
 
-        Column(modifier = Modifier.fillMaxSize()) {
-            // Collapsible bracket navigation (toggle controlled from top app bar)
-            AnimatedVisibility(
-                visible = isNavigationExpanded,
-                enter = expandVertically(),
-                exit = shrinkVertically()
-            ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    MiniMapNavigation(
-                        regions = regions,
-                        currentIndex = currentQuadrant,
-                        onRegionClick = { index -> currentQuadrant = index },
-                        onFinalFourClick = { currentQuadrant = 4 },
-                        isFinalFourSelected = currentQuadrant == 4
-                    )
-                }
-            }
-
-            // Single unified bracket visualization
+        // Use Box for overlay layout - bracket fills entire space, navigation overlays on top
+        Box(modifier = Modifier.fillMaxSize()) {
+            // Single unified bracket visualization (fills entire space)
             XYGraph(
                 xAxisModel = xAxisModel,
                 yAxisModel = yAxisModel,
@@ -197,9 +176,7 @@ fun NCAABracket(
                 horizontalMinorGridLineStyle = null,
                 verticalMajorGridLineStyle = null,
                 verticalMinorGridLineStyle = null,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .weight(1f)
+                modifier = Modifier.fillMaxSize()
             ) {
                 // Calculate zoom level from current view extent
                 // When zoomed in (extent ~8), show details. When zoomed out (extent ~13), show dots.
@@ -243,6 +220,31 @@ fun NCAABracket(
                         selectedMatchup = MatchupSheetData(game, regionName, roundName, color)
                     }
                 )
+            }
+
+            // Collapsible bracket navigation (overlays on top of bracket)
+            AnimatedVisibility(
+                visible = isNavigationExpanded,
+                enter = expandVertically(),
+                exit = shrinkVertically(),
+                modifier = Modifier.align(Alignment.TopCenter)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(backgroundColor.copy(alpha = 0.9f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    MiniMapNavigation(
+                        regions = regions,
+                        currentIndex = currentQuadrant,
+                        onRegionClick = { index -> currentQuadrant = index },
+                        onFinalFourClick = { currentQuadrant = 4 },
+                        isFinalFourSelected = currentQuadrant == 4,
+                        modifier = Modifier.padding(8.dp)
+                    )
+                }
             }
         }
     }
@@ -544,9 +546,9 @@ private fun XYGraphScope<Float, Float>.DrawFinalFourConnectors(
     // Landscape: arranged horizontally in the center (between Elite 8 rows)
     val finalFourY = 16.5f  // Center Y position for all Final Four games
 
-    val semifinal1X = if (isLandscape) 4.5f else centerX   // Left semifinal
+    val semifinal1X = if (isLandscape) 4.0f else centerX   // Left semifinal (slightly from center)
     val semifinal1Y = if (isLandscape) finalFourY else 19f
-    val semifinal2X = if (isLandscape) 7.5f else centerX   // Right semifinal
+    val semifinal2X = if (isLandscape) 8.0f else centerX   // Right semifinal (slightly from center)
     val semifinal2Y = if (isLandscape) finalFourY else 14f
     val championshipX = centerX  // Always at center (6.0)
     val championshipY = 16.5f

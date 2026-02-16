@@ -489,17 +489,8 @@ private fun RenderVisualization(
             onScheduleToggleHandlerChanged = onScheduleToggleHandlerChanged
         )
     } else if (visualization is HelloWorldVisualization) {
-        // Hello World placeholder screen
-        Box(
-            modifier = Modifier.fillMaxSize(),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = "Hello World",
-                style = MaterialTheme.typography.displayMedium,
-                color = MaterialTheme.colorScheme.onBackground
-            )
-        }
+        // NCAA Tournament bracket
+        NCAABracket(modifier = Modifier.fillMaxSize())
     } else {
         // For charts: use vertical scroll to show chart + data table
         val scrollState = rememberScrollState()

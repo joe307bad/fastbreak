@@ -145,99 +145,105 @@ fun NCAABracket(
         yAxisModel.setViewRange(bounds.yMin..bounds.yMax)
     }
 
-    Column(modifier = modifier.fillMaxSize()) {
-        // Collapsible bracket navigation (toggle controlled from top app bar)
-        AnimatedVisibility(
-            visible = isNavigationExpanded,
-            enter = expandVertically(),
-            exit = shrinkVertically()
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                contentAlignment = Alignment.Center
+    BoxWithConstraints(modifier = modifier.fillMaxSize()) {
+        val isLandscape = maxWidth > maxHeight
+
+        Column(modifier = Modifier.fillMaxSize()) {
+            // Collapsible bracket navigation (toggle controlled from top app bar)
+            AnimatedVisibility(
+                visible = isNavigationExpanded,
+                enter = expandVertically(),
+                exit = shrinkVertically()
             ) {
-                MiniMapNavigation(
-                    regions = regions,
-                    currentIndex = currentQuadrant,
-                    onRegionClick = { index -> currentQuadrant = index },
-                    onFinalFourClick = { currentQuadrant = 4 },
-                    isFinalFourSelected = currentQuadrant == 4
-                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    MiniMapNavigation(
+                        regions = regions,
+                        currentIndex = currentQuadrant,
+                        onRegionClick = { index -> currentQuadrant = index },
+                        onFinalFourClick = { currentQuadrant = 4 },
+                        isFinalFourSelected = currentQuadrant == 4
+                    )
+                }
             }
-        }
 
-        // Single unified bracket visualization
-        XYGraph(
-            xAxisModel = xAxisModel,
-            yAxisModel = yAxisModel,
-            gestureConfig = GestureConfig(
-                panXEnabled = true,
-                panYEnabled = true,
-                zoomXEnabled = true,
-                zoomYEnabled = true
-            ),
-            xAxisStyle = rememberAxisStyle(
-                color = Color.Transparent,
-                tickPosition = io.github.koalaplot.core.xygraph.TickPosition.None
-            ),
-            yAxisStyle = rememberAxisStyle(
-                color = Color.Transparent,
-                tickPosition = io.github.koalaplot.core.xygraph.TickPosition.None
-            ),
-            xAxisLabels = { },
-            yAxisLabels = { },
-            xAxisTitle = { },
-            yAxisTitle = { },
-            horizontalMajorGridLineStyle = null,
-            horizontalMinorGridLineStyle = null,
-            verticalMajorGridLineStyle = null,
-            verticalMinorGridLineStyle = null,
-            modifier = Modifier
-                .fillMaxSize()
-                .weight(1f)
-        ) {
-            // Calculate zoom level from current view extent
-            // When zoomed in (extent ~6.5), show details. When zoomed out (extent ~13), show dots.
-            val currentXRange = xAxisModel.viewRange.value
-            val currentXExtent = currentXRange.endInclusive - currentXRange.start
-            // Threshold: show details when viewing roughly one quadrant or less (extent <= 8)
-            val isZoomedIn = currentXExtent <= 8f
+            // Single unified bracket visualization
+            XYGraph(
+                xAxisModel = xAxisModel,
+                yAxisModel = yAxisModel,
+                gestureConfig = GestureConfig(
+                    panXEnabled = true,
+                    panYEnabled = true,
+                    zoomXEnabled = true,
+                    zoomYEnabled = true
+                ),
+                xAxisStyle = rememberAxisStyle(
+                    color = Color.Transparent,
+                    tickPosition = io.github.koalaplot.core.xygraph.TickPosition.None
+                ),
+                yAxisStyle = rememberAxisStyle(
+                    color = Color.Transparent,
+                    tickPosition = io.github.koalaplot.core.xygraph.TickPosition.None
+                ),
+                xAxisLabels = { },
+                yAxisLabels = { },
+                xAxisTitle = { },
+                yAxisTitle = { },
+                horizontalMajorGridLineStyle = null,
+                horizontalMinorGridLineStyle = null,
+                verticalMajorGridLineStyle = null,
+                verticalMinorGridLineStyle = null,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .weight(1f)
+            ) {
+                // Calculate zoom level from current view extent
+                // When zoomed in (extent ~8), show details. When zoomed out (extent ~13), show dots.
+                val currentXRange = xAxisModel.viewRange.value
+                val currentXExtent = currentXRange.endInclusive - currentXRange.start
+                // Threshold: show details when viewing roughly one quadrant or less
+                // Default quadrant extent is 8, so use 9.5 to give margin for panning
+                val isZoomedIn = currentXExtent <= 9.5f
 
-            // Draw all four regions
-            // Show full details when zoomed in, dots when zoomed out
-            regions.forEachIndexed { index, region ->
-                val isReversed = index == 1 || index == 3  // South and West are reversed
-                val xOffset = if (index == 1 || index == 3) 4f else 0f
-                val yOffset = if (index == 0 || index == 1) 17f else 0f
+                // Draw all four regions
+                // Show full details when zoomed in, dots when zoomed out
+                regions.forEachIndexed { index, region ->
+                    val isReversed = index == 1 || index == 3  // South and West are reversed
+                    val xOffset = if (index == 1 || index == 3) 4f else 0f
+                    val yOffset = if (index == 0 || index == 1) 17f else 0f
 
-                DrawRegionContent(
-                    region = region,
-                    regionName = region.name,
-                    isReversed = isReversed,
-                    xOffset = xOffset,
-                    yOffset = yOffset,
-                    showDetails = isZoomedIn,
+                    DrawRegionContent(
+                        region = region,
+                        regionName = region.name,
+                        isReversed = isReversed,
+                        xOffset = xOffset,
+                        yOffset = yOffset,
+                        showDetails = isZoomedIn,
+                        lineColor = lineColor,
+                        textColor = textColor,
+                        backgroundColor = backgroundColor,
+                        onMatchupClick = { game, roundName ->
+                            selectedMatchup = MatchupSheetData(game, region.name, roundName, region.color)
+                        }
+                    )
+                }
+
+                // Draw Final Four connector lines, Elite 8, semifinals, and championship
+                DrawFinalFourConnectors(
+                    regions = regions,
                     lineColor = lineColor,
                     textColor = textColor,
                     backgroundColor = backgroundColor,
-                    onMatchupClick = { game, roundName ->
-                        selectedMatchup = MatchupSheetData(game, region.name, roundName, region.color)
+                    isLandscape = isLandscape,
+                    onMatchupClick = { game, regionName, roundName, color ->
+                        selectedMatchup = MatchupSheetData(game, regionName, roundName, color)
                     }
                 )
             }
-
-            // Draw Final Four connector lines, Elite 8, semifinals, and championship
-            DrawFinalFourConnectors(
-                regions = regions,
-                lineColor = lineColor,
-                textColor = textColor,
-                backgroundColor = backgroundColor,
-                onMatchupClick = { game, regionName, roundName, color ->
-                    selectedMatchup = MatchupSheetData(game, regionName, roundName, color)
-                }
-            )
         }
     }
 
@@ -489,6 +495,7 @@ private fun XYGraphScope<Float, Float>.DrawRegionContent(
 /**
  * Draws Final Four connector lines, Elite 8, semifinals, and championship matchups
  * These matchups are always visible with full details regardless of zoom level
+ * In landscape mode, the Final Four games are arranged horizontally side by side
  */
 @OptIn(ExperimentalKoalaPlotApi::class)
 @Composable
@@ -497,6 +504,7 @@ private fun XYGraphScope<Float, Float>.DrawFinalFourConnectors(
     lineColor: Color,
     textColor: Color,
     backgroundColor: Color,
+    isLandscape: Boolean,
     onMatchupClick: (BracketGame, String, String, Color) -> Unit
 ) {
     // Elite 8 positions (now separated - left regions at x=7, right regions at x=5)
@@ -506,22 +514,42 @@ private fun XYGraphScope<Float, Float>.DrawFinalFourConnectors(
     // - West: x=5, y=8
 
     val centerX = 6f
-    val topY = 25f   // y position for East/South Elite 8
-    val bottomY = 8f // y position for Midwest/West Elite 8
+    val topY = 25f   // y position for East/South Elite 8 (portrait)
+    val bottomY = 8f // y position for Midwest/West Elite 8 (portrait)
 
     // Elite 8 matchup positions (region index to position)
-    // Stacked vertically in pairs at center
-    val elite8Positions = listOf(
-        Triple(0, centerX, topY + 2f),      // East (top pair, upper)
-        Triple(1, centerX, topY - 2f),      // South (top pair, lower)
-        Triple(2, centerX, bottomY + 2f),   // Midwest (bottom pair, upper)
-        Triple(3, centerX, bottomY - 2f)    // West (bottom pair, lower)
-    )
+    // Portrait: stacked vertically in pairs at center
+    // Landscape: spread horizontally, positioned in the center of Sweet 16 area (same Y as portrait)
+    val elite8Positions = if (isLandscape) {
+        // Landscape: Elite 8 spread horizontally at Sweet 16 center positions
+        // Top row at Y=25 (center of top Sweet 16), bottom row at Y=8 (center of bottom Sweet 16)
+        listOf(
+            Triple(0, 4.5f, topY),      // East - left, in top Sweet 16 center
+            Triple(1, 7.5f, topY),      // South - right, in top Sweet 16 center
+            Triple(2, 4.5f, bottomY),   // Midwest - left, in bottom Sweet 16 center
+            Triple(3, 7.5f, bottomY)    // West - right, in bottom Sweet 16 center
+        )
+    } else {
+        // Portrait: stacked vertically at center in pairs
+        listOf(
+            Triple(0, centerX, topY + 2f),      // East (top pair, upper)
+            Triple(1, centerX, topY - 2f),      // South (top pair, lower)
+            Triple(2, centerX, bottomY + 2f),   // Midwest (bottom pair, upper)
+            Triple(3, centerX, bottomY - 2f)    // West (bottom pair, lower)
+        )
+    }
 
-    // Final Four semifinal positions (stacked vertically with championship in center)
-    // Spacing of 2.5 units prevents overlap when zoomed out while keeping them close together
-    val finalFourY1 = 19f  // Top semifinal (East vs South)
-    val finalFourY2 = 14f  // Bottom semifinal (Midwest vs West)
+    // Final Four positions - different layout for portrait vs landscape
+    // Portrait: stacked vertically with championship in center
+    // Landscape: arranged horizontally in the center (between Elite 8 rows)
+    val finalFourY = 16.5f  // Center Y position for all Final Four games
+
+    val semifinal1X = if (isLandscape) 4.5f else centerX   // Left semifinal
+    val semifinal1Y = if (isLandscape) finalFourY else 19f
+    val semifinal2X = if (isLandscape) 7.5f else centerX   // Right semifinal
+    val semifinal2Y = if (isLandscape) finalFourY else 14f
+    val championshipX = centerX  // Always at center (6.0)
+    val championshipY = 16.5f
 
     // Create Final Four semifinal games from Elite 8 winners
     val eastElite8 = regions[0].rounds.last().first()
@@ -534,9 +562,6 @@ private fun XYGraphScope<Float, Float>.DrawFinalFourConnectors(
     val southWinner = if (southElite8.team1?.isWinner == true) southElite8.team1 else southElite8.team2
     val midwestWinner = if (midwestElite8.team1?.isWinner == true) midwestElite8.team1 else midwestElite8.team2
     val westWinner = if (westElite8.team1?.isWinner == true) westElite8.team1 else westElite8.team2
-
-    // Championship Y position (midpoint between the two semifinals)
-    val championshipY = 16.5f
 
     // Final Four semifinal games
     val topSemifinal = BracketGame(
@@ -561,75 +586,143 @@ private fun XYGraphScope<Float, Float>.DrawFinalFourConnectors(
     )
 
     // Draw connector lines FIRST (so matchup boxes appear on top)
-    // Vertical line connecting East to South (top pair)
-    LinePlot(
-        data = listOf(
-            DefaultPoint(centerX, topY + 2f),
-            DefaultPoint(centerX, topY - 2f)
-        ),
-        lineStyle = LineStyle(
-            brush = SolidColor(lineColor),
-            strokeWidth = 2.dp
-        )
-    )
+    if (isLandscape) {
+        // Landscape: Elite 8 in center of Sweet 16 areas, Final Four in center
+        // Top row (Y=25): East(4.5) - South(7.5) in Sweet 16 center
+        // Middle (Y=16.5): Semi1(4.5) - Champ(6) - Semi2(7.5)
+        // Bottom row (Y=8): Midwest(4.5) - West(7.5) in Sweet 16 center
 
-    // Vertical line connecting Midwest to West (bottom pair)
-    LinePlot(
-        data = listOf(
-            DefaultPoint(centerX, bottomY + 2f),
-            DefaultPoint(centerX, bottomY - 2f)
-        ),
-        lineStyle = LineStyle(
-            brush = SolidColor(lineColor),
-            strokeWidth = 2.dp
+        // Horizontal line connecting top Elite 8 pair (East - South)
+        LinePlot(
+            data = listOf(
+                DefaultPoint(4.0f, topY),
+                DefaultPoint(8.0f, topY)
+            ),
+            lineStyle = LineStyle(
+                brush = SolidColor(lineColor),
+                strokeWidth = 2.dp
+            )
         )
-    )
 
-    // Connector from top Elite 8 pair to top semifinal
-    LinePlot(
-        data = listOf(
-            DefaultPoint(centerX, topY - 2f),
-            DefaultPoint(centerX, finalFourY1)
-        ),
-        lineStyle = LineStyle(
-            brush = SolidColor(lineColor),
-            strokeWidth = 2.dp
+        // Horizontal line connecting bottom Elite 8 pair (Midwest - West)
+        LinePlot(
+            data = listOf(
+                DefaultPoint(4.0f, bottomY),
+                DefaultPoint(8.0f, bottomY)
+            ),
+            lineStyle = LineStyle(
+                brush = SolidColor(lineColor),
+                strokeWidth = 2.dp
+            )
         )
-    )
 
-    // Connector from bottom Elite 8 pair to bottom semifinal
-    LinePlot(
-        data = listOf(
-            DefaultPoint(centerX, bottomY + 2f),
-            DefaultPoint(centerX, finalFourY2)
-        ),
-        lineStyle = LineStyle(
-            brush = SolidColor(lineColor),
-            strokeWidth = 2.dp
+        // Vertical connector from top Elite 8 row down to Final Four
+        LinePlot(
+            data = listOf(
+                DefaultPoint(centerX, topY),
+                DefaultPoint(centerX, finalFourY)
+            ),
+            lineStyle = LineStyle(
+                brush = SolidColor(lineColor),
+                strokeWidth = 2.dp
+            )
         )
-    )
 
-    // Championship connector (vertical line between the two Final Four semifinals)
-    LinePlot(
-        data = listOf(
-            DefaultPoint(centerX, finalFourY2),
-            DefaultPoint(centerX, championshipY)
-        ),
-        lineStyle = LineStyle(
-            brush = SolidColor(lineColor),
-            strokeWidth = 2.dp
+        // Vertical connector from bottom Elite 8 row up to Final Four
+        LinePlot(
+            data = listOf(
+                DefaultPoint(centerX, bottomY),
+                DefaultPoint(centerX, finalFourY)
+            ),
+            lineStyle = LineStyle(
+                brush = SolidColor(lineColor),
+                strokeWidth = 2.dp
+            )
         )
-    )
-    LinePlot(
-        data = listOf(
-            DefaultPoint(centerX, championshipY),
-            DefaultPoint(centerX, finalFourY1)
-        ),
-        lineStyle = LineStyle(
-            brush = SolidColor(lineColor),
-            strokeWidth = 2.dp
+
+        // Horizontal line connecting Final Four (Semi1 - Champ - Semi2)
+        LinePlot(
+            data = listOf(
+                DefaultPoint(semifinal1X, finalFourY),
+                DefaultPoint(semifinal2X, finalFourY)
+            ),
+            lineStyle = LineStyle(
+                brush = SolidColor(lineColor),
+                strokeWidth = 2.dp
+            )
         )
-    )
+    } else {
+        // Portrait: Elite 8 pairs stacked vertically at center
+        // Vertical line connecting East to South (top pair)
+        LinePlot(
+            data = listOf(
+                DefaultPoint(centerX, topY + 2f),
+                DefaultPoint(centerX, topY - 2f)
+            ),
+            lineStyle = LineStyle(
+                brush = SolidColor(lineColor),
+                strokeWidth = 2.dp
+            )
+        )
+
+        // Vertical line connecting Midwest to West (bottom pair)
+        LinePlot(
+            data = listOf(
+                DefaultPoint(centerX, bottomY + 2f),
+                DefaultPoint(centerX, bottomY - 2f)
+            ),
+            lineStyle = LineStyle(
+                brush = SolidColor(lineColor),
+                strokeWidth = 2.dp
+            )
+        )
+
+        // Connector from top Elite 8 pair to top semifinal
+        LinePlot(
+            data = listOf(
+                DefaultPoint(centerX, topY - 2f),
+                DefaultPoint(centerX, semifinal1Y)
+            ),
+            lineStyle = LineStyle(
+                brush = SolidColor(lineColor),
+                strokeWidth = 2.dp
+            )
+        )
+
+        // Connector from bottom Elite 8 pair to bottom semifinal
+        LinePlot(
+            data = listOf(
+                DefaultPoint(centerX, bottomY + 2f),
+                DefaultPoint(centerX, semifinal2Y)
+            ),
+            lineStyle = LineStyle(
+                brush = SolidColor(lineColor),
+                strokeWidth = 2.dp
+            )
+        )
+
+        // Championship connector (vertical line between the two Final Four semifinals)
+        LinePlot(
+            data = listOf(
+                DefaultPoint(centerX, semifinal2Y),
+                DefaultPoint(centerX, championshipY)
+            ),
+            lineStyle = LineStyle(
+                brush = SolidColor(lineColor),
+                strokeWidth = 2.dp
+            )
+        )
+        LinePlot(
+            data = listOf(
+                DefaultPoint(centerX, championshipY),
+                DefaultPoint(centerX, semifinal1Y)
+            ),
+            lineStyle = LineStyle(
+                brush = SolidColor(lineColor),
+                strokeWidth = 2.dp
+            )
+        )
+    }
 
     // Draw Elite 8 matchup boxes AFTER lines (so they appear on top)
     elite8Positions.forEach { (regionIndex, x, y) ->
@@ -654,9 +747,9 @@ private fun XYGraphScope<Float, Float>.DrawFinalFourConnectors(
     // Draw Final Four semifinal matchup boxes
     val primaryColor = MaterialTheme.colorScheme.primary
 
-    // Top semifinal (East vs South)
+    // Semifinal 1 (East vs South) - left in landscape, top in portrait
     LinePlot(
-        data = listOf(DefaultPoint(centerX, finalFourY1)),
+        data = listOf(DefaultPoint(semifinal1X, semifinal1Y)),
         lineStyle = null,
         symbol = {
             MatchupBoxSymbol(
@@ -669,9 +762,9 @@ private fun XYGraphScope<Float, Float>.DrawFinalFourConnectors(
         }
     )
 
-    // Bottom semifinal (Midwest vs West)
+    // Semifinal 2 (Midwest vs West) - right in landscape, bottom in portrait
     LinePlot(
-        data = listOf(DefaultPoint(centerX, finalFourY2)),
+        data = listOf(DefaultPoint(semifinal2X, semifinal2Y)),
         lineStyle = null,
         symbol = {
             MatchupBoxSymbol(
@@ -686,7 +779,7 @@ private fun XYGraphScope<Float, Float>.DrawFinalFourConnectors(
 
     // Championship game (center between semifinals)
     LinePlot(
-        data = listOf(DefaultPoint(centerX, championshipY)),
+        data = listOf(DefaultPoint(championshipX, championshipY)),
         lineStyle = null,
         symbol = {
             MatchupBoxSymbol(

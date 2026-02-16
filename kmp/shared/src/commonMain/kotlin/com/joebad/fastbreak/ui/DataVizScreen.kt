@@ -356,10 +356,11 @@ private fun SuccessContent(
 
     Column(modifier = Modifier.fillMaxSize()) {
         // Show filter bar if there are any filterable properties or pinned teams
-        // BUT hide it for MatchupV2Visualization and NBAMatchupVisualization (they handle pinned teams internally)
+        // BUT hide it for MatchupV2Visualization, NBAMatchupVisualization, and HelloWorldVisualization (bracket)
         if ((filterOptions.isNotEmpty() || sportPinnedTeams.isNotEmpty())
             && visualization !is MatchupV2Visualization
-            && visualization !is NBAMatchupVisualization) {
+            && visualization !is NBAMatchupVisualization
+            && visualization !is HelloWorldVisualization) {
             val scrollState = rememberScrollState()
             Row(
                 modifier = Modifier

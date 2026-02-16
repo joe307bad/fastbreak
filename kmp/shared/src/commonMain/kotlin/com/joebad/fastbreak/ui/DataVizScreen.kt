@@ -51,6 +51,21 @@ fun DataVizScreen(
 
         state = DataVizState.Loading
 
+        // Handle HELLO_WORLD viz type as a hardcoded screen (no data loading needed)
+        if (component.vizType == VizType.HELLO_WORLD) {
+            state = DataVizState.Success(
+                HelloWorldVisualization(
+                    sport = component.sport.name,
+                    visualizationType = "HELLO_WORLD",
+                    title = "NCAA Tournament",
+                    subtitle = "Coming Soon",
+                    description = "NCAA Tournament bracket visualization",
+                    lastUpdated = kotlin.time.Clock.System.now()
+                )
+            )
+            return@LaunchedEffect
+        }
+
         try {
             // First check if this chart failed during synchronization
             val syncProgress = registryState.syncProgress
@@ -473,6 +488,18 @@ private fun RenderVisualization(
             highlightedTeamCodes = highlightedTeamCodes,
             onScheduleToggleHandlerChanged = onScheduleToggleHandlerChanged
         )
+    } else if (visualization is HelloWorldVisualization) {
+        // Hello World placeholder screen
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = "Hello World",
+                style = MaterialTheme.typography.displayMedium,
+                color = MaterialTheme.colorScheme.onBackground
+            )
+        }
     } else {
         // For charts: use vertical scroll to show chart + data table
         val scrollState = rememberScrollState()
@@ -555,6 +582,9 @@ private fun RenderVisualization(
                             }
                             is NBAMatchupVisualization -> {
                                 // Handled by NBAMatchupWorksheet below
+                            }
+                            is HelloWorldVisualization -> {
+                                // Handled above
                             }
                         }
                     }

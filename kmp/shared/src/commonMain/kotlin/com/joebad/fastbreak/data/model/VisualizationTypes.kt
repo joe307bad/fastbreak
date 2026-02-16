@@ -589,3 +589,18 @@ data class NBAMatchupVisualization(
     override val sortOrder: Int? = null,
     val dataPoints: List<NBAMatchup>
 ) : VisualizationType
+
+// Hello World visualization (placeholder for future features)
+@Serializable
+data class HelloWorldVisualization(
+    override val sport: String,
+    override val visualizationType: String,
+    override val title: String,
+    override val subtitle: String,
+    override val description: String,
+    override val lastUpdated: Instant,
+    override val source: String? = null,
+    @Serializable(with = TagListSerializer::class)
+    override val tags: List<Tag>? = null,
+    override val sortOrder: Int? = null
+) : VisualizationType

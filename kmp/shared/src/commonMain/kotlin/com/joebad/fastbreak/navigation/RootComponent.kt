@@ -178,7 +178,10 @@ class RootComponent(
             is Config.Settings -> Child.Settings(
                 SettingsComponent(
                     componentContext = componentContext,
-                    onNavigateBack = { navigation.pop() }
+                    onNavigateBack = { navigation.pop() },
+                    onNavigateToBracketPrototype = {
+                        navigation.push(Config.DataViz("ncaa-tournament-prototype", Sport.NBA, VizType.HELLO_WORLD))
+                    }
                 )
             )
             is Config.Topics -> Child.Topics(

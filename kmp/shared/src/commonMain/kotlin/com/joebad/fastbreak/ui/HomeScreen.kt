@@ -367,9 +367,8 @@ fun HomeScreen(
                         }
                     }
                 }
-                filteredCharts.isEmpty() && registryState.registry != null && selectedSport != Sport.CBB -> {
+                filteredCharts.isEmpty() && registryState.registry != null -> {
                     // No charts for this specific sport/tag combination (but registry has charts)
-                    // CBB is excluded because it has hardcoded charts
                     Box(
                         modifier = Modifier.fillMaxSize(),
                         contentAlignment = Alignment.Center
@@ -423,25 +422,6 @@ fun HomeScreen(
                         //         )
                         //     }
                         // }
-
-                        // Hardcoded NCAA Tournament chart for CBB tab
-                        if (selectedSport == Sport.CBB) {
-                            item {
-                                VisualizationItem(
-                                    title = "NCAA Tournament",
-                                    description = "College basketball tournament bracket",
-                                    interval = null,
-                                    lastUpdated = Clock.System.now(),
-                                    viewed = true,
-                                    isSyncing = false,
-                                    isReady = true,
-                                    tags = emptyList(),
-                                    onClick = {
-                                        component.onNavigateToDataViz("ncaa-tournament", Sport.CBB, com.joebad.fastbreak.data.model.VizType.HELLO_WORLD)
-                                    }
-                                )
-                            }
-                        }
 
                         items(filteredCharts) { chart ->
                             // Determine chart sync state

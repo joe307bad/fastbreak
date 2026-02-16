@@ -1,26 +1,30 @@
 package com.joebad.fastbreak.ui.visualizations
 
-import androidx.compose.animation.core.*
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.pager.HorizontalPager
-import androidx.compose.foundation.pager.PagerDefaults
-import androidx.compose.foundation.pager.VerticalPager
-import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import kotlinx.coroutines.launch
+import io.github.koalaplot.core.gestures.GestureConfig
+import io.github.koalaplot.core.line.LinePlot
+import io.github.koalaplot.core.style.LineStyle
+import io.github.koalaplot.core.util.ExperimentalKoalaPlotApi
+import io.github.koalaplot.core.xygraph.DefaultPoint
+import io.github.koalaplot.core.xygraph.FloatLinearAxisModel
+import io.github.koalaplot.core.xygraph.XYGraph
+import io.github.koalaplot.core.xygraph.XYGraphScope
+import io.github.koalaplot.core.xygraph.rememberAxisStyle
 
 // Data classes
 data class BracketTeam(
@@ -42,98 +46,207 @@ data class BracketRegion(
     val rounds: List<List<BracketGame>>
 )
 
-@OptIn(ExperimentalFoundationApi::class)
+data class MatchupSheetData(
+    val game: BracketGame,
+    val regionName: String,
+    val roundName: String,
+    val regionColor: Color
+)
+
+/**
+ * Data class to hold bracket navigation toggle state and handler
+ */
+data class BracketNavigationToggleHandler(
+    val isExpanded: Boolean,
+    val toggle: () -> Unit
+)
+
+// Region quadrant positions in the unified coordinate system
+private data class QuadrantBounds(
+    val xMin: Float,
+    val xMax: Float,
+    val yMin: Float,
+    val yMax: Float
+)
+
+// Round X positions with spacing (2 units between rounds)
+// Rounds at: 1, 3, 5, 7 for left regions (shifted right by 1 to avoid cutoff)
+// Rounds at: 5, 7, 9, 11 for right regions (reversed: 11, 9, 7, 5)
+private const val ROUND_SPACING = 2f
+private val ROUND_X_POSITIONS = listOf(1f, 3f, 5f, 7f)
+
+// Quadrant layout:
+// East (top-left)     | South (top-right, reversed)
+//                 F4
+// Midwest (bottom-left) | West (bottom-right, reversed)
+private val QUADRANT_BOUNDS = listOf(
+    QuadrantBounds(xMin = 0f, xMax = 8f, yMin = 16.5f, yMax = 33.5f),       // East (0)
+    QuadrantBounds(xMin = 4f, xMax = 12f, yMin = 16.5f, yMax = 33.5f),      // South (1)
+    QuadrantBounds(xMin = 0f, xMax = 8f, yMin = -0.5f, yMax = 16.5f),       // Midwest (2)
+    QuadrantBounds(xMin = 4f, xMax = 12f, yMin = -0.5f, yMax = 16.5f),      // West (3)
+    QuadrantBounds(xMin = 2f, xMax = 10f, yMin = 4f, yMax = 29f)            // Final Four (4) - centered
+)
+
+@OptIn(ExperimentalKoalaPlotApi::class)
 @Composable
 fun NCAABracket(
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onNavigationToggleHandlerChanged: ((BracketNavigationToggleHandler?) -> Unit)? = null
 ) {
-    // Regions arranged as 2x2 grid:
-    // Row 0: East (0), South (1)
-    // Row 1: Midwest (2), West (3)
     val regions = remember { generateBracketRegions() }
-    val scope = rememberCoroutineScope()
+    var currentQuadrant by remember { mutableIntStateOf(0) }
+    var isNavigationExpanded by remember { mutableStateOf(true) }
+    var selectedMatchup by remember { mutableStateOf<MatchupSheetData?>(null) }
 
-    // Vertical pager for rows (0 = top row, 1 = bottom row)
-    val verticalPagerState = rememberPagerState(pageCount = { 2 })
-    // Horizontal pager states for each row
-    val horizontalPagerStateRow0 = rememberPagerState(pageCount = { 2 })
-    val horizontalPagerStateRow1 = rememberPagerState(pageCount = { 2 })
+    val backgroundColor = MaterialTheme.colorScheme.background
+    val textColor = MaterialTheme.colorScheme.onBackground
+    val lineColor = MaterialTheme.colorScheme.onBackground
 
-    // Keep horizontal pagers in sync - when one changes, update the other
-    LaunchedEffect(horizontalPagerStateRow0.currentPage) {
-        if (horizontalPagerStateRow1.currentPage != horizontalPagerStateRow0.currentPage) {
-            horizontalPagerStateRow1.scrollToPage(horizontalPagerStateRow0.currentPage)
+    // Expose navigation toggle handler to parent
+    LaunchedEffect(isNavigationExpanded) {
+        onNavigationToggleHandlerChanged?.invoke(
+            BracketNavigationToggleHandler(
+                isExpanded = isNavigationExpanded,
+                toggle = { isNavigationExpanded = !isNavigationExpanded }
+            )
+        )
+    }
+
+    // Cleanup when leaving
+    DisposableEffect(Unit) {
+        onDispose {
+            onNavigationToggleHandlerChanged?.invoke(null)
         }
     }
 
-    LaunchedEffect(horizontalPagerStateRow1.currentPage) {
-        if (horizontalPagerStateRow0.currentPage != horizontalPagerStateRow1.currentPage) {
-            horizontalPagerStateRow0.scrollToPage(horizontalPagerStateRow1.currentPage)
-        }
+    // Full coordinate system for entire bracket
+    // X: 0-12 (left regions: 0-4.5, right regions: 7.5-12)
+    // Y: 0-33 (bottom regions: 0-16, top regions: 17-33)
+    val xAxisModel = remember {
+        FloatLinearAxisModel(
+            range = -0.5f..12.5f,
+            minViewExtent = 6.5f,  // One quadrant width
+            maxViewExtent = 13f    // Full bracket width
+        )
     }
 
-    // Calculate current region index based on both pagers
-    val currentRegionIndex by remember {
-        derivedStateOf {
-            val row = verticalPagerState.currentPage
-            val col = if (row == 0) horizontalPagerStateRow0.currentPage else horizontalPagerStateRow1.currentPage
-            row * 2 + col
-        }
+    val yAxisModel = remember {
+        FloatLinearAxisModel(
+            range = -0.5f..33.5f,
+            minViewExtent = 17f,   // One quadrant height
+            maxViewExtent = 34f    // Full bracket height
+        )
+    }
+
+    // Navigate to quadrant when selection changes
+    LaunchedEffect(currentQuadrant) {
+        val bounds = QUADRANT_BOUNDS[currentQuadrant]
+        xAxisModel.setViewRange(bounds.xMin..bounds.xMax)
+        yAxisModel.setViewRange(bounds.yMin..bounds.yMax)
     }
 
     Column(modifier = modifier.fillMaxSize()) {
-        // Mini bracket map navigation
-        MiniMapNavigation(
-            regions = regions,
-            currentIndex = currentRegionIndex,
-            onRegionClick = { index ->
-                scope.launch {
-                    val targetRow = index / 2
-                    val targetCol = index % 2
-
-                    // Navigate to the correct row and column (both pagers will sync)
-                    verticalPagerState.scrollToPage(targetRow)
-                    horizontalPagerStateRow0.scrollToPage(targetCol)
-                    horizontalPagerStateRow1.scrollToPage(targetCol)
-                }
-            },
-            modifier = Modifier.padding(16.dp)
-        )
-
-        // 2D swipeable grid: Vertical pager containing horizontal pagers
-        VerticalPager(
-            state = verticalPagerState,
-            modifier = Modifier
-                .fillMaxSize()
-                .weight(1f),
-            beyondViewportPageCount = 1,
-            flingBehavior = PagerDefaults.flingBehavior(
-                state = verticalPagerState,
-                snapAnimationSpec = snap()
-            )
-        ) { row ->
-            val horizontalPagerState = if (row == 0) horizontalPagerStateRow0 else horizontalPagerStateRow1
-
-            HorizontalPager(
-                state = horizontalPagerState,
-                modifier = Modifier.fillMaxSize(),
-                beyondViewportPageCount = 1,
-                flingBehavior = PagerDefaults.flingBehavior(
-                    state = horizontalPagerState,
-                    snapAnimationSpec = snap()
-                )
-            ) { col ->
-                val regionIndex = row * 2 + col
-                // South (index 1) and West (index 3) should be reversed (right to left)
-                val isReversed = regionIndex == 1 || regionIndex == 3
-
-                BracketRegionView(
-                    region = regions[regionIndex],
-                    isReversed = isReversed,
-                    modifier = Modifier.fillMaxSize()
+        // Collapsible bracket navigation (toggle controlled from top app bar)
+        AnimatedVisibility(
+            visible = isNavigationExpanded,
+            enter = expandVertically(),
+            exit = shrinkVertically()
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                MiniMapNavigation(
+                    regions = regions,
+                    currentIndex = currentQuadrant,
+                    onRegionClick = { index -> currentQuadrant = index },
+                    onFinalFourClick = { currentQuadrant = 4 },
+                    isFinalFourSelected = currentQuadrant == 4
                 )
             }
         }
+
+        // Single unified bracket visualization
+        XYGraph(
+            xAxisModel = xAxisModel,
+            yAxisModel = yAxisModel,
+            gestureConfig = GestureConfig(
+                panXEnabled = true,
+                panYEnabled = true,
+                zoomXEnabled = true,
+                zoomYEnabled = true
+            ),
+            xAxisStyle = rememberAxisStyle(
+                color = Color.Transparent,
+                tickPosition = io.github.koalaplot.core.xygraph.TickPosition.None
+            ),
+            yAxisStyle = rememberAxisStyle(
+                color = Color.Transparent,
+                tickPosition = io.github.koalaplot.core.xygraph.TickPosition.None
+            ),
+            xAxisLabels = { },
+            yAxisLabels = { },
+            xAxisTitle = { },
+            yAxisTitle = { },
+            horizontalMajorGridLineStyle = null,
+            horizontalMinorGridLineStyle = null,
+            verticalMajorGridLineStyle = null,
+            verticalMinorGridLineStyle = null,
+            modifier = Modifier
+                .fillMaxSize()
+                .weight(1f)
+        ) {
+            // Calculate zoom level from current view extent
+            // When zoomed in (extent ~6.5), show details. When zoomed out (extent ~13), show dots.
+            val currentXRange = xAxisModel.viewRange.value
+            val currentXExtent = currentXRange.endInclusive - currentXRange.start
+            // Threshold: show details when viewing roughly one quadrant or less (extent <= 8)
+            val isZoomedIn = currentXExtent <= 8f
+
+            // Draw all four regions
+            // Show full details when zoomed in, dots when zoomed out
+            regions.forEachIndexed { index, region ->
+                val isReversed = index == 1 || index == 3  // South and West are reversed
+                val xOffset = if (index == 1 || index == 3) 4f else 0f
+                val yOffset = if (index == 0 || index == 1) 17f else 0f
+
+                DrawRegionContent(
+                    region = region,
+                    regionName = region.name,
+                    isReversed = isReversed,
+                    xOffset = xOffset,
+                    yOffset = yOffset,
+                    showDetails = isZoomedIn,
+                    lineColor = lineColor,
+                    textColor = textColor,
+                    backgroundColor = backgroundColor,
+                    onMatchupClick = { game, roundName ->
+                        selectedMatchup = MatchupSheetData(game, region.name, roundName, region.color)
+                    }
+                )
+            }
+
+            // Draw Final Four connector lines, Elite 8, semifinals, and championship
+            DrawFinalFourConnectors(
+                regions = regions,
+                lineColor = lineColor,
+                textColor = textColor,
+                backgroundColor = backgroundColor,
+                onMatchupClick = { game, regionName, roundName, color ->
+                    selectedMatchup = MatchupSheetData(game, regionName, roundName, color)
+                }
+            )
+        }
+    }
+
+    // Bottom sheet for matchup details
+    selectedMatchup?.let { matchup ->
+        MatchupBottomSheet(
+            matchupData = matchup,
+            onDismiss = { selectedMatchup = null }
+        )
     }
 }
 
@@ -142,82 +255,76 @@ private fun MiniMapNavigation(
     regions: List<BracketRegion>,
     currentIndex: Int,
     onRegionClick: (Int) -> Unit,
+    onFinalFourClick: () -> Unit,
+    isFinalFourSelected: Boolean,
     modifier: Modifier = Modifier
 ) {
-    // 2x2 grid layout matching bracket structure
-    // Top: East (0), South (1)
-    // Bottom: Midwest (2), West (3)
-    Column(
-        modifier = modifier.fillMaxWidth(),
-        horizontalAlignment = Alignment.CenterHorizontally
+    Row(
+        modifier = modifier.width(180.dp),
+        horizontalArrangement = Arrangement.spacedBy(2.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(
-            text = "NCAA Tournament",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(bottom = 12.dp)
-        )
-
-        Row(
-            modifier = Modifier.width(200.dp),
-            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        // Left column: East (top), Midwest (bottom)
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(2.dp)
         ) {
-            // Left column: East (top), Midwest (bottom)
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                MiniRegionBox(
-                    region = regions[0], // East
-                    isSelected = currentIndex == 0,
-                    onClick = { onRegionClick(0) }
-                )
-                MiniRegionBox(
-                    region = regions[2], // Midwest
-                    isSelected = currentIndex == 2,
-                    onClick = { onRegionClick(2) }
-                )
-            }
+            MiniRegionBox(
+                region = regions[0],
+                isSelected = currentIndex == 0,
+                onClick = { onRegionClick(0) }
+            )
+            MiniRegionBox(
+                region = regions[2],
+                isSelected = currentIndex == 2,
+                onClick = { onRegionClick(2) }
+            )
+        }
 
-            // Center: Final Four indicator
-            Box(
-                modifier = Modifier
-                    .width(40.dp)
-                    .height(80.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(4.dp))
-                        .background(MaterialTheme.colorScheme.primaryContainer)
-                        .padding(horizontal = 4.dp, vertical = 8.dp)
-                ) {
-                    Text(
-                        text = "F4",
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer
-                    )
-                }
-            }
+        // Center: Final Four indicator (clickable)
+        val f4BackgroundColor = if (isFinalFourSelected) {
+            MaterialTheme.colorScheme.primary
+        } else {
+            MaterialTheme.colorScheme.primaryContainer
+        }
+        val f4TextColor = if (isFinalFourSelected) {
+            MaterialTheme.colorScheme.onPrimary
+        } else {
+            MaterialTheme.colorScheme.onPrimaryContainer
+        }
 
-            // Right column: South (top), West (bottom)
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                MiniRegionBox(
-                    region = regions[1], // South
-                    isSelected = currentIndex == 1,
-                    onClick = { onRegionClick(1) }
-                )
-                MiniRegionBox(
-                    region = regions[3], // West
-                    isSelected = currentIndex == 3,
-                    onClick = { onRegionClick(3) }
-                )
-            }
+        Box(
+            modifier = Modifier
+                .width(28.dp)
+                .height(56.dp)
+                .clip(RoundedCornerShape(4.dp))
+                .background(f4BackgroundColor)
+                .clickable(onClick = onFinalFourClick),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = "F4",
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.Bold,
+                color = f4TextColor
+            )
+        }
+
+        // Right column: South (top), West (bottom)
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(2.dp)
+        ) {
+            MiniRegionBox(
+                region = regions[1],
+                isSelected = currentIndex == 1,
+                onClick = { onRegionClick(1) }
+            )
+            MiniRegionBox(
+                region = regions[3],
+                isSelected = currentIndex == 3,
+                onClick = { onRegionClick(3) }
+            )
         }
     }
 }
@@ -243,229 +350,458 @@ private fun MiniRegionBox(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(38.dp)
-            .clip(RoundedCornerShape(6.dp))
+            .height(27.dp)
+            .clip(RoundedCornerShape(4.dp))
             .background(backgroundColor)
             .border(
                 width = if (isSelected) 2.dp else 1.dp,
                 color = borderColor,
-                shape = RoundedCornerShape(6.dp)
+                shape = RoundedCornerShape(4.dp)
             )
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
         Text(
             text = region.name,
-            style = MaterialTheme.typography.labelMedium,
+            style = MaterialTheme.typography.labelSmall,
             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
             color = if (isSelected) region.color else MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
 }
 
+/**
+ * Draws a single region's content at the specified offset
+ * @param showDetails When true, shows full matchup boxes. When false, shows simplified dots.
+ */
+@OptIn(ExperimentalKoalaPlotApi::class)
 @Composable
-private fun BracketRegionView(
+private fun XYGraphScope<Float, Float>.DrawRegionContent(
     region: BracketRegion,
-    isReversed: Boolean = false,
-    modifier: Modifier = Modifier
+    regionName: String,
+    isReversed: Boolean,
+    xOffset: Float,
+    yOffset: Float,
+    showDetails: Boolean,
+    lineColor: Color,
+    textColor: Color,
+    backgroundColor: Color,
+    onMatchupClick: (BracketGame, String) -> Unit
 ) {
-    val scrollState = rememberScrollState()
+    // Y positions for each round (centered vertically within region)
+    val round1Positions = listOf(1f, 3f, 5f, 7f, 9f, 11f, 13f, 15f)
+    val round2Positions = listOf(2f, 6f, 10f, 14f)
+    val round3Positions = listOf(4f, 12f)
+    val round4Positions = listOf(8f)
 
-    Column(
-        modifier = modifier
-            .verticalScroll(scrollState)
-            .padding(horizontal = 8.dp)
-    ) {
-        // Region header
-        Text(
-            text = "${region.name} Region",
-            style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.Bold,
-            color = region.color,
-            modifier = Modifier.padding(start = 8.dp, bottom = 12.dp)
-        )
+    val allPositions = listOf(round1Positions, round2Positions, round3Positions, round4Positions)
 
-        // Bracket layout - horizontal scroll for wide bracket
-        val horizontalScrollState = rememberScrollState()
+    // Draw connecting lines between rounds
+    for (roundIndex in 0 until 3) {
+        val currentPositions = allPositions[roundIndex]
+        val nextPositions = allPositions[roundIndex + 1]
 
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .horizontalScroll(horizontalScrollState)
-        ) {
-            // For reversed regions (South, West), display rounds in reverse order
-            val displayRounds = if (isReversed) region.rounds.reversed() else region.rounds
+        // For reversed regions, rounds go 3,2,1,0 instead of 0,1,2,3
+        // Use ROUND_X_POSITIONS for proper spacing (0, 1.5, 3, 4.5)
+        val currentX = xOffset + if (isReversed) ROUND_X_POSITIONS[3 - roundIndex] else ROUND_X_POSITIONS[roundIndex]
+        val nextX = xOffset + if (isReversed) ROUND_X_POSITIONS[2 - roundIndex] else ROUND_X_POSITIONS[roundIndex + 1]
 
-            Row(
-                modifier = Modifier.padding(vertical = 4.dp),
-                horizontalArrangement = Arrangement.spacedBy(0.dp)
-            ) {
-                displayRounds.forEachIndexed { displayIndex, games ->
-                    // Calculate the actual round index for spacing calculations
-                    val actualRoundIndex = if (isReversed) {
-                        region.rounds.lastIndex - displayIndex
-                    } else {
-                        displayIndex
-                    }
+        for (i in nextPositions.indices) {
+            val topY = yOffset + currentPositions[i * 2]
+            val bottomY = yOffset + currentPositions[i * 2 + 1]
+            val midY = yOffset + nextPositions[i]
 
-                    BracketRound(
-                        roundIndex = actualRoundIndex,
-                        games = games,
-                        regionColor = region.color,
-                        isLastRound = if (isReversed) displayIndex == 0 else displayIndex == region.rounds.lastIndex,
-                        isReversed = isReversed
-                    )
-                }
-            }
+            // Horizontal line from top game
+            LinePlot(
+                data = listOf(
+                    DefaultPoint(currentX + if (isReversed) -0.4f else 0.4f, topY),
+                    DefaultPoint((currentX + nextX) / 2, topY)
+                ),
+                lineStyle = LineStyle(
+                    brush = SolidColor(lineColor),
+                    strokeWidth = 1.5.dp
+                )
+            )
+
+            // Horizontal line from bottom game
+            LinePlot(
+                data = listOf(
+                    DefaultPoint(currentX + if (isReversed) -0.4f else 0.4f, bottomY),
+                    DefaultPoint((currentX + nextX) / 2, bottomY)
+                ),
+                lineStyle = LineStyle(
+                    brush = SolidColor(lineColor),
+                    strokeWidth = 1.5.dp
+                )
+            )
+
+            // Vertical connector
+            LinePlot(
+                data = listOf(
+                    DefaultPoint((currentX + nextX) / 2, topY),
+                    DefaultPoint((currentX + nextX) / 2, bottomY)
+                ),
+                lineStyle = LineStyle(
+                    brush = SolidColor(lineColor),
+                    strokeWidth = 1.5.dp
+                )
+            )
+
+            // Horizontal line to next round
+            LinePlot(
+                data = listOf(
+                    DefaultPoint((currentX + nextX) / 2, midY),
+                    DefaultPoint(nextX + if (isReversed) 0.4f else -0.4f, midY)
+                ),
+                lineStyle = LineStyle(
+                    brush = SolidColor(lineColor),
+                    strokeWidth = 1.5.dp
+                )
+            )
+        }
+    }
+
+    // Round names for display
+    val roundNames = listOf("Round of 64", "Round of 32", "Sweet 16", "Elite 8")
+
+    // Draw matchup boxes for each round (skip Elite 8 / round 4 - it's drawn separately in F4 section)
+    region.rounds.dropLast(1).forEachIndexed { roundIndex, games ->
+        val positions = allPositions[roundIndex]
+        val x = xOffset + if (isReversed) ROUND_X_POSITIONS[3 - roundIndex] else ROUND_X_POSITIONS[roundIndex]
+        val roundName = roundNames[roundIndex]
+
+        games.forEachIndexed { gameIndex, game ->
+            val y = yOffset + positions[gameIndex]
+            DrawMatchupBox(
+                game = game,
+                x = x,
+                y = y,
+                regionColor = region.color,
+                textColor = textColor,
+                backgroundColor = backgroundColor,
+                showDetails = showDetails,
+                onClick = { onMatchupClick(game, roundName) }
+            )
         }
     }
 }
 
+/**
+ * Draws Final Four connector lines, Elite 8, semifinals, and championship matchups
+ * These matchups are always visible with full details regardless of zoom level
+ */
+@OptIn(ExperimentalKoalaPlotApi::class)
 @Composable
-private fun BracketRound(
-    roundIndex: Int,
-    games: List<BracketGame>,
-    regionColor: Color,
-    isLastRound: Boolean,
-    isReversed: Boolean = false
+private fun XYGraphScope<Float, Float>.DrawFinalFourConnectors(
+    regions: List<BracketRegion>,
+    lineColor: Color,
+    textColor: Color,
+    backgroundColor: Color,
+    onMatchupClick: (BracketGame, String, String, Color) -> Unit
 ) {
-    val roundNames = listOf("Round of 64", "Round of 32", "Sweet 16", "Elite 8")
-    val roundName = roundNames.getOrElse(roundIndex) { "Round ${roundIndex + 1}" }
+    // Elite 8 positions (now separated - left regions at x=7, right regions at x=5)
+    // - East: x=7 (0 + ROUND_X_POSITIONS[3]), y=25 (17 + 8)
+    // - South: x=5 (4 + ROUND_X_POSITIONS[0]), y=25
+    // - Midwest: x=7, y=8 (0 + 8)
+    // - West: x=5, y=8
 
-    // Calculate spacing - increases with each round to align bracket lines
-    val verticalSpacing = when (roundIndex) {
-        0 -> 4.dp
-        1 -> 36.dp
-        2 -> 100.dp
-        3 -> 228.dp
-        else -> 4.dp
-    }
+    val centerX = 6f
+    val topY = 25f   // y position for East/South Elite 8
+    val bottomY = 8f // y position for Midwest/West Elite 8
 
-    val topPadding = when (roundIndex) {
-        0 -> 0.dp
-        1 -> 20.dp
-        2 -> 52.dp
-        3 -> 116.dp
-        else -> 0.dp
-    }
+    // Elite 8 matchup positions (region index to position)
+    // Stacked vertically in pairs at center
+    val elite8Positions = listOf(
+        Triple(0, centerX, topY + 2f),      // East (top pair, upper)
+        Triple(1, centerX, topY - 2f),      // South (top pair, lower)
+        Triple(2, centerX, bottomY + 2f),   // Midwest (bottom pair, upper)
+        Triple(3, centerX, bottomY - 2f)    // West (bottom pair, lower)
+    )
 
-    Column(
-        modifier = Modifier.width(140.dp)
-    ) {
-        // Round label
-        Text(
-            text = roundName,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(start = if (isReversed) 0.dp else 4.dp, end = if (isReversed) 4.dp else 0.dp, bottom = 8.dp)
+    // Final Four semifinal positions (stacked vertically with championship in center)
+    // Spacing of 2.5 units prevents overlap when zoomed out while keeping them close together
+    val finalFourY1 = 19f  // Top semifinal (East vs South)
+    val finalFourY2 = 14f  // Bottom semifinal (Midwest vs West)
+
+    // Create Final Four semifinal games from Elite 8 winners
+    val eastElite8 = regions[0].rounds.last().first()
+    val southElite8 = regions[1].rounds.last().first()
+    val midwestElite8 = regions[2].rounds.last().first()
+    val westElite8 = regions[3].rounds.last().first()
+
+    // Get winners from Elite 8 games
+    val eastWinner = if (eastElite8.team1?.isWinner == true) eastElite8.team1 else eastElite8.team2
+    val southWinner = if (southElite8.team1?.isWinner == true) southElite8.team1 else southElite8.team2
+    val midwestWinner = if (midwestElite8.team1?.isWinner == true) midwestElite8.team1 else midwestElite8.team2
+    val westWinner = if (westElite8.team1?.isWinner == true) westElite8.team1 else westElite8.team2
+
+    // Championship Y position (midpoint between the two semifinals)
+    val championshipY = 16.5f
+
+    // Final Four semifinal games
+    val topSemifinal = BracketGame(
+        team1 = eastWinner?.copy(score = 72, isWinner = true),
+        team2 = southWinner?.copy(score = 68, isWinner = false),
+        gameNumber = 1
+    )
+    val bottomSemifinal = BracketGame(
+        team1 = midwestWinner?.copy(score = 75, isWinner = true),
+        team2 = westWinner?.copy(score = 70, isWinner = false),
+        gameNumber = 2
+    )
+
+    // Championship game from semifinal winners
+    val topSemifinalWinner = if (topSemifinal.team1?.isWinner == true) topSemifinal.team1 else topSemifinal.team2
+    val bottomSemifinalWinner = if (bottomSemifinal.team1?.isWinner == true) bottomSemifinal.team1 else bottomSemifinal.team2
+
+    val championshipGame = BracketGame(
+        team1 = topSemifinalWinner?.copy(score = 68, isWinner = true),
+        team2 = bottomSemifinalWinner?.copy(score = 64, isWinner = false),
+        gameNumber = 1
+    )
+
+    // Draw connector lines FIRST (so matchup boxes appear on top)
+    // Vertical line connecting East to South (top pair)
+    LinePlot(
+        data = listOf(
+            DefaultPoint(centerX, topY + 2f),
+            DefaultPoint(centerX, topY - 2f)
+        ),
+        lineStyle = LineStyle(
+            brush = SolidColor(lineColor),
+            strokeWidth = 2.dp
         )
+    )
 
-        Column(
-            modifier = Modifier.padding(top = topPadding),
-            verticalArrangement = Arrangement.spacedBy(verticalSpacing)
-        ) {
-            games.forEach { game ->
-                BracketMatchup(
+    // Vertical line connecting Midwest to West (bottom pair)
+    LinePlot(
+        data = listOf(
+            DefaultPoint(centerX, bottomY + 2f),
+            DefaultPoint(centerX, bottomY - 2f)
+        ),
+        lineStyle = LineStyle(
+            brush = SolidColor(lineColor),
+            strokeWidth = 2.dp
+        )
+    )
+
+    // Connector from top Elite 8 pair to top semifinal
+    LinePlot(
+        data = listOf(
+            DefaultPoint(centerX, topY - 2f),
+            DefaultPoint(centerX, finalFourY1)
+        ),
+        lineStyle = LineStyle(
+            brush = SolidColor(lineColor),
+            strokeWidth = 2.dp
+        )
+    )
+
+    // Connector from bottom Elite 8 pair to bottom semifinal
+    LinePlot(
+        data = listOf(
+            DefaultPoint(centerX, bottomY + 2f),
+            DefaultPoint(centerX, finalFourY2)
+        ),
+        lineStyle = LineStyle(
+            brush = SolidColor(lineColor),
+            strokeWidth = 2.dp
+        )
+    )
+
+    // Championship connector (vertical line between the two Final Four semifinals)
+    LinePlot(
+        data = listOf(
+            DefaultPoint(centerX, finalFourY2),
+            DefaultPoint(centerX, championshipY)
+        ),
+        lineStyle = LineStyle(
+            brush = SolidColor(lineColor),
+            strokeWidth = 2.dp
+        )
+    )
+    LinePlot(
+        data = listOf(
+            DefaultPoint(centerX, championshipY),
+            DefaultPoint(centerX, finalFourY1)
+        ),
+        lineStyle = LineStyle(
+            brush = SolidColor(lineColor),
+            strokeWidth = 2.dp
+        )
+    )
+
+    // Draw Elite 8 matchup boxes AFTER lines (so they appear on top)
+    elite8Positions.forEach { (regionIndex, x, y) ->
+        val region = regions[regionIndex]
+        val elite8Game = region.rounds.last().first() // Elite 8 is the last round (round 4)
+
+        LinePlot(
+            data = listOf(DefaultPoint(x, y)),
+            lineStyle = null,
+            symbol = {
+                MatchupBoxSymbol(
+                    game = elite8Game,
+                    regionColor = region.color,
+                    textColor = textColor,
+                    backgroundColor = backgroundColor,
+                    onClick = { onMatchupClick(elite8Game, region.name, "Elite 8", region.color) }
+                )
+            }
+        )
+    }
+
+    // Draw Final Four semifinal matchup boxes
+    val primaryColor = MaterialTheme.colorScheme.primary
+
+    // Top semifinal (East vs South)
+    LinePlot(
+        data = listOf(DefaultPoint(centerX, finalFourY1)),
+        lineStyle = null,
+        symbol = {
+            MatchupBoxSymbol(
+                game = topSemifinal,
+                regionColor = primaryColor,
+                textColor = textColor,
+                backgroundColor = backgroundColor,
+                onClick = { onMatchupClick(topSemifinal, "Final Four", "Semifinal", primaryColor) }
+            )
+        }
+    )
+
+    // Bottom semifinal (Midwest vs West)
+    LinePlot(
+        data = listOf(DefaultPoint(centerX, finalFourY2)),
+        lineStyle = null,
+        symbol = {
+            MatchupBoxSymbol(
+                game = bottomSemifinal,
+                regionColor = primaryColor,
+                textColor = textColor,
+                backgroundColor = backgroundColor,
+                onClick = { onMatchupClick(bottomSemifinal, "Final Four", "Semifinal", primaryColor) }
+            )
+        }
+    )
+
+    // Championship game (center between semifinals)
+    LinePlot(
+        data = listOf(DefaultPoint(centerX, championshipY)),
+        lineStyle = null,
+        symbol = {
+            MatchupBoxSymbol(
+                game = championshipGame,
+                regionColor = Color(0xFFFFD700), // Gold for championship
+                textColor = textColor,
+                backgroundColor = backgroundColor,
+                onClick = { onMatchupClick(championshipGame, "Final Four", "Championship", Color(0xFFFFD700)) }
+            )
+        }
+    )
+}
+
+/**
+ * Draws a single matchup box at the specified coordinates
+ * @param showDetails When true, shows full matchup card. When false, shows a simple dot.
+ */
+@OptIn(ExperimentalKoalaPlotApi::class)
+@Composable
+private fun XYGraphScope<Float, Float>.DrawMatchupBox(
+    game: BracketGame,
+    x: Float,
+    y: Float,
+    regionColor: Color,
+    textColor: Color,
+    backgroundColor: Color,
+    showDetails: Boolean,
+    onClick: () -> Unit
+) {
+    LinePlot(
+        data = listOf(DefaultPoint(x, y)),
+        lineStyle = null,
+        symbol = {
+            if (showDetails) {
+                MatchupBoxSymbol(
                     game = game,
                     regionColor = regionColor,
-                    showConnector = !isLastRound,
-                    isReversed = isReversed
+                    textColor = textColor,
+                    backgroundColor = backgroundColor,
+                    onClick = onClick
                 )
+            } else {
+                MatchupDotSymbol(regionColor = regionColor, onClick = onClick)
             }
         }
-    }
+    )
 }
 
+/**
+ * Simple dot symbol for zoomed-out view
+ */
 @Composable
-private fun BracketMatchup(
+private fun MatchupDotSymbol(regionColor: Color, onClick: () -> Unit = {}) {
+    Box(
+        modifier = Modifier
+            .size(12.dp)
+            .clip(RoundedCornerShape(6.dp))
+            .background(regionColor.copy(alpha = 0.7f))
+            .border(1.dp, regionColor, RoundedCornerShape(6.dp))
+            .clickable(onClick = onClick)
+    )
+}
+
+/**
+ * The visual symbol for a matchup box (detailed view)
+ */
+@Composable
+private fun MatchupBoxSymbol(
     game: BracketGame,
     regionColor: Color,
-    showConnector: Boolean,
-    isReversed: Boolean = false
+    textColor: Color,
+    backgroundColor: Color,
+    onClick: () -> Unit = {}
 ) {
-    val lineColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
-
-    Row(
-        verticalAlignment = Alignment.CenterVertically
+    Card(
+        modifier = Modifier
+            .width(100.dp)
+            .clickable(onClick = onClick),
+        colors = CardDefaults.cardColors(
+            containerColor = backgroundColor
+        ),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.4f))
     ) {
-        // Connector line on left (for reversed regions)
-        if (showConnector && isReversed) {
-            Box(
-                modifier = Modifier
-                    .width(20.dp)
-                    .height(64.dp)
-                    .drawBehind {
-                        val strokeWidth = 2.dp.toPx()
-                        val centerY = size.height / 2
-
-                        drawLine(
-                            color = lineColor,
-                            start = Offset(0f, centerY),
-                            end = Offset(size.width, centerY),
-                            strokeWidth = strokeWidth
-                        )
-                    }
-            )
-        }
-
-        // Matchup card
-        Card(
-            modifier = Modifier.width(120.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surface
-            ),
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
-        ) {
-            Column {
-                game.team1?.let { team ->
-                    BracketTeamRow(
-                        team = team,
-                        regionColor = regionColor
-                    )
-                } ?: EmptyTeamRow()
-
-                HorizontalDivider(
-                    color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f),
-                    thickness = 1.dp
+        Column {
+            game.team1?.let { team ->
+                MatchupTeamRow(
+                    team = team,
+                    regionColor = regionColor,
+                    textColor = textColor
                 )
+            } ?: EmptyMatchupRow()
 
-                game.team2?.let { team ->
-                    BracketTeamRow(
-                        team = team,
-                        regionColor = regionColor
-                    )
-                } ?: EmptyTeamRow()
-            }
-        }
-
-        // Connector line on right (for normal regions)
-        if (showConnector && !isReversed) {
-            Box(
-                modifier = Modifier
-                    .width(20.dp)
-                    .height(64.dp)
-                    .drawBehind {
-                        val strokeWidth = 2.dp.toPx()
-                        val centerY = size.height / 2
-
-                        drawLine(
-                            color = lineColor,
-                            start = Offset(0f, centerY),
-                            end = Offset(size.width, centerY),
-                            strokeWidth = strokeWidth
-                        )
-                    }
+            HorizontalDivider(
+                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f),
+                thickness = 0.5.dp
             )
+
+            game.team2?.let { team ->
+                MatchupTeamRow(
+                    team = team,
+                    regionColor = regionColor,
+                    textColor = textColor
+                )
+            } ?: EmptyMatchupRow()
         }
     }
 }
 
 @Composable
-private fun BracketTeamRow(
+private fun MatchupTeamRow(
     team: BracketTeam,
-    regionColor: Color
+    regionColor: Color,
+    textColor: Color
 ) {
-    val backgroundColor = if (team.isWinner) {
+    val rowBackground = if (team.isWinner) {
         regionColor.copy(alpha = 0.15f)
     } else {
         Color.Transparent
@@ -474,8 +810,8 @@ private fun BracketTeamRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(backgroundColor)
-            .padding(horizontal = 6.dp, vertical = 6.dp),
+            .background(rowBackground)
+            .padding(horizontal = 4.dp, vertical = 3.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -487,15 +823,18 @@ private fun BracketTeamRow(
                 text = "${team.seed}",
                 style = MaterialTheme.typography.labelSmall,
                 fontWeight = FontWeight.Bold,
-                color = if (team.isWinner) regionColor else MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.width(16.dp)
+                color = if (team.isWinner) regionColor else textColor.copy(alpha = 0.6f),
+                maxLines = 1,
+                modifier = Modifier.width(18.dp)
             )
 
             Text(
                 text = team.name,
-                style = MaterialTheme.typography.bodySmall,
+                style = MaterialTheme.typography.labelSmall,
                 fontWeight = if (team.isWinner) FontWeight.Bold else FontWeight.Normal,
+                color = textColor,
                 maxLines = 1,
+                softWrap = false,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f)
             )
@@ -504,28 +843,184 @@ private fun BracketTeamRow(
         team.score?.let { score ->
             Text(
                 text = "$score",
-                style = MaterialTheme.typography.labelMedium,
+                style = MaterialTheme.typography.labelSmall,
                 fontWeight = if (team.isWinner) FontWeight.Bold else FontWeight.Normal,
-                color = if (team.isWinner) regionColor else MaterialTheme.colorScheme.onSurface
+                color = if (team.isWinner) regionColor else textColor,
+                maxLines = 1
             )
         }
     }
 }
 
 @Composable
-private fun EmptyTeamRow() {
+private fun EmptyMatchupRow() {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 6.dp, vertical = 6.dp)
-            .height(20.dp),
+            .padding(horizontal = 4.dp, vertical = 4.dp)
+            .height(16.dp),
         contentAlignment = Alignment.CenterStart
     ) {
         Text(
             text = "TBD",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
         )
+    }
+}
+
+/**
+ * Bottom sheet showing matchup details
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun MatchupBottomSheet(
+    matchupData: MatchupSheetData,
+    onDismiss: () -> Unit
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = MaterialTheme.colorScheme.surface
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp)
+                .padding(bottom = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            // Header
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column {
+                    Text(
+                        text = matchupData.roundName,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = matchupData.regionColor
+                    )
+                    Text(
+                        text = matchupData.regionName,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Text(
+                    text = "Game #${matchupData.game.gameNumber}",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+
+            // Team 1
+            matchupData.game.team1?.let { team ->
+                MatchupSheetTeamRow(
+                    team = team,
+                    regionColor = matchupData.regionColor
+                )
+            }
+
+            // VS divider
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center
+            ) {
+                Text(
+                    text = "vs",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            // Team 2
+            matchupData.game.team2?.let { team ->
+                MatchupSheetTeamRow(
+                    team = team,
+                    regionColor = matchupData.regionColor
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun MatchupSheetTeamRow(
+    team: BracketTeam,
+    regionColor: Color
+) {
+    val rowBackground = if (team.isWinner) {
+        regionColor.copy(alpha = 0.1f)
+    } else {
+        Color.Transparent
+    }
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(8.dp))
+            .background(rowBackground)
+            .padding(12.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            // Seed badge
+            Box(
+                modifier = Modifier
+                    .size(28.dp)
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(
+                        if (team.isWinner) regionColor else MaterialTheme.colorScheme.surfaceVariant
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "${team.seed}",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = if (team.isWinner) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            // Team name
+            Text(
+                text = team.name,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = if (team.isWinner) FontWeight.Bold else FontWeight.Normal,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+        }
+
+        // Score
+        team.score?.let { score ->
+            Text(
+                text = "$score",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = if (team.isWinner) regionColor else MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+
+        // Winner indicator
+        if (team.isWinner) {
+            Text(
+                text = "W",
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.Bold,
+                color = regionColor
+            )
+        }
     }
 }
 

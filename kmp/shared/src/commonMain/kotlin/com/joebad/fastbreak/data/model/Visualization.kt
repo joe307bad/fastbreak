@@ -145,7 +145,6 @@ object VisualizationData {
             Sport.NBA -> nbaVisualizations
             Sport.MLB -> mlbVisualizations
             Sport.NHL -> emptyList() // NHL uses the new visualization system
-            Sport.CBB -> emptyList() // CBB uses hardcoded charts
         }
     }
 }

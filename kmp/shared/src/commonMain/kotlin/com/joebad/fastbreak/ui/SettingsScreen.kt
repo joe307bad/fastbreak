@@ -174,6 +174,29 @@ fun SettingsScreen(
 
             HorizontalDivider(color = MaterialTheme.colorScheme.outline)
 
+            // Prototype section
+            Column {
+                Text(
+                    text = "prototype",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontFamily = FontFamily.Monospace
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                OutlinedButton(
+                    onClick = component.onNavigateToBracketPrototype,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = "NCAA Tournament Bracket",
+                        fontFamily = FontFamily.Monospace
+                    )
+                }
+            }
+
+            HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+
             // Version info section
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,

@@ -195,7 +195,9 @@ fun TopicsScreen(
                 SegmentedText(
                     segments = topics.descriptionSegments,
                     textColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                    accentColor = MaterialTheme.colorScheme.primary
+                    accentColor = MaterialTheme.colorScheme.primary,
+                    fontSize = 14.sp,
+                    lineHeight = 22.sp
                 )
             } else if (topics?.description?.isNotBlank() == true) {
                 Text(
@@ -224,9 +226,12 @@ private fun SegmentedText(
     segments: List<TextSegment>,
     textColor: Color,
     accentColor: Color,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    fontSize: androidx.compose.ui.unit.TextUnit = 11.sp,
+    lineHeight: androidx.compose.ui.unit.TextUnit = 18.sp
 ) {
     val linkIconColor = MaterialTheme.colorScheme.onBackground
+    val linkIconSize = fontSize * 0.9f
 
     val annotatedString = buildAnnotatedString {
         segments.forEach { segment ->
@@ -238,7 +243,7 @@ private fun SegmentedText(
                         append(segment.value)
                     }
                     // Include the icon in the clickable area
-                    withStyle(SpanStyle(color = linkIconColor, fontSize = 10.sp)) {
+                    withStyle(SpanStyle(color = linkIconColor, fontSize = linkIconSize)) {
                         append(" ↗")
                     }
                     pop()
@@ -257,8 +262,8 @@ private fun SegmentedText(
         modifier = modifier,
         style = MaterialTheme.typography.bodySmall.copy(
             fontFamily = FontFamily.Monospace,
-            fontSize = 11.sp,
-            lineHeight = 18.sp
+            fontSize = fontSize,
+            lineHeight = lineHeight
         ),
         onClick = { offset ->
             annotatedString.getStringAnnotations(tag = "URL", start = offset, end = offset)

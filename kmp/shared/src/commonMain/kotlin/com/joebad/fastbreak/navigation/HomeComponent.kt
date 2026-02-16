@@ -6,17 +6,35 @@ import com.arkivanov.decompose.value.Value
 import com.joebad.fastbreak.data.model.Sport
 import com.joebad.fastbreak.data.model.Tag
 import com.joebad.fastbreak.data.model.VizType
+import kotlinx.serialization.Serializable
 
 class HomeComponent(
     componentContext: ComponentContext,
     val onNavigateToDataViz: (String, Sport, VizType) -> Unit
 ) : ComponentContext by componentContext {
 
-    private val _selectedSport = MutableValue(Sport.NBA)
+    @Serializable
+    private data class SavedState(
+        val selectedSport: Sport = Sport.NBA,
+        val selectedTags: Set<String> = emptySet()
+    )
+
+    private val savedState = stateKeeper.consume(key = "HomeComponent", strategy = SavedState.serializer()) ?: SavedState()
+
+    private val _selectedSport = MutableValue(savedState.selectedSport)
     val selectedSport: Value<Sport> = _selectedSport
 
-    private val _selectedTags = MutableValue<Set<String>>(emptySet())
+    private val _selectedTags = MutableValue(savedState.selectedTags)
     val selectedTags: Value<Set<String>> = _selectedTags
+
+    init {
+        stateKeeper.register(key = "HomeComponent", strategy = SavedState.serializer()) {
+            SavedState(
+                selectedSport = _selectedSport.value,
+                selectedTags = _selectedTags.value
+            )
+        }
+    }
 
     fun selectSport(sport: Sport) {
         _selectedSport.value = sport

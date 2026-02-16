@@ -73,6 +73,7 @@ dependencies {
     implementation(project(":shared"))
     implementation(libs.androidx.activity.compose)
     implementation(libs.decompose)
+    implementation(libs.decompose.android)
     implementation(libs.essenty.lifecycle)
     implementation(libs.multiplatform.settings.no.arg)
     implementation(libs.ktor.client.core)

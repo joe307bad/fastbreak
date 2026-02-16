@@ -7,8 +7,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Info
@@ -46,6 +44,7 @@ import com.joebad.fastbreak.data.model.TextSegment
 import com.joebad.fastbreak.data.model.TopicsResponse
 import com.joebad.fastbreak.data.model.VizType
 import com.joebad.fastbreak.navigation.TopicsComponent
+import com.joebad.fastbreak.ui.components.InfoBottomSheet
 import com.joebad.fastbreak.platform.UrlLauncher
 import kotlin.time.Clock
 import kotlin.time.Instant
@@ -74,7 +73,6 @@ fun TopicsScreen(
     topicsUpdatedAt: Instant?,
     onMenuClick: () -> Unit = {}
 ) {
-    val sheetState = rememberModalBottomSheetState()
     var showInfoSheet by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
@@ -189,35 +187,24 @@ fun TopicsScreen(
 
     // Info bottom sheet
     if (showInfoSheet && (topics?.descriptionSegments?.isNotEmpty() == true || topics?.description?.isNotBlank() == true)) {
-        ModalBottomSheet(
-            onDismissRequest = { showInfoSheet = false },
-            sheetState = sheetState
+        InfoBottomSheet(
+            onDismiss = { showInfoSheet = false },
+            title = "about topics"
         ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .verticalScroll(rememberScrollState())
-                    .padding(16.dp)
-                    .padding(bottom = 32.dp)
-            ) {
-                Text(
-                    text = "About Topics",
-                    style = MaterialTheme.typography.titleLarge,
-                    modifier = Modifier.padding(bottom = 8.dp)
+            if (topics?.descriptionSegments?.isNotEmpty() == true) {
+                SegmentedText(
+                    segments = topics.descriptionSegments,
+                    textColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    accentColor = MaterialTheme.colorScheme.primary,
+                    fontSize = 14.sp,
+                    lineHeight = 22.sp
                 )
-                if (topics?.descriptionSegments?.isNotEmpty() == true) {
-                    SegmentedText(
-                        segments = topics.descriptionSegments,
-                        textColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                        accentColor = MaterialTheme.colorScheme.primary
-                    )
-                } else if (topics?.description?.isNotBlank() == true) {
-                    Text(
-                        text = topics.description,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
+            } else if (topics?.description?.isNotBlank() == true) {
+                Text(
+                    text = topics.description,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
         }
     }
@@ -239,9 +226,12 @@ private fun SegmentedText(
     segments: List<TextSegment>,
     textColor: Color,
     accentColor: Color,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    fontSize: androidx.compose.ui.unit.TextUnit = 11.sp,
+    lineHeight: androidx.compose.ui.unit.TextUnit = 18.sp
 ) {
     val linkIconColor = MaterialTheme.colorScheme.onBackground
+    val linkIconSize = fontSize * 0.9f
 
     val annotatedString = buildAnnotatedString {
         segments.forEach { segment ->
@@ -253,7 +243,7 @@ private fun SegmentedText(
                         append(segment.value)
                     }
                     // Include the icon in the clickable area
-                    withStyle(SpanStyle(color = linkIconColor, fontSize = 10.sp)) {
+                    withStyle(SpanStyle(color = linkIconColor, fontSize = linkIconSize)) {
                         append(" ↗")
                     }
                     pop()
@@ -272,8 +262,8 @@ private fun SegmentedText(
         modifier = modifier,
         style = MaterialTheme.typography.bodySmall.copy(
             fontFamily = FontFamily.Monospace,
-            fontSize = 11.sp,
-            lineHeight = 18.sp
+            fontSize = fontSize,
+            lineHeight = lineHeight
         ),
         onClick = { offset ->
             annotatedString.getStringAnnotations(tag = "URL", start = offset, end = offset)

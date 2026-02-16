@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.joebad.fastbreak.data.model.*
 import com.joebad.fastbreak.navigation.DataVizComponent
+import com.joebad.fastbreak.ui.components.InfoBottomSheet
 import com.joebad.fastbreak.ui.visualizations.*
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -35,7 +36,6 @@ fun DataVizScreen(
     var state by remember { mutableStateOf<DataVizState>(DataVizState.Loading) }
     var refreshTrigger by remember { mutableStateOf(0) }
     val scope = rememberCoroutineScope()
-    val sheetState = rememberModalBottomSheetState()
     var showInfoSheet by remember { mutableStateOf(false) }
 
     // Observe registry state for sync failures
@@ -50,6 +50,21 @@ fun DataVizScreen(
         println("   initialFilters: ${component.initialFilters}")
 
         state = DataVizState.Loading
+
+        // Handle HELLO_WORLD viz type as a hardcoded screen (no data loading needed)
+        if (component.vizType == VizType.HELLO_WORLD) {
+            state = DataVizState.Success(
+                HelloWorldVisualization(
+                    sport = component.sport.name,
+                    visualizationType = "HELLO_WORLD",
+                    title = "NCAA Tournament",
+                    subtitle = "Coming Soon",
+                    description = "NCAA Tournament bracket visualization",
+                    lastUpdated = kotlin.time.Clock.System.now()
+                )
+            )
+            return@LaunchedEffect
+        }
 
         try {
             // First check if this chart failed during synchronization
@@ -107,6 +122,9 @@ fun DataVizScreen(
     // State to hold the schedule toggle handler from NBA matchup worksheet
     var scheduleToggleHandler by remember { mutableStateOf<ScheduleToggleHandler?>(null) }
 
+    // State to hold the bracket navigation toggle handler from NCAA bracket
+    var bracketNavigationToggleHandler by remember { mutableStateOf<BracketNavigationToggleHandler?>(null) }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -140,6 +158,15 @@ fun DataVizScreen(
                             Icon(
                                 imageVector = if (handler.isExpanded) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
                                 contentDescription = if (handler.isExpanded) "Collapse schedule" else "Expand schedule"
+                            )
+                        }
+                    }
+                    // Show bracket navigation toggle icon for NCAA bracket
+                    bracketNavigationToggleHandler?.let { handler ->
+                        IconButton(onClick = handler.toggle) {
+                            Icon(
+                                imageVector = if (handler.isExpanded) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
+                                contentDescription = if (handler.isExpanded) "Collapse bracket navigation" else "Expand bracket navigation"
                             )
                         }
                     }
@@ -191,6 +218,9 @@ fun DataVizScreen(
                     },
                     onScheduleToggleHandlerChanged = { handler ->
                         scheduleToggleHandler = handler
+                    },
+                    onBracketNavigationToggleHandlerChanged = { handler ->
+                        bracketNavigationToggleHandler = handler
                     }
                 )
                 is DataVizState.Error -> ErrorContent(
@@ -242,28 +272,15 @@ fun DataVizScreen(
     // Bottom sheet for chart description
     if (showInfoSheet && state is DataVizState.Success) {
         val visualization = (state as DataVizState.Success).data
-        ModalBottomSheet(
-            onDismissRequest = { showInfoSheet = false },
-            sheetState = sheetState
+        InfoBottomSheet(
+            onDismiss = { showInfoSheet = false },
+            title = visualization.title
         ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .verticalScroll(rememberScrollState())
-                    .padding(16.dp)
-                    .padding(bottom = 32.dp)
-            ) {
-                Text(
-                    text = visualization.title,
-                    style = MaterialTheme.typography.titleLarge,
-                    modifier = Modifier.padding(bottom = 8.dp)
-                )
-                Text(
-                    text = visualization.description,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
+            Text(
+                text = visualization.description,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }
@@ -290,7 +307,8 @@ private fun SuccessContent(
     pinnedTeams: List<PinnedTeam>,
     initialFilters: Map<String, String>? = null,
     onChartShareHandlerChanged: ((() -> Unit)?) -> Unit,
-    onScheduleToggleHandlerChanged: ((ScheduleToggleHandler?) -> Unit)? = null
+    onScheduleToggleHandlerChanged: ((ScheduleToggleHandler?) -> Unit)? = null,
+    onBracketNavigationToggleHandlerChanged: ((BracketNavigationToggleHandler?) -> Unit)? = null
 ) {
     // State for filters and team highlighting - initialize from deep link filters if provided
     var selectedFilters by remember { mutableStateOf(initialFilters ?: emptyMap()) }
@@ -400,6 +418,7 @@ private fun SuccessContent(
             onChartShareHandlerChanged = onChartShareHandlerChanged,
             pinnedTeams = pinnedTeams,
             onScheduleToggleHandlerChanged = onScheduleToggleHandlerChanged,
+            onBracketNavigationToggleHandlerChanged = onBracketNavigationToggleHandlerChanged,
             onTeamClick = { label ->
                 // For PLAYER scatter plots, highlight individual players by label
                 // For TEAM scatter plots (and others), highlight teams by extracting team code
@@ -440,7 +459,8 @@ private fun RenderVisualization(
     onChartShareHandlerChanged: ((() -> Unit)?) -> Unit = {},
     onTeamClick: (String) -> Unit = {},
     pinnedTeams: List<PinnedTeam> = emptyList(),
-    onScheduleToggleHandlerChanged: ((ScheduleToggleHandler?) -> Unit)? = null
+    onScheduleToggleHandlerChanged: ((ScheduleToggleHandler?) -> Unit)? = null,
+    onBracketNavigationToggleHandlerChanged: ((BracketNavigationToggleHandler?) -> Unit)? = null
 ) {
     println("📊 RenderVisualization - highlightedPlayerLabels: $highlightedPlayerLabels")
     println("📊 RenderVisualization - visualization type: ${visualization::class.simpleName}")
@@ -485,6 +505,12 @@ private fun RenderVisualization(
             pinnedTeams = pinnedTeams,
             highlightedTeamCodes = highlightedTeamCodes,
             onScheduleToggleHandlerChanged = onScheduleToggleHandlerChanged
+        )
+    } else if (visualization is HelloWorldVisualization) {
+        // NCAA Tournament bracket
+        NCAABracket(
+            modifier = Modifier.fillMaxSize(),
+            onNavigationToggleHandlerChanged = onBracketNavigationToggleHandlerChanged
         )
     } else {
         // For charts: use vertical scroll to show chart + data table
@@ -568,6 +594,9 @@ private fun RenderVisualization(
                             }
                             is NBAMatchupVisualization -> {
                                 // Handled by NBAMatchupWorksheet below
+                            }
+                            is HelloWorldVisualization -> {
+                                // Handled above
                             }
                         }
                     }

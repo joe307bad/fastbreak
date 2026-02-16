@@ -1,6 +1,7 @@
 package com.joebad.fastbreak.ui.container
 
 import com.joebad.fastbreak.data.model.BarGraphVisualization
+import com.joebad.fastbreak.data.model.HelloWorldVisualization
 import com.joebad.fastbreak.data.model.LineChartVisualization
 import com.joebad.fastbreak.data.model.MatchupVisualization
 import com.joebad.fastbreak.data.model.MatchupV2Visualization
@@ -101,6 +102,9 @@ class ChartDataContainer(
                     }
                     com.joebad.fastbreak.data.model.VizType.NBA_MATCHUP -> {
                         json.decodeFromString<NBAMatchupVisualization>(cached.dataJson)
+                    }
+                    com.joebad.fastbreak.data.model.VizType.HELLO_WORLD -> {
+                        json.decodeFromString<HelloWorldVisualization>(cached.dataJson)
                     }
                 }
 

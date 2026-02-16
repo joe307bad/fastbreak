@@ -5,8 +5,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.core.view.WindowCompat
-import com.arkivanov.decompose.DefaultComponentContext
-import com.arkivanov.essenty.lifecycle.LifecycleRegistry
+import com.arkivanov.decompose.defaultComponentContext
 import com.joebad.fastbreak.App
 import com.joebad.fastbreak.data.api.RegistryApi
 import com.joebad.fastbreak.data.repository.ChartDataRepository
@@ -100,7 +99,7 @@ class MainActivity : ComponentActivity() {
         )
 
         val rootComponent = RootComponent(
-            componentContext = DefaultComponentContext(lifecycle = LifecycleRegistry()),
+            componentContext = defaultComponentContext(),
             themeRepository = themeRepository,
             registryContainer = registryContainer,
             pinnedTeamsContainer = pinnedTeamsContainer,

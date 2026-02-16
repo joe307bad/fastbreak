@@ -15,6 +15,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
+import com.joebad.fastbreak.ui.components.InfoBottomSheet
 
 data class FilterOption(
     val key: String,
@@ -33,7 +34,6 @@ fun FilterBar(
     if (filters.isEmpty()) return
 
     var activeFilterKey by remember { mutableStateOf<String?>(null) }
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     // Filter chips - parent is responsible for Row layout and scrolling
     filters.forEach { filter ->
@@ -74,57 +74,30 @@ fun FilterBar(
     if (activeFilterKey != null) {
         val activeFilter = filters.find { it.key == activeFilterKey }
         if (activeFilter != null) {
-            val scrollState = rememberScrollState()
-
-            ModalBottomSheet(
-                onDismissRequest = { activeFilterKey = null },
-                sheetState = sheetState,
-                containerColor = MaterialTheme.colorScheme.background,
-                dragHandle = { BottomSheetDefaults.DragHandle() }
+            InfoBottomSheet(
+                onDismiss = { activeFilterKey = null },
+                title = activeFilter.displayName
             ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .fillMaxHeight(0.9f)
-                ) {
-                    // Sheet title
-                    Text(
-                        text = activeFilter.displayName,
-                        style = MaterialTheme.typography.titleMedium,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-                    )
-
-                    // Scrollable content
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .weight(1f)
-                            .verticalScroll(scrollState)
-                    ) {
-                        // "All" option
-                        FilterOptionItem(
-                            label = "All",
-                            isSelected = selectedFilters[activeFilter.key] == null,
-                            onClick = {
-                                onFilterChange(activeFilter.key, null)
-                                activeFilterKey = null
-                            }
-                        )
-
-                        // Individual filter values
-                        activeFilter.values.forEach { value ->
-                            FilterOptionItem(
-                                label = value,
-                                isSelected = selectedFilters[activeFilter.key] == value,
-                                onClick = {
-                                    onFilterChange(activeFilter.key, value)
-                                    activeFilterKey = null
-                                }
-                            )
-                        }
+                // "All" option
+                FilterOptionItem(
+                    label = "All",
+                    isSelected = selectedFilters[activeFilter.key] == null,
+                    onClick = {
+                        onFilterChange(activeFilter.key, null)
+                        activeFilterKey = null
                     }
+                )
 
-                    Spacer(modifier = Modifier.height(32.dp))
+                // Individual filter values
+                activeFilter.values.forEach { value ->
+                    FilterOptionItem(
+                        label = value,
+                        isSelected = selectedFilters[activeFilter.key] == value,
+                        onClick = {
+                            onFilterChange(activeFilter.key, value)
+                            activeFilterKey = null
+                        }
+                    )
                 }
             }
         }

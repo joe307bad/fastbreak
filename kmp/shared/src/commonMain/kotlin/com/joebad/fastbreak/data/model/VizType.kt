@@ -14,5 +14,6 @@ enum class VizType {
     TABLE,
     MATCHUP,
     MATCHUP_V2,
-    NBA_MATCHUP
+    NBA_MATCHUP,
+    HELLO_WORLD
 }

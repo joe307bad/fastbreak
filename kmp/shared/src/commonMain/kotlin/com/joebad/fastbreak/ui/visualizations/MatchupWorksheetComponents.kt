@@ -124,6 +124,97 @@ fun getNBAPlayerRankColor(rank: Int?): Color {
 }
 
 /**
+ * Pre-computed rank colors for CBB team stats (1-64 scale)
+ * - Ranks 1-21: Green gradient
+ * - Ranks 22-42: Orange gradient
+ * - Ranks 43-64: Red gradient
+ */
+val cbbTeamRankColors: Map<Int, Color> = buildMap {
+    put(0, Color.Transparent) // For null ranks
+
+    // Darkest red color for rank 64+
+    val darkestRed = Color(139, 0, 0)
+
+    for (rank in 1..64) {
+        val color = when {
+            rank <= 21 -> {
+                // Green gradient (ranks 1-21): Bright green to darker green
+                val ratio = (rank - 1) / 20f
+                val red = (0 + ratio * 80).toInt()
+                val green = (150 + ratio * 30).toInt()
+                val blue = 0
+                Color(red, green, blue)
+            }
+            rank <= 42 -> {
+                // Orange to dark orange gradient (ranks 22-42)
+                val ratio = (rank - 22) / 20f
+                val red = (255 - ratio * 55).toInt()
+                val green = (140 - ratio * 40).toInt()
+                val blue = 0
+                Color(red, green, blue)
+            }
+            else -> {
+                // Red to dark red gradient (ranks 43-64)
+                val ratio = (rank - 43) / 21f
+                val red = (200 - ratio * 61).toInt()
+                val green = (0 + ratio * 0).toInt()
+                val blue = 0
+                Color(red, green, blue)
+            }
+        }
+        put(rank, color)
+    }
+
+    // Add explicit mapping for ranks > 64 to use the darkest red
+    for (rank in 65..100) {
+        put(rank, darkestRed)
+    }
+}
+
+/**
+ * Get color for CBB team rank (1-64 scale)
+ */
+fun getCBBTeamRankColor(rank: Int?): Color {
+    if (rank == null || rank <= 0) return Color.Transparent
+    return cbbTeamRankColors[rank.coerceIn(1, 100)] ?: Color.Transparent
+}
+
+/**
+ * Get color for AP rank (1-25 scale)
+ * - Ranks 1-8: Green gradient
+ * - Ranks 9-17: Orange gradient
+ * - Ranks 18-25: Red gradient
+ * - Unranked (null): Dark red
+ */
+fun getAPRankColor(rank: Int?): Color {
+    // Unranked teams get dark red
+    if (rank == null || rank <= 0) return Color(139, 0, 0)
+
+    return when {
+        rank <= 8 -> {
+            // Green gradient (ranks 1-8)
+            val ratio = (rank - 1) / 7f
+            val red = (0 + ratio * 60).toInt()
+            val green = (150 + ratio * 30).toInt()
+            Color(red, green, 0)
+        }
+        rank <= 17 -> {
+            // Orange gradient (ranks 9-17)
+            val ratio = (rank - 9) / 8f
+            val red = (255 - ratio * 55).toInt()
+            val green = (140 - ratio * 40).toInt()
+            Color(red, green, 0)
+        }
+        else -> {
+            // Red gradient (ranks 18-25+)
+            val ratio = ((rank - 18).coerceAtMost(7)) / 7f
+            val red = (200 - ratio * 61).toInt()
+            Color(red, 0, 0)
+        }
+    }
+}
+
+/**
  * Get color for conference rank (1-15 scale)
  * Light green for 1st, dark red for 15th
  */
@@ -254,7 +345,8 @@ fun FiveColumnRowWithRanks(
     rightRankDisplay: String?,
     advantage: Int = 0,
     useNBARanks: Boolean = true, // true for NBA (30 teams), false for NFL (32 teams)
-    usePlayerRanks: Boolean = false // true for player ranks (1-100+ scale), overrides useNBARanks
+    usePlayerRanks: Boolean = false, // true for player ranks (1-100+ scale), overrides useNBARanks
+    useCBBRanks: Boolean = false // true for CBB (64 teams), overrides useNBARanks
 ) {
     Row(
         modifier = Modifier
@@ -294,6 +386,7 @@ fun FiveColumnRowWithRanks(
                 .background(
                     when {
                         usePlayerRanks -> getNBAPlayerRankColor(leftRank)
+                        useCBBRanks -> getCBBTeamRankColor(leftRank)
                         useNBARanks -> getNBATeamRankColor(leftRank)
                         else -> Color.Gray
                     },
@@ -335,6 +428,7 @@ fun FiveColumnRowWithRanks(
                 .background(
                     when {
                         usePlayerRanks -> getNBAPlayerRankColor(rightRank)
+                        useCBBRanks -> getCBBTeamRankColor(rightRank)
                         useNBARanks -> getNBATeamRankColor(rightRank)
                         else -> Color.Gray
                     },

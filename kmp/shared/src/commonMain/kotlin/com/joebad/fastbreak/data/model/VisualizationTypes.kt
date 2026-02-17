@@ -460,12 +460,13 @@ data class TeamStatEntry(
 )
 
 /**
- * Side-by-side comparison views (offense vs offense, defense vs defense)
+ * Side-by-side comparison views (offense vs offense, defense vs defense, overall)
  */
 @Serializable
 data class SideBySideComparison(
     val offense: Map<String, SideBySideStatComparison> = emptyMap(),
-    val defense: Map<String, SideBySideStatComparison> = emptyMap()
+    val defense: Map<String, SideBySideStatComparison> = emptyMap(),
+    val overall: Map<String, SideBySideStatComparison> = emptyMap()
 )
 
 /**
@@ -588,6 +589,68 @@ data class NBAMatchupVisualization(
     override val tags: List<Tag>? = null,
     override val sortOrder: Int? = null,
     val dataPoints: List<NBAMatchup>
+) : VisualizationType
+
+// CBB (College Basketball) Matchup Visualization
+@Serializable
+data class CBBTeamInfo(
+    val name: String,
+    val abbreviation: String,
+    val logo: String,
+    val conference: String? = null,
+    val apRank: Int? = null,
+    val srsRank: Int? = null,
+    val wins: Int? = null,
+    val losses: Int? = null,
+    val stats: CBBTeamStats? = null
+)
+
+@Serializable
+data class CBBTeamStats(
+    val pointsPerGame: CBBStatValue? = null,
+    val oppPointsPerGame: CBBStatValue? = null,
+    val marginOfVictory: CBBStatValue? = null,
+    val strengthOfSchedule: CBBStatValue? = null,
+    val offensiveSRS: CBBStatValue? = null,
+    val defensiveSRS: CBBStatValue? = null,
+    val srs: CBBStatValue? = null,
+    val offensiveRating: CBBStatValue? = null,
+    val defensiveRating: CBBStatValue? = null,
+    val netRating: CBBStatValue? = null
+)
+
+@Serializable
+data class CBBStatValue(
+    val value: Double? = null,
+    val rank: Int? = null,
+    val rankDisplay: String? = null
+)
+
+@Serializable
+data class CBBMatchup(
+    val gameId: String,
+    val gameDate: String,  // ISO 8601 format
+    val gameName: String,
+    val homeTeam: CBBTeamInfo,
+    val awayTeam: CBBTeamInfo,
+    val location: MatchupLocation? = null,
+    val odds: NBAMatchupOdds? = null,  // Reuse NBA odds structure
+    val comparisons: MatchupComparisons? = null  // Reuse existing comparison structure
+)
+
+@Serializable
+data class CBBMatchupVisualization(
+    override val sport: String,
+    override val visualizationType: String,
+    override val title: String,
+    override val subtitle: String,
+    override val description: String,
+    override val lastUpdated: Instant,
+    override val source: String? = null,
+    @Serializable(with = TagListSerializer::class)
+    override val tags: List<Tag>? = null,
+    override val sortOrder: Int? = null,
+    val dataPoints: List<CBBMatchup>
 ) : VisualizationType
 
 // Hello World visualization (placeholder for future features)

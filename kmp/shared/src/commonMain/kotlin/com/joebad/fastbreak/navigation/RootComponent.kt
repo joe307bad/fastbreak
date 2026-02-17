@@ -168,6 +168,9 @@ class RootComponent(
                         if (config.fromTopics) {
                             // Just pop back to Topics
                             navigation.pop()
+                        } else if (config.vizType == VizType.HELLO_WORLD) {
+                            // Bracket visualization - pop back to Settings
+                            navigation.pop()
                         } else {
                             navigateBackToHome()
                         }

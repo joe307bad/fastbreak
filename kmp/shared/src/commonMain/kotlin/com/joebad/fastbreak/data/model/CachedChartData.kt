@@ -82,6 +82,7 @@ data class CachedChartData(
             VizType.MATCHUP -> json.decodeFromString<MatchupVisualization>(dataJson)
             VizType.MATCHUP_V2 -> json.decodeFromString<MatchupV2Visualization>(dataJson)
             VizType.NBA_MATCHUP -> json.decodeFromString<NBAMatchupVisualization>(dataJson)
+            VizType.CBB_MATCHUP -> json.decodeFromString<CBBMatchupVisualization>(dataJson)
             VizType.HELLO_WORLD -> json.decodeFromString<HelloWorldVisualization>(dataJson)
         }
         return result

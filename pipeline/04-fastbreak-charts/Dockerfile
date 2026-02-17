@@ -29,7 +29,7 @@ WORKDIR /app
 COPY weekly /app/weekly
 COPY daily /app/daily
 COPY utils /app/utils
-RUN mkdir -p /app/data
+COPY data /app/data
 
 # Copy Fastbreak.Daily executable (built by CI)
 COPY Fastbreak.Daily /app/Fastbreak.Daily

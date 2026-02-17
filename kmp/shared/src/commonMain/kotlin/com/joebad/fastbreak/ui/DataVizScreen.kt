@@ -356,10 +356,11 @@ private fun SuccessContent(
 
     Column(modifier = Modifier.fillMaxSize()) {
         // Show filter bar if there are any filterable properties or pinned teams
-        // BUT hide it for MatchupV2Visualization, NBAMatchupVisualization, and HelloWorldVisualization (bracket)
+        // BUT hide it for MatchupV2Visualization, NBAMatchupVisualization, CBBMatchupVisualization, and HelloWorldVisualization (bracket)
         if ((filterOptions.isNotEmpty() || sportPinnedTeams.isNotEmpty())
             && visualization !is MatchupV2Visualization
             && visualization !is NBAMatchupVisualization
+            && visualization !is CBBMatchupVisualization
             && visualization !is HelloWorldVisualization) {
             val scrollState = rememberScrollState()
             Row(
@@ -507,6 +508,15 @@ private fun RenderVisualization(
             highlightedTeamCodes = highlightedTeamCodes,
             onScheduleToggleHandlerChanged = onScheduleToggleHandlerChanged
         )
+    } else if (visualization is CBBMatchupVisualization) {
+        // CBB Matchup has its own dedicated screen with two-row navigation
+        CBBMatchupWorksheet(
+            visualization = visualization,
+            modifier = Modifier.fillMaxSize(),
+            pinnedTeams = pinnedTeams,
+            highlightedTeamCodes = highlightedTeamCodes,
+            onScheduleToggleHandlerChanged = onScheduleToggleHandlerChanged
+        )
     } else if (visualization is HelloWorldVisualization) {
         // NCAA Tournament bracket
         NCAABracket(
@@ -594,7 +604,10 @@ private fun RenderVisualization(
                                 // Handled by MatchupWorksheet below
                             }
                             is NBAMatchupVisualization -> {
-                                // Handled by NBAMatchupWorksheet below
+                                // Handled by NBAMatchupWorksheet above
+                            }
+                            is CBBMatchupVisualization -> {
+                                // Handled by CBBMatchupWorksheet above
                             }
                             is HelloWorldVisualization -> {
                                 // Handled above
@@ -698,6 +711,11 @@ private fun extractFiltersAndCalculateHighlights(
         }
         is NBAMatchupVisualization -> {
             // For NBAMatchup, calculate highlighted teams from the "team" filter
+            val highlights = selectedFilters["team"]?.let { setOf(it.uppercase()) } ?: emptySet()
+            emptyList<FilterOption>() to highlights
+        }
+        is CBBMatchupVisualization -> {
+            // For CBBMatchup, calculate highlighted teams from the "team" filter
             val highlights = selectedFilters["team"]?.let { setOf(it.uppercase()) } ?: emptySet()
             emptyList<FilterOption>() to highlights
         }

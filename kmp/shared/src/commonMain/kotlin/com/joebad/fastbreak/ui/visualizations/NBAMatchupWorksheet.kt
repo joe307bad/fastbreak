@@ -1230,7 +1230,7 @@ private fun formatOrdinal(number: Int): String {
  * Date badge for filtering games by date
  */
 @Composable
-private fun DateBadge(
+internal fun DateBadge(
     date: LocalDate,
     isSelected: Boolean,
     onClick: () -> Unit
@@ -1280,7 +1280,7 @@ private fun DateBadge(
  * Matchup badge showing team abbreviations and game time
  */
 @Composable
-private fun MatchupBadge(
+internal fun MatchupBadge(
     awayTeam: String,
     homeTeam: String,
     gameDate: String,

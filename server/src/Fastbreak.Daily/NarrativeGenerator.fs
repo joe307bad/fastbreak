@@ -227,6 +227,7 @@ let private parseDataPoints (text: string) =
 // Topics for each league - each becomes a separate narrative with its own grounded search
 let private getTopics (league: string) =
     match league with
+    | "CBB" -> ["game results, scores, and standout player performances from recent games"; "roster moves, trades, injuries, and tournament implications"]
     | "NFL" -> ["game results, scores, and standout player performances from recent games"; "roster moves, trades, injuries, and playoff implications"]
     | "NBA" -> ["game results, scores, and standout player performances from recent games"; "roster moves, trades, injuries, and playoff race standings"]
     | "NHL" -> ["game results, scores, and standout player performances from recent games"; "roster moves, trades, injuries, and playoff race standings"]

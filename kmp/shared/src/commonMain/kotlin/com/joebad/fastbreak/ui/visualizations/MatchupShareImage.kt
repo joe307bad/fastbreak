@@ -63,7 +63,8 @@ data class ShareFiveColStat(
     val rightRank: Int? = null,
     val rightRankDisplay: String? = null,
     val advantage: Int = 0, // -1 for left (away), 0 for even, 1 for right (home)
-    val usePlayerRanks: Boolean = false // true for player ranks, false for team ranks
+    val usePlayerRanks: Boolean = false, // true for player ranks (100+ scale)
+    val useCBBRanks: Boolean = false // true for CBB ranks (64 team scale)
 )
 
 /** A box/card in the share image containing stats */
@@ -137,6 +138,40 @@ private fun getShareTeamRankColor(rank: Int?): Color = shareTeamRankColors[rank 
 private fun getSharePlayerRankColor(rank: Int?): Color {
     if (rank == null || rank == 0) return Color.Transparent
     return sharePlayerRankColors[rank] ?: Color(139, 0, 0)
+}
+
+/**
+ * Pre-computed rank colors for CBB team stats (1-64 scale)
+ */
+private val shareCBBRankColors: Map<Int, Color> = buildMap {
+    put(0, Color.Transparent)
+    val darkestRed = Color(139, 0, 0)
+    for (rank in 1..64) {
+        val color = when {
+            rank <= 21 -> {
+                // Green gradient (ranks 1-21)
+                val ratio = (rank - 1) / 20f
+                Color((0 + ratio * 80).toInt(), (150 + ratio * 30).toInt(), 0)
+            }
+            rank <= 42 -> {
+                // Orange gradient (ranks 22-42)
+                val ratio = (rank - 22) / 20f
+                Color((255 - ratio * 55).toInt(), (140 - ratio * 40).toInt(), 0)
+            }
+            else -> {
+                // Red gradient (ranks 43-64)
+                val ratio = (rank - 43) / 21f
+                Color((200 - ratio * 61).toInt(), 0, 0)
+            }
+        }
+        put(rank, color)
+    }
+    for (rank in 65..100) put(rank, darkestRed)
+}
+
+private fun getShareCBBRankColor(rank: Int?): Color {
+    if (rank == null || rank == 0) return Color.Transparent
+    return shareCBBRankColors[rank] ?: Color(139, 0, 0)
 }
 
 /**
@@ -778,6 +813,7 @@ private fun GenericStatBoxContent(
                 rightRankDisplay = stat.rightRankDisplay,
                 advantage = stat.advantage,
                 usePlayerRanks = stat.usePlayerRanks,
+                useCBBRanks = stat.useCBBRanks,
                 textColor = textColor
             )
         }
@@ -798,6 +834,7 @@ private fun ShareGenericFiveColumnRow(
     rightRankDisplay: String?,
     advantage: Int = 0,
     usePlayerRanks: Boolean = false,
+    useCBBRanks: Boolean = false,
     textColor: Color
 ) {
     Row(
@@ -833,7 +870,8 @@ private fun ShareGenericFiveColumnRow(
         ShareGenericRankBadge(
             rank = leftRank,
             rankDisplay = leftRankDisplay,
-            usePlayerRanks = usePlayerRanks
+            usePlayerRanks = usePlayerRanks,
+            useCBBRanks = useCBBRanks
         )
 
         Spacer(modifier = Modifier.width(12.dp))
@@ -855,7 +893,8 @@ private fun ShareGenericFiveColumnRow(
         ShareGenericRankBadge(
             rank = rightRank,
             rankDisplay = rightRankDisplay,
-            usePlayerRanks = usePlayerRanks
+            usePlayerRanks = usePlayerRanks,
+            useCBBRanks = useCBBRanks
         )
 
         // Right value with advantage indicator
@@ -890,12 +929,13 @@ private fun ShareGenericFiveColumnRow(
 private fun ShareGenericRankBadge(
     rank: Int?,
     rankDisplay: String?,
-    usePlayerRanks: Boolean
+    usePlayerRanks: Boolean,
+    useCBBRanks: Boolean = false
 ) {
-    val backgroundColor = if (usePlayerRanks) {
-        getSharePlayerRankColor(rank)
-    } else {
-        getShareTeamRankColor(rank)
+    val backgroundColor = when {
+        useCBBRanks -> getShareCBBRankColor(rank)
+        usePlayerRanks -> getSharePlayerRankColor(rank)
+        else -> getShareTeamRankColor(rank)
     }
 
     Box(

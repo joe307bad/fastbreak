@@ -13,7 +13,6 @@ xcuserdata
 sentry.properties
 
 .fake
-pipeline/**/*.csv
 pipeline/**/*.png
 pipeline/**/d3-charts/*.json
 pipeline/**/data/*.json
@@ -35,3 +34,5 @@ kmp/screenshots/demos/test-output.log
 server/src/Fastbreak.Daily/publish
 server/src/Fastbreak.Daily/publish-mac
 pipeline/04-fastbreak-charts/Fastbreak.Daily
+pipeline/02-nfl-fantasy-sleeper-breakout/output/weekly_player_stats/*.csv
+pipeline/02-nfl-fantasy-sleeper-breakout/output/defensive_power_rankings/*.csv

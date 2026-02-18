@@ -90,19 +90,22 @@ Narrative:
 Title: {narrativeTitle}
 Summary: {narrativeSummary}
 
-IMPORTANT: Look for any team names or player names mentioned in the narrative. Teams are often abbreviated to 3 letters (e.g., NYK, LAL, BOS, CHI, KC, PHI, DET, SEA, NE, etc.). Find data points for these specific teams/players from the charts.
-
 Chart data:
 {chartSummaries}
 
-Find exactly 5 specific metrics and values from the a mix of visualization types/charts that are relevant to this narrative. For each data point:
-- Include the 3-letter team abbreviation in "team"
-- If the data point is about a specific player, include their name in "player" (otherwise leave empty string)
-- Include the chart id in "id"
-- Include the visualization type in "vizType" (one of: SCATTER_PLOT, BAR_GRAPH, LINE_CHART, TABLE)
+CRITICAL RULES - READ CAREFULLY:
+1. ONLY use values that EXACTLY appear in the chart data above
+2. The "team" field MUST be the EXACT 3-letter abbreviation from the chart (e.g., "NYK", "LAL", "BOS")
+3. The "value" field MUST be the EXACT number from the chart data - do NOT make up values
+4. The "metric" must match what the chart measures (check the chart title and description)
+5. The "id" MUST be the exact chart ID from the data (e.g., "nfl__offense_vs_defense")
+6. Double-check: Is this team abbreviation actually in this chart? Is this value actually listed?
+
+Find 5 data points from a mix of chart types that relate to teams/players in the narrative.
+If a team from the narrative isn't in the charts, find other relevant teams instead.
 
 Respond with JSON only, no markdown:
-{{"dataPoints": [{{"metric": "metric name", "value": "value with units", "chartName": "name of chart", "team": "ABC", "player": "", "id": "chart_id", "vizType": "SCATTER_PLOT"}}, ...]}}"""
+{{"dataPoints": [{{"metric": "metric name", "value": "exact value from chart", "chartName": "chart title", "team": "ABC", "player": "", "id": "exact_chart_id", "vizType": "SCATTER_PLOT"}}, ...]}}"""
 
 // Step 4: Generate statistical context prose from data points
 let private buildStatisticalContextPrompt (league: string) (narrativeTitle: string) (narrativeSummary: string) (dataPoints: DataPoint list) =
@@ -163,6 +166,16 @@ let private parseJson (text: string) : InitialNarrativeItem =
     else
         { Title = "News Update"; Summary = text }
 
+// Sanitize JSON to ensure "value" fields are quoted strings (Gemini sometimes outputs numbers)
+let private sanitizeDataPointsJson (json: string) =
+    // Pattern: "value": 123 or "value": 123.45 -> "value": "123" or "value": "123.45"
+    let result = System.Text.RegularExpressions.Regex.Replace(
+        json,
+        "\"value\"\\s*:\\s*(-?\\d+\\.?\\d*)",
+        "\"value\": \"$1\""
+    )
+    result.Replace("\\$", "$").Replace("\\'", "'")
+
 let private parseDataPoints (text: string) =
     let options = JsonSerializerOptions()
     options.AllowTrailingCommas <- true
@@ -173,7 +186,7 @@ let private parseDataPoints (text: string) =
 
     if arrayStartIdx >= 0 && arrayEndIdx > arrayStartIdx then
         let jsonPart = text.Substring(arrayStartIdx, arrayEndIdx - arrayStartIdx + 1)
-        let cleaned = jsonPart.Replace("\\$", "$").Replace("\\'", "'")
+        let cleaned = sanitizeDataPointsJson jsonPart
         try
             // Try parsing as a bare array of DataPoints
             let dataPoints = JsonSerializer.Deserialize<DataPoint[]>(cleaned, options)
@@ -186,7 +199,7 @@ let private parseDataPoints (text: string) =
             let objEndIdx = text.LastIndexOf('}')
             if objStartIdx >= 0 && objEndIdx > objStartIdx then
                 let objJsonPart = text.Substring(objStartIdx, objEndIdx - objStartIdx + 1)
-                let objCleaned = objJsonPart.Replace("\\$", "$").Replace("\\'", "'")
+                let objCleaned = sanitizeDataPointsJson objJsonPart
                 try
                     let response = JsonSerializer.Deserialize<DataPointsResponse>(objCleaned, options)
                     printfn "      [ParseDataPoints] Parsed as object: %d items" response.DataPoints.Length
@@ -203,7 +216,7 @@ let private parseDataPoints (text: string) =
         let objEndIdx = text.LastIndexOf('}')
         if objStartIdx >= 0 && objEndIdx > objStartIdx then
             let jsonPart = text.Substring(objStartIdx, objEndIdx - objStartIdx + 1)
-            let cleaned = jsonPart.Replace("\\$", "$").Replace("\\'", "'")
+            let cleaned = sanitizeDataPointsJson jsonPart
             // First, try wrapping in array brackets (handles comma-separated objects)
             try
                 let asArray = "[" + cleaned + "]"
@@ -227,7 +240,7 @@ let private parseDataPoints (text: string) =
 // Topics for each league - each becomes a separate narrative with its own grounded search
 let private getTopics (league: string) =
     match league with
-    | "CBB" -> ["game results, scores, and standout player performances from recent games"; "roster moves, trades, injuries, and tournament implications"]
+    | "CBB" -> ["men's college basketball top 25 game results, scores, and standout player performances from recent games"; "men's college basketball top 25 roster moves, trades, injuries, and tournament implications"]
     | "NFL" -> ["game results, scores, and standout player performances from recent games"; "roster moves, trades, injuries, and playoff implications"]
     | "NBA" -> ["game results, scores, and standout player performances from recent games"; "roster moves, trades, injuries, and playoff race standings"]
     | "NHL" -> ["game results, scores, and standout player performances from recent games"; "roster moves, trades, injuries, and playoff race standings"]
@@ -334,7 +347,7 @@ let generate (charts: ChartData list) = async {
     use client = new HttpClient()
     client.Timeout <- TimeSpan.FromMinutes(3.0)
 
-    let leagues = ["NBA"; "NHL"; "MLB"; "NFL"]
+    let leagues = ["NBA"; "NHL"; "MLB"; "NFL"; "CBB"]
 
     let! results =
         leagues

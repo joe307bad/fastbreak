@@ -162,8 +162,20 @@ let private extractLinks (candidate: Candidate option) : RelevantLink list =
         |> Array.toList)
     |> Option.defaultValue []
 
+// Random number generator for defensive delays
+let private random = Random()
+
+/// Add a random delay to avoid rate limiting (500-1500ms)
+let private defensiveDelay () = async {
+    let delayMs = random.Next(500, 1500)
+    do! Async.Sleep delayMs
+}
+
 /// Call Gemini without grounding (for text processing tasks)
 let callGemini (client: HttpClient) (apiKey: string) (prompt: string) (temperature: float) = async {
+    // Add defensive delay before each call
+    do! defensiveDelay ()
+
     let url = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={apiKey}"
 
     let request: GeminiRequest = {
@@ -175,15 +187,28 @@ let callGemini (client: HttpClient) (apiKey: string) (prompt: string) (temperatu
     jsonOptions.PropertyNamingPolicy <- JsonNamingPolicy.CamelCase
 
     let json = JsonSerializer.Serialize(request, jsonOptions)
-    use content = new StringContent(json, Encoding.UTF8, "application/json")
 
-    let! response = client.PostAsync(url, content) |> Async.AwaitTask
-    let! responseBody = response.Content.ReadAsStringAsync() |> Async.AwaitTask
+    let rec tryCall (attempt: int) (delayMs: int) = async {
+        use content = new StringContent(json, Encoding.UTF8, "application/json")
+        let! response = client.PostAsync(url, content) |> Async.AwaitTask
+        let! responseBody = response.Content.ReadAsStringAsync() |> Async.AwaitTask
 
-    if not response.IsSuccessStatusCode then
-        printfn "      [CallGemini] API error: %s" responseBody
-        return None
-    else
+        if response.IsSuccessStatusCode then
+            return Some responseBody
+        elif int response.StatusCode = 429 && attempt < 5 then
+            printfn "      [CallGemini] Rate limited (429), waiting %dms before retry %d/5..." delayMs attempt
+            do! Async.Sleep delayMs
+            return! tryCall (attempt + 1) (delayMs * 2)
+        else
+            printfn "      [CallGemini] API error: %s" responseBody
+            return None
+    }
+
+    let! responseBodyOpt = tryCall 1 2000
+
+    match responseBodyOpt with
+    | None -> return None
+    | Some responseBody ->
         try
             let geminiResponse = JsonSerializer.Deserialize<GeminiResponse>(responseBody)
             let text =
@@ -198,8 +223,11 @@ let callGemini (client: HttpClient) (apiKey: string) (prompt: string) (temperatu
             return None
 }
 
-/// Call Gemini without grounding, throwing on error
+/// Call Gemini without grounding, throwing on error (with retry for rate limiting)
 let callGeminiOrFail (client: HttpClient) (apiKey: string) (prompt: string) (temperature: float) = async {
+    // Add defensive delay before each call
+    do! defensiveDelay ()
+
     let url = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={apiKey}"
 
     let request: GeminiRequest = {
@@ -211,13 +239,24 @@ let callGeminiOrFail (client: HttpClient) (apiKey: string) (prompt: string) (tem
     jsonOptions.PropertyNamingPolicy <- JsonNamingPolicy.CamelCase
 
     let json = JsonSerializer.Serialize(request, jsonOptions)
-    use content = new StringContent(json, Encoding.UTF8, "application/json")
 
-    let! response = client.PostAsync(url, content) |> Async.AwaitTask
-    let! responseBody = response.Content.ReadAsStringAsync() |> Async.AwaitTask
+    let rec tryCall (attempt: int) (delayMs: int) = async {
+        use content = new StringContent(json, Encoding.UTF8, "application/json")
+        let! response = client.PostAsync(url, content) |> Async.AwaitTask
+        let! responseBody = response.Content.ReadAsStringAsync() |> Async.AwaitTask
 
-    if not response.IsSuccessStatusCode then
-        failwithf "Gemini API error: %s" responseBody
+        if response.IsSuccessStatusCode then
+            return responseBody
+        elif int response.StatusCode = 429 && attempt < 5 then
+            // Rate limited - wait and retry with exponential backoff
+            printfn "      [CallGemini] Rate limited (429), waiting %dms before retry %d/5..." delayMs attempt
+            do! Async.Sleep delayMs
+            return! tryCall (attempt + 1) (delayMs * 2)
+        else
+            return failwithf "Gemini API error: %s" responseBody
+    }
+
+    let! responseBody = tryCall 1 2000
 
     let geminiResponse = JsonSerializer.Deserialize<GeminiResponse>(responseBody)
 
@@ -230,8 +269,11 @@ let callGeminiOrFail (client: HttpClient) (apiKey: string) (prompt: string) (tem
         |> Option.defaultValue ""
 }
 
-/// Call Gemini with Google Search grounding
+/// Call Gemini with Google Search grounding (with retry for rate limiting)
 let callGeminiWithSearch (client: HttpClient) (apiKey: string) (prompt: string) = async {
+    // Add defensive delay before each call
+    do! defensiveDelay ()
+
     let url = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={apiKey}"
 
     // Temperature 1.0 recommended for grounded search per Google docs
@@ -245,16 +287,26 @@ let callGeminiWithSearch (client: HttpClient) (apiKey: string) (prompt: string) 
     jsonOptions.PropertyNamingPolicy <- JsonNamingPolicy.CamelCase
 
     let json = JsonSerializer.Serialize(request, jsonOptions)
-    use content = new StringContent(json, Encoding.UTF8, "application/json")
 
     printfn "      [Grounded] Sending request..."
 
-    let! response = client.PostAsync(url, content) |> Async.AwaitTask
-    let! responseBody = response.Content.ReadAsStringAsync() |> Async.AwaitTask
+    let rec tryCall (attempt: int) (delayMs: int) = async {
+        use content = new StringContent(json, Encoding.UTF8, "application/json")
+        let! response = client.PostAsync(url, content) |> Async.AwaitTask
+        let! responseBody = response.Content.ReadAsStringAsync() |> Async.AwaitTask
 
-    if not response.IsSuccessStatusCode then
-        printfn "      [Grounded] API error: %s" responseBody
-        failwithf "Gemini API error: %s" responseBody
+        if response.IsSuccessStatusCode then
+            return responseBody
+        elif int response.StatusCode = 429 && attempt < 5 then
+            printfn "      [Grounded] Rate limited (429), waiting %dms before retry %d/5..." delayMs attempt
+            do! Async.Sleep delayMs
+            return! tryCall (attempt + 1) (delayMs * 2)
+        else
+            printfn "      [Grounded] API error: %s" responseBody
+            return failwithf "Gemini API error: %s" responseBody
+    }
+
+    let! responseBody = tryCall 1 2000
 
     let geminiResponse = JsonSerializer.Deserialize<GeminiResponse>(responseBody)
 

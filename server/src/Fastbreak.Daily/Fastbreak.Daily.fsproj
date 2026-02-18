@@ -8,6 +8,7 @@
   <ItemGroup>
     <Compile Include="ChartDownloader.fs" />
     <Compile Include="CallGemini.fs" />
+    <Compile Include="TeamSiteList.fs" />
     <Compile Include="NarrativeGenerator.fs" />
     <Compile Include="TextSegmentConverter.fs" />
     <Compile Include="Main.fs" />

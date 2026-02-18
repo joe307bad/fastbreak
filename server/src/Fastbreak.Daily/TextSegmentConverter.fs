@@ -6,6 +6,7 @@ open System.Text.Json
 open System.Text.Json.Serialization
 open Fastbreak.Daily.CallGemini
 open Fastbreak.Daily.NarrativeGenerator
+open Fastbreak.Daily.TeamSiteList
 
 // Text segment types - using nullable string instead of option for JSON compat
 [<CLIMutable>]
@@ -25,39 +26,56 @@ type TextSegmentsResponse = {
 }
 
 let private buildSegmentPrompt (text: string) (league: string) =
-    let leagueTeamUrlPattern =
-        match league.ToUpperInvariant() with
-        | "NBA" -> "https://www.espn.com/nba/team/_/name/{team_abbr}"
-        | "NFL" -> "https://www.espn.com/nfl/team/_/name/{team_abbr}"
-        | "NHL" -> "https://www.espn.com/nhl/team/_/name/{team_abbr}"
-        | "MLB" -> "https://www.espn.com/mlb/team/_/name/{team_abbr}"
-        | _ -> "https://www.espn.com/{league}/team/_/name/{team_abbr}"
+    let teamList = getTeamListForPrompt league
 
     $"""Convert the following text into segments. Each segment is either plain text or a link.
 
 Text to convert:
 {text}
 
+OFFICIAL TEAM URLs - Use these EXACT URLs when you find these team names:
+{teamList}
+
 Rules for creating segments:
-1. For player names, create a link segment with URL to their Wikipedia page (https://en.wikipedia.org/wiki/Player_Name with underscores)
-2. For team names (full names like "Boston Celtics" or city names like "Boston" when referring to a team), create a link segment with URL pattern: {leagueTeamUrlPattern}/{{team-slug}}
-   - Use lowercase team abbreviations and slugs (e.g., bos/boston-celtics, lal/los-angeles-lakers, utah/utah-jazz)
+1. For team names: If the team appears in the OFFICIAL TEAM URLs list above, use that EXACT URL
+2. For player names: Create a link to their Wikipedia page (https://en.wikipedia.org/wiki/Player_Name with underscores)
 3. All other text should be plain text segments
 4. Preserve the exact wording and punctuation
 5. Keep segments logically grouped - don't split mid-sentence unnecessarily
 
-Return JSON in this exact format:
-{{"segments": [
-  {{"type": "text", "value": "The "}},
-  {{"type": "link", "value": "Boston Celtics", "url": "https://www.espn.com/nba/team/_/name/bos/boston-celtics"}},
-  {{"type": "text", "value": " defeated the "}},
-  {{"type": "link", "value": "Utah Jazz", "url": "https://www.espn.com/nba/team/_/name/utah/utah-jazz"}},
-  {{"type": "text", "value": ". "}},
-  {{"type": "link", "value": "LeBron James", "url": "https://en.wikipedia.org/wiki/LeBron_James"}},
-  {{"type": "text", "value": " scored 30 points."}}
-]}}
+CRITICAL JSON FORMATTING RULES:
+- Each object must be separated by a comma
+- No trailing commas after the last object in the array
+- All strings must be properly quoted
+- No line breaks within string values
 
-Return ONLY the JSON, no other text."""
+Return ONLY valid JSON in this exact format (no markdown, no explanation):
+{{"segments": [{{"type": "text", "value": "The "}}, {{"type": "link", "value": "Boston Celtics", "url": "https://www.espn.com/nba/team/_/name/bos/boston-celtics"}}, {{"type": "text", "value": " won."}}]}}"""
+
+let private sanitizeJson (json: string) : string =
+    // Fix common JSON issues from Gemini output
+    let mutable result = json
+
+    // Remove any markdown code block markers
+    result <- result.Replace("```json", "").Replace("```", "")
+
+    // Fix missing commas between objects (common Gemini issue)
+    // Pattern: }\n{ or }\r\n{ should be },\n{
+    result <- System.Text.RegularExpressions.Regex.Replace(
+        result,
+        @"\}\s*\{",
+        "},{"
+    )
+
+    // Fix missing commas after string values before next key
+    // Pattern: "value"  "key" should be "value", "key"
+    result <- System.Text.RegularExpressions.Regex.Replace(
+        result,
+        "\"\\s+\"(?=[a-zA-Z])",
+        "\", \""
+    )
+
+    result.Trim()
 
 let private parseSegmentsResponse (text: string) : TextSegment list =
     try
@@ -65,10 +83,12 @@ let private parseSegmentsResponse (text: string) : TextSegment list =
         let endIdx = text.LastIndexOf('}')
         if startIdx >= 0 && endIdx > startIdx then
             let jsonPart = text.Substring(startIdx, endIdx - startIdx + 1)
-            printfn "      [TextSegmentConverter] Parsing JSON: %s" (jsonPart.Substring(0, min 200 jsonPart.Length))
+            let sanitized = sanitizeJson jsonPart
+            printfn "      [TextSegmentConverter] Parsing JSON: %s" (sanitized.Substring(0, min 200 sanitized.Length))
             let options = JsonSerializerOptions()
             options.AllowTrailingCommas <- true
-            let response = JsonSerializer.Deserialize<TextSegmentsResponse>(jsonPart, options)
+            let response = JsonSerializer.Deserialize<TextSegmentsResponse>(sanitized, options)
+            printfn "      Summary: %d segments" response.Segments.Length
             response.Segments |> Array.toList
         else
             // Return original text as single segment

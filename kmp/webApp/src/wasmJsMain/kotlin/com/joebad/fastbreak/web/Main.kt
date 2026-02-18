@@ -493,7 +493,8 @@ fun ChartCard(viz: VisualizationType) {
             is LineChartVisualization -> {
                 LineChartComponent(
                     series = viz.series,
-                    modifier = chartModifier
+                    modifier = chartModifier,
+                    yAxisAbsoluteLabels = viz.yAxisAbsoluteLabels
                 )
             }
             is TableVisualization -> {

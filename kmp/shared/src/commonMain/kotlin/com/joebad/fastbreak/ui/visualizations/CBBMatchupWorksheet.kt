@@ -342,10 +342,14 @@ fun CBBMatchupWorksheet(
                     homeRecord = selectedMatchup.homeTeam.wins?.let { w ->
                         selectedMatchup.homeTeam.losses?.let { l -> "$w-$l" }
                     },
-                    awayConferenceRank = selectedMatchup.awayTeam.srsRank,
-                    homeConferenceRank = selectedMatchup.homeTeam.srsRank,
                     awayConference = selectedMatchup.awayTeam.conference,
-                    homeConference = selectedMatchup.homeTeam.conference
+                    homeConference = selectedMatchup.homeTeam.conference,
+                    // CBB-specific fields
+                    awayApRank = selectedMatchup.awayTeam.apRank,
+                    homeApRank = selectedMatchup.homeTeam.apRank,
+                    awaySrsRank = selectedMatchup.awayTeam.srsRank,
+                    homeSrsRank = selectedMatchup.homeTeam.srsRank,
+                    isCBB = true
                 )
 
                 val odds = selectedMatchup.odds?.let {

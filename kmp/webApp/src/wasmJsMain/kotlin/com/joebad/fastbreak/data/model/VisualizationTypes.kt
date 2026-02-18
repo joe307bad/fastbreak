@@ -101,7 +101,9 @@ data class LineChartVisualization(
     override val description: String,
     override val lastUpdated: Instant,
     override val source: String? = null,
-    val series: List<LineChartSeries>
+    val series: List<LineChartSeries>,
+    /** When true, display y-axis labels as absolute values (for inverted rankings) */
+    val yAxisAbsoluteLabels: Boolean = false
 ) : VisualizationType
 
 // Table View data structures

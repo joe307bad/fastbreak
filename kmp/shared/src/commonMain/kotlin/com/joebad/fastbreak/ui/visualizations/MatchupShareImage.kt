@@ -30,10 +30,16 @@ data class ShareGameInfo(
     val source: String = "ESPN",
     val awayRecord: String? = null, // e.g., "25-15"
     val homeRecord: String? = null,
-    val awayConferenceRank: Int? = null,
+    val awayConferenceRank: Int? = null, // NBA: conference standing
     val homeConferenceRank: Int? = null,
-    val awayConference: String? = null, // e.g., "Eastern" or "Western"
-    val homeConference: String? = null
+    val awayConference: String? = null, // e.g., "Eastern" or "Western" for NBA, conference name for CBB
+    val homeConference: String? = null,
+    // CBB-specific fields
+    val awayApRank: Int? = null, // AP ranking (1-25)
+    val homeApRank: Int? = null,
+    val awaySrsRank: Int? = null, // SRS ranking
+    val homeSrsRank: Int? = null,
+    val isCBB: Boolean = false // Flag to use CBB display format
 )
 
 /** Generic odds information */
@@ -598,9 +604,93 @@ fun GenericMatchupShareImage(
             }
         }
 
-        // Record and Conference Rank Row (for NBA only)
-        if (gameInfo.awayRecord != null || gameInfo.homeRecord != null ||
+        // Record and Ranking Row
+        if (gameInfo.isCBB) {
+            // CBB-specific display: AP Rank, SRS Rank, Conference
+            val hasAwayInfo = gameInfo.awayRecord != null || gameInfo.awayApRank != null ||
+                             gameInfo.awaySrsRank != null || gameInfo.awayConference != null
+            val hasHomeInfo = gameInfo.homeRecord != null || gameInfo.homeApRank != null ||
+                             gameInfo.homeSrsRank != null || gameInfo.homeConference != null
+
+            if (hasAwayInfo || hasHomeInfo) {
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Away team info (left-aligned)
+                    if (hasAwayInfo) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            // AP rank color indicator
+                            val awayApRankColor = when {
+                                gameInfo.awayApRank == null -> Color(0xFFF44336) // Red if unranked
+                                gameInfo.awayApRank <= 10 -> Color(0xFF4CAF50) // Green for top 10
+                                gameInfo.awayApRank <= 20 -> Color(0xFFFFC107) // Yellow for 11-20
+                                else -> Color(0xFFFF9800) // Orange for 21-25
+                            }
+                            Canvas(modifier = Modifier.size(24.dp)) {
+                                drawCircle(color = awayApRankColor)
+                            }
+
+                            // Build display text: "W-L • #N AP • #N SRS • Conf"
+                            val parts = mutableListOf<String>()
+                            gameInfo.awayRecord?.let { parts.add(it) }
+                            gameInfo.awayApRank?.let { parts.add("#$it AP") }
+                            gameInfo.awaySrsRank?.let { parts.add("#$it SRS") }
+                            gameInfo.awayConference?.let { parts.add(it) }
+
+                            Text(
+                                text = parts.joinToString(" • "),
+                                fontSize = 36.sp,
+                                color = textColor.copy(alpha = 0.8f)
+                            )
+                        }
+                    }
+
+                    // Center space
+                    Spacer(modifier = Modifier.width(20.dp))
+
+                    // Home team info (right-aligned, mirrored layout)
+                    if (hasHomeInfo) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            // Build display text: "Conf • #N SRS • #N AP • W-L"
+                            val parts = mutableListOf<String>()
+                            gameInfo.homeConference?.let { parts.add(it) }
+                            gameInfo.homeSrsRank?.let { parts.add("#$it SRS") }
+                            gameInfo.homeApRank?.let { parts.add("#$it AP") }
+                            gameInfo.homeRecord?.let { parts.add(it) }
+
+                            Text(
+                                text = parts.joinToString(" • "),
+                                fontSize = 36.sp,
+                                color = textColor.copy(alpha = 0.8f)
+                            )
+
+                            // AP rank color indicator
+                            val homeApRankColor = when {
+                                gameInfo.homeApRank == null -> Color(0xFFF44336) // Red if unranked
+                                gameInfo.homeApRank <= 10 -> Color(0xFF4CAF50) // Green for top 10
+                                gameInfo.homeApRank <= 20 -> Color(0xFFFFC107) // Yellow for 11-20
+                                else -> Color(0xFFFF9800) // Orange for 21-25
+                            }
+                            Canvas(modifier = Modifier.size(24.dp)) {
+                                drawCircle(color = homeApRankColor)
+                            }
+                        }
+                    }
+                }
+            }
+        } else if (gameInfo.awayRecord != null || gameInfo.homeRecord != null ||
             gameInfo.awayConferenceRank != null || gameInfo.homeConferenceRank != null) {
+            // NBA-style display: Record and Conference Standing
             Spacer(modifier = Modifier.height(8.dp))
 
             Row(

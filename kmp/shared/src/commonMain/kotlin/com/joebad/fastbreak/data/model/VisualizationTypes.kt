@@ -146,7 +146,9 @@ data class LineChartVisualization(
     @Serializable(with = TagListSerializer::class)
     override val tags: List<Tag>? = null,
     override val sortOrder: Int? = null,
-    val series: List<LineChartSeries>
+    val series: List<LineChartSeries>,
+    /** When true, display y-axis labels as absolute values (for inverted rankings) */
+    val yAxisAbsoluteLabels: Boolean = false
 ) : VisualizationType
 
 // Table View data structures

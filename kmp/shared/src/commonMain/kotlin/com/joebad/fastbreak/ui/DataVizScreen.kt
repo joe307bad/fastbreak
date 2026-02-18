@@ -591,6 +591,7 @@ private fun RenderVisualization(
                                         shareHandlerCallback(handler)
                                     },
                                     source = visualization.source ?: "",
+                                    yAxisAbsoluteLabels = visualization.yAxisAbsoluteLabels,
                                     modifier = Modifier.fillMaxWidth()
                                 )
                             }

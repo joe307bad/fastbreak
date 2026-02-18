@@ -87,7 +87,8 @@ fun LineChartComponent(
     title: String = "Line Chart",
     showShareButton: Boolean = false,
     onShareClick: ((() -> Unit)?) -> Unit = {},
-    source: String = ""
+    source: String = "",
+    yAxisAbsoluteLabels: Boolean = false
 ) {
     if (series.isEmpty() || series.all { it.dataPoints.isEmpty() }) return
 
@@ -188,8 +189,9 @@ fun LineChartComponent(
                 )
             },
             yAxisLabels = { value ->
+                val displayValue = if (yAxisAbsoluteLabels) abs(value) else value
                 Text(
-                    text = formatToTenth(value),
+                    text = formatToTenth(displayValue),
                     fontSize = 10.sp,
                     color = MaterialTheme.colorScheme.onSurface
                 )

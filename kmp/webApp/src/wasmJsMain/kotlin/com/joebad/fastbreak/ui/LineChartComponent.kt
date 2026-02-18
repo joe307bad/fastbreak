@@ -64,7 +64,8 @@ private fun Float.formatTo(decimals: Int): String {
 @Composable
 fun LineChartComponent(
     series: List<LineChartSeries>,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    yAxisAbsoluteLabels: Boolean = false
 ) {
     if (series.isEmpty() || series.all { it.dataPoints.isEmpty() }) return
 
@@ -314,8 +315,9 @@ fun LineChartComponent(
                     strokeWidth = 1f
                 )
 
-                // Draw tick label
-                val tickLabel = tickValue.formatTo(1)
+                // Draw tick label (use absolute value if yAxisAbsoluteLabels is true)
+                val displayValue = if (yAxisAbsoluteLabels) abs(tickValue) else tickValue
+                val tickLabel = displayValue.formatTo(1)
                 val measured = textMeasurer.measure(tickLabel, labelTextStyle)
                 drawText(
                     textMeasurer,

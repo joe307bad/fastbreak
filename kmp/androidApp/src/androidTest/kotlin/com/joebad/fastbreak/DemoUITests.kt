@@ -51,37 +51,29 @@ class DemoUITests {
     }
 
     /**
-     * Demo test: Pinch to zoom and pan on NFL Team Tiers chart
+     * Demo test: Pinch to zoom and pan on any Efficiency chart
      */
     @Test
     fun testDemo_PinchToZoomAndPan() {
         println("⏱ Waiting for app to load...")
         Thread.sleep(2000)
 
-        // Find and tap on "NFL Team Tiers" text using UiObject2
-        println("🔍 Looking for 'NFL Team Tiers' text...")
-        val teamTiersText = device.wait(
-            Until.findObject(By.textContains("NFL Team Tier")),
-            10000
-        )
+        // Find and tap on the second chart with "Efficiency" in the title
+        println("🔍 Looking for charts with 'Efficiency' in title...")
+        device.wait(Until.hasObject(By.textContains("Efficiency")), 10000)
+        val efficiencyCharts = device.findObjects(By.textContains("Efficiency"))
 
-        if (teamTiersText != null) {
-            println("✓ Found 'NFL Team Tiers', tapping...")
-            teamTiersText.click()
+        if (efficiencyCharts.size >= 2) {
+            println("✓ Found ${efficiencyCharts.size} 'Efficiency' charts, tapping second one...")
+            efficiencyCharts[1].click()
+            Thread.sleep(1000)
+        } else if (efficiencyCharts.isNotEmpty()) {
+            println("⚠ Only found ${efficiencyCharts.size} 'Efficiency' chart(s), tapping first one...")
+            efficiencyCharts[0].click()
             Thread.sleep(1000)
         } else {
-            println("⚠ 'NFL Team Tiers' not found, trying alternative search...")
-            val alternativeText = device.wait(
-                Until.findObject(By.textContains("Team Tiers")),
-                5000
-            )
-            if (alternativeText != null) {
-                alternativeText.click()
-                Thread.sleep(2000)
-            } else {
-                println("⚠ Could not find Team Tiers text, continuing anyway...")
-                Thread.sleep(2000)
-            }
+            println("⚠ 'Efficiency' chart not found, continuing anyway...")
+            Thread.sleep(2000)
         }
 
         println("✓ Chart should be visible, starting pan and zoom demo...")
@@ -227,30 +219,44 @@ class DemoUITests {
             println("⚠ Search field not found")
         }
 
-        // Select Pittsburgh Penguins from results
+        // Select Pittsburgh Penguins from results (skip the search field which also contains the text)
         println("🔍 Looking for Pittsburgh Penguins in results...")
-        val penguinsResult = device.wait(
-            Until.findObject(By.textContains("Pittsburgh Penguins")),
-            3000
-        ) ?: device.wait(
-            Until.findObject(By.textContains("Penguins")),
-            2000
-        )
+        Thread.sleep(500) // Wait for results to appear
+        val penguinsMatches = device.findObjects(By.textContains("Penguins"))
+
+        // Find the result item (not the search field) - it should be below the search field
+        val penguinsResult = penguinsMatches.find { match ->
+            // Skip if it's an EditText (the search field)
+            match.className != "android.widget.EditText"
+        }
 
         if (penguinsResult != null) {
-            println("✓ Found Penguins, selecting...")
+            println("✓ Found Penguins in results (${penguinsMatches.size} matches, selecting non-input), clicking...")
             penguinsResult.click()
+            Thread.sleep(500)
+        } else if (penguinsMatches.size > 1) {
+            // Fallback: if we couldn't filter by class, just click the second match
+            println("✓ Found ${penguinsMatches.size} Penguins matches, selecting second one...")
+            penguinsMatches[1].click()
             Thread.sleep(500)
         } else {
             println("⚠ Pittsburgh Penguins not found in results")
         }
 
-        // Close the team selector bottom sheet first
-        println("🔍 Closing team selector bottom sheet...")
-        device.pressBack()
+        // Close the team selector bottom sheet by swiping down
+        println("🔍 Closing team selector bottom sheet with swipe down...")
+        val screenHeight = device.displayHeight
+        val screenWidth = device.displayWidth
+        device.swipe(
+            screenWidth / 2,
+            screenHeight / 2,
+            screenWidth / 2,
+            screenHeight - 100,
+            10
+        )
         Thread.sleep(500)
 
-        // Now navigate back from Settings to home screen
+        // Navigate back from Settings to home screen
         println("🔍 Looking for Settings back button...")
         val settingsBackButton = device.wait(
             Until.findObject(By.desc("Back")),
@@ -282,19 +288,19 @@ class DemoUITests {
             println("⚠ NHL tab not found")
         }
 
-        // Find and tap "Scoring Leaders" chart
-        println("🔍 Looking for 'Scoring Leaders' chart...")
-        val scoringLeadersChart = device.wait(
-            Until.findObject(By.textContains("Scoring Leader")),
+        // Find and tap "Efficiency" chart
+        println("🔍 Looking for 'Efficiency' chart...")
+        val efficiencyChart = device.wait(
+            Until.findObject(By.textContains("Efficiency")),
             5000
         )
 
-        if (scoringLeadersChart != null) {
-            println("✓ Found 'Scoring Leaders', tapping...")
-            scoringLeadersChart.click()
+        if (efficiencyChart != null) {
+            println("✓ Found 'Efficiency' chart, tapping...")
+            efficiencyChart.click()
             Thread.sleep(1000)
         } else {
-            println("⚠ Scoring Leaders chart not found")
+            println("⚠ Efficiency chart not found")
         }
 
         // Find and tap PIT filter badge
@@ -330,7 +336,7 @@ class DemoUITests {
 
     /**
      * Demo test: Highlighting data points
-     * Shows: NBA tab > Select PHI and LAL badges > Division badge > Southwest Division > Select top 3 players
+     * Shows: Select PHI and LAL badges > Division badge > Southwest Division > Select top 3 players
      */
     @Test
     fun testDemo_HighlightingDataPoints() {
@@ -339,22 +345,7 @@ class DemoUITests {
         println("⏱ Waiting for app to load...")
         Thread.sleep(1500)
 
-        // Switch to NBA tab
-        println("🔍 Looking for NBA tab...")
-        val nbaTab = device.wait(
-            Until.findObject(By.text("NBA")),
-            3000
-        )
-
-        if (nbaTab != null) {
-            println("✓ Found NBA tab, tapping...")
-            nbaTab.click()
-            Thread.sleep(1000)
-        } else {
-            println("⚠ NBA tab not found")
-        }
-
-        // Find and tap "Player Efficiency" chart
+        // Find and tap "Player Efficiency" chart (already on NBA tab by default)
         println("🔍 Looking for 'Player Efficiency' chart...")
         val playerEfficiency = device.wait(
             Until.findObject(By.textContains("Player Efficiency")),
@@ -555,8 +546,8 @@ class DemoUITests {
     }
 
     /**
-     * Demo test: Navigate through all charts and show info bottom sheet
-     * Shows: Cumulative EPA > Back > Team Snaps > Back > Playoff Odds > Back > Turnover Differential > Info button
+     * Demo test: Navigate through charts in the default list
+     * Shows: Select each chart > scroll inside > back > next chart
      */
     @Test
     fun testDemo_NavigateChartsAndShowInfo() {
@@ -565,64 +556,54 @@ class DemoUITests {
         println("⏱ Waiting for app to load...")
         Thread.sleep(1500)
 
-        // Define the charts to visit in order
-        val chartNames = listOf(
-            "Cumulative EPA",
-            "Team Snaps",
-            "Playoff Odds",
-            "Turnover Differential"
+        val screenHeight = device.displayHeight
+        val screenWidth = device.displayWidth
+
+        // Chart keywords to find (case-insensitive partial match)
+        val chartKeywords = listOf(
+            "matchup",
+            "rating",
+            "player efficiency",
+            "team efficiency"
         )
 
-        for ((index, chartName) in chartNames.withIndex()) {
-            val isLastChart = index == chartNames.size - 1
-            println("📊 Looking for '$chartName' chart...")
+        for ((index, keyword) in chartKeywords.withIndex()) {
+            println("📊 [${index + 1}/${chartKeywords.size}] Looking for '$keyword' chart...")
 
-            // Find the chart by name
+            // Find chart by keyword (case-insensitive via regex)
             val chart = device.wait(
-                Until.findObject(By.textContains(chartName)),
-                5000
+                Until.findObject(By.text(java.util.regex.Pattern.compile(".*$keyword.*", java.util.regex.Pattern.CASE_INSENSITIVE))),
+                3000
             )
 
             if (chart != null) {
-                println("  ✓ Found '$chartName', tapping...")
+                println("  ✓ Found '$keyword', tapping...")
                 chart.click()
-                Thread.sleep(1000)
+                Thread.sleep(1200)
 
-                // If this is the last chart (Turnover Differential), click the info button
-                if (isLastChart) {
-                    println("  🔍 Looking for info button on '$chartName'...")
-                    val infoButton = device.wait(
-                        Until.findObject(By.desc("Chart Info")),
-                        3000
-                    )
+                // Scroll down a bit inside the chart
+                println("  → Scrolling in chart...")
+                device.swipe(
+                    screenWidth / 2,
+                    screenHeight * 2 / 3,
+                    screenWidth / 2,
+                    screenHeight / 3,
+                    15
+                )
+                Thread.sleep(600)
 
-                    if (infoButton != null) {
-                        println("  ✓ Found info button, tapping...")
-                        infoButton.click()
-                        Thread.sleep(1500)
-
-                        // Show the bottom sheet for a moment
-                        println("  ✓ Bottom sheet description should be visible")
-                        Thread.sleep(2000)
-
-                        // Close the bottom sheet
-                        println("  → Closing bottom sheet...")
-                        device.pressBack()
-                        Thread.sleep(500)
-                    } else {
-                        println("  ⚠ Info button not found, trying to click top-right area...")
-                        // Try clicking the approximate location of info button (top right)
-                        device.click(device.displayWidth - 100, 200)
-                        Thread.sleep(1500)
-
-                        // If bottom sheet opened, close it
-                        device.pressBack()
-                        Thread.sleep(500)
-                    }
-                }
+                // Scroll back up
+                device.swipe(
+                    screenWidth / 2,
+                    screenHeight / 3,
+                    screenWidth / 2,
+                    screenHeight * 2 / 3,
+                    15
+                )
+                Thread.sleep(400)
 
                 // Navigate back to the chart list
-                println("  ← Navigating back to chart list...")
+                println("  ← Navigating back...")
                 val backButton = device.wait(
                     Until.findObject(By.desc("Back")),
                     2000
@@ -635,7 +616,7 @@ class DemoUITests {
                 }
                 Thread.sleep(800)
             } else {
-                println("  ⚠ '$chartName' chart not found, skipping...")
+                println("  ⚠ '$keyword' chart not found, skipping...")
             }
         }
 

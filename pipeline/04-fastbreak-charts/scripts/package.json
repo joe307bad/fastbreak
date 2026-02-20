@@ -1,0 +1,12 @@
+{
+  "name": "fastbreak-scripts",
+  "version": "1.0.0",
+  "description": "Utility scripts for Fastbreak charts pipeline",
+  "type": "module",
+  "scripts": {
+    "force-refresh": "node force-refresh.mjs"
+  },
+  "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.0.0"
+  }
+}

@@ -43,8 +43,9 @@ command -v gifsicle >/dev/null 2>&1 || {
 echo -e "${GREEN}✓ All dependencies installed${NC}"
 echo ""
 
-# Create output directory
+# Create output directory and convert to absolute path
 mkdir -p "$OUTPUT_DIR"
+OUTPUT_DIR="$(cd "$OUTPUT_DIR" && pwd)"
 
 # Check for running emulator or start one
 echo -e "${GREEN}Checking for Android emulator...${NC}"

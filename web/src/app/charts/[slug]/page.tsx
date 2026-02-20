@@ -36,7 +36,7 @@ export default async function ChartPage({ params }: Props) {
         <div className="flex items-center gap-2 text-xs text-[var(--muted)] uppercase tracking-wider">
           <span>{data.sport}</span>
           <span>·</span>
-          <span>{data.visualizationType.replace('_', ' ')}</span>
+          <span>{data.visualizationType?.replace('_', ' ')}</span>
         </div>
         <h1 className="text-xl font-bold mt-1">{data.title}</h1>
         {data.subtitle && (

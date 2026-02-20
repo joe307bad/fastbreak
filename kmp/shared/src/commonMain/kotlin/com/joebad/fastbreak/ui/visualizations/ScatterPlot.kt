@@ -229,7 +229,15 @@ fun QuadrantScatterPlot(
     highlightedPlayerLabels: Set<String> = emptySet(),
     showShareButton: Boolean = false,
     onShareClick: ((()-> Unit) -> Unit)? = null,
-    source: String = ""
+    source: String = "",
+    // Custom center point for quadrant dividers (if not provided, uses data average)
+    customCenterX: Double? = null,
+    customCenterY: Double? = null,
+    // Custom axis bounds for consistent scaling across charts (if not provided, uses data bounds)
+    customXMin: Double? = null,
+    customXMax: Double? = null,
+    customYMin: Double? = null,
+    customYMax: Double? = null
 ) {
     // Use MaterialTheme colorScheme to detect app theme (not system theme)
     val isDark = MaterialTheme.colorScheme.background == Color.Black ||
@@ -321,20 +329,25 @@ fun QuadrantScatterPlot(
         val avgY: Float
     )
 
-    val bounds = remember(data, invertYAxis) {
+    val bounds = remember(data, invertYAxis, customCenterX, customCenterY, customXMin, customXMax, customYMin, customYMax) {
         val xValues = data.map { it.x }
         val yValues = data.map { it.y * yMultiplier }
 
-        val minX = xValues.minOrNull() ?: 0.0
-        val maxX = xValues.maxOrNull() ?: 100.0
-        val minY = yValues.minOrNull() ?: -0.5
-        val maxY = yValues.maxOrNull() ?: 0.5
+        // Use custom bounds if provided, otherwise calculate from data
+        val minX = customXMin ?: (xValues.minOrNull() ?: 0.0)
+        val maxX = customXMax ?: (xValues.maxOrNull() ?: 100.0)
+        val rawMinY = customYMin?.let { it * yMultiplier } ?: (yValues.minOrNull() ?: -0.5)
+        val rawMaxY = customYMax?.let { it * yMultiplier } ?: (yValues.maxOrNull() ?: 0.5)
+        // Ensure minY < maxY (important when invertYAxis flips the values)
+        val minY = minOf(rawMinY, rawMaxY)
+        val maxY = maxOf(rawMinY, rawMaxY)
 
         val xPadding = (maxX - minX) * 0.1
         val yPadding = (maxY - minY) * 0.1
 
-        val avgX = xValues.average()
-        val avgY = yValues.average()
+        // Use custom center if provided, otherwise calculate average
+        val avgX = customCenterX ?: xValues.average()
+        val avgY = customCenterY?.let { it * yMultiplier } ?: yValues.average()
 
         PlotBounds(
             xMin = (minX - xPadding).toFloat(),

@@ -15,6 +15,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.style.TextAlign
@@ -35,6 +36,14 @@ import io.github.koalaplot.core.util.rotateVertically
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
+/**
+ * Data class representing a horizontal reference line on the chart
+ */
+data class HorizontalReferenceLine(
+    val yValue: List<Pair<Double, Double>>, // List of (x, y) pairs for the reference line
+    val color: String = "#9E9E9E", // Gray by default
+    val label: String? = null
+)
 
 /**
  * Format number to one decimal place
@@ -88,7 +97,8 @@ fun LineChartComponent(
     showShareButton: Boolean = false,
     onShareClick: ((() -> Unit)?) -> Unit = {},
     source: String = "",
-    yAxisAbsoluteLabels: Boolean = false
+    yAxisAbsoluteLabels: Boolean = false,
+    referenceLines: List<HorizontalReferenceLine> = emptyList()
 ) {
     if (series.isEmpty() || series.all { it.dataPoints.isEmpty() }) return
 
@@ -263,6 +273,24 @@ fun LineChartComponent(
                         strokeWidth = 2.dp
                     )
                 )
+            }
+
+            // Draw reference lines
+            referenceLines.forEach { refLine ->
+                if (refLine.yValue.size >= 2) {
+                    val refColor = parseHexColor(refLine.color) ?: Color.Gray
+                    val refPoints = refLine.yValue.map { (x, y) ->
+                        DefaultPoint(x.toFloat(), y.toFloat())
+                    }
+                    LinePlot(
+                        data = refPoints,
+                        lineStyle = LineStyle(
+                            brush = SolidColor(refColor.copy(alpha = 0.7f)),
+                            strokeWidth = 1.5.dp,
+                            pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 5f), 0f)
+                        )
+                    )
+                }
             }
         }
 

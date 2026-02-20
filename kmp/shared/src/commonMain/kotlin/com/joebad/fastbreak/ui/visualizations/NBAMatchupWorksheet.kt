@@ -10,6 +10,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -31,9 +32,17 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.joebad.fastbreak.data.model.LineChartDataPoint
+import com.joebad.fastbreak.data.model.LineChartSeries
+import com.joebad.fastbreak.data.model.NBAMatchup
 import com.joebad.fastbreak.data.model.NBAMatchupVisualization
+import com.joebad.fastbreak.data.model.ScatterPlotDataPoint
 import com.joebad.fastbreak.platform.getImageExporter
+import com.joebad.fastbreak.ui.QuadrantScatterPlot
 import com.joebad.fastbreak.ui.components.ShareFab
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.doubleOrNull
 import kotlinx.coroutines.launch
 import kotlinx.datetime.Instant
 import kotlinx.datetime.LocalDate
@@ -188,6 +197,9 @@ fun NBAMatchupWorksheet(
     // State for view selection: 0 = Team, 1 = Away Off vs Home Def, 2 = Home Off vs Away Def
     var viewSelection by remember { mutableStateOf(0) }
 
+    // State for Stats/Charts tab selection: 0 = Stats, 1 = Charts
+    var selectedTab by remember { mutableStateOf(0) }
+
     // Graphics layer for capturing share image
     val graphicsLayer = rememberGraphicsLayer()
     val coroutineScope = rememberCoroutineScope()
@@ -259,25 +271,49 @@ fun NBAMatchupWorksheet(
 
                     Spacer(modifier = Modifier.height(12.dp))
 
-                    // Second row: Matchup badges for selected date
+                    // Second row: Matchup badges + Stats/Charts selector
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            .padding(vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        matchupsForDate.forEachIndexed { index, matchup ->
-                            MatchupBadge(
-                                awayTeam = matchup.awayTeam.abbreviation,
-                                homeTeam = matchup.homeTeam.abbreviation,
-                                gameDate = matchup.gameDate,
-                                isSelected = selectedMatchupIndex == index,
-                                onClick = { selectedMatchupIndex = index }
+                        // Stats/Charts toggle badges
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            NavigationBadge(
+                                text = "Stats",
+                                isSelected = selectedTab == 0,
+                                onClick = { selectedTab = 0 }
                             )
+                            NavigationBadge(
+                                text = "Charts",
+                                isSelected = selectedTab == 1,
+                                onClick = { selectedTab = 1 }
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.width(8.dp))
+
+                        // Matchup badges (scrollable)
+                        Row(
+                            modifier = Modifier
+                                .weight(1f)
+                                .horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            matchupsForDate.forEachIndexed { index, matchup ->
+                                MatchupBadge(
+                                    awayTeam = matchup.awayTeam.abbreviation,
+                                    homeTeam = matchup.homeTeam.abbreviation,
+                                    gameDate = matchup.gameDate,
+                                    isSelected = selectedMatchupIndex == index,
+                                    onClick = { selectedMatchupIndex = index }
+                                )
+                            }
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(4.dp))
                 }
             }
 
@@ -287,41 +323,54 @@ fun NBAMatchupWorksheet(
                     .fillMaxWidth()
                     .weight(1f)
             ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .verticalScroll(rememberScrollState())
-                        .padding(top = 20.dp) // Space for pinned header (one row now)
-                ) {
-                    // Record and conference rank section (scrollable)
-                    RecordAndConferenceSection(
-                        awayTeam = selectedMatchup.awayTeam.abbreviation,
-                        homeTeam = selectedMatchup.homeTeam.abbreviation,
-                        awayWins = selectedMatchup.awayTeam.wins,
-                        awayLosses = selectedMatchup.awayTeam.losses,
-                        awayConferenceRank = selectedMatchup.awayTeam.conferenceRank,
-                        awayConference = selectedMatchup.awayTeam.conference,
-                        homeWins = selectedMatchup.homeTeam.wins,
-                        homeLosses = selectedMatchup.homeTeam.losses,
-                        homeConferenceRank = selectedMatchup.homeTeam.conferenceRank,
-                        homeConference = selectedMatchup.homeTeam.conference
-                    )
+                when (selectedTab) {
+                    0 -> {
+                        // Stats Tab
+                        Column(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .verticalScroll(rememberScrollState())
+                                .padding(top = 20.dp) // Space for pinned header (one row now)
+                        ) {
+                            // Record and conference rank section (scrollable)
+                            RecordAndConferenceSection(
+                                awayTeam = selectedMatchup.awayTeam.abbreviation,
+                                homeTeam = selectedMatchup.homeTeam.abbreviation,
+                                awayWins = selectedMatchup.awayTeam.wins,
+                                awayLosses = selectedMatchup.awayTeam.losses,
+                                awayConferenceRank = selectedMatchup.awayTeam.conferenceRank,
+                                awayConference = selectedMatchup.awayTeam.conference,
+                                homeWins = selectedMatchup.homeTeam.wins,
+                                homeLosses = selectedMatchup.homeTeam.losses,
+                                homeConferenceRank = selectedMatchup.homeTeam.conferenceRank,
+                                homeConference = selectedMatchup.homeTeam.conference
+                            )
 
-                    Spacer(modifier = Modifier.height(8.dp))
+                            Spacer(modifier = Modifier.height(8.dp))
 
-                    NBAMatchupContent(
-                        matchup = selectedMatchup,
-                        viewSelection = viewSelection,
-                        onViewSelectionChange = { viewSelection = it }
-                    )
+                            NBAMatchupContent(
+                                matchup = selectedMatchup,
+                                viewSelection = viewSelection,
+                                onViewSelectionChange = { viewSelection = it }
+                            )
+                        }
+
+                        // Pinned header (only team abbreviations)
+                        PinnedMatchupHeader(
+                            awayTeam = selectedMatchup.awayTeam.abbreviation,
+                            homeTeam = selectedMatchup.homeTeam.abbreviation,
+                            modifier = Modifier.align(Alignment.TopCenter)
+                        )
+                    }
+                    1 -> {
+                        // Charts Tab
+                        NBAChartsTab(
+                            awayTeam = selectedMatchup.awayTeam.abbreviation,
+                            homeTeam = selectedMatchup.homeTeam.abbreviation,
+                            matchup = selectedMatchup
+                        )
+                    }
                 }
-
-                // Pinned header (only team abbreviations)
-                PinnedMatchupHeader(
-                    awayTeam = selectedMatchup.awayTeam.abbreviation,
-                    homeTeam = selectedMatchup.homeTeam.abbreviation,
-                    modifier = Modifier.align(Alignment.TopCenter)
-                )
             }
 
             // Source attribution
@@ -836,6 +885,14 @@ private fun NBAMatchupContent(
                 Spacer(modifier = Modifier.height(6.dp))
             }
         }
+
+        // One Month Trend Section
+        OneMonthTrendSection(
+            awayTeam = matchup.awayTeam.abbreviation,
+            homeTeam = matchup.homeTeam.abbreviation,
+            awayStats = matchup.awayTeam.stats,
+            homeStats = matchup.homeTeam.stats
+        )
 
         // View Navigation
         Spacer(modifier = Modifier.height(4.dp))
@@ -1406,4 +1463,743 @@ private fun formatGameDate(gameDate: String): String {
     } catch (e: Exception) {
         gameDate
     }
+}
+
+/**
+ * Navigation badge for Stats/Charts tab selection
+ */
+@Composable
+private fun NavigationBadge(
+    text: String,
+    isSelected: Boolean,
+    onClick: () -> Unit
+) {
+    val backgroundColor = if (isSelected) {
+        MaterialTheme.colorScheme.primary
+    } else {
+        MaterialTheme.colorScheme.surfaceVariant
+    }
+
+    val textColor = if (isSelected) {
+        MaterialTheme.colorScheme.onPrimary
+    } else {
+        MaterialTheme.colorScheme.onSurfaceVariant
+    }
+
+    Box(
+        modifier = Modifier
+            .background(backgroundColor, RoundedCornerShape(12.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelMedium,
+            fontSize = 11.sp,
+            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+            color = textColor
+        )
+    }
+}
+
+/**
+ * Charts tab showing cumulative net rating and weekly efficiency charts
+ */
+@Composable
+private fun NBAChartsTab(
+    awayTeam: String,
+    homeTeam: String,
+    matchup: NBAMatchup
+) {
+    val scrollState = rememberScrollState()
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(scrollState)
+            .padding(top = 16.dp, bottom = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        // Cumulative Net Rating Chart
+        CumulativeNetRatingChart(
+            awayTeam = awayTeam,
+            homeTeam = homeTeam,
+            awayStats = matchup.awayTeam.stats,
+            homeStats = matchup.homeTeam.stats,
+            tenthNetRatingByWeek = matchup.tenthNetRatingByWeek
+        )
+
+        // Weekly Efficiency Scatter Plot
+        WeeklyEfficiencyScatterPlot(
+            awayTeam = awayTeam,
+            homeTeam = homeTeam,
+            awayStats = matchup.awayTeam.stats,
+            homeStats = matchup.homeTeam.stats,
+            leagueStats = matchup.leagueEfficiencyStats
+        )
+    }
+}
+
+/**
+ * Cumulative Net Rating line chart comparing both teams over the season
+ */
+@Composable
+private fun CumulativeNetRatingChart(
+    awayTeam: String,
+    homeTeam: String,
+    awayStats: JsonObject,
+    homeStats: JsonObject,
+    tenthNetRatingByWeek: JsonObject? = null
+) {
+    Text(
+        text = "Cumulative Net Rating Over Season",
+        style = MaterialTheme.typography.titleSmall,
+        fontWeight = FontWeight.Bold,
+        modifier = Modifier.padding(bottom = 4.dp)
+    )
+
+    // Parse data points from cumNetRatingByWeek
+    val awayDataPoints = parseNetRatingByWeek(awayStats)
+    val homeDataPoints = parseNetRatingByWeek(homeStats)
+
+    if (awayDataPoints.isEmpty() && homeDataPoints.isEmpty()) {
+        Text(
+            text = "Cumulative net rating data not available",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        return
+    }
+
+    // Parse #10 net rating reference line
+    val tenthNetRatingPoints = parseTenthNetRatingByWeek(tenthNetRatingByWeek)
+    val referenceLines = if (tenthNetRatingPoints.isNotEmpty()) {
+        listOf(
+            HorizontalReferenceLine(
+                yValue = tenthNetRatingPoints,
+                color = "#4CAF50", // Green for "playoff cutoff" line
+                label = "#10"
+            )
+        )
+    } else {
+        emptyList()
+    }
+
+    // Create series with team colors
+    val series = listOf(
+        LineChartSeries(
+            label = awayTeam,
+            dataPoints = awayDataPoints,
+            color = "#2196F3" // Blue for away team
+        ),
+        LineChartSeries(
+            label = homeTeam,
+            dataPoints = homeDataPoints,
+            color = "#FF5722" // Deep Orange for home team
+        )
+    )
+
+    LineChartComponent(
+        series = series,
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(250.dp),
+        yAxisTitle = "Net Rating",
+        referenceLines = referenceLines
+    )
+
+    // Add legend for team colors
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 4.dp),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(12.dp)
+                    .background(Team1Color, CircleShape)
+            )
+            Text(
+                text = awayTeam,
+                style = MaterialTheme.typography.bodySmall,
+                fontWeight = FontWeight.Medium
+            )
+        }
+
+        Spacer(modifier = Modifier.width(16.dp))
+
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(12.dp)
+                    .background(Team2Color, CircleShape)
+            )
+            Text(
+                text = homeTeam,
+                style = MaterialTheme.typography.bodySmall,
+                fontWeight = FontWeight.Medium
+            )
+        }
+
+        // Add #10 reference line legend if available
+        if (tenthNetRatingByWeek != null) {
+            Spacer(modifier = Modifier.width(16.dp))
+
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .width(16.dp)
+                        .height(2.dp)
+                        .background(Color(0xFF4CAF50)) // Green color for reference line
+                )
+                Text(
+                    text = "#10 Rating",
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Weekly Efficiency scatter plot showing offensive vs defensive rating for last 10 weeks
+ */
+@Composable
+private fun WeeklyEfficiencyScatterPlot(
+    awayTeam: String,
+    homeTeam: String,
+    awayStats: JsonObject,
+    homeStats: JsonObject,
+    leagueStats: com.joebad.fastbreak.data.model.LeagueEfficiencyStats? = null
+) {
+    // State for week filter: 0 = Last 10 weeks (all), 1 = Last 5 weeks, 2 = Prior 5 weeks
+    var weekFilter by remember { mutableStateOf(0) }
+
+    // Parse efficiency by week data
+    val awayEfficiency = parseEfficiencyByWeek(awayStats)
+    val homeEfficiency = parseEfficiencyByWeek(homeStats)
+
+    if (awayEfficiency.isEmpty() && homeEfficiency.isEmpty()) {
+        Text(
+            text = "Weekly efficiency data not available",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        return
+    }
+
+    // Get the max week number to determine week ranges
+    val maxWeek = maxOf(
+        awayEfficiency.maxOfOrNull { it.week } ?: 0,
+        homeEfficiency.maxOfOrNull { it.week } ?: 0
+    )
+
+    // Filter data based on selection
+    val filteredAwayEfficiency = when (weekFilter) {
+        0 -> awayEfficiency.filter { it.week > maxWeek - 10 } // Last 10 weeks (all)
+        1 -> awayEfficiency.filter { it.week > maxWeek - 5 } // Last 5 weeks
+        2 -> awayEfficiency.filter { it.week <= maxWeek - 5 && it.week > maxWeek - 10 } // Prior 5 weeks
+        else -> awayEfficiency
+    }
+
+    val filteredHomeEfficiency = when (weekFilter) {
+        0 -> homeEfficiency.filter { it.week > maxWeek - 10 } // Last 10 weeks (all)
+        1 -> homeEfficiency.filter { it.week > maxWeek - 5 } // Last 5 weeks
+        2 -> homeEfficiency.filter { it.week <= maxWeek - 5 && it.week > maxWeek - 10 } // Prior 5 weeks
+        else -> homeEfficiency
+    }
+
+    Column {
+        // Title
+        Text(
+            text = "Weekly Off vs Def Rating",
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(bottom = 8.dp)
+        )
+
+        // Filter badges - centered
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                TeamStatsNavBadge(
+                    text = "Last 10 Wks",
+                    isSelected = weekFilter == 0,
+                    onClick = { weekFilter = 0 }
+                )
+                TeamStatsNavBadge(
+                    text = "Last 5 Wks",
+                    isSelected = weekFilter == 1,
+                    onClick = { weekFilter = 1 }
+                )
+                TeamStatsNavBadge(
+                    text = "Prior 5 Wks",
+                    isSelected = weekFilter == 2,
+                    onClick = { weekFilter = 2 }
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // Create scatter plot data points from filtered data
+        val scatterData = mutableListOf<ScatterPlotDataPoint>()
+
+        filteredAwayEfficiency.forEach { (week, offRating, defRating) ->
+            scatterData.add(
+                ScatterPlotDataPoint(
+                    label = "$awayTeam W$week",
+                    x = offRating,
+                    y = defRating,
+                    sum = offRating - defRating, // Net rating
+                    teamCode = awayTeam,
+                    color = "#2196F3"
+                )
+            )
+        }
+
+        filteredHomeEfficiency.forEach { (week, offRating, defRating) ->
+            scatterData.add(
+                ScatterPlotDataPoint(
+                    label = "$homeTeam W$week",
+                    x = offRating,
+                    y = defRating,
+                    sum = offRating - defRating, // Net rating
+                    teamCode = homeTeam,
+                    color = "#FF5722"
+                )
+            )
+        }
+
+        if (scatterData.isEmpty()) {
+            Text(
+                text = "No data for selected week range",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        } else {
+            QuadrantScatterPlot(
+                data = scatterData,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(300.dp),
+                title = "",
+                xAxisLabel = "Offensive Rating",
+                yAxisLabel = "Defensive Rating",
+                invertYAxis = true, // Lower defensive rating is better
+                highlightedTeamCodes = setOf(awayTeam, homeTeam),
+                // Use league-wide stats for consistent scaling across all matchups
+                customCenterX = leagueStats?.avgOffRating,
+                customCenterY = leagueStats?.avgDefRating,
+                customXMin = leagueStats?.minOffRating,
+                customXMax = leagueStats?.maxOffRating,
+                customYMin = leagueStats?.minDefRating,
+                customYMax = leagueStats?.maxDefRating
+            )
+        }
+    }
+}
+
+/**
+ * Helper to parse cumulative net rating by week from stats JsonObject
+ */
+private fun parseNetRatingByWeek(stats: JsonObject): List<LineChartDataPoint> {
+    val dataPoints = mutableListOf<LineChartDataPoint>()
+
+    // Get the cumNetRatingByWeek object
+    val cumNetRating = stats["cumNetRatingByWeek"]
+    if (cumNetRating is JsonObject) {
+        cumNetRating.forEach { (weekKey, value) ->
+            val weekNum = weekKey.removePrefix("week-").toIntOrNull()
+            val netRating = (value as? JsonPrimitive)?.doubleOrNull
+            if (weekNum != null && netRating != null) {
+                dataPoints.add(LineChartDataPoint(x = weekNum.toDouble(), y = netRating))
+            }
+        }
+    }
+
+    return dataPoints.sortedBy { it.x }
+}
+
+/**
+ * Helper to parse #10 net rating by week from matchup JsonObject
+ * Returns a list of (x, y) pairs representing the reference line
+ */
+private fun parseTenthNetRatingByWeek(data: JsonObject?): List<Pair<Double, Double>> {
+    if (data == null) return emptyList()
+
+    val points = mutableListOf<Pair<Double, Double>>()
+
+    data.forEach { (weekKey, value) ->
+        val weekNum = weekKey.removePrefix("week-").toIntOrNull()
+        val netRating = (value as? JsonPrimitive)?.doubleOrNull
+        if (weekNum != null && netRating != null) {
+            points.add(Pair(weekNum.toDouble(), netRating))
+        }
+    }
+
+    return points.sortedBy { it.first }
+}
+
+/**
+ * Helper data class for weekly efficiency
+ */
+private data class WeeklyEfficiencyData(
+    val week: Int,
+    val offRating: Double,
+    val defRating: Double
+)
+
+/**
+ * Helper to parse weekly efficiency data from stats JsonObject
+ */
+private fun parseEfficiencyByWeek(stats: JsonObject): List<WeeklyEfficiencyData> {
+    val efficiencyList = mutableListOf<WeeklyEfficiencyData>()
+
+    // Get the efficiencyByWeek object
+    val efficiency = stats["efficiencyByWeek"]
+    if (efficiency is JsonObject) {
+        efficiency.forEach { (weekKey, value) ->
+            val weekNum = weekKey.removePrefix("week-").toIntOrNull()
+            if (weekNum != null && value is JsonObject) {
+                val offRating = (value["offRating"] as? JsonPrimitive)?.doubleOrNull
+                val defRating = (value["defRating"] as? JsonPrimitive)?.doubleOrNull
+                if (offRating != null && defRating != null) {
+                    efficiencyList.add(WeeklyEfficiencyData(weekNum, offRating, defRating))
+                }
+            }
+        }
+    }
+
+    return efficiencyList.sortedBy { it.week }
+}
+
+/**
+ * One Month Trend section comparing teams over the last 4 weeks
+ */
+@Composable
+private fun OneMonthTrendSection(
+    awayTeam: String,
+    homeTeam: String,
+    awayStats: JsonObject,
+    homeStats: JsonObject
+) {
+    val awayTrend = parseMonthTrend(awayStats)
+    val homeTrend = parseMonthTrend(homeStats)
+
+    // Only show section if we have trend data for at least one team
+    if (awayTrend == null && homeTrend == null) {
+        return
+    }
+
+    SectionHeader("One Month Trend")
+    Spacer(modifier = Modifier.height(4.dp))
+
+    // Record
+    val awayRecord = awayTrend?.let { "${it.wins}-${it.losses}" } ?: "-"
+    val homeRecord = homeTrend?.let { "${it.wins}-${it.losses}" } ?: "-"
+    val recordAdvantage = when {
+        awayTrend?.recordRank != null && homeTrend?.recordRank != null ->
+            when {
+                awayTrend.recordRank < homeTrend.recordRank -> -1
+                homeTrend.recordRank < awayTrend.recordRank -> 1
+                else -> 0
+            }
+        else -> 0
+    }
+    FiveColumnRowWithRanks(
+        leftValue = awayRecord,
+        leftRank = awayTrend?.recordRank,
+        leftRankDisplay = awayTrend?.recordRankDisplay,
+        centerText = "Record",
+        rightValue = homeRecord,
+        rightRank = homeTrend?.recordRank,
+        rightRankDisplay = homeTrend?.recordRankDisplay,
+        advantage = recordAdvantage
+    )
+
+    // Net Rating
+    val netRatingAdvantage = when {
+        awayTrend?.netRatingRank != null && homeTrend?.netRatingRank != null ->
+            when {
+                awayTrend.netRatingRank < homeTrend.netRatingRank -> -1
+                homeTrend.netRatingRank < awayTrend.netRatingRank -> 1
+                else -> 0
+            }
+        else -> 0
+    }
+    FiveColumnRowWithRanks(
+        leftValue = awayTrend?.netRating?.formatStat(1) ?: "-",
+        leftRank = awayTrend?.netRatingRank,
+        leftRankDisplay = awayTrend?.netRatingRankDisplay,
+        centerText = "Net Rating",
+        rightValue = homeTrend?.netRating?.formatStat(1) ?: "-",
+        rightRank = homeTrend?.netRatingRank,
+        rightRankDisplay = homeTrend?.netRatingRankDisplay,
+        advantage = netRatingAdvantage
+    )
+
+    // Offensive Rating
+    val offRatingAdvantage = when {
+        awayTrend?.offRatingRank != null && homeTrend?.offRatingRank != null ->
+            when {
+                awayTrend.offRatingRank < homeTrend.offRatingRank -> -1
+                homeTrend.offRatingRank < awayTrend.offRatingRank -> 1
+                else -> 0
+            }
+        else -> 0
+    }
+    FiveColumnRowWithRanks(
+        leftValue = awayTrend?.offRating?.formatStat(1) ?: "-",
+        leftRank = awayTrend?.offRatingRank,
+        leftRankDisplay = awayTrend?.offRatingRankDisplay,
+        centerText = "Off Rating",
+        rightValue = homeTrend?.offRating?.formatStat(1) ?: "-",
+        rightRank = homeTrend?.offRatingRank,
+        rightRankDisplay = homeTrend?.offRatingRankDisplay,
+        advantage = offRatingAdvantage
+    )
+
+    // Defensive Rating (lower rank is better)
+    val defRatingAdvantage = when {
+        awayTrend?.defRatingRank != null && homeTrend?.defRatingRank != null ->
+            when {
+                awayTrend.defRatingRank < homeTrend.defRatingRank -> -1
+                homeTrend.defRatingRank < awayTrend.defRatingRank -> 1
+                else -> 0
+            }
+        else -> 0
+    }
+    FiveColumnRowWithRanks(
+        leftValue = awayTrend?.defRating?.formatStat(1) ?: "-",
+        leftRank = awayTrend?.defRatingRank,
+        leftRankDisplay = awayTrend?.defRatingRankDisplay,
+        centerText = "Def Rating",
+        rightValue = homeTrend?.defRating?.formatStat(1) ?: "-",
+        rightRank = homeTrend?.defRatingRank,
+        rightRankDisplay = homeTrend?.defRatingRankDisplay,
+        advantage = defRatingAdvantage
+    )
+
+    // Points Per Game
+    val ppgAdvantage = when {
+        awayTrend?.ppgRank != null && homeTrend?.ppgRank != null ->
+            when {
+                awayTrend.ppgRank < homeTrend.ppgRank -> -1
+                homeTrend.ppgRank < awayTrend.ppgRank -> 1
+                else -> 0
+            }
+        else -> 0
+    }
+    FiveColumnRowWithRanks(
+        leftValue = awayTrend?.ppg?.formatStat(1) ?: "-",
+        leftRank = awayTrend?.ppgRank,
+        leftRankDisplay = awayTrend?.ppgRankDisplay,
+        centerText = "PPG",
+        rightValue = homeTrend?.ppg?.formatStat(1) ?: "-",
+        rightRank = homeTrend?.ppgRank,
+        rightRankDisplay = homeTrend?.ppgRankDisplay,
+        advantage = ppgAdvantage
+    )
+
+    // Assists Per Game
+    val apgAdvantage = when {
+        awayTrend?.apgRank != null && homeTrend?.apgRank != null ->
+            when {
+                awayTrend.apgRank < homeTrend.apgRank -> -1
+                homeTrend.apgRank < awayTrend.apgRank -> 1
+                else -> 0
+            }
+        else -> 0
+    }
+    FiveColumnRowWithRanks(
+        leftValue = awayTrend?.apg?.formatStat(1) ?: "-",
+        leftRank = awayTrend?.apgRank,
+        leftRankDisplay = awayTrend?.apgRankDisplay,
+        centerText = "APG",
+        rightValue = homeTrend?.apg?.formatStat(1) ?: "-",
+        rightRank = homeTrend?.apgRank,
+        rightRankDisplay = homeTrend?.apgRankDisplay,
+        advantage = apgAdvantage
+    )
+
+    // Turnovers Per Game (lower is better)
+    val tpgAdvantage = when {
+        awayTrend?.tpgRank != null && homeTrend?.tpgRank != null ->
+            when {
+                awayTrend.tpgRank < homeTrend.tpgRank -> -1
+                homeTrend.tpgRank < awayTrend.tpgRank -> 1
+                else -> 0
+            }
+        else -> 0
+    }
+    FiveColumnRowWithRanks(
+        leftValue = awayTrend?.tpg?.formatStat(1) ?: "-",
+        leftRank = awayTrend?.tpgRank,
+        leftRankDisplay = awayTrend?.tpgRankDisplay,
+        centerText = "TOV",
+        rightValue = homeTrend?.tpg?.formatStat(1) ?: "-",
+        rightRank = homeTrend?.tpgRank,
+        rightRankDisplay = homeTrend?.tpgRankDisplay,
+        advantage = tpgAdvantage
+    )
+
+    // Turnover Differential (higher is better)
+    val tovDiffAdvantage = when {
+        awayTrend?.tovDiffRank != null && homeTrend?.tovDiffRank != null ->
+            when {
+                awayTrend.tovDiffRank < homeTrend.tovDiffRank -> -1
+                homeTrend.tovDiffRank < awayTrend.tovDiffRank -> 1
+                else -> 0
+            }
+        else -> 0
+    }
+    FiveColumnRowWithRanks(
+        leftValue = awayTrend?.tovDiff?.let { if (it >= 0) "+${it.formatStat(1)}" else it.formatStat(1) } ?: "-",
+        leftRank = awayTrend?.tovDiffRank,
+        leftRankDisplay = awayTrend?.tovDiffRankDisplay,
+        centerText = "TOV Diff",
+        rightValue = homeTrend?.tovDiff?.let { if (it >= 0) "+${it.formatStat(1)}" else it.formatStat(1) } ?: "-",
+        rightRank = homeTrend?.tovDiffRank,
+        rightRankDisplay = homeTrend?.tovDiffRankDisplay,
+        advantage = tovDiffAdvantage
+    )
+
+    Spacer(modifier = Modifier.height(6.dp))
+}
+
+/**
+ * Data class for month trend stats
+ */
+private data class MonthTrendData(
+    val wins: Int,
+    val losses: Int,
+    val recordRank: Int?,
+    val recordRankDisplay: String?,
+    val netRating: Double?,
+    val netRatingRank: Int?,
+    val netRatingRankDisplay: String?,
+    val offRating: Double?,
+    val offRatingRank: Int?,
+    val offRatingRankDisplay: String?,
+    val defRating: Double?,
+    val defRatingRank: Int?,
+    val defRatingRankDisplay: String?,
+    val ppg: Double?,
+    val ppgRank: Int?,
+    val ppgRankDisplay: String?,
+    val apg: Double?,
+    val apgRank: Int?,
+    val apgRankDisplay: String?,
+    val tpg: Double?,
+    val tpgRank: Int?,
+    val tpgRankDisplay: String?,
+    val tovDiff: Double?,
+    val tovDiffRank: Int?,
+    val tovDiffRankDisplay: String?
+)
+
+/**
+ * Helper to parse month trend data from stats JsonObject
+ */
+private fun parseMonthTrend(stats: JsonObject): MonthTrendData? {
+    val monthTrend = stats["monthTrend"]
+    if (monthTrend !is JsonObject) {
+        return null
+    }
+
+    // Parse record
+    val record = monthTrend["record"] as? JsonObject
+    val wins = (record?.get("wins") as? JsonPrimitive)?.content?.toIntOrNull() ?: 0
+    val losses = (record?.get("losses") as? JsonPrimitive)?.content?.toIntOrNull() ?: 0
+    val recordRank = (record?.get("rank") as? JsonPrimitive)?.content?.toIntOrNull()
+    val recordRankDisplay = (record?.get("rankDisplay") as? JsonPrimitive)?.content
+
+    // Parse net rating
+    val netRatingObj = monthTrend["netRating"] as? JsonObject
+    val netRating = (netRatingObj?.get("value") as? JsonPrimitive)?.doubleOrNull
+    val netRatingRank = (netRatingObj?.get("rank") as? JsonPrimitive)?.content?.toIntOrNull()
+    val netRatingRankDisplay = (netRatingObj?.get("rankDisplay") as? JsonPrimitive)?.content
+
+    // Parse offensive rating
+    val offRatingObj = monthTrend["offensiveRating"] as? JsonObject
+    val offRating = (offRatingObj?.get("value") as? JsonPrimitive)?.doubleOrNull
+    val offRatingRank = (offRatingObj?.get("rank") as? JsonPrimitive)?.content?.toIntOrNull()
+    val offRatingRankDisplay = (offRatingObj?.get("rankDisplay") as? JsonPrimitive)?.content
+
+    // Parse defensive rating
+    val defRatingObj = monthTrend["defensiveRating"] as? JsonObject
+    val defRating = (defRatingObj?.get("value") as? JsonPrimitive)?.doubleOrNull
+    val defRatingRank = (defRatingObj?.get("rank") as? JsonPrimitive)?.content?.toIntOrNull()
+    val defRatingRankDisplay = (defRatingObj?.get("rankDisplay") as? JsonPrimitive)?.content
+
+    // Parse points per game
+    val ppgObj = monthTrend["pointsPerGame"] as? JsonObject
+    val ppg = (ppgObj?.get("value") as? JsonPrimitive)?.doubleOrNull
+    val ppgRank = (ppgObj?.get("rank") as? JsonPrimitive)?.content?.toIntOrNull()
+    val ppgRankDisplay = (ppgObj?.get("rankDisplay") as? JsonPrimitive)?.content
+
+    // Parse assists per game
+    val apgObj = monthTrend["assistsPerGame"] as? JsonObject
+    val apg = (apgObj?.get("value") as? JsonPrimitive)?.doubleOrNull
+    val apgRank = (apgObj?.get("rank") as? JsonPrimitive)?.content?.toIntOrNull()
+    val apgRankDisplay = (apgObj?.get("rankDisplay") as? JsonPrimitive)?.content
+
+    // Parse turnovers per game
+    val tpgObj = monthTrend["turnoversPerGame"] as? JsonObject
+    val tpg = (tpgObj?.get("value") as? JsonPrimitive)?.doubleOrNull
+    val tpgRank = (tpgObj?.get("rank") as? JsonPrimitive)?.content?.toIntOrNull()
+    val tpgRankDisplay = (tpgObj?.get("rankDisplay") as? JsonPrimitive)?.content
+
+    // Parse turnover differential
+    val tovDiffObj = monthTrend["turnoverDiff"] as? JsonObject
+    val tovDiff = (tovDiffObj?.get("value") as? JsonPrimitive)?.doubleOrNull
+    val tovDiffRank = (tovDiffObj?.get("rank") as? JsonPrimitive)?.content?.toIntOrNull()
+    val tovDiffRankDisplay = (tovDiffObj?.get("rankDisplay") as? JsonPrimitive)?.content
+
+    return MonthTrendData(
+        wins = wins,
+        losses = losses,
+        recordRank = recordRank,
+        recordRankDisplay = recordRankDisplay,
+        netRating = netRating,
+        netRatingRank = netRatingRank,
+        netRatingRankDisplay = netRatingRankDisplay,
+        offRating = offRating,
+        offRatingRank = offRatingRank,
+        offRatingRankDisplay = offRatingRankDisplay,
+        defRating = defRating,
+        defRatingRank = defRatingRank,
+        defRatingRankDisplay = defRatingRankDisplay,
+        ppg = ppg,
+        ppgRank = ppgRank,
+        ppgRankDisplay = ppgRankDisplay,
+        apg = apg,
+        apgRank = apgRank,
+        apgRankDisplay = apgRankDisplay,
+        tpg = tpg,
+        tpgRank = tpgRank,
+        tpgRankDisplay = tpgRankDisplay,
+        tovDiff = tovDiff,
+        tovDiffRank = tovDiffRank,
+        tovDiffRankDisplay = tovDiffRankDisplay
+    )
 }

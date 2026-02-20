@@ -340,6 +340,202 @@ if (!is.null(four_factors_stats)) {
 }
 
 # ============================================================================
+# STEP 1b: Calculate cumulative net rating and weekly efficiency by week
+# ============================================================================
+cat("\n1b. Calculating cumulative net rating and weekly efficiency...\n")
+
+# Calculate per-game net rating and group by week
+# Net Rating = Offensive Rating - Defensive Rating (per 100 possessions)
+# Possessions ≈ FGA - ORB + TOV + (0.44 * FTA)
+# NBA season starts in October, so we use the season start year as reference
+season_start_date <- as.Date(paste0(NBA_SEASON - 1, "-10-01"))
+
+# First, calculate per-game ratings using simple possession estimate
+game_ratings <- team_box %>%
+  mutate(
+    game_date_parsed = as.Date(game_date),
+    week_num = as.integer(floor(difftime(game_date_parsed, season_start_date, units = "weeks")) + 1),
+    # Simple possession estimate: FGA - ORB + TOV + 0.44*FTA
+    possessions = field_goals_attempted - offensive_rebounds + turnovers + (0.44 * free_throws_attempted),
+    # Calculate offensive and defensive ratings (per 100 possessions)
+    off_rating = (team_score / possessions) * 100,
+    def_rating = (opponent_team_score / possessions) * 100,
+    # Net rating for this game
+    game_net_rating = off_rating - def_rating
+  ) %>%
+  filter(week_num > 0, possessions > 0)
+
+# Calculate cumulative average net rating by week
+cum_net_rating_by_team <- game_ratings %>%
+  group_by(team_abbreviation) %>%
+  arrange(game_date_parsed) %>%
+  mutate(
+    # Running average net rating through each game
+    cum_avg_net_rating = cummean(game_net_rating)
+  ) %>%
+  # Get the last game of each week to represent that week's cumulative average
+  group_by(team_abbreviation, week_num) %>%
+  slice_tail(n = 1) %>%
+  ungroup() %>%
+  select(team_abbreviation, week_num, cum_net_rating = cum_avg_net_rating)
+
+cat("Calculated cumulative net rating for", length(unique(cum_net_rating_by_team$team_abbreviation)), "teams\n")
+
+# Calculate the #10 ranked cumulative net rating for each week (for reference line on chart)
+# This represents the "playoff cutoff" level - top 10 teams have positive ratings generally
+tenth_net_rating_by_week <- cum_net_rating_by_team %>%
+  group_by(week_num) %>%
+  arrange(desc(cum_net_rating)) %>%
+  slice(10) %>%  # Get the 10th best team's rating
+  ungroup() %>%
+  select(week_num, tenth_net_rating = cum_net_rating)
+
+cat("Calculated #10 net rating reference line for", nrow(tenth_net_rating_by_week), "weeks\n")
+
+# Calculate weekly efficiency (off_rating and def_rating per week) - last 10 weeks
+# This averages the ratings for all games within each week
+weekly_efficiency <- game_ratings %>%
+  group_by(team_abbreviation, week_num) %>%
+  summarise(
+    off_rating = mean(off_rating, na.rm = TRUE),
+    def_rating = mean(def_rating, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  # Keep only last 10 weeks per team
+  group_by(team_abbreviation) %>%
+  arrange(desc(week_num)) %>%
+  slice_head(n = 10) %>%
+  arrange(week_num) %>%
+  ungroup()
+
+cat("Calculated weekly efficiency for", length(unique(weekly_efficiency$team_abbreviation)), "teams\n")
+
+# Calculate league-wide efficiency stats for consistent scatter plot scaling
+# This provides: avg off/def rating, min/max for axis bounds across all teams
+league_efficiency_stats <- weekly_efficiency %>%
+  summarise(
+    avg_off_rating = mean(off_rating, na.rm = TRUE),
+    avg_def_rating = mean(def_rating, na.rm = TRUE),
+    min_off_rating = min(off_rating, na.rm = TRUE),
+    max_off_rating = max(off_rating, na.rm = TRUE),
+    min_def_rating = min(def_rating, na.rm = TRUE),
+    max_def_rating = max(def_rating, na.rm = TRUE)
+  )
+
+cat("League avg off rating:", round(league_efficiency_stats$avg_off_rating, 1),
+    "def rating:", round(league_efficiency_stats$avg_def_rating, 1), "\n")
+
+# ============================================================================
+# STEP 1c: Calculate 1-month trend rankings (last 4 weeks)
+# ============================================================================
+cat("\n1c. Calculating 1-month trend rankings (last 4 weeks)...\n")
+
+# Get current week number
+current_week <- max(game_ratings$week_num, na.rm = TRUE)
+month_start_week <- current_week - 3  # Last 4 weeks including current
+
+# Filter to last 4 weeks of games
+month_games <- game_ratings %>%
+  filter(week_num >= month_start_week)
+
+cat("Month trend: weeks", month_start_week, "to", current_week, "\n")
+
+# Calculate per-team stats for the last 4 weeks
+month_trend_stats <- month_games %>%
+  group_by(team_abbreviation) %>%
+  summarise(
+    games_played = n(),
+    # Record
+    wins = sum(team_score > opponent_team_score, na.rm = TRUE),
+    losses = sum(team_score < opponent_team_score, na.rm = TRUE),
+    # Ratings (average over the month)
+    avg_net_rating = mean(game_net_rating, na.rm = TRUE),
+    avg_off_rating = mean(off_rating, na.rm = TRUE),
+    avg_def_rating = mean(def_rating, na.rm = TRUE),
+    # Per game stats
+    points_per_game = mean(team_score, na.rm = TRUE),
+    assists_per_game = mean(assists, na.rm = TRUE),
+    turnovers_per_game = mean(turnovers, na.rm = TRUE),
+    # Turnovers forced (from opponent box scores - need to calculate differently)
+    .groups = "drop"
+  )
+
+# Get opponent turnovers (turnovers forced by this team) from opponent perspective
+opponent_turnovers_month <- month_games %>%
+  group_by(opponent_team_abbreviation = team_abbreviation) %>%
+  summarise(
+    opp_turnovers_committed = mean(turnovers, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+# Join with month_trend_stats - turnovers forced = opponent's turnovers when playing against us
+# We need to flip the perspective: look at what opponents did AGAINST each team
+turnovers_forced <- team_box %>%
+  mutate(
+    game_date_parsed = as.Date(game_date),
+    week_num = as.integer(floor(difftime(game_date_parsed, season_start_date, units = "weeks")) + 1)
+  ) %>%
+  filter(week_num >= month_start_week, week_num <= current_week) %>%
+  group_by(defending_team = opponent_team_abbreviation) %>%
+  summarise(
+    turnovers_forced_pg = mean(turnovers, na.rm = TRUE),  # Turnovers by the opponent = forced by defending_team
+    .groups = "drop"
+  )
+
+# Join turnovers forced
+month_trend_stats <- month_trend_stats %>%
+  left_join(turnovers_forced, by = c("team_abbreviation" = "defending_team")) %>%
+  mutate(
+    # Turnover differential: forced - committed (higher is better)
+    turnover_diff = coalesce(turnovers_forced_pg, 0) - turnovers_per_game
+  )
+
+# Calculate rankings for each stat (across all 30 teams)
+# Net rating (higher is better)
+net_rating_month_ranks <- tied_rank(-month_trend_stats$avg_net_rating)
+month_trend_stats$net_rating_rank <- net_rating_month_ranks$rank
+month_trend_stats$net_rating_rankDisplay <- net_rating_month_ranks$rankDisplay
+
+# Offensive rating (higher is better)
+off_rating_month_ranks <- tied_rank(-month_trend_stats$avg_off_rating)
+month_trend_stats$off_rating_rank <- off_rating_month_ranks$rank
+month_trend_stats$off_rating_rankDisplay <- off_rating_month_ranks$rankDisplay
+
+# Defensive rating (lower is better)
+def_rating_month_ranks <- tied_rank(month_trend_stats$avg_def_rating)
+month_trend_stats$def_rating_rank <- def_rating_month_ranks$rank
+month_trend_stats$def_rating_rankDisplay <- def_rating_month_ranks$rankDisplay
+
+# Points per game (higher is better)
+ppg_month_ranks <- tied_rank(-month_trend_stats$points_per_game)
+month_trend_stats$ppg_rank <- ppg_month_ranks$rank
+month_trend_stats$ppg_rankDisplay <- ppg_month_ranks$rankDisplay
+
+# Assists per game (higher is better)
+apg_month_ranks <- tied_rank(-month_trend_stats$assists_per_game)
+month_trend_stats$apg_rank <- apg_month_ranks$rank
+month_trend_stats$apg_rankDisplay <- apg_month_ranks$rankDisplay
+
+# Turnovers per game (lower is better)
+tpg_month_ranks <- tied_rank(month_trend_stats$turnovers_per_game)
+month_trend_stats$tpg_rank <- tpg_month_ranks$rank
+month_trend_stats$tpg_rankDisplay <- tpg_month_ranks$rankDisplay
+
+# Turnover differential (higher is better)
+tov_diff_month_ranks <- tied_rank(-month_trend_stats$turnover_diff)
+month_trend_stats$tov_diff_rank <- tov_diff_month_ranks$rank
+month_trend_stats$tov_diff_rankDisplay <- tov_diff_month_ranks$rankDisplay
+
+# Win percentage for record ranking (higher is better)
+month_trend_stats <- month_trend_stats %>%
+  mutate(win_pct = wins / (wins + losses))
+record_month_ranks <- tied_rank(-month_trend_stats$win_pct)
+month_trend_stats$record_rank <- record_month_ranks$rank
+month_trend_stats$record_rankDisplay <- record_month_ranks$rankDisplay
+
+cat("Calculated month trend rankings for", nrow(month_trend_stats), "teams\n")
+
+# ============================================================================
 # STEP 2: Load player stats and calculate ranks
 # ============================================================================
 cat("\n2. Loading player stats...\n")
@@ -1276,6 +1472,92 @@ for (game in upcoming_games) {
     home_team_data$stats$oppEffectiveFgPctRankDisplay <- home_stats$opp_efg_pct_rankDisplay
   }
 
+  # Add cumulative net rating by week for home team
+  home_cum_net_rating <- cum_net_rating_by_team %>%
+    filter(team_abbreviation == game$home_team_abbrev) %>%
+    select(week_num, cum_net_rating)
+
+  home_team_data$stats$cumNetRatingByWeek <- if (nrow(home_cum_net_rating) > 0) {
+    setNames(
+      as.list(round(home_cum_net_rating$cum_net_rating, 1)),
+      paste0("week-", home_cum_net_rating$week_num)
+    )
+  } else {
+    list()
+  }
+
+  # Add weekly efficiency (off/def rating) for last 10 weeks - for scatter plot
+  home_weekly_eff <- weekly_efficiency %>%
+    filter(team_abbreviation == game$home_team_abbrev) %>%
+    select(week_num, off_rating, def_rating)
+
+  home_team_data$stats$efficiencyByWeek <- if (nrow(home_weekly_eff) > 0) {
+    setNames(
+      lapply(1:nrow(home_weekly_eff), function(i) {
+        list(
+          offRating = round(home_weekly_eff$off_rating[i], 1),
+          defRating = round(home_weekly_eff$def_rating[i], 1)
+        )
+      }),
+      paste0("week-", home_weekly_eff$week_num)
+    )
+  } else {
+    list()
+  }
+
+  # Add 1-month trend rankings for home team
+  home_month_trend <- month_trend_stats %>%
+    filter(team_abbreviation == game$home_team_abbrev)
+
+  home_team_data$stats$monthTrend <- if (nrow(home_month_trend) > 0) {
+    list(
+      gamesPlayed = as.integer(home_month_trend$games_played),
+      record = list(
+        wins = as.integer(home_month_trend$wins),
+        losses = as.integer(home_month_trend$losses),
+        rank = as.integer(home_month_trend$record_rank),
+        rankDisplay = home_month_trend$record_rankDisplay
+      ),
+      netRating = list(
+        value = round(home_month_trend$avg_net_rating, 1),
+        rank = as.integer(home_month_trend$net_rating_rank),
+        rankDisplay = home_month_trend$net_rating_rankDisplay
+      ),
+      offensiveRating = list(
+        value = round(home_month_trend$avg_off_rating, 1),
+        rank = as.integer(home_month_trend$off_rating_rank),
+        rankDisplay = home_month_trend$off_rating_rankDisplay
+      ),
+      defensiveRating = list(
+        value = round(home_month_trend$avg_def_rating, 1),
+        rank = as.integer(home_month_trend$def_rating_rank),
+        rankDisplay = home_month_trend$def_rating_rankDisplay
+      ),
+      pointsPerGame = list(
+        value = round(home_month_trend$points_per_game, 1),
+        rank = as.integer(home_month_trend$ppg_rank),
+        rankDisplay = home_month_trend$ppg_rankDisplay
+      ),
+      assistsPerGame = list(
+        value = round(home_month_trend$assists_per_game, 1),
+        rank = as.integer(home_month_trend$apg_rank),
+        rankDisplay = home_month_trend$apg_rankDisplay
+      ),
+      turnoversPerGame = list(
+        value = round(home_month_trend$turnovers_per_game, 1),
+        rank = as.integer(home_month_trend$tpg_rank),
+        rankDisplay = home_month_trend$tpg_rankDisplay
+      ),
+      turnoverDiff = list(
+        value = round(home_month_trend$turnover_diff, 1),
+        rank = as.integer(home_month_trend$tov_diff_rank),
+        rankDisplay = home_month_trend$tov_diff_rankDisplay
+      )
+    )
+  } else {
+    list()
+  }
+
   away_team_data <- list(
     id = game$away_team_id,
     name = game$away_team_name,
@@ -1350,6 +1632,92 @@ for (game in upcoming_games) {
     away_team_data$stats$oppEffectiveFgPct <- round(away_stats$opp_efg_pct, 1)
     away_team_data$stats$oppEffectiveFgPctRank <- away_stats$opp_efg_pct_rank
     away_team_data$stats$oppEffectiveFgPctRankDisplay <- away_stats$opp_efg_pct_rankDisplay
+  }
+
+  # Add cumulative net rating by week for away team
+  away_cum_net_rating <- cum_net_rating_by_team %>%
+    filter(team_abbreviation == game$away_team_abbrev) %>%
+    select(week_num, cum_net_rating)
+
+  away_team_data$stats$cumNetRatingByWeek <- if (nrow(away_cum_net_rating) > 0) {
+    setNames(
+      as.list(round(away_cum_net_rating$cum_net_rating, 1)),
+      paste0("week-", away_cum_net_rating$week_num)
+    )
+  } else {
+    list()
+  }
+
+  # Add weekly efficiency (off/def rating) for last 10 weeks - for scatter plot
+  away_weekly_eff <- weekly_efficiency %>%
+    filter(team_abbreviation == game$away_team_abbrev) %>%
+    select(week_num, off_rating, def_rating)
+
+  away_team_data$stats$efficiencyByWeek <- if (nrow(away_weekly_eff) > 0) {
+    setNames(
+      lapply(1:nrow(away_weekly_eff), function(i) {
+        list(
+          offRating = round(away_weekly_eff$off_rating[i], 1),
+          defRating = round(away_weekly_eff$def_rating[i], 1)
+        )
+      }),
+      paste0("week-", away_weekly_eff$week_num)
+    )
+  } else {
+    list()
+  }
+
+  # Add 1-month trend rankings for away team
+  away_month_trend <- month_trend_stats %>%
+    filter(team_abbreviation == game$away_team_abbrev)
+
+  away_team_data$stats$monthTrend <- if (nrow(away_month_trend) > 0) {
+    list(
+      gamesPlayed = as.integer(away_month_trend$games_played),
+      record = list(
+        wins = as.integer(away_month_trend$wins),
+        losses = as.integer(away_month_trend$losses),
+        rank = as.integer(away_month_trend$record_rank),
+        rankDisplay = away_month_trend$record_rankDisplay
+      ),
+      netRating = list(
+        value = round(away_month_trend$avg_net_rating, 1),
+        rank = as.integer(away_month_trend$net_rating_rank),
+        rankDisplay = away_month_trend$net_rating_rankDisplay
+      ),
+      offensiveRating = list(
+        value = round(away_month_trend$avg_off_rating, 1),
+        rank = as.integer(away_month_trend$off_rating_rank),
+        rankDisplay = away_month_trend$off_rating_rankDisplay
+      ),
+      defensiveRating = list(
+        value = round(away_month_trend$avg_def_rating, 1),
+        rank = as.integer(away_month_trend$def_rating_rank),
+        rankDisplay = away_month_trend$def_rating_rankDisplay
+      ),
+      pointsPerGame = list(
+        value = round(away_month_trend$points_per_game, 1),
+        rank = as.integer(away_month_trend$ppg_rank),
+        rankDisplay = away_month_trend$ppg_rankDisplay
+      ),
+      assistsPerGame = list(
+        value = round(away_month_trend$assists_per_game, 1),
+        rank = as.integer(away_month_trend$apg_rank),
+        rankDisplay = away_month_trend$apg_rankDisplay
+      ),
+      turnoversPerGame = list(
+        value = round(away_month_trend$turnovers_per_game, 1),
+        rank = as.integer(away_month_trend$tpg_rank),
+        rankDisplay = away_month_trend$tpg_rankDisplay
+      ),
+      turnoverDiff = list(
+        value = round(away_month_trend$turnover_diff, 1),
+        rank = as.integer(away_month_trend$tov_diff_rank),
+        rankDisplay = away_month_trend$tov_diff_rankDisplay
+      )
+    )
+  } else {
+    list()
   }
 
   # Build player data
@@ -1580,6 +1948,26 @@ for (game in upcoming_games) {
       awayMoneyline = game$odds$away_moneyline
     )
   }
+
+  # Add #10 net rating reference line (league-wide data for chart overlay)
+  matchup$tenthNetRatingByWeek <- if (nrow(tenth_net_rating_by_week) > 0) {
+    setNames(
+      as.list(round(tenth_net_rating_by_week$tenth_net_rating, 1)),
+      paste0("week-", tenth_net_rating_by_week$week_num)
+    )
+  } else {
+    list()
+  }
+
+  # Add league-wide efficiency stats for consistent scatter plot scaling
+  matchup$leagueEfficiencyStats <- list(
+    avgOffRating = round(league_efficiency_stats$avg_off_rating, 1),
+    avgDefRating = round(league_efficiency_stats$avg_def_rating, 1),
+    minOffRating = round(league_efficiency_stats$min_off_rating, 1),
+    maxOffRating = round(league_efficiency_stats$max_off_rating, 1),
+    minDefRating = round(league_efficiency_stats$min_def_rating, 1),
+    maxDefRating = round(league_efficiency_stats$max_def_rating, 1)
+  )
 
   matchups_json[[length(matchups_json) + 1]] <- matchup
 }

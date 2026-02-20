@@ -7,6 +7,7 @@ import com.joebad.fastbreak.data.serializers.TagListSerializer
 import kotlin.time.Instant
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseSerializers
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 
 // Tag structure for categorizing and filtering visualizations
@@ -514,7 +515,7 @@ data class NBATeamInfo(
     val name: String,
     val abbreviation: String,
     val logo: String,
-    val stats: Map<String, JsonPrimitive>,
+    val stats: JsonObject,
     val wins: Int? = null,
     val losses: Int? = null,
     val conferenceRank: Int? = null,
@@ -565,6 +566,16 @@ data class NBAMatchupOdds(
 )
 
 @Serializable
+data class LeagueEfficiencyStats(
+    val avgOffRating: Double,
+    val avgDefRating: Double,
+    val minOffRating: Double,
+    val maxOffRating: Double,
+    val minDefRating: Double,
+    val maxDefRating: Double
+)
+
+@Serializable
 data class NBAMatchup(
     val gameId: String,
     val gameDate: String,  // ISO 8601 format
@@ -575,7 +586,9 @@ data class NBAMatchup(
     val awayPlayers: List<NBAPlayerInfo> = emptyList(),
     val location: MatchupLocation? = null,
     val odds: NBAMatchupOdds? = null,
-    val comparisons: MatchupComparisons? = null
+    val comparisons: MatchupComparisons? = null,
+    val tenthNetRatingByWeek: JsonObject? = null,  // #10 ranked cumulative net rating by week for reference line
+    val leagueEfficiencyStats: LeagueEfficiencyStats? = null  // League-wide stats for consistent scatter plot scaling
 )
 
 @Serializable

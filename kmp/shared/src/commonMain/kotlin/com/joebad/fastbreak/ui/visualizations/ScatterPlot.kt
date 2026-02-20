@@ -237,7 +237,10 @@ fun QuadrantScatterPlot(
     customXMin: Double? = null,
     customXMax: Double? = null,
     customYMin: Double? = null,
-    customYMax: Double? = null
+    customYMax: Double? = null,
+    // Optional: data to use for regression line calculation (if not provided, uses main data)
+    // Use this to keep regression line fixed when filtering the displayed data
+    regressionData: List<ScatterPlotDataPoint>? = null
 ) {
     // Use MaterialTheme colorScheme to detect app theme (not system theme)
     val isDark = MaterialTheme.colorScheme.background == Color.Black ||
@@ -366,9 +369,10 @@ fun QuadrantScatterPlot(
     val avgX = bounds.avgX
     val avgY = bounds.avgY
 
-    // Calculate regression line
-    val regression = remember(data, yMultiplier) {
-        val points = data.map { it.x.toFloat() to (it.y * yMultiplier).toFloat() }
+    // Calculate regression line - use regressionData if provided, otherwise use displayed data
+    val regression = remember(regressionData, data, yMultiplier) {
+        val dataForRegression = regressionData ?: data
+        val points = dataForRegression.map { it.x.toFloat() to (it.y * yMultiplier).toFloat() }
         calculateRegression(points)
     }
 

@@ -592,6 +592,14 @@ data class NBAMatchup(
 )
 
 @Serializable
+data class ScatterPlotQuadrants(
+    val topRight: QuadrantConfig? = null,
+    val topLeft: QuadrantConfig? = null,
+    val bottomLeft: QuadrantConfig? = null,
+    val bottomRight: QuadrantConfig? = null
+)
+
+@Serializable
 data class NBAMatchupVisualization(
     override val sport: String,
     override val visualizationType: String,
@@ -603,6 +611,7 @@ data class NBAMatchupVisualization(
     @Serializable(with = TagListSerializer::class)
     override val tags: List<Tag>? = null,
     override val sortOrder: Int? = null,
+    val scatterPlotQuadrants: ScatterPlotQuadrants? = null,
     val dataPoints: List<NBAMatchup>
 ) : VisualizationType
 

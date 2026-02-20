@@ -1991,6 +1991,15 @@ output_data <- list(
     list(label = "regular season", layout = "right", color = "#9C27B0")
   ),
   sortOrder = 0,
+  # Scatter plot quadrant configuration for Off vs Def Rating chart
+  # With inverted Y axis: top = good defense (low rating), bottom = poor defense
+  # X axis: right = good offense (high rating), left = poor offense
+  scatterPlotQuadrants = list(
+    topRight = list(label = "Elite", color = "#4CAF50", lightModeColor = "#4CAF50"),
+    topLeft = list(label = "Defensive", color = "#2196F3", lightModeColor = "#2196F3"),
+    bottomLeft = list(label = "Struggling", color = "#F44336", lightModeColor = "#F44336"),
+    bottomRight = list(label = "Offensive", color = "#FF9800", lightModeColor = "#FF9800")
+  ),
   dataPoints = matchups_json
 )
 

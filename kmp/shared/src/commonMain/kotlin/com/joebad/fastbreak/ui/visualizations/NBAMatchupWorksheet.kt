@@ -20,6 +20,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.layer.drawLayer
@@ -37,6 +38,8 @@ import com.joebad.fastbreak.data.model.LineChartSeries
 import com.joebad.fastbreak.data.model.NBAMatchup
 import com.joebad.fastbreak.data.model.NBAMatchupVisualization
 import com.joebad.fastbreak.data.model.ScatterPlotDataPoint
+import com.joebad.fastbreak.data.model.ScatterPlotQuadrants
+import com.joebad.fastbreak.data.model.QuadrantConfig
 import com.joebad.fastbreak.platform.getImageExporter
 import com.joebad.fastbreak.ui.QuadrantScatterPlot
 import com.joebad.fastbreak.ui.components.ShareFab
@@ -367,7 +370,8 @@ fun NBAMatchupWorksheet(
                         NBAChartsTab(
                             awayTeam = selectedMatchup.awayTeam.abbreviation,
                             homeTeam = selectedMatchup.homeTeam.abbreviation,
-                            matchup = selectedMatchup
+                            matchup = selectedMatchup,
+                            quadrantConfig = visualization.scatterPlotQuadrants
                         )
                     }
                 }
@@ -1510,7 +1514,8 @@ private fun NavigationBadge(
 private fun NBAChartsTab(
     awayTeam: String,
     homeTeam: String,
-    matchup: NBAMatchup
+    matchup: NBAMatchup,
+    quadrantConfig: ScatterPlotQuadrants? = null
 ) {
     val scrollState = rememberScrollState()
 
@@ -1536,7 +1541,8 @@ private fun NBAChartsTab(
             homeTeam = homeTeam,
             awayStats = matchup.awayTeam.stats,
             homeStats = matchup.homeTeam.stats,
-            leagueStats = matchup.leagueEfficiencyStats
+            leagueStats = matchup.leagueEfficiencyStats,
+            quadrantConfig = quadrantConfig
         )
     }
 }
@@ -1685,7 +1691,8 @@ private fun WeeklyEfficiencyScatterPlot(
     homeTeam: String,
     awayStats: JsonObject,
     homeStats: JsonObject,
-    leagueStats: com.joebad.fastbreak.data.model.LeagueEfficiencyStats? = null
+    leagueStats: com.joebad.fastbreak.data.model.LeagueEfficiencyStats? = null,
+    quadrantConfig: ScatterPlotQuadrants? = null
 ) {
     // State for week filter: 0 = Last 10 weeks (all), 1 = Last 5 weeks, 2 = Prior 5 weeks
     var weekFilter by remember { mutableStateOf(0) }
@@ -1796,8 +1803,46 @@ private fun WeeklyEfficiencyScatterPlot(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         } else {
+            // Use quadrant config from data, with defaults as fallback
+            val topRight = quadrantConfig?.topRight ?: QuadrantConfig(label = "Elite", color = "#4CAF50", lightModeColor = "#4CAF50")
+            val topLeft = quadrantConfig?.topLeft ?: QuadrantConfig(label = "Defensive", color = "#2196F3", lightModeColor = "#2196F3")
+            val bottomLeft = quadrantConfig?.bottomLeft ?: QuadrantConfig(label = "Struggling", color = "#F44336", lightModeColor = "#F44336")
+            val bottomRight = quadrantConfig?.bottomRight ?: QuadrantConfig(label = "Offensive", color = "#FF9800", lightModeColor = "#FF9800")
+
+            // State for selected quadrants (for filtering)
+            var selectedQuadrants by remember { mutableStateOf(setOf<String>()) }
+
+            // State for selected teams (for filtering)
+            var selectedTeams by remember { mutableStateOf(setOf<String>()) }
+
+            // Calculate center points for quadrant determination
+            val centerX = leagueStats?.avgOffRating ?: scatterData.map { it.x }.average()
+            val centerY = leagueStats?.avgDefRating ?: scatterData.map { it.y }.average()
+
+            // Helper to determine which quadrant a point belongs to
+            // With invertYAxis: lower Y (better defense) = top, higher Y (worse defense) = bottom
+            fun getQuadrant(x: Double, y: Double): String {
+                val isRight = x >= centerX  // Good offense
+                val isTop = y <= centerY    // Good defense (lower rating is better)
+                return when {
+                    isTop && isRight -> "topRight"
+                    isTop && !isRight -> "topLeft"
+                    !isTop && !isRight -> "bottomLeft"
+                    else -> "bottomRight"
+                }
+            }
+
+            // Filter data based on selected quadrants and selected teams
+            val filteredScatterData = scatterData.filter { point ->
+                val quadrantMatch = selectedQuadrants.isEmpty() ||
+                    selectedQuadrants.contains(getQuadrant(point.x, point.y))
+                val teamMatch = selectedTeams.isEmpty() ||
+                    selectedTeams.contains(point.teamCode)
+                quadrantMatch && teamMatch
+            }
+
             QuadrantScatterPlot(
-                data = scatterData,
+                data = filteredScatterData,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(300.dp),
@@ -1806,15 +1851,224 @@ private fun WeeklyEfficiencyScatterPlot(
                 yAxisLabel = "Defensive Rating",
                 invertYAxis = true, // Lower defensive rating is better
                 highlightedTeamCodes = setOf(awayTeam, homeTeam),
+                // Quadrant labels for NBA Off vs Def Rating (with inverted Y)
+                // Top = good defense (low rating), Bottom = poor defense (high rating)
+                // Right = good offense (high rating), Left = poor offense (low rating)
+                quadrantTopRight = topRight,
+                quadrantTopLeft = topLeft,
+                quadrantBottomLeft = bottomLeft,
+                quadrantBottomRight = bottomRight,
                 // Use league-wide stats for consistent scaling across all matchups
                 customCenterX = leagueStats?.avgOffRating,
                 customCenterY = leagueStats?.avgDefRating,
                 customXMin = leagueStats?.minOffRating,
                 customXMax = leagueStats?.maxOffRating,
                 customYMin = leagueStats?.minDefRating,
-                customYMax = leagueStats?.maxDefRating
+                customYMax = leagueStats?.maxDefRating,
+                // Use unfiltered data for regression line so it stays fixed when filtering
+                regressionData = scatterData
             )
+
+            // Team Legend (interactive - click to filter by team)
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Away team legend item (clickable)
+                    val awaySelected = selectedTeams.contains(awayTeam)
+                    val awayColor = Color(0xFF2196F3)
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(4.dp))
+                            .clickable {
+                                selectedTeams = if (awaySelected) {
+                                    selectedTeams - awayTeam
+                                } else {
+                                    selectedTeams + awayTeam
+                                }
+                            }
+                            .background(
+                                if (awaySelected) awayColor.copy(alpha = 0.2f)
+                                else Color.Transparent
+                            )
+                            .padding(horizontal = 6.dp, vertical = 4.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(10.dp)
+                                .background(
+                                    if (awaySelected || selectedTeams.isEmpty()) awayColor
+                                    else awayColor.copy(alpha = 0.3f),
+                                    CircleShape
+                                )
+                        )
+                        Text(
+                            text = awayTeam,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = if (awaySelected || selectedTeams.isEmpty())
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                        )
+                    }
+                    // Home team legend item (clickable)
+                    val homeSelected = selectedTeams.contains(homeTeam)
+                    val homeColor = Color(0xFFFF5722)
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(4.dp))
+                            .clickable {
+                                selectedTeams = if (homeSelected) {
+                                    selectedTeams - homeTeam
+                                } else {
+                                    selectedTeams + homeTeam
+                                }
+                            }
+                            .background(
+                                if (homeSelected) homeColor.copy(alpha = 0.2f)
+                                else Color.Transparent
+                            )
+                            .padding(horizontal = 6.dp, vertical = 4.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(10.dp)
+                                .background(
+                                    if (homeSelected || selectedTeams.isEmpty()) homeColor
+                                    else homeColor.copy(alpha = 0.3f),
+                                    CircleShape
+                                )
+                        )
+                        Text(
+                            text = homeTeam,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = if (homeSelected || selectedTeams.isEmpty())
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                        )
+                    }
+                }
+            }
+
+            // Quadrant Legend (interactive - click to filter, 2x2 grid)
+            Spacer(modifier = Modifier.height(8.dp))
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                // Top row: Elite and Defensive
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Elite (top right)
+                    ScatterLegendItem(
+                        label = topRight.label,
+                        color = Color(0xFF4CAF50),
+                        isSelected = selectedQuadrants.isEmpty() || selectedQuadrants.contains("topRight"),
+                        onClick = {
+                            selectedQuadrants = if (selectedQuadrants.contains("topRight")) {
+                                selectedQuadrants - "topRight"
+                            } else {
+                                selectedQuadrants + "topRight"
+                            }
+                        }
+                    )
+                    // Defensive (top left)
+                    ScatterLegendItem(
+                        label = topLeft.label,
+                        color = Color(0xFF2196F3),
+                        isSelected = selectedQuadrants.isEmpty() || selectedQuadrants.contains("topLeft"),
+                        onClick = {
+                            selectedQuadrants = if (selectedQuadrants.contains("topLeft")) {
+                                selectedQuadrants - "topLeft"
+                            } else {
+                                selectedQuadrants + "topLeft"
+                            }
+                        }
+                    )
+                }
+                // Bottom row: Struggling and Offensive
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Struggling (bottom left)
+                    ScatterLegendItem(
+                        label = bottomLeft.label,
+                        color = Color(0xFFF44336),
+                        isSelected = selectedQuadrants.isEmpty() || selectedQuadrants.contains("bottomLeft"),
+                        onClick = {
+                            selectedQuadrants = if (selectedQuadrants.contains("bottomLeft")) {
+                                selectedQuadrants - "bottomLeft"
+                            } else {
+                                selectedQuadrants + "bottomLeft"
+                            }
+                        }
+                    )
+                    // Offensive (bottom right)
+                    ScatterLegendItem(
+                        label = bottomRight.label,
+                        color = Color(0xFFFF9800),
+                        isSelected = selectedQuadrants.isEmpty() || selectedQuadrants.contains("bottomRight"),
+                        onClick = {
+                            selectedQuadrants = if (selectedQuadrants.contains("bottomRight")) {
+                                selectedQuadrants - "bottomRight"
+                            } else {
+                                selectedQuadrants + "bottomRight"
+                            }
+                        }
+                    )
+                }
+            }
         }
+    }
+}
+
+/**
+ * Interactive legend item for scatter plot quadrant filtering
+ */
+@Composable
+private fun ScatterLegendItem(
+    label: String,
+    color: Color,
+    isSelected: Boolean,
+    onClick: () -> Unit
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        modifier = Modifier
+            .clickable { onClick() }
+            .padding(horizontal = 4.dp, vertical = 2.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(10.dp)
+                .background(
+                    if (isSelected) color else color.copy(alpha = 0.3f),
+                    CircleShape
+                )
+        )
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodySmall,
+            color = if (isSelected) {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+            }
+        )
     }
 }
 

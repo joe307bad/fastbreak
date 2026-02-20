@@ -27,7 +27,7 @@ export default async function Home() {
   );
 
   const sportCharts = allCharts.filter(
-    chart => chart.data.sport.toLowerCase() === sport.toLowerCase()
+    chart => chart.data.sport?.toLowerCase() === sport.toLowerCase()
   );
 
   // List of supported visualization types on web

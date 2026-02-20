@@ -14,7 +14,7 @@ export function DemoGif({ src, alt, caption }: DemoGifProps) {
 
   return (
     <>
-      <div className="inline-block">
+      <div className="inline-block w-[280px] lg:w-[240px] xl:w-[320px] 2xl:w-[400px]">
         <div
           className="cursor-pointer rounded-lg border border-[var(--border)] overflow-hidden hover:opacity-90 transition-opacity"
           onClick={() => setLightboxOpen(true)}
@@ -22,9 +22,9 @@ export function DemoGif({ src, alt, caption }: DemoGifProps) {
           <Image
             src={src}
             alt={alt}
-            width={200}
-            height={450}
-            className="max-w-full h-auto"
+            width={400}
+            height={900}
+            className="w-full h-auto"
             unoptimized // GIFs should not be optimized by Next.js
           />
         </div>

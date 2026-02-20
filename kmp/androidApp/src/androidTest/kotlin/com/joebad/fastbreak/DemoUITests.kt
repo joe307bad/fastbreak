@@ -628,105 +628,123 @@ class DemoUITests {
     }
 
     /**
-     * Demo test: Week 18 Matchup Worksheet interaction
-     * Shows: Opening app > Week 18 Matchup Worksheet > Scroll through matchup badges >
-     *        Select TEN vs JAX > Scroll stats > View charts > Scroll charts
+     * Demo test: Generic Matchup Worksheet interaction
+     * Shows: Opening app > Select Matchups item > Scroll dates > Select date >
+     *        Scroll matchups > Select matchup > Scroll stats > View charts > Scroll charts
      */
     @Test
-    fun testDemo_Week18MatchupWorksheet() {
+    fun testDemo_MatchupWorksheet() {
         println("🎬 RECORDING_READY - Starting demo...")
 
         println("⏱ Waiting for app to load...")
         Thread.sleep(1500)
 
-        // Find and tap on "Week 18 Matchup Worksheet" chart
-        println("🔍 Looking for 'Week 18 Matchup Worksheet' chart...")
-        val matchupWorksheet = device.wait(
-            Until.findObject(By.textContains("Week 18 Matchup Worksheet")),
-            10000
+        val screenWidth = device.displayWidth
+        val screenHeight = device.displayHeight
+
+        // Find and tap on a Matchup Worksheet item (be specific to avoid clicking refresh button)
+        println("🔍 Looking for 'Matchup Worksheet' item...")
+
+        // Try to find "Matchup Worksheet" first (most specific) - fast search
+        var matchupItem = device.wait(
+            Until.findObject(By.textContains("Matchup Worksheet")),
+            1500
         )
 
-        if (matchupWorksheet != null) {
-            println("✓ Found 'Week 18 Matchup Worksheet', tapping...")
-            matchupWorksheet.click()
-            Thread.sleep(1500)
-        } else {
-            println("⚠ 'Week 18 Matchup Worksheet' not found, trying alternative search...")
-            val alternativeText = device.wait(
-                Until.findObject(By.textContains("Matchup Worksheet")),
-                5000
+        // If not found, try "Matchups" (plural - likely a card title)
+        if (matchupItem == null) {
+            println("  → Trying 'Matchups'...")
+            matchupItem = device.wait(
+                Until.findObject(By.textContains("Matchups")),
+                1000
             )
-            if (alternativeText != null) {
-                alternativeText.click()
-                Thread.sleep(1500)
-            } else {
-                println("⚠ Could not find Matchup Worksheet, continuing anyway...")
-                Thread.sleep(1000)
-            }
+        }
+
+        // Last resort: find all "Matchup" elements and pick one that's likely a card (not in header)
+        if (matchupItem == null) {
+            println("  → Looking for any 'Matchup' text below header area...")
+            val matchupElements = device.findObjects(By.textContains("Matchup"))
+            // Filter to elements that are below the header (y > 200) to avoid refresh/menu buttons
+            matchupItem = matchupElements.find { it.visibleBounds.top > 200 }
+        }
+
+        if (matchupItem != null) {
+            println("✓ Found '${matchupItem.text}', tapping...")
+            matchupItem.click()
+            Thread.sleep(1000)
+        } else {
+            println("⚠ No Matchup Worksheet item found")
+            return
         }
 
         println("✓ Matchup Worksheet should be visible")
-        Thread.sleep(1500)
+        Thread.sleep(1000)
 
-        // Scroll through the matchup badges at the top (horizontal scroll from right to left)
-        println("📱 Scrolling through matchup badges...")
-        // The badges are in the top navigation area after the Stats/Charts tabs
-        // Try a position closer to where the badges should be (around 1/8 to 1/7 of screen height)
-        val badgesY = device.displayHeight / 7
-        println("  → Swiping through matchup badges (right to left)...")
-        // Start from far right, swipe to center-left to scroll the badge list
+        // Scroll through the dates (horizontal scroll)
+        // Dates row is below the header - use a lower Y position to avoid header/collapse caret
+        println("📅 Scrolling through dates...")
+        val datesY = screenHeight / 7  // Lower than header, in the dates area
+
+        // Swipe LEFT to demonstrate date navigation (start from center-right, end center)
+        println("  → Swiping dates left to see more...")
         device.swipe(
-            device.displayWidth - 100,  // Start from near right edge
-            badgesY,
-            device.displayWidth / 4,    // Swipe to left quarter
-            badgesY,
-            25  // Even slower swipe
+            screenWidth * 3 / 4,  // Start from right side (but not edge)
+            datesY,
+            screenWidth / 2,      // End at center
+            datesY,
+            25
         )
-        Thread.sleep(2000)
+        Thread.sleep(1000)
 
-        // Select TEN vs JAX matchup by searching for it
-        println("🔍 Looking for 'TEN' vs 'JAX' matchup...")
-        val tenJaxBadge = device.wait(
-            Until.findObject(By.textContains("TEN")),
-            5000
+        // Select a different date by tapping in the dates area
+        println("🔍 Selecting a different date...")
+        device.click(screenWidth / 2, datesY)
+        Thread.sleep(1000)
+
+        // Scroll through the matchups (horizontal scroll below dates)
+        println("📱 Scrolling through matchups...")
+        val matchupsY = screenHeight / 5  // Matchups row is below dates
+
+        // Swipe LEFT to demonstrate matchup navigation
+        println("  → Swiping matchups left to see more...")
+        device.swipe(
+            screenWidth * 3 / 4,  // Start from right side (but not edge)
+            matchupsY,
+            screenWidth / 2,      // End at center
+            matchupsY,
+            25
         )
+        Thread.sleep(1000)
 
-        if (tenJaxBadge != null) {
-            println("✓ Found TEN matchup badge, tapping...")
-            tenJaxBadge.click()
-            Thread.sleep(1500)
-        } else {
-            println("⚠ TEN badge not found, trying to find JAX...")
-            val jaxBadge = device.wait(
-                Until.findObject(By.textContains("JAX")),
-                3000
-            )
-            if (jaxBadge != null) {
-                println("✓ Found JAX matchup badge, tapping...")
-                jaxBadge.click()
-                Thread.sleep(1500)
-            } else {
-                println("⚠ Could not find TEN vs JAX matchup, selecting current matchup...")
-                device.click(device.displayWidth / 2, badgesY)
-                Thread.sleep(1500)
-            }
-        }
+        // Select a matchup by tapping (tap on right side where we scrolled to)
+        println("🔍 Selecting a matchup...")
+        device.click(screenWidth * 2 / 3, matchupsY)
+        Thread.sleep(1000)
 
         println("✓ Matchup selected, stats should be visible")
 
-        // Scroll down through the stats once
-        println("📜 Scrolling down through stats...")
-        println("  → Scrolling to view stats...")
+        // Scroll down through the stats
+        println("📜 Scrolling through stats...")
         device.swipe(
-            device.displayWidth / 2,
-            device.displayHeight * 2 / 3,
-            device.displayWidth / 2,
-            device.displayHeight / 3,
+            screenWidth / 2,
+            screenHeight * 2 / 3,
+            screenWidth / 2,
+            screenHeight / 3,
             15
         )
-        Thread.sleep(1500)
+        Thread.sleep(1000)
 
-        // Find and tap on "Charts" tab/button
+        // Scroll back up
+        device.swipe(
+            screenWidth / 2,
+            screenHeight / 3,
+            screenWidth / 2,
+            screenHeight * 2 / 3,
+            15
+        )
+        Thread.sleep(1000)
+
+        // Find and tap on "Charts" tab
         println("🔍 Looking for 'Charts' tab...")
         val chartsTab = device.wait(
             Until.findObject(By.textContains("Charts")),
@@ -738,8 +756,7 @@ class DemoUITests {
             chartsTab.click()
             Thread.sleep(1500)
         } else {
-            println("⚠ 'Charts' tab not found, trying alternative search...")
-            // Try finding by text "Chart" (singular)
+            println("⚠ 'Charts' tab not found, trying 'Chart'...")
             val chartAlt = device.wait(
                 Until.findObject(By.textContains("Chart")),
                 3000
@@ -755,154 +772,117 @@ class DemoUITests {
         println("✓ Charts view should be visible")
         Thread.sleep(1000)
 
-        // Find the scatter plot title to get its position for scrolling
-        println("📜 Scrolling down to view scatter plot...")
-        println("  → Looking for scatter plot title...")
+        // Scroll through the charts
+        println("📜 Scrolling through charts...")
+        device.swipe(
+            screenWidth / 2,
+            screenHeight * 2 / 3,
+            screenWidth / 2,
+            screenHeight / 4,
+            20
+        )
+        Thread.sleep(1500)
 
-        // First, try to find the title "Weekly Offensive vs Defensive EPA"
-        val scatterPlotTitle = device.wait(
-            Until.findObject(By.textContains("Weekly Offensive")),
-            5000
+        // Select "Last 5 Wks" filter first
+        println("🔍 Looking for 'Last 5' filter...")
+        val last5Badge = device.wait(
+            Until.findObject(By.textContains("Last 5")),
+            2000
         )
 
-        if (scatterPlotTitle != null) {
-            println("  ✓ Found scatter plot title, using it as scroll reference")
-            val titleBounds = scatterPlotTitle.visibleBounds
-            val scrollFromY = titleBounds.top
-
-            // Scroll from the title position - longer distance to show more of the scatter plot
-            device.swipe(
-                device.displayWidth / 2,
-                scrollFromY + 50,  // Start just below the title
-                device.displayWidth / 2,
-                scrollFromY - 400,  // Scroll up a longer distance to show more content
-                25  // Slower scroll to make it more visible
-            )
-        } else {
-            println("  ⚠ Title not found, using estimated position for scroll")
-            // Fallback: scroll from a position that should be below the first chart
-            device.swipe(
-                device.displayWidth / 2,
-                device.displayHeight * 3 / 5,
-                device.displayWidth / 2,
-                device.displayHeight / 5,  // Longer scroll distance
-                25
-            )
-        }
-
-        Thread.sleep(2000)
-
-        // Select "Weeks 1-6" badge on the scatter plot
-        println("🔍 Looking for 'Weeks 1-6' badge...")
-        val weeks16Badge = device.wait(
-            Until.findObject(By.textContains("Weeks 1-6")),
-            5000
-        )
-
-        if (weeks16Badge != null) {
-            println("✓ Found 'Weeks 1-6' badge, tapping...")
-            weeks16Badge.click()
+        if (last5Badge != null) {
+            println("✓ Found 'Last 5 Wks', tapping...")
+            last5Badge.click()
             Thread.sleep(1500)
         } else {
-            println("⚠ 'Weeks 1-6' badge not found, trying alternative...")
-            val weeks1Badge = device.wait(
-                Until.findObject(By.textContains("1-6")),
-                3000
-            )
-            if (weeks1Badge != null) {
-                weeks1Badge.click()
-                Thread.sleep(1500)
-            } else {
-                println("⚠ Could not find Weeks 1-6 badge")
-            }
+            println("⚠ 'Last 5' filter not found")
         }
 
-        // Select "Weeks 7-12" badge on the scatter plot
-        println("🔍 Looking for 'Weeks 7-12' badge...")
-        val weeks712Badge = device.wait(
-            Until.findObject(By.textContains("Weeks 7-12")),
-            5000
+        // Then select "Prior 5 Wks" filter
+        println("🔍 Looking for 'Prior 5' filter...")
+        val prior5Badge = device.wait(
+            Until.findObject(By.textContains("Prior 5")),
+            2000
         )
 
-        if (weeks712Badge != null) {
-            println("✓ Found 'Weeks 7-12' badge, tapping...")
-            weeks712Badge.click()
+        if (prior5Badge != null) {
+            println("✓ Found 'Prior 5 Wks', tapping...")
+            prior5Badge.click()
             Thread.sleep(1500)
         } else {
-            println("⚠ 'Weeks 7-12' badge not found, trying alternative...")
-            val weeks7Badge = device.wait(
-                Until.findObject(By.textContains("7-12")),
-                3000
-            )
-            if (weeks7Badge != null) {
-                weeks7Badge.click()
-                Thread.sleep(1500)
-            } else {
-                println("⚠ Could not find Weeks 7-12 badge")
-            }
+            println("⚠ 'Prior 5' filter not found")
         }
 
-        // Final pause to show the charts
-        println("✓ Showing final charts view...")
+        // Pause to show the filtered chart
+        println("✓ Showing filtered chart...")
+        Thread.sleep(1500)
+
+        // Scroll back up to show more of the chart
+        println("📜 Scrolling back up...")
+        device.swipe(
+            screenWidth / 2,
+            screenHeight / 3,
+            screenWidth / 2,
+            screenHeight * 2 / 3,
+            20
+        )
         Thread.sleep(2000)
 
         println("✓ Demo complete!")
     }
 
     /**
-     * Demo test: Walkthrough of loading app, selecting Divisional Round matchup worksheet, and sharing
-     * Shows: App loading > Divisional Round Matchup Worksheet > Share FAB
+     * Demo test: Generic Matchup Worksheet share image
+     * Shows: Opening app > Select Matchups item > Select matchup > Tap share FAB
      */
     @Test
-    fun testDemo_DivisionalRoundShareWalkthrough() {
-        println("🎬 RECORDING_READY - Starting walkthrough demo...")
+    fun testDemo_MatchupShareImage() {
+        println("🎬 RECORDING_READY - Starting share image demo...")
 
         println("⏱ Waiting for app to load...")
-        Thread.sleep(2000)
+        Thread.sleep(1500)
 
-        // Find and tap on "Divisional Round Matchup Worksheet" chart
-        println("🔍 Looking for 'Divisional Round Matchup Worksheet' chart...")
-        val divisionalWorksheet = device.wait(
-            Until.findObject(By.textContains("Divisional Round Matchup Worksheet")),
-            10000
+        // Find and tap on a Matchup Worksheet item (be specific to avoid clicking refresh button)
+        println("🔍 Looking for 'Matchup Worksheet' item...")
+
+        // Try to find "Matchup Worksheet" first (most specific) - fast search
+        var matchupItem = device.wait(
+            Until.findObject(By.textContains("Matchup Worksheet")),
+            1500
         )
 
-        if (divisionalWorksheet != null) {
-            println("✓ Found 'Divisional Round Matchup Worksheet', tapping...")
-            divisionalWorksheet.click()
-            Thread.sleep(2000)
-        } else {
-            println("⚠ 'Divisional Round Matchup Worksheet' not found, trying alternative search...")
-            // Try searching for just "Divisional Round"
-            val divisionalAlt = device.wait(
-                Until.findObject(By.textContains("Divisional Round")),
-                5000
+        // If not found, try "Matchups" (plural - likely a card title)
+        if (matchupItem == null) {
+            println("  → Trying 'Matchups'...")
+            matchupItem = device.wait(
+                Until.findObject(By.textContains("Matchups")),
+                1000
             )
-            if (divisionalAlt != null) {
-                println("✓ Found 'Divisional Round', tapping...")
-                divisionalAlt.click()
-                Thread.sleep(2000)
-            } else {
-                println("⚠ Could not find Divisional Round worksheet, trying 'Divisional'...")
-                val divisionalShort = device.wait(
-                    Until.findObject(By.textContains("Divisional")),
-                    5000
-                )
-                if (divisionalShort != null) {
-                    divisionalShort.click()
-                    Thread.sleep(2000)
-                } else {
-                    println("⚠ Could not find any Divisional Round worksheet")
-                }
-            }
         }
 
-        println("✓ Divisional Round Matchup Worksheet should be visible")
-        Thread.sleep(1500)
+        // Last resort: find all "Matchup" elements and pick one that's likely a card (not in header)
+        if (matchupItem == null) {
+            println("  → Looking for any 'Matchup' text below header area...")
+            val matchupElements = device.findObjects(By.textContains("Matchup"))
+            // Filter to elements that are below the header (y > 200) to avoid refresh/menu buttons
+            matchupItem = matchupElements.find { it.visibleBounds.top > 200 }
+        }
+
+        if (matchupItem != null) {
+            println("✓ Found '${matchupItem.text}', tapping...")
+            matchupItem.click()
+            Thread.sleep(1500)
+        } else {
+            println("⚠ No Matchup Worksheet item found")
+            return
+        }
+
+        println("✓ Matchup Worksheet should be visible")
+        Thread.sleep(1000)
 
         // Pause to show the worksheet content
         println("📊 Showing matchup worksheet content...")
-        Thread.sleep(2000)
+        Thread.sleep(1500)
 
         // Find and tap the Share FAB (Floating Action Button)
         println("🔍 Looking for Share FAB button...")
@@ -944,6 +924,200 @@ class DemoUITests {
         // Final pause to show the share dialog
         println("✓ Showing share dialog...")
         Thread.sleep(2000)
+
+        println("✓ Demo complete!")
+    }
+
+    /**
+     * Demo test: Topics screen walkthrough
+     * Shows: Navigate to Topics > Scroll through topic > Select data point > Back >
+     *        Scroll more > Mark as read > Scroll more
+     */
+    @Test
+    fun testDemo_TopicsWalkthrough() {
+        println("🎬 RECORDING_READY - Starting topics walkthrough demo...")
+
+        println("⏱ Waiting for app to load...")
+        Thread.sleep(1500)
+
+        val screenWidth = device.displayWidth
+        val screenHeight = device.displayHeight
+
+        // 1) Navigate to Topics screen
+        println("🔍 Looking for 'Topics' navigation item...")
+        var topicsNav = device.wait(
+            Until.findObject(By.textContains("Topics")),
+            3000
+        )
+
+        if (topicsNav == null) {
+            // Try finding it in bottom navigation or side menu
+            println("  → Trying to find Topics in navigation...")
+            topicsNav = device.wait(
+                Until.findObject(By.descContains("Topics")),
+                2000
+            )
+        }
+
+        if (topicsNav != null) {
+            println("✓ Found 'Topics', tapping...")
+            topicsNav.click()
+            Thread.sleep(1500)
+        } else {
+            println("⚠ Topics navigation not found")
+            return
+        }
+
+        println("✓ Topics screen should be visible")
+        Thread.sleep(1500)
+
+        // 2) Scroll down once to reveal content
+        println("📜 Scrolling down through topics...")
+        device.swipe(
+            screenWidth / 2,
+            screenHeight * 2 / 3,
+            screenWidth / 2,
+            screenHeight / 3,
+            20
+        )
+        Thread.sleep(1500)
+
+        // 3) Look for the "data points" section and select a data point
+        println("🔍 Looking for 'data points' section...")
+        val dataPointsSection = device.wait(
+            Until.findObject(By.text("data points")),
+            3000
+        )
+
+        if (dataPointsSection != null) {
+            println("✓ Found 'data points' section")
+            Thread.sleep(500)
+
+            // The data points are listed below the badge - find one with an arrow (clickable)
+            println("🔍 Looking for clickable data point with arrow...")
+            val arrowElement = device.wait(
+                Until.findObject(By.text("→")),
+                2000
+            )
+
+            if (arrowElement != null) {
+                // Click on the same row as the arrow (to the left of it)
+                println("✓ Found clickable data point, tapping...")
+                val bounds = arrowElement.visibleBounds
+                device.click(screenWidth / 2, bounds.centerY())
+                Thread.sleep(2000)
+
+                // 4) We should now be on a chart/detail screen - show it
+                println("📊 Showing linked chart content...")
+                Thread.sleep(2000)
+
+                // Press back to return to topics
+                println("🔙 Pressing back to return to topics...")
+                device.pressBack()
+                Thread.sleep(1500)
+            } else {
+                // No arrow found, try clicking below the data points badge
+                println("  → No arrow found, tapping below data points section...")
+                val bounds = dataPointsSection.visibleBounds
+                device.click(screenWidth / 2, bounds.bottom + 30)
+                Thread.sleep(2000)
+
+                println("📊 Showing linked chart content...")
+                Thread.sleep(2000)
+
+                println("🔙 Pressing back to return to topics...")
+                device.pressBack()
+                Thread.sleep(1500)
+            }
+        } else {
+            println("⚠ 'data points' section not found, trying to scroll more...")
+            // Scroll down more to find data points
+            device.swipe(
+                screenWidth / 2,
+                screenHeight * 2 / 3,
+                screenWidth / 2,
+                screenHeight / 3,
+                20
+            )
+            Thread.sleep(1000)
+
+            // Try again
+            val dataPointsRetry = device.wait(
+                Until.findObject(By.text("data points")),
+                2000
+            )
+
+            if (dataPointsRetry != null) {
+                println("✓ Found 'data points' section on retry")
+                val bounds = dataPointsRetry.visibleBounds
+                device.click(screenWidth / 2, bounds.bottom + 30)
+                Thread.sleep(2000)
+
+                println("📊 Showing linked chart content...")
+                Thread.sleep(2000)
+
+                println("🔙 Pressing back to return to topics...")
+                device.pressBack()
+                Thread.sleep(1500)
+            } else {
+                println("⚠ Still no data points section found, continuing...")
+            }
+        }
+
+        // 5) Scroll more through topics
+        println("📜 Scrolling more through topics...")
+        device.swipe(
+            screenWidth / 2,
+            screenHeight * 2 / 3,
+            screenWidth / 2,
+            screenHeight / 3,
+            20
+        )
+        Thread.sleep(1000)
+
+        // 6) Select "Mark as read" button (text is "[mark as read]" with brackets)
+        println("🔍 Looking for '[mark as read]' button...")
+        var markAsRead = device.wait(
+            Until.findObject(By.text("[mark as read]")),
+            2000
+        )
+
+        if (markAsRead == null) {
+            // Try partial match
+            markAsRead = device.wait(
+                Until.findObject(By.textContains("mark as read")),
+                1000
+            )
+        }
+
+        if (markAsRead != null) {
+            println("✓ Found 'mark as read', tapping...")
+            markAsRead.click()
+            Thread.sleep(1500)
+        } else {
+            println("⚠ 'mark as read' not found, continuing...")
+        }
+
+        // 7) Scroll more to show additional content
+        println("📜 Final scroll through topics...")
+        device.swipe(
+            screenWidth / 2,
+            screenHeight * 2 / 3,
+            screenWidth / 2,
+            screenHeight / 3,
+            20
+        )
+        Thread.sleep(1000)
+
+        // Scroll back up to show more content
+        device.swipe(
+            screenWidth / 2,
+            screenHeight / 3,
+            screenWidth / 2,
+            screenHeight * 2 / 3,
+            20
+        )
+        Thread.sleep(1500)
 
         println("✓ Demo complete!")
     }

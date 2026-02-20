@@ -7,6 +7,16 @@ import manualFeatures from '@/data/manual-features.json';
 
 type SortMode = 'all' | 'latest';
 
+// TextSegment type matching the app's data model
+interface TextSegment {
+  type: 'text' | 'link';
+  value: string;
+  url?: string;
+}
+
+// Section content can be either a plain string or an array of TextSegments
+type SectionContent = string | TextSegment[];
+
 interface ManualFeature {
   id: string;
   title: string;
@@ -21,10 +31,38 @@ interface ManualFeature {
   dateReleased: string;
   version: string;
   sections: {
-    howToUse: string;
-    whatItDoes: string;
-    whyUseful: string;
+    howToUse: SectionContent;
+    whatItDoes: SectionContent;
+    whyUseful: SectionContent;
   };
+}
+
+// Renders section content - handles both plain strings and TextSegment arrays
+function SectionText({ content }: { content: SectionContent }) {
+  if (typeof content === 'string') {
+    return <>{content}</>;
+  }
+
+  return (
+    <>
+      {content.map((segment, index) => {
+        if (segment.type === 'link' && segment.url) {
+          return (
+            <a
+              key={index}
+              href={segment.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-500 hover:text-blue-600 underline"
+            >
+              {segment.value}
+            </a>
+          );
+        }
+        return <span key={index}>{segment.value}</span>;
+      })}
+    </>
+  );
 }
 
 export function ManualPage() {
@@ -118,30 +156,30 @@ export function ManualPage() {
             dateReleased={feature.dateReleased}
           />
 
-          <div className="flex flex-col md:flex-row gap-8 my-8 items-start">
+          <div id="feature-container" className="flex flex-col lg:flex-row gap-8 lg:gap-10 xl:gap-12 my-8 items-start w-full">
             <div className="flex-shrink-0">
               <DemoGif src={feature.demoGif} alt={feature.demoAlt} />
             </div>
 
-            <div className="flex flex-col gap-6 flex-1">
+            <div className="flex flex-col gap-8 flex-1">
               <div>
-                <h3 className="text-lg font-bold mb-2 mt-0">How do I use this?</h3>
-                <p className="text-[var(--muted)] leading-relaxed">
-                  {feature.sections.howToUse}
+                <h3 className="text-xl font-bold mb-3 mt-0">How do I use this?</h3>
+                <p className="text-[var(--muted)] leading-relaxed text-base">
+                  <SectionText content={feature.sections.howToUse} />
                 </p>
               </div>
 
               <div>
-                <h3 className="text-lg font-bold mb-2 mt-0">What does this do?</h3>
-                <p className="text-[var(--muted)] leading-relaxed">
-                  {feature.sections.whatItDoes}
+                <h3 className="text-xl font-bold mb-3 mt-0">What does this do?</h3>
+                <p className="text-[var(--muted)] leading-relaxed text-base">
+                  <SectionText content={feature.sections.whatItDoes} />
                 </p>
               </div>
 
               <div>
-                <h3 className="text-lg font-bold mb-2 mt-0">Why is this useful?</h3>
-                <p className="text-[var(--muted)] leading-relaxed">
-                  {feature.sections.whyUseful}
+                <h3 className="text-xl font-bold mb-3 mt-0">Why is this useful?</h3>
+                <p className="text-[var(--muted)] leading-relaxed text-base">
+                  <SectionText content={feature.sections.whyUseful} />
                 </p>
               </div>
             </div>

@@ -217,6 +217,7 @@ private fun getLeagueColor(league: String): Color {
         "nhl" -> Color(0xFFFC4C02)  // NHL orange (visible in dark mode)
         "mlb" -> Color(0xFF0052A5)  // MLB blue (vivid)
         "mls" -> Color(0xFF00B140)  // MLS green (vivid)
+        "cbb" -> Color(0xFF9C27B0)  // CBB purple (college basketball)
         else -> Color(0xFF757575)   // Gray for unknown
     }
 }
@@ -283,6 +284,7 @@ private fun leagueToSport(league: String): Sport? {
         "NFL" -> Sport.NFL
         "NHL" -> Sport.NHL
         "MLB" -> Sport.MLB
+        "CBB" -> Sport.CBB
         else -> null
     }
 }
@@ -511,8 +513,9 @@ private fun NarrativeItem(
                                     color = MaterialTheme.colorScheme.onSurface
                                 )
                                 val teamPrefix = if (dp.team.isNotBlank()) "${dp.team}: " else ""
+                                val displayValue = dp.value.toIntOrNull()?.let { kotlin.math.abs(it).toString() } ?: dp.value
                                 Text(
-                                    text = "$teamPrefix${dp.metric} = ${dp.value}",
+                                    text = "$teamPrefix${dp.metric} = $displayValue",
                                     style = MaterialTheme.typography.bodySmall,
                                     fontFamily = FontFamily.Monospace,
                                     fontSize = 11.sp,

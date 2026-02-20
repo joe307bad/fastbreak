@@ -98,7 +98,7 @@
     "id": "matchup-worksheet",
     "title": "Matchup Worksheets",
     "sortOrder": 6,
-    "demoGif": "/02-manual-screenshots/06-week18-matchup-worksheet.gif",
+    "demoGif": "/02-manual-screenshots/06-matchup-worksheet.gif",
     "demoAlt": "Matchup Worksheet demo showing matchup selection and chart interaction",
     "platforms": {
       "ios": true,
@@ -108,8 +108,8 @@
     "dateReleased": "2026-01-03",
     "version": "1.4.0",
     "sections": {
-      "howToUse": "Open the Matchup Worksheets from the NFL charts list. Scroll through the matchup badges at the top to browse different games, then tap a matchup to select it. View detailed team statistics in the Stats tab, or switch to the Charts tab to see visual comparisons. In the Charts tab, use the week range badges to filter the scatter plot by specific timeframes.",
-      "whatItDoes": "Provides comprehensive head-to-head analysis for NFL matchups throughout the season. The worksheet combines team statistics, performance charts, and historical data in one interactive view. You can explore cumulative EPA trends, weekly offensive vs defensive performance, key player stats, head-to-head records, and common opponent comparisons for each matchup.",
+      "howToUse": "Open the Matchup Worksheets from the NFL or NBA charts list. Scroll through the matchup badges at the top to browse different games, then tap a matchup to select it. View detailed team statistics in the Stats tab, or switch to the Charts tab to see visual comparisons. In the Charts tab, use the week range badges to filter the scatter plot by specific timeframes.",
+      "whatItDoes": "Provides comprehensive head-to-head analysis for NFL and NBA matchups throughout the season. The worksheet combines team statistics, performance charts, and historical data in one interactive view. For the NFL, you can explore cumulative EPA trends, weekly offensive vs defensive performance, key player stats, head-to-head records, and common opponent comparisons for each matchup. For the NBA, you can explore offensive an defensive net rating over time and one month trends",
       "whyUseful": "The Matchup Worksheet consolidates all the information you need to analyze any week's games in one place. By combining stats and charts with interactive filtering, you can quickly compare teams across multiple dimensions and identify key factors that might determine the outcome. The ability to switch between matchups and timeframes makes it easy to analyze multiple games and spot trends throughout the season."
     }
   },
@@ -130,6 +130,29 @@
       "howToUse": "Look for the red share button (FAB) in the bottom-right corner on various charts and worksheets throughout the app. Tap the share button to capture the current view. The native share sheet will appear with a preview of the image. Select your preferred sharing method (text message, social media, email, etc.) to share the image with others. The demo shows sharing a matchup worksheet, but you'll find the share button on other visualizations as well.",
       "whatItDoes": "Generates a high-resolution image of the chart or worksheet you're viewing and opens your device's native share dialog with a preview. The shared image captures all the data currently displayed, including statistics, charts, and any applied filters. The image is automatically saved to your device and includes attribution to the data source.",
       "whyUseful": "Sharing your analysis is essential for discussing games with friends, posting insights on social media, or saving your own research for reference. The preview in the share dialog lets you confirm the image looks correct before sharing. The high-quality exported images capture all the important details in a shareable format, making it easy to communicate your findings without needing multiple screenshots or manual formatting."
+    }
+  },
+  {
+    "id": "topics",
+    "title": "Daily Topics",
+    "sortOrder": 8,
+    "demoGif": "/02-manual-screenshots/08-topics-walkthrough.gif",
+    "demoAlt": "Topics screen walkthrough showing data point navigation and mark as read",
+    "platforms": {
+      "ios": true,
+      "android": true,
+      "web": false
+    },
+    "dateReleased": "2026-02-20",
+    "version": "1.6.0",
+    "sections": {
+      "howToUse": "Navigate to the Topics screen from the main menu. Scroll through the daily topics to see statistically grounded insights about your favorite sports. Each topic contains data points that link directly to relevant charts - tap any data point with an arrow to jump to that visualization. Use the '[mark as read]' button to track which topics you've reviewed.",
+      "whatItDoes": [
+        { "type": "text", "value": "Topics provides summaries and insights about what's happening across different sports. The content is generated everyday at 7am ET using " },
+        { "type": "link", "value": "Google's Gemini with Grounded Search", "url": "https://docs.cloud.google.com/vertex-ai/generative-ai/docs/grounding/overview" },
+        { "type": "text", "value": ", which ensures factual accuracy by verifying information against Google Search results. Each topic highlights key statistics and trends, with direct links to the underlying charts and visualizations. The system tracks which topics you've read, helping you stay on top of the latest developments." }
+      ],
+      "whyUseful": "Topics gives you a daily sports briefing without ads, clickbait, or fluff. Every insight is grounded in actual statistics from the app's charts and verified against Google Search results for factual accuracy. Instead of manually searching through dozens of charts, Topics surfaces the most interesting and relevant insights each day. The linked data points let you quickly dive deeper into any statistic that catches your attention, while the read tracking ensures you never miss important updates."
     }
   }
 ]

@@ -79,6 +79,15 @@ export default async function BlogPostPage({ params }: Props) {
                 month: "long",
                 day: "numeric",
               })}
+              {post.updatedAt && (
+                <span className="ml-1">
+                  (Updated {new Date(post.updatedAt).toLocaleDateString("en-US", {
+                    year: "numeric",
+                    month: "long",
+                    day: "numeric",
+                  })})
+                </span>
+              )}
             </time>
             {post.author && (
               <>

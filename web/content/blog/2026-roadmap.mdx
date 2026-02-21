@@ -1,35 +1,40 @@
 ---
 title: "2026 Roadmap"
 date: "2026-01-17"
+updatedAt: "2026-02-20"
 description: "2026 feature roadmap for fastbreak"
 author: "Joe Badaczewski"
 authorUrl: "https://joebad.com"
 ---
+<GoalProgress inProgress={3} total={6} completed={0} />
 
-## March Madness features
+## 1. College basketball features
 
-A dedicated March Madness experience that tracks team performance metrics throughout the tournament, allowing users to compare matchups and identify potential upsets based on historical trends and current form. This would help fans and analysts make more informed predictions by surfacing key statistical advantages and weaknesses in bracket scenarios.
+- ✅ Mobile friendly, minimalist 64-team bracket prototype ahead of NCAA tournament [[tweet]](https://x.com/joe307bad/status/2023508986860118117)
+- ✅ Matchup worksheets for AP top 25 matchups [[tweet]](https://x.com/joe307bad/status/2023973398099984711)
+- ✅ AP Top 25 progression over the season [[tweet]](https://x.com/joe307bad/status/2023975956214317555?s=20)
+- ⏳ Daily updating bracket from March through the championship in April. Bracket should have matchup worksheets for all the games.
 
-## More NBA/NHL charts that include matchup worksheets that integrate the result of the matchup as the week progresses
+## 2. NBA and NHL trends and charts
 
-Enhanced matchup worksheets that dynamically update as games conclude, showing how pre-game predictions compared to actual outcomes. This feature would allow users to track the accuracy of their analysis over time and refine their understanding of which metrics are most predictive. By comparing expected vs. actual performance, analysts can identify when teams are trending above or below their statistical projections.
+- ✅ "One month trend" camparison chart for each NBA matchup over the next 7 days that includes stats for points per game, net rating, and other advanced stats. [[user guide]](/docs/guide#matchup-worksheet)
+- ✅ Comparison charts for each NBA matchup over the next 7 days that compares each teams cumulative net rating ver the season and their defensive vs offensive rating over the past 10 weeks. [[user guide]](/docs/guide#matchup-worksheet)
+- ⏳ NHL matchup worksheets with trends and charts
+- Results view what shows the results of the past week. It will be similar to the matchup worksheets but with a way of dispkaying the outcome of the game when it becomes available.
 
-## 3 week trend charts for players/teams
+## 3. Web project parity: sharing, filtering, matchup worksheets, pinning teams and storing in local storage
 
-Visualizations that show performance trajectories over a three-week rolling window, making it easier to spot hot and cold streaks before they become obvious. This mid-range timeframe is particularly valuable for identifying sustainable performance changes versus random variance. Users can quickly see which players are trending up or down.
+Bringing the mobile app's most powerful features to the web platform, including the ability to share custom visualizations with colleagues, filter data by relevant parameters, create detailed matchup analysis worksheets, and save favorite teams for quick access.
 
-## Web project parity: sharing, filtering, matchup worksheets, pinning teams and storing in local storage
+## ✅ 4. Daily summaries and insights based on Google search results and backed by fastbreak charts
 
-Bringing the mobile app's most powerful features to the web platform, including the ability to share custom visualizations with colleagues, filter data by relevant parameters, create detailed matchup analysis worksheets, and save favorite teams for quick access. This cross-platform consistency ensures analysts can seamlessly transition between devices while maintaining their personalized workflow. Local storage of preferences means users can build a curated analytics experience tailored to the teams and metrics they care about most.
+- ✅ Beta demonstrating using Gemini with grounded search to summarize 2 narratives for 5 sports (NBA, NHL, CBB, MLB, and NFL). Each narrative tries to outline a statistical analysis based on fasbtreak charts. [[user guide]](/docs/guide#topics)
+- A mechanism for battling the same topics everyday. This has pros and cons. I like being reminded of the progress of certain news topics everyday. Other topics are not useful to hear about repeatedly.
 
-## AI generated "topics of the day/week"
+## 5. Push notifications when there are updated charts
 
-An LLM-powered analysis engine that automatically reviews the latest statistical trends and generates talking points highlighting the most interesting storylines. This feature would save analysts hours of manual chart review by surfacing noteworthy patterns like unusual team performance, breakout player performances, or significant tactical shifts. The AI can identify correlations and anomalies that might be missed in manual review, ensuring users never miss important developments.
+A user specified, in-app setting that notifies the user when the topics have been generated and gives a quick snapshot of those topics in the push notification message.
 
-## Push notifications when there are updated charts
+## 6. Selectable themes for major teams
 
-Real-time alerts when new statistical visualizations are published or existing charts receive significant updates with fresh data. This keeps analysts informed the moment new insights become available, allowing them to stay ahead of the news cycle and react to developing trends before they become widely known. Users can customize notification preferences to receive alerts only for specific sports, teams, or chart types they follow most closely.
-
-## Selectable themes for major teams
-
-Allowing users to select a theme that correlates to a given team, with that theme affecting the entire fastbreak UI. This personalization feature would let fans show their team loyalty while using the app, with color schemes, accents, and design elements reflecting their favorite team's branding. The theming system would maintain readability and usability while creating a more immersive experience that connects users emotionally to the analytics they're viewing.
+Allowing users to select a theme that correlates to a given team, with that theme affecting the entire fastbreak UI.

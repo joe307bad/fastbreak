@@ -48,6 +48,15 @@ export default function BlogPage() {
                       month: "long",
                       day: "numeric",
                     })}
+                    {post.updatedAt && (
+                      <span className="ml-2">
+                        (Updated {new Date(post.updatedAt).toLocaleDateString("en-US", {
+                          year: "numeric",
+                          month: "long",
+                          day: "numeric",
+                        })})
+                      </span>
+                    )}
                   </time>
                   <h2 className="text-lg font-bold mt-1 group-hover:underline">
                     {post.title}

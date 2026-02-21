@@ -18,6 +18,7 @@ class TopicsRepository(
     private val json = Json {
         ignoreUnknownKeys = true
         prettyPrint = false
+        coerceInputValues = true
     }
 
     companion object {

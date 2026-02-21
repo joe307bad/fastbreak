@@ -513,7 +513,8 @@ private fun NarrativeItem(
                                     color = MaterialTheme.colorScheme.onSurface
                                 )
                                 val teamPrefix = if (dp.team.isNotBlank()) "${dp.team}: " else ""
-                                val displayValue = dp.value.toIntOrNull()?.let { kotlin.math.abs(it).toString() } ?: dp.value
+                                val rawValue = dp.value ?: ""
+                                val displayValue = rawValue.toIntOrNull()?.let { kotlin.math.abs(it).toString() } ?: rawValue
                                 Text(
                                     text = "$teamPrefix${dp.metric} = $displayValue",
                                     style = MaterialTheme.typography.bodySmall,

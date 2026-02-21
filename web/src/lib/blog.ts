@@ -8,6 +8,7 @@ export interface BlogPost {
   slug: string;
   title: string;
   date: string;
+  updatedAt?: string;
   description: string;
   author?: string;
   authorUrl?: string;
@@ -18,6 +19,7 @@ export interface BlogPostMeta {
   slug: string;
   title: string;
   date: string;
+  updatedAt?: string;
   description: string;
 }
 
@@ -38,6 +40,7 @@ export function getAllPosts(): BlogPostMeta[] {
       slug,
       title: data.title || slug,
       date: data.date || "",
+      updatedAt: data.updatedAt,
       description: data.description || "",
     };
   });
@@ -61,6 +64,7 @@ export function getPostBySlug(slug: string): BlogPost | null {
     slug,
     title: data.title || slug,
     date: data.date || "",
+    updatedAt: data.updatedAt,
     description: data.description || "",
     author: data.author,
     authorUrl: data.authorUrl,

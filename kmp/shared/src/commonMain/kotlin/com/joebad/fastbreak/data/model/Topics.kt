@@ -46,7 +46,7 @@ data class ChartReference(
 @Serializable
 data class NarrativeDataPoint(
     val metric: String,
-    val value: String,
+    val value: String? = null,
     val chartName: String = "",
     val team: String = "",
     val player: String = "",

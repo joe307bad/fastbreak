@@ -12,6 +12,7 @@ import { ManualPage } from "./src/components/ui/ManualPage";
 import { SportsTalkGallery } from "./src/components/ui/SportsTalkGallery";
 import { WorksheetLightbox } from "./src/components/ui/WorksheetLightbox";
 import { SportsTalkExamplesGallery } from "./src/components/ui/SportsTalkExamplesGallery";
+import { GoalProgress } from "./src/components/ui/GoalProgress";
 
 export function useMDXComponents(components: MDXComponents): MDXComponents {
   return {
@@ -27,6 +28,7 @@ export function useMDXComponents(components: MDXComponents): MDXComponents {
     SportsTalkGallery,
     WorksheetLightbox,
     SportsTalkExamplesGallery,
+    GoalProgress,
     h1: ({ children }) => (
       <h1 className="text-2xl font-bold mb-4">{children}</h1>
     ),

@@ -22,6 +22,52 @@ NBA_SEASON_STRING <- paste0(NBA_SEASON - 1, "-", substr(NBA_SEASON, 3, 4))
 # Number of days to look ahead for matchups
 DAYS_AHEAD <- 7
 
+# Number of days to look behind for completed games with results
+DAYS_BEHIND <- 3
+
+# Maximum number of completed games to fetch full results for (rate limiting)
+MAX_RESULTS_GAMES <- 50
+
+# ============================================================================
+# TIMING UTILITIES
+# ============================================================================
+script_start_time <- Sys.time()
+step_timings <- list()
+
+# Helper function to format duration nicely
+format_duration <- function(duration) {
+ secs <- as.numeric(duration, units = "secs")
+ if (secs < 60) {
+   sprintf("%.1f seconds", secs)
+ } else if (secs < 3600) {
+   sprintf("%.1f minutes (%.0f seconds)", secs / 60, secs)
+ } else {
+   sprintf("%.2f hours (%.0f minutes)", secs / 3600, secs / 60)
+ }
+}
+
+# Helper function to start timing a step
+start_timer <- function(step_name) {
+ assign("current_step_name", step_name, envir = .GlobalEnv)
+ assign("current_step_start", Sys.time(), envir = .GlobalEnv)
+ cat("\n[TIMER] Starting:", step_name, "\n")
+}
+
+# Helper function to end timing a step
+end_timer <- function() {
+ if (exists("current_step_start", envir = .GlobalEnv)) {
+   duration <- Sys.time() - get("current_step_start", envir = .GlobalEnv)
+   step_name <- get("current_step_name", envir = .GlobalEnv)
+   step_timings[[step_name]] <<- duration
+   cat("[TIMER] Completed:", step_name, "in", format_duration(duration), "\n")
+ }
+}
+
+# Helper function to safely check if a value is valid (not NA, NULL, or zero-length)
+is_valid_value <- function(x) {
+  !is.null(x) && length(x) > 0 && !is.na(x[1])
+}
+
 # Helper function to create tied ranks
 tied_rank <- function(x) {
   numeric_ranks <- rank(x, ties.method = "min", na.last = "keep")
@@ -46,11 +92,438 @@ add_api_delay <- function() {
   Sys.sleep(0.5)
 }
 
+# Helper function to fetch game data from ESPN (box scores, play-by-play, etc.)
+fetch_espn_game_data <- function(game_id) {
+  add_api_delay()
+
+  tryCatch({
+    result <- hoopR::espn_nba_game_all(game_id = as.integer(game_id))
+
+    list(
+      plays = result$Plays,
+      team = result$Team,
+      player = result$Player,
+      success = TRUE
+    )
+  }, error = function(e) {
+    cat("Warning: Could not fetch ESPN game data for game", game_id, ":", e$message, "\n")
+    list(success = FALSE, error = e$message)
+  })
+}
+
+# Helper function to extract shot chart from ESPN play-by-play data
+extract_shot_chart <- function(plays, team_id) {
+  if (is.null(plays) || nrow(plays) == 0) {
+    return(list(shots = NULL, success = TRUE, empty = TRUE))
+  }
+
+  tryCatch({
+    # Filter for shot attempts (field goals) - look for scoring plays with coordinates
+    shots <- plays %>%
+      filter(
+        !is.na(coordinate_x) & !is.na(coordinate_y),
+        team_id == !!team_id | home_team_id == !!team_id | away_team_id == !!team_id
+      )
+
+    # Try to identify shots by looking at play types
+    if ("type_text" %in% names(shots)) {
+      shots <- shots %>%
+        filter(grepl("Shot|Jump|Layup|Dunk|Three|3PT|Field Goal|shot|jumper|layup|dunk", type_text, ignore.case = TRUE))
+    }
+
+    if (nrow(shots) > 0) {
+      # Select relevant columns for shot chart
+      shot_data <- shots %>%
+        select(
+          any_of(c("coordinate_x", "coordinate_y", "scoring_play", "type_text",
+                   "text", "period", "clock_display_value", "team_id"))
+        ) %>%
+        rename(any_of(c(locX = "coordinate_x", locY = "coordinate_y")))
+
+      list(shots = shot_data, success = TRUE)
+    } else {
+      list(shots = NULL, success = TRUE, empty = TRUE)
+    }
+  }, error = function(e) {
+    cat("Warning: Could not extract shot chart:", e$message, "\n")
+    list(success = FALSE, error = e$message)
+  })
+}
+
+# Helper function to extract win probability from ESPN play-by-play (score progression)
+extract_win_probability <- function(plays, home_team_id) {
+  if (is.null(plays) || nrow(plays) == 0) {
+    return(list(win_prob = NULL, success = TRUE, empty = TRUE))
+  }
+
+  tryCatch({
+    # Get score progression from plays
+    score_plays <- plays %>%
+      filter(!is.na(home_score) & !is.na(away_score)) %>%
+      select(any_of(c("period", "clock_display_value", "home_score", "away_score",
+                      "game_id", "sequence_number")))
+
+    if (nrow(score_plays) > 0) {
+      # Sample at regular intervals to reduce data size
+      sample_indices <- seq(1, nrow(score_plays), by = max(1, floor(nrow(score_plays) / 50)))
+      score_sampled <- score_plays[sample_indices, ]
+
+      # Calculate simple win probability based on score differential and time
+      # This is a simplified model - actual win prob would need more sophisticated modeling
+      score_sampled <- score_sampled %>%
+        mutate(
+          score_diff = home_score - away_score,
+          # Simple logistic-based win prob estimate (very rough approximation)
+          home_pct = round(plogis(score_diff / 5), 3),
+          away_pct = round(1 - home_pct, 3)
+        )
+
+      list(win_prob = score_sampled, success = TRUE)
+    } else {
+      list(win_prob = NULL, success = TRUE, empty = TRUE)
+    }
+  }, error = function(e) {
+    cat("Warning: Could not extract win probability:", e$message, "\n")
+    list(success = FALSE, error = e$message)
+  })
+}
+
+# Helper function to compare game stats to season averages
+compare_to_season_avg <- function(game_value, season_avg, stat_name, higher_is_better = TRUE) {
+  if (is.na(game_value) || is.na(season_avg) || is.null(game_value) || is.null(season_avg)) {
+    return(list(
+      gameValue = if (!is.null(game_value) && !is.na(game_value)) round(game_value, 1) else NULL,
+      seasonAvg = if (!is.null(season_avg) && !is.na(season_avg)) round(season_avg, 1) else NULL,
+      difference = NULL,
+      percentDiff = NULL,
+      aboveAverage = NULL,
+      label = NULL
+    ))
+  }
+
+  diff <- game_value - season_avg
+  pct_diff <- if (season_avg != 0) (diff / season_avg) * 100 else 0
+  above_avg <- if (higher_is_better) diff > 0 else diff < 0
+
+  label <- if (abs(pct_diff) < 5) {
+    "near average"
+  } else if (above_avg) {
+    "above average"
+  } else {
+    "below average"
+  }
+
+  list(
+    gameValue = round(game_value, 1),
+    seasonAvg = round(season_avg, 1),
+    difference = round(diff, 1),
+    percentDiff = round(pct_diff, 1),
+    aboveAverage = above_avg,
+    label = label
+  )
+}
+
+# Helper function to build results data for a completed game
+build_game_results <- function(game, home_season_stats, away_season_stats, team_stats) {
+  game_id <- game$game_id
+
+  cat("  Fetching results for game", game_id, "...\n")
+
+  # Determine winner
+  home_won <- game$home_score > game$away_score
+  winner <- if (home_won) game$home_team_abbrev else game$away_team_abbrev
+
+  # Helper functions for safe value extraction
+  safe_int <- function(x) if (length(x) > 0 && !is.na(x[1])) as.integer(x[1]) else NULL
+  safe_num <- function(x) if (length(x) > 0 && !is.na(x[1])) as.numeric(x[1]) else NULL
+  safe_chr <- function(x) if (length(x) > 0 && !is.na(x[1])) as.character(x[1]) else NULL
+
+  # Build basic result
+  result <- list(
+    finalScore = list(
+      home = game$home_score,
+      away = game$away_score,
+      winner = winner,
+      margin = abs(game$home_score - game$away_score),
+      homeWon = home_won
+    )
+  )
+
+  # Fetch ESPN data - this is our primary source for box scores
+  espn_data <- fetch_espn_game_data(game_id)
+
+  if (espn_data$success) {
+    # Extract team box scores from ESPN data
+    if (!is.null(espn_data$team) && nrow(espn_data$team) > 0) {
+      home_box <- espn_data$team %>% filter(team_id == as.character(game$home_team_id))
+      away_box <- espn_data$team %>% filter(team_id == as.character(game$away_team_id))
+
+      if (nrow(home_box) > 0 && nrow(away_box) > 0) {
+        # Calculate TS% and eFG% for teams
+        calc_ts_pct <- function(pts, fga, fta) {
+          if (!is.null(pts) && !is.null(fga) && !is.null(fta) && (fga + 0.44 * fta) > 0) {
+            round(pts / (2 * (fga + 0.44 * fta)) * 100, 1)
+          } else NULL
+        }
+
+        calc_efg_pct <- function(fgm, fg3m, fga) {
+          if (!is.null(fgm) && !is.null(fg3m) && !is.null(fga) && fga > 0) {
+            round((fgm + 0.5 * fg3m) / fga * 100, 1)
+          } else NULL
+        }
+
+        # Home team box score
+        home_pts <- safe_int(home_box$team_score)
+        home_fgm <- safe_int(home_box$field_goals_made)
+        home_fga <- safe_int(home_box$field_goals_attempted)
+        home_fg3m <- safe_int(home_box$three_point_field_goals_made)
+        home_fg3a <- safe_int(home_box$three_point_field_goals_attempted)
+        home_ftm <- safe_int(home_box$free_throws_made)
+        home_fta <- safe_int(home_box$free_throws_attempted)
+
+        # Away team box score
+        away_pts <- safe_int(away_box$team_score)
+        away_fgm <- safe_int(away_box$field_goals_made)
+        away_fga <- safe_int(away_box$field_goals_attempted)
+        away_fg3m <- safe_int(away_box$three_point_field_goals_made)
+        away_fg3a <- safe_int(away_box$three_point_field_goals_attempted)
+        away_ftm <- safe_int(away_box$free_throws_made)
+        away_fta <- safe_int(away_box$free_throws_attempted)
+
+        result$teamBoxScore <- list(
+          home = list(
+            pts = home_pts,
+            fgm = home_fgm,
+            fga = home_fga,
+            fgPct = safe_num(home_box$field_goal_pct),
+            fg3m = home_fg3m,
+            fg3a = home_fg3a,
+            fg3Pct = safe_num(home_box$three_point_field_goal_pct),
+            ftm = home_ftm,
+            fta = home_fta,
+            ftPct = safe_num(home_box$free_throw_pct),
+            oreb = safe_int(home_box$offensive_rebounds),
+            dreb = safe_int(home_box$defensive_rebounds),
+            reb = safe_int(home_box$total_rebounds),
+            ast = safe_int(home_box$assists),
+            stl = safe_int(home_box$steals),
+            blk = safe_int(home_box$blocks),
+            tov = safe_int(home_box$turnovers),
+            pf = safe_int(home_box$fouls),
+            ptsPaint = safe_int(home_box$points_in_paint),
+            ptsFb = safe_int(home_box$fast_break_points),
+            ptsOffTov = safe_int(home_box$turnover_points),
+            largestLead = safe_int(home_box$largest_lead),
+            leadPct = safe_num(home_box$lead_percentage),
+            # Calculated advanced stats
+            tsPct = calc_ts_pct(home_pts, home_fga, home_fta),
+            efgPct = calc_efg_pct(home_fgm, home_fg3m, home_fga),
+            astTovRatio = if (!is.null(safe_int(home_box$assists)) && !is.null(safe_int(home_box$turnovers)) && safe_int(home_box$turnovers) > 0)
+              round(safe_int(home_box$assists) / safe_int(home_box$turnovers), 2) else NULL
+          ),
+          away = list(
+            pts = away_pts,
+            fgm = away_fgm,
+            fga = away_fga,
+            fgPct = safe_num(away_box$field_goal_pct),
+            fg3m = away_fg3m,
+            fg3a = away_fg3a,
+            fg3Pct = safe_num(away_box$three_point_field_goal_pct),
+            ftm = away_ftm,
+            fta = away_fta,
+            ftPct = safe_num(away_box$free_throw_pct),
+            oreb = safe_int(away_box$offensive_rebounds),
+            dreb = safe_int(away_box$defensive_rebounds),
+            reb = safe_int(away_box$total_rebounds),
+            ast = safe_int(away_box$assists),
+            stl = safe_int(away_box$steals),
+            blk = safe_int(away_box$blocks),
+            tov = safe_int(away_box$turnovers),
+            pf = safe_int(away_box$fouls),
+            ptsPaint = safe_int(away_box$points_in_paint),
+            ptsFb = safe_int(away_box$fast_break_points),
+            ptsOffTov = safe_int(away_box$turnover_points),
+            largestLead = safe_int(away_box$largest_lead),
+            leadPct = safe_num(away_box$lead_percentage),
+            # Calculated advanced stats
+            tsPct = calc_ts_pct(away_pts, away_fga, away_fta),
+            efgPct = calc_efg_pct(away_fgm, away_fg3m, away_fga),
+            astTovRatio = if (!is.null(safe_int(away_box$assists)) && !is.null(safe_int(away_box$turnovers)) && safe_int(away_box$turnovers) > 0)
+              round(safe_int(away_box$assists) / safe_int(away_box$turnovers), 2) else NULL
+          )
+        )
+
+        # Compare to season averages
+        # Note: ESPN returns percentages as integers (43 = 43%), season stats are also percentages
+        # ts_pct and efg_pct in season stats are decimals (0.60 = 60%), so multiply by 100
+        result$vsSeasonAvg <- list(
+          home = list(
+            points = compare_to_season_avg(game$home_score, home_season_stats$points_per_game, "points"),
+            fieldGoalPct = compare_to_season_avg(safe_num(home_box$field_goal_pct), home_season_stats$fg_pct, "fg_pct"),
+            threePtPct = compare_to_season_avg(safe_num(home_box$three_point_field_goal_pct), home_season_stats$three_pt_pct, "three_pt_pct"),
+            freeThrowPct = compare_to_season_avg(safe_num(home_box$free_throw_pct), home_season_stats$ft_pct, "ft_pct"),
+            rebounds = compare_to_season_avg(safe_num(home_box$total_rebounds), home_season_stats$rebounds_per_game, "rebounds"),
+            offRebounds = compare_to_season_avg(safe_num(home_box$offensive_rebounds), home_season_stats$offensive_rebounds_total / home_season_stats$games_played, "oreb"),
+            assists = compare_to_season_avg(safe_num(home_box$assists), home_season_stats$assists_per_game, "assists"),
+            steals = compare_to_season_avg(safe_num(home_box$steals), home_season_stats$steals_per_game, "steals"),
+            blocks = compare_to_season_avg(safe_num(home_box$blocks), home_season_stats$blocks_per_game, "blocks"),
+            turnovers = compare_to_season_avg(safe_num(home_box$turnovers), home_season_stats$turnovers_per_game, "turnovers", higher_is_better = FALSE),
+            tsPct = compare_to_season_avg(calc_ts_pct(home_pts, home_fga, home_fta), home_season_stats$ts_pct * 100, "ts_pct"),
+            efgPct = compare_to_season_avg(calc_efg_pct(home_fgm, home_fg3m, home_fga), home_season_stats$efg_pct * 100, "efg_pct")
+          ),
+          away = list(
+            points = compare_to_season_avg(game$away_score, away_season_stats$points_per_game, "points"),
+            fieldGoalPct = compare_to_season_avg(safe_num(away_box$field_goal_pct), away_season_stats$fg_pct, "fg_pct"),
+            threePtPct = compare_to_season_avg(safe_num(away_box$three_point_field_goal_pct), away_season_stats$three_pt_pct, "three_pt_pct"),
+            freeThrowPct = compare_to_season_avg(safe_num(away_box$free_throw_pct), away_season_stats$ft_pct, "ft_pct"),
+            rebounds = compare_to_season_avg(safe_num(away_box$total_rebounds), away_season_stats$rebounds_per_game, "rebounds"),
+            offRebounds = compare_to_season_avg(safe_num(away_box$offensive_rebounds), away_season_stats$offensive_rebounds_total / away_season_stats$games_played, "oreb"),
+            assists = compare_to_season_avg(safe_num(away_box$assists), away_season_stats$assists_per_game, "assists"),
+            steals = compare_to_season_avg(safe_num(away_box$steals), away_season_stats$steals_per_game, "steals"),
+            blocks = compare_to_season_avg(safe_num(away_box$blocks), away_season_stats$blocks_per_game, "blocks"),
+            turnovers = compare_to_season_avg(safe_num(away_box$turnovers), away_season_stats$turnovers_per_game, "turnovers", higher_is_better = FALSE),
+            tsPct = compare_to_season_avg(calc_ts_pct(away_pts, away_fga, away_fta), away_season_stats$ts_pct * 100, "ts_pct"),
+            efgPct = compare_to_season_avg(calc_efg_pct(away_fgm, away_fg3m, away_fga), away_season_stats$efg_pct * 100, "efg_pct")
+          )
+        )
+      }
+    }
+
+    # Extract player box scores from ESPN data
+    if (!is.null(espn_data$player) && nrow(espn_data$player) > 0) {
+      home_players <- espn_data$player %>%
+        filter(team_id == as.character(game$home_team_id)) %>%
+        arrange(desc(as.numeric(gsub(":", ".", minutes))))
+
+      away_players <- espn_data$player %>%
+        filter(team_id == as.character(game$away_team_id)) %>%
+        arrange(desc(as.numeric(gsub(":", ".", minutes))))
+
+      # Function to build player stat line from ESPN data
+      build_player_line <- function(p) {
+        pts <- safe_int(p$points)
+        fga <- safe_int(p$field_goals_attempted)
+        fta <- safe_int(p$free_throws_attempted)
+        fgm <- safe_int(p$field_goals_made)
+        fg3m <- safe_int(p$three_point_field_goals_made)
+
+        # Calculate TS%: PTS / (2 * (FGA + 0.44 * FTA))
+        ts_pct <- if (!is.null(pts) && !is.null(fga) && !is.null(fta) && (fga + 0.44 * fta) > 0) {
+          round(pts / (2 * (fga + 0.44 * fta)) * 100, 1)
+        } else NULL
+
+        # Calculate eFG%: (FGM + 0.5 * FG3M) / FGA
+        efg_pct <- if (!is.null(fgm) && !is.null(fg3m) && !is.null(fga) && fga > 0) {
+          round((fgm + 0.5 * fg3m) / fga * 100, 1)
+        } else NULL
+
+        list(
+          playerId = safe_chr(p$athlete_id),
+          name = safe_chr(p$athlete_display_name),
+          position = safe_chr(p$athlete_position_abbreviation),
+          jersey = safe_chr(p$athlete_jersey),
+          min = safe_chr(p$minutes),
+          starter = if (!is.null(p$starter) && !is.na(p$starter)) as.logical(p$starter) else NULL,
+          pts = pts,
+          oreb = safe_int(p$offensive_rebounds),
+          dreb = safe_int(p$defensive_rebounds),
+          reb = safe_int(p$rebounds),
+          ast = safe_int(p$assists),
+          stl = safe_int(p$steals),
+          blk = safe_int(p$blocks),
+          tov = safe_int(p$turnovers),
+          pf = safe_int(p$fouls),
+          fgm = fgm,
+          fga = fga,
+          fg3m = fg3m,
+          fg3a = safe_int(p$three_point_field_goals_attempted),
+          ftm = safe_int(p$free_throws_made),
+          fta = fta,
+          plusMinus = safe_int(p$plus_minus),
+          # Advanced stats
+          tsPct = ts_pct,
+          efgPct = efg_pct
+        )
+      }
+
+      if (nrow(home_players) > 0 && nrow(away_players) > 0) {
+        result$playerBoxScore <- list(
+          home = lapply(seq_len(nrow(home_players)), function(i) {
+            build_player_line(home_players[i, ])
+          }),
+          away = lapply(seq_len(nrow(away_players)), function(i) {
+            build_player_line(away_players[i, ])
+          })
+        )
+      }
+    }
+
+    # Extract shot charts from play-by-play data
+    if (!is.null(espn_data$plays)) {
+      plays <- espn_data$plays
+
+      # Extract shot charts for both teams
+      home_shots <- extract_shot_chart(plays, game$home_team_id)
+      away_shots <- extract_shot_chart(plays, game$away_team_id)
+
+      if ((home_shots$success && !isTRUE(home_shots$empty)) ||
+          (away_shots$success && !isTRUE(away_shots$empty))) {
+        result$shotChart <- list(
+          home = if (home_shots$success && !isTRUE(home_shots$empty) && !is.null(home_shots$shots) && nrow(home_shots$shots) > 0) {
+            lapply(seq_len(nrow(home_shots$shots)), function(i) {
+              s <- home_shots$shots[i, ]
+              list(
+                locX = if ("locX" %in% names(s)) as.integer(s$locX) else NULL,
+                locY = if ("locY" %in% names(s)) as.integer(s$locY) else NULL,
+                made = if ("scoring_play" %in% names(s)) as.integer(s$scoring_play) else NULL,
+                type = if ("type_text" %in% names(s)) as.character(s$type_text) else NULL,
+                period = if ("period" %in% names(s)) as.integer(s$period) else NULL
+              )
+            })
+          } else NULL,
+          away = if (away_shots$success && !isTRUE(away_shots$empty) && !is.null(away_shots$shots) && nrow(away_shots$shots) > 0) {
+            lapply(seq_len(nrow(away_shots$shots)), function(i) {
+              s <- away_shots$shots[i, ]
+              list(
+                locX = if ("locX" %in% names(s)) as.integer(s$locX) else NULL,
+                locY = if ("locY" %in% names(s)) as.integer(s$locY) else NULL,
+                made = if ("scoring_play" %in% names(s)) as.integer(s$scoring_play) else NULL,
+                type = if ("type_text" %in% names(s)) as.character(s$type_text) else NULL,
+                period = if ("period" %in% names(s)) as.integer(s$period) else NULL
+              )
+            })
+          } else NULL
+        )
+      }
+
+      # Extract win probability from score progression
+      win_prob <- extract_win_probability(plays, game$home_team_id)
+      if (win_prob$success && !isTRUE(win_prob$empty) && !is.null(win_prob$win_prob) && nrow(win_prob$win_prob) > 0) {
+        result$winProbability <- lapply(seq_len(nrow(win_prob$win_prob)), function(i) {
+          w <- win_prob$win_prob[i, ]
+          list(
+            period = if ("period" %in% names(w)) as.integer(w$period) else NULL,
+            clock = if ("clock_display_value" %in% names(w)) as.character(w$clock_display_value) else NULL,
+            homePct = if ("home_pct" %in% names(w)) as.numeric(w$home_pct) else NULL,
+            awayPct = if ("away_pct" %in% names(w)) as.numeric(w$away_pct) else NULL,
+            homePts = if ("home_score" %in% names(w)) as.integer(w$home_score) else NULL,
+            awayPts = if ("away_score" %in% names(w)) as.integer(w$away_score) else NULL
+          )
+        })
+      }
+    }
+  }
+
+  return(result)
+}
+
 cat("=== Loading NBA data for", NBA_SEASON_STRING, "season ===\n")
+cat("[TIMER] Script started at:", format(script_start_time, "%Y-%m-%d %H:%M:%S"), "\n")
 
 # ============================================================================
 # STEP 1: Load team stats and calculate season totals with ranks
 # ============================================================================
+start_timer("STEP 1: Load team stats")
 cat("\n1. Loading team stats from hoopR...\n")
 
 # Load team box scores for the season
@@ -339,9 +812,12 @@ if (!is.null(four_factors_stats)) {
     )
 }
 
+end_timer()
+
 # ============================================================================
 # STEP 1b: Calculate cumulative net rating and weekly efficiency by week
 # ============================================================================
+start_timer("STEP 1b: Calculate cumulative net rating")
 cat("\n1b. Calculating cumulative net rating and weekly efficiency...\n")
 
 # Calculate per-game net rating and group by week
@@ -425,9 +901,12 @@ league_efficiency_stats <- weekly_efficiency %>%
 cat("League avg off rating:", round(league_efficiency_stats$avg_off_rating, 1),
     "def rating:", round(league_efficiency_stats$avg_def_rating, 1), "\n")
 
+end_timer()
+
 # ============================================================================
 # STEP 1c: Calculate 1-month trend rankings (last 4 weeks)
 # ============================================================================
+start_timer("STEP 1c: Calculate 1-month trend rankings")
 cat("\n1c. Calculating 1-month trend rankings (last 4 weeks)...\n")
 
 # Get current week number
@@ -535,9 +1014,12 @@ month_trend_stats$record_rankDisplay <- record_month_ranks$rankDisplay
 
 cat("Calculated month trend rankings for", nrow(month_trend_stats), "teams\n")
 
+end_timer()
+
 # ============================================================================
 # STEP 2: Load player stats and calculate ranks
 # ============================================================================
+start_timer("STEP 2: Load player stats")
 cat("\n2. Loading player stats...\n")
 
 player_box <- tryCatch({
@@ -866,9 +1348,12 @@ if (!is.null(player_usage_stats)) {
     )
 }
 
+end_timer()
+
 # ============================================================================
 # STEP 3: Get team standings (records, division/conference rankings)
 # ============================================================================
+start_timer("STEP 3: Fetch team standings")
 cat("\n3. Fetching team standings...\n")
 
 # Fetch standings from ESPN API
@@ -955,18 +1440,22 @@ if (!is.null(standings_data) && !is.null(standings_data$children)) {
   cat("Warning: No standings data available\n")
 }
 
+end_timer()
+
 # ============================================================================
-# STEP 4: Get upcoming games (next 7 days)
+# STEP 4: Get games (past 7 days + next 7 days)
 # ============================================================================
-cat("\n4. Fetching upcoming NBA games for next", DAYS_AHEAD, "days...\n")
+start_timer("STEP 4: Fetch games schedule")
+cat("\n4. Fetching NBA games for past", DAYS_BEHIND, "days and next", DAYS_AHEAD, "days...\n")
 
 # Get today's date and calculate date range
 today <- Sys.Date()
+start_date <- today - days(DAYS_BEHIND)
 end_date <- today + days(DAYS_AHEAD)
 
 # Fetch schedule from ESPN API
-upcoming_games <- list()
-current_date <- today
+all_games <- list()
+current_date <- start_date
 
 while (current_date <= end_date) {
   date_string <- format(current_date, "%Y%m%d")
@@ -1002,6 +1491,17 @@ while (current_date <= end_date) {
         }
         game_name <- event$name
 
+        # Capture game status (STATUS_SCHEDULED, STATUS_IN_PROGRESS, STATUS_FINAL)
+        game_status <- NULL
+        game_status_completed <- FALSE
+        home_score <- NULL
+        away_score <- NULL
+
+        if (!is.null(event$status)) {
+          game_status <- event$status$type$name
+          game_status_completed <- isTRUE(event$status$type$completed)
+        }
+
         # Extract teams
         if (!is.null(event$competitions) && length(event$competitions) > 0) {
           competition <- event$competitions[[1]]
@@ -1014,8 +1514,15 @@ while (current_date <= end_date) {
           for (team in teams) {
             if (team$homeAway == "home") {
               home_team <- team
+              # Capture final score for completed games
+              if (game_status_completed && !is.null(team$score)) {
+                home_score <- as.integer(team$score)
+              }
             } else {
               away_team <- team
+              if (game_status_completed && !is.null(team$score)) {
+                away_score <- as.integer(team$score)
+              }
             }
           }
 
@@ -1078,19 +1585,23 @@ while (current_date <= end_date) {
               game_id = game_id,
               game_date = game_date,
               game_name = game_name,
+              game_status = game_status,
+              game_status_completed = game_status_completed,
               home_team_id = home_team$team$id,
               home_team_name = home_team$team$displayName,
               home_team_abbrev = home_team$team$abbreviation,
               home_team_logo = if (!is.null(home_team$team$logo)) home_team$team$logo else NA,
+              home_score = home_score,
               away_team_id = away_team$team$id,
               away_team_name = away_team$team$displayName,
               away_team_abbrev = away_team$team$abbreviation,
               away_team_logo = if (!is.null(away_team$team$logo)) away_team$team$logo else NA,
+              away_score = away_score,
               location = location_data,
               odds = odds_data
             )
 
-            upcoming_games[[length(upcoming_games) + 1]] <- game_info
+            all_games[[length(all_games) + 1]] <- game_info
           }
         }
       }
@@ -1100,16 +1611,25 @@ while (current_date <= end_date) {
   current_date <- current_date + days(1)
 }
 
-cat("Found", length(upcoming_games), "upcoming games\n")
+# Separate completed and upcoming games
+completed_games <- Filter(function(g) isTRUE(g$game_status_completed), all_games)
+upcoming_games <- Filter(function(g) !isTRUE(g$game_status_completed), all_games)
 
-if (length(upcoming_games) == 0) {
-  cat("No upcoming games found. Exiting.\n")
+cat("Found", length(completed_games), "completed games\n")
+cat("Found", length(upcoming_games), "upcoming games\n")
+cat("Total:", length(all_games), "games\n")
+
+if (length(all_games) == 0) {
+  cat("No games found. Exiting.\n")
   quit(status = 0)
 }
+
+end_timer()
 
 # ============================================================================
 # STEP 5: Build matchup data for each game
 # ============================================================================
+start_timer("STEP 5: Build matchup data")
 cat("\n5. Building matchup statistics...\n")
 
 # Helper function to build comparison data
@@ -1369,9 +1889,12 @@ build_nba_comparisons <- function(home_stats, away_stats, home_team, away_team) 
 }
 
 matchups_json <- list()
+results_fetched <- 0
+total_results_time <- 0
 
-for (game in upcoming_games) {
-  cat("Processing matchup:", game$away_team_abbrev, "@", game$home_team_abbrev, "\n")
+for (game in all_games) {
+  game_status_label <- if (isTRUE(game$game_status_completed)) "COMPLETED" else "UPCOMING"
+  cat("Processing matchup:", game$away_team_abbrev, "@", game$home_team_abbrev, "(", game_status_label, ")\n")
 
   # Get team stats for both teams
   home_stats <- team_stats %>% filter(team_id == game$home_team_id)
@@ -1401,10 +1924,10 @@ for (game in upcoming_games) {
     name = game$home_team_name,
     abbreviation = game$home_team_abbrev,
     logo = game$home_team_logo,
-    wins = if (!is.na(home_stats$wins)) as.integer(home_stats$wins) else NULL,
-    losses = if (!is.na(home_stats$losses)) as.integer(home_stats$losses) else NULL,
-    conferenceRank = if (!is.na(home_stats$conference_rank)) as.integer(home_stats$conference_rank) else NULL,
-    conference = if (!is.na(home_stats$conference)) as.character(home_stats$conference) else NULL,
+    wins = if (is_valid_value(home_stats$wins)) as.integer(home_stats$wins) else NULL,
+    losses = if (is_valid_value(home_stats$losses)) as.integer(home_stats$losses) else NULL,
+    conferenceRank = if (is_valid_value(home_stats$conference_rank)) as.integer(home_stats$conference_rank) else NULL,
+    conference = if (is_valid_value(home_stats$conference)) as.character(home_stats$conference) else NULL,
     stats = list(
       gamesPlayed = home_stats$games_played,
       pointsPerGame = round(home_stats$points_per_game, 1),
@@ -1563,10 +2086,10 @@ for (game in upcoming_games) {
     name = game$away_team_name,
     abbreviation = game$away_team_abbrev,
     logo = game$away_team_logo,
-    wins = if (!is.na(away_stats$wins)) as.integer(away_stats$wins) else NULL,
-    losses = if (!is.na(away_stats$losses)) as.integer(away_stats$losses) else NULL,
-    conferenceRank = if (!is.na(away_stats$conference_rank)) as.integer(away_stats$conference_rank) else NULL,
-    conference = if (!is.na(away_stats$conference)) as.character(away_stats$conference) else NULL,
+    wins = if (is_valid_value(away_stats$wins)) as.integer(away_stats$wins) else NULL,
+    losses = if (is_valid_value(away_stats$losses)) as.integer(away_stats$losses) else NULL,
+    conferenceRank = if (is_valid_value(away_stats$conference_rank)) as.integer(away_stats$conference_rank) else NULL,
+    conference = if (is_valid_value(away_stats$conference)) as.character(away_stats$conference) else NULL,
     stats = list(
       gamesPlayed = away_stats$games_played,
       pointsPerGame = round(away_stats$points_per_game, 1),
@@ -1720,12 +2243,12 @@ for (game in upcoming_games) {
     list()
   }
 
-  # Build player data
-  home_players_data <- lapply(1:nrow(home_players), function(i) {
+  # Build player data (use seq_len to handle empty player lists)
+  home_players_data <- lapply(seq_len(nrow(home_players)), function(i) {
     p <- home_players[i, ]
 
     # Helper to create NULL if value is NA
-    na_to_null <- function(x) if (is.na(x)) NULL else x
+    na_to_null <- function(x) if (length(x) == 0 || is.null(x) || is.na(x)) NULL else x
 
     list(
       name = p$athlete_display_name,
@@ -1765,7 +2288,7 @@ for (game in upcoming_games) {
         rank = na_to_null(as.integer(p$three_pt_pct_rank)),
         rankDisplay = na_to_null(p$three_pt_pct_rankDisplay)
       ),
-      true_shooting_pct = if ("player_ts_pct" %in% names(p) && !is.na(p$player_ts_pct)) {
+      true_shooting_pct = if ("player_ts_pct" %in% names(p) && is_valid_value(p$player_ts_pct)) {
         list(
           value = na_to_null(round(p$player_ts_pct, 2)),
           rank = na_to_null(as.integer(p$player_ts_pct_rank)),
@@ -1774,7 +2297,7 @@ for (game in upcoming_games) {
       } else {
         list(value = NULL, rank = NULL, rankDisplay = NULL)
       },
-      effective_fg_pct = if ("player_efg_pct" %in% names(p) && !is.na(p$player_efg_pct)) {
+      effective_fg_pct = if ("player_efg_pct" %in% names(p) && is_valid_value(p$player_efg_pct)) {
         list(
           value = na_to_null(round(p$player_efg_pct, 2)),
           rank = na_to_null(as.integer(p$player_efg_pct_rank)),
@@ -1783,7 +2306,7 @@ for (game in upcoming_games) {
       } else {
         list(value = NULL, rank = NULL, rankDisplay = NULL)
       },
-      pie = if ("player_pie" %in% names(p) && !is.na(p$player_pie)) {
+      pie = if ("player_pie" %in% names(p) && is_valid_value(p$player_pie)) {
         list(
           value = na_to_null(round(p$player_pie, 2)),
           rank = na_to_null(as.integer(p$player_pie_rank)),
@@ -1792,7 +2315,7 @@ for (game in upcoming_games) {
       } else {
         list(value = NULL, rank = NULL, rankDisplay = NULL)
       },
-      usage_pct = if ("player_usg_pct" %in% names(p) && !is.na(p$player_usg_pct)) {
+      usage_pct = if ("player_usg_pct" %in% names(p) && is_valid_value(p$player_usg_pct)) {
         list(
           value = na_to_null(round(p$player_usg_pct, 2)),
           rank = na_to_null(as.integer(p$player_usg_pct_rank)),
@@ -1814,11 +2337,11 @@ for (game in upcoming_games) {
     )
   })
 
-  away_players_data <- lapply(1:nrow(away_players), function(i) {
+  away_players_data <- lapply(seq_len(nrow(away_players)), function(i) {
     p <- away_players[i, ]
 
     # Helper to create NULL if value is NA
-    na_to_null <- function(x) if (is.na(x)) NULL else x
+    na_to_null <- function(x) if (length(x) == 0 || is.null(x) || is.na(x)) NULL else x
 
     list(
       name = p$athlete_display_name,
@@ -1858,7 +2381,7 @@ for (game in upcoming_games) {
         rank = na_to_null(as.integer(p$three_pt_pct_rank)),
         rankDisplay = na_to_null(p$three_pt_pct_rankDisplay)
       ),
-      true_shooting_pct = if ("player_ts_pct" %in% names(p) && !is.na(p$player_ts_pct)) {
+      true_shooting_pct = if ("player_ts_pct" %in% names(p) && is_valid_value(p$player_ts_pct)) {
         list(
           value = na_to_null(round(p$player_ts_pct, 2)),
           rank = na_to_null(as.integer(p$player_ts_pct_rank)),
@@ -1867,7 +2390,7 @@ for (game in upcoming_games) {
       } else {
         list(value = NULL, rank = NULL, rankDisplay = NULL)
       },
-      effective_fg_pct = if ("player_efg_pct" %in% names(p) && !is.na(p$player_efg_pct)) {
+      effective_fg_pct = if ("player_efg_pct" %in% names(p) && is_valid_value(p$player_efg_pct)) {
         list(
           value = na_to_null(round(p$player_efg_pct, 2)),
           rank = na_to_null(as.integer(p$player_efg_pct_rank)),
@@ -1876,7 +2399,7 @@ for (game in upcoming_games) {
       } else {
         list(value = NULL, rank = NULL, rankDisplay = NULL)
       },
-      pie = if ("player_pie" %in% names(p) && !is.na(p$player_pie)) {
+      pie = if ("player_pie" %in% names(p) && is_valid_value(p$player_pie)) {
         list(
           value = na_to_null(round(p$player_pie, 2)),
           rank = na_to_null(as.integer(p$player_pie_rank)),
@@ -1885,7 +2408,7 @@ for (game in upcoming_games) {
       } else {
         list(value = NULL, rank = NULL, rankDisplay = NULL)
       },
-      usage_pct = if ("player_usg_pct" %in% names(p) && !is.na(p$player_usg_pct)) {
+      usage_pct = if ("player_usg_pct" %in% names(p) && is_valid_value(p$player_usg_pct)) {
         list(
           value = na_to_null(round(p$player_usg_pct, 2)),
           rank = na_to_null(as.integer(p$player_usg_pct_rank)),
@@ -1920,6 +2443,8 @@ for (game in upcoming_games) {
     gameId = game$game_id,
     gameDate = game$game_date,
     gameName = game$game_name,
+    gameStatus = game$game_status,
+    gameCompleted = isTRUE(game$game_status_completed),
     homeTeam = home_team_data,
     awayTeam = away_team_data,
     homePlayers = home_players_data,
@@ -1969,19 +2494,33 @@ for (game in upcoming_games) {
     maxDefRating = round(league_efficiency_stats$max_def_rating, 1)
   )
 
+  # Add results for completed games (with rate limiting)
+  if (isTRUE(game$game_status_completed) && results_fetched < MAX_RESULTS_GAMES) {
+    result_start <- Sys.time()
+    cat("  -> Game completed, fetching results... (", results_fetched + 1, ")\n")
+    matchup$results <- build_game_results(game, home_stats, away_stats, team_stats)
+    result_duration <- as.numeric(Sys.time() - result_start, units = "secs")
+    total_results_time <- total_results_time + result_duration
+    cat("  -> Results fetched in", sprintf("%.1f seconds", result_duration), "\n")
+    results_fetched <- results_fetched + 1
+  }
+
   matchups_json[[length(matchups_json) + 1]] <- matchup
 }
+
+end_timer()
 
 # ============================================================================
 # STEP 6: Generate output JSON
 # ============================================================================
+start_timer("STEP 6: Generate output JSON")
 cat("\n6. Generating output JSON...\n")
 
 output_data <- list(
   sport = "NBA",
   visualizationType = "NBA_MATCHUP",
-  title = paste0("NBA Matchups - ", format(today, "%b %d"), " - ", format(end_date, "%b %d")),
-  subtitle = paste("Upcoming games and comprehensive statistical analysis for the next", DAYS_AHEAD, "days"),
+  title = paste0("NBA Matchups - ", format(start_date, "%b %d"), " - ", format(end_date, "%b %d")),
+  subtitle = paste("Games from the past", DAYS_BEHIND, "days and next", DAYS_AHEAD, "days with results and stats"),
   description = paste0("Detailed matchup statistics including team performance metrics, player stats, and betting odds.\n\nTEAM STATS:\n\n • Points Per Game: Average points scored per game\n\n • Field Goal %: Percentage of field goals made\n\n • 3-Point %: Percentage of three-point shots made\n\n • Rebounds Per Game: Average rebounds per game (offensive + defensive)\n\n • Assists Per Game: Average assists per game\n\n • Steals Per Game: Average steals per game\n\n • Blocks Per Game: Average blocks per game\n\n • Turnovers Per Game: Average turnovers per game (lower is better)\n\n • Offensive Rating: Points scored per 100 possessions (higher is better)\n\n • Defensive Rating: Points allowed per 100 possessions (lower is better)\n\n • Net Rating: Offensive Rating - Defensive Rating (higher is better)\n\nPLAYER STATS:\n\n • Points Per Game: Average points scored per game\n\n • Rebounds Per Game: Average rebounds per game\n\n • Assists Per Game: Average assists per game\n\n • Steals Per Game: Average steals per game\n\n • Blocks Per Game: Average blocks per game\n\n • Field Goal %: Percentage of field goals made\n\n • 3-Point %: Percentage of three-point shots made\n\nAll stats are season totals through the current date. Players must have played at least ", MIN_GAMES_PLAYED, " games to be included."),
   lastUpdated = format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC"),
   source = "hoopR / ESPN",
@@ -2028,7 +2567,7 @@ if (nzchar(s3_bucket)) {
   # Update DynamoDB with metadata
   dynamodb_table <- Sys.getenv("AWS_DYNAMODB_TABLE", "fastbreak-file-timestamps")
   utc_timestamp <- format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC")
-  chart_title <- paste0("NBA Matchups - ", format(today, "%b %d"), " - ", format(end_date, "%b %d"))
+  chart_title <- paste0("NBA Matchups - ", format(start_date, "%b %d"), " - ", format(end_date, "%b %d"))
   chart_interval <- "daily"
 
   dynamodb_item <- sprintf(
@@ -2055,5 +2594,33 @@ if (nzchar(s3_bucket)) {
   cat("Development mode - output written to:", dev_output, "\n")
   cat("To upload to S3, set AWS_S3_BUCKET environment variable\n")
 }
+
+end_timer()
+
+# ============================================================================
+# TIMING SUMMARY
+# ============================================================================
+script_end_time <- Sys.time()
+total_duration <- script_end_time - script_start_time
+
+cat("\n")
+cat("============================================================\n")
+cat("                    TIMING SUMMARY                          \n")
+cat("============================================================\n")
+cat("Script started:", format(script_start_time, "%Y-%m-%d %H:%M:%S"), "\n")
+cat("Script ended:  ", format(script_end_time, "%Y-%m-%d %H:%M:%S"), "\n")
+cat("------------------------------------------------------------\n")
+cat("Step breakdown:\n")
+for (step_name in names(step_timings)) {
+  cat(sprintf("  %-45s %s\n", step_name, format_duration(step_timings[[step_name]])))
+}
+cat("------------------------------------------------------------\n")
+if (results_fetched > 0) {
+  cat(sprintf("Results fetched: %d games in %.1f seconds (avg: %.1f sec/game)\n",
+              results_fetched, total_results_time, total_results_time / results_fetched))
+}
+cat("------------------------------------------------------------\n")
+cat(sprintf("TOTAL RUNTIME: %s\n", format_duration(total_duration)))
+cat("============================================================\n")
 
 cat("\n=== NBA Matchup Stats generation complete ===\n")

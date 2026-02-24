@@ -565,6 +565,91 @@ data class NBAMatchupOdds(
     val awayMoneyline: String? = null
 )
 
+// Game Results data structures for completed games
+@Serializable
+data class NBAFinalScore(
+    val home: Int,
+    val away: Int,
+    val winner: String,
+    val margin: Int,
+    val homeWon: Boolean
+)
+
+@Serializable
+data class NBATeamBoxScore(
+    val pts: Int? = null,
+    val fgm: Int? = null,
+    val fga: Int? = null,
+    val fgPct: Double? = null,
+    val fg3m: Int? = null,
+    val fg3a: Int? = null,
+    val fg3Pct: Double? = null,
+    val ftm: Int? = null,
+    val fta: Int? = null,
+    val ftPct: Double? = null,
+    val oreb: Int? = null,
+    val dreb: Int? = null,
+    val reb: Int? = null,
+    val ast: Int? = null,
+    val stl: Int? = null,
+    val blk: Int? = null,
+    val tov: Int? = null,
+    val pf: Int? = null,
+    val ptsPaint: Int? = null,
+    val ptsFb: Int? = null,
+    val ptsOffTov: Int? = null,
+    val largestLead: Int? = null,
+    val leadPct: Double? = null,
+    val tsPct: Double? = null,
+    val efgPct: Double? = null,
+    val astTovRatio: Double? = null
+)
+
+@Serializable
+data class NBAStatComparison(
+    val gameValue: Double? = null,
+    val seasonAvg: Double? = null,
+    val difference: Double? = null,
+    val percentDiff: Double? = null,
+    val aboveAverage: Boolean? = null,
+    val label: String? = null
+)
+
+@Serializable
+data class NBATeamSeasonComparison(
+    val points: NBAStatComparison? = null,
+    val fieldGoalPct: NBAStatComparison? = null,
+    val threePtPct: NBAStatComparison? = null,
+    val freeThrowPct: NBAStatComparison? = null,
+    val rebounds: NBAStatComparison? = null,
+    val offRebounds: NBAStatComparison? = null,
+    val assists: NBAStatComparison? = null,
+    val steals: NBAStatComparison? = null,
+    val blocks: NBAStatComparison? = null,
+    val turnovers: NBAStatComparison? = null,
+    val tsPct: NBAStatComparison? = null,
+    val efgPct: NBAStatComparison? = null
+)
+
+@Serializable
+data class NBAGameResults(
+    val finalScore: NBAFinalScore,
+    val teamBoxScore: NBATeamBoxScores? = null,
+    val vsSeasonAvg: NBASeasonAvgComparison? = null
+)
+
+@Serializable
+data class NBATeamBoxScores(
+    val home: NBATeamBoxScore? = null,
+    val away: NBATeamBoxScore? = null
+)
+
+@Serializable
+data class NBASeasonAvgComparison(
+    val home: NBATeamSeasonComparison? = null,
+    val away: NBATeamSeasonComparison? = null
+)
+
 @Serializable
 data class LeagueEfficiencyStats(
     val avgOffRating: Double,
@@ -580,6 +665,8 @@ data class NBAMatchup(
     val gameId: String,
     val gameDate: String,  // ISO 8601 format
     val gameName: String,
+    val gameStatus: String? = null,  // e.g., "STATUS_FINAL", "STATUS_SCHEDULED"
+    val gameCompleted: Boolean = false,
     val homeTeam: NBATeamInfo,
     val awayTeam: NBATeamInfo,
     val homePlayers: List<NBAPlayerInfo> = emptyList(),
@@ -588,7 +675,8 @@ data class NBAMatchup(
     val odds: NBAMatchupOdds? = null,
     val comparisons: MatchupComparisons? = null,
     val tenthNetRatingByWeek: JsonObject? = null,  // #10 ranked cumulative net rating by week for reference line
-    val leagueEfficiencyStats: LeagueEfficiencyStats? = null  // League-wide stats for consistent scatter plot scaling
+    val leagueEfficiencyStats: LeagueEfficiencyStats? = null,  // League-wide stats for consistent scatter plot scaling
+    val results: NBAGameResults? = null  // Results data for completed games
 )
 
 @Serializable

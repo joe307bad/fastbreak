@@ -288,18 +288,20 @@ fun ThreeColumnRow(
             Text(
                 text = leftText,
                 style = MaterialTheme.typography.bodySmall,
-                fontSize = 11.sp,
+                fontSize = 10.sp,
                 fontWeight = leftWeight,
-                color = leftColor
+                color = leftColor,
+                maxLines = 1,
+                softWrap = false
             )
         }
 
         Text(
             text = centerText,
             style = MaterialTheme.typography.bodySmall,
-            modifier = Modifier.weight(1f),
+            modifier = Modifier.weight(0.6f),
             textAlign = TextAlign.Center,
-            fontSize = 11.sp,
+            fontSize = 10.sp,
             fontWeight = centerWeight,
             color = centerColor,
             maxLines = centerMaxLines,
@@ -315,9 +317,11 @@ fun ThreeColumnRow(
             Text(
                 text = rightText,
                 style = MaterialTheme.typography.bodySmall,
-                fontSize = 11.sp,
+                fontSize = 10.sp,
                 fontWeight = rightWeight,
-                color = rightColor
+                color = rightColor,
+                maxLines = 1,
+                softWrap = false
             )
             if (advantage == 1) {
                 Spacer(modifier = Modifier.width(4.dp))
@@ -529,6 +533,7 @@ fun TeamStatsNavBadge(
 
 /**
  * Pinned header showing team matchup at the top
+ * When final scores are provided, displays: "AWAY score +margin score HOME"
  */
 @Composable
 fun PinnedMatchupHeader(
@@ -542,13 +547,18 @@ fun PinnedMatchupHeader(
     homeLosses: Int? = null,
     homeConferenceRank: Int? = null,
     homeConference: String? = null,
+    awayScore: Int? = null,
+    homeScore: Int? = null,
     modifier: Modifier = Modifier
 ) {
+    val hasScore = awayScore != null && homeScore != null
+    val homeWon = hasScore && homeScore!! > awayScore!!
+    val margin = if (hasScore) kotlin.math.abs(homeScore!! - awayScore!!) else 0
+
     androidx.compose.material3.Surface(
         modifier = modifier.fillMaxWidth(),
         color = MaterialTheme.colorScheme.background
     ) {
-        // Only show team abbreviations (single row)
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -556,37 +566,71 @@ fun PinnedMatchupHeader(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = awayTeam,
-                style = MaterialTheme.typography.bodySmall.copy(lineHeight = 11.sp),
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface,
+            // Away team + score
+            Row(
                 modifier = Modifier.weight(1f),
-                maxLines = 1
-            )
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Start
+            ) {
+                Text(
+                    text = awayTeam,
+                    style = MaterialTheme.typography.bodySmall.copy(lineHeight = 11.sp),
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = if (hasScore && !homeWon) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1
+                )
+                if (hasScore) {
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = awayScore.toString(),
+                        style = MaterialTheme.typography.bodySmall.copy(lineHeight = 11.sp),
+                        fontSize = 11.sp,
+                        fontWeight = if (!homeWon) FontWeight.Bold else FontWeight.Normal,
+                        color = if (!homeWon) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1
+                    )
+                }
+            }
 
+            // Center: @ or winner +margin
+            val winner = if (homeWon) homeTeam else awayTeam
             Text(
-                text = "@",
+                text = if (hasScore) "$winner +$margin" else "@",
                 style = MaterialTheme.typography.bodySmall.copy(lineHeight = 11.sp),
                 fontSize = 11.sp,
                 fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-                modifier = Modifier.weight(1f),
+                color = if (hasScore) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
                 textAlign = TextAlign.Center,
                 maxLines = 1
             )
 
-            Text(
-                text = homeTeam,
-                style = MaterialTheme.typography.bodySmall.copy(lineHeight = 11.sp),
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface,
+            // Home team + score
+            Row(
                 modifier = Modifier.weight(1f),
-                textAlign = TextAlign.End,
-                maxLines = 1
-            )
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.End
+            ) {
+                if (hasScore) {
+                    Text(
+                        text = homeScore.toString(),
+                        style = MaterialTheme.typography.bodySmall.copy(lineHeight = 11.sp),
+                        fontSize = 11.sp,
+                        fontWeight = if (homeWon) FontWeight.Bold else FontWeight.Normal,
+                        color = if (homeWon) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                }
+                Text(
+                    text = homeTeam,
+                    style = MaterialTheme.typography.bodySmall.copy(lineHeight = 11.sp),
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = if (hasScore && homeWon) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1
+                )
+            }
         }
     }
 }

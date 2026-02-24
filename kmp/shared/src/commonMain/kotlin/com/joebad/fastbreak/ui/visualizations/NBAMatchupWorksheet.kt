@@ -51,6 +51,7 @@ import kotlinx.datetime.Instant
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
+import kotlin.time.Clock
 import kotlin.math.round
 
 /**
@@ -131,18 +132,23 @@ fun NBAMatchupWorksheet(
 
     val dates = remember(matchupsByDate) { matchupsByDate.keys.toList() }
 
-    // Calculate initial date index based on highlighted teams (from deep links)
-    // Find the first date that contains a matchup with the highlighted team
+    // Calculate initial date index based on highlighted teams (from deep links) or current date
+    // Find the first date that contains a matchup with the highlighted team, or default to today
     val initialDateIndex = remember(dates, matchupsByDate, highlightedTeamCodes) {
-        if (highlightedTeamCodes.isEmpty()) {
-            0
-        } else {
+        if (highlightedTeamCodes.isNotEmpty()) {
+            // If there are highlighted teams, find the first date with those teams
             dates.indexOfFirst { date ->
                 matchupsByDate[date]?.any { matchup ->
                     highlightedTeamCodes.contains(matchup.awayTeam.abbreviation) ||
                     highlightedTeamCodes.contains(matchup.homeTeam.abbreviation)
                 } == true
             }.takeIf { it >= 0 } ?: 0
+        } else {
+            // Default to today's date
+            val now = Clock.System.now()
+            val today = Instant.fromEpochMilliseconds(now.toEpochMilliseconds())
+                .toLocalDateTime(TimeZone.of("America/New_York")).date
+            dates.indexOfFirst { it == today }.takeIf { it >= 0 } ?: 0
         }
     }
 
@@ -358,10 +364,12 @@ fun NBAMatchupWorksheet(
                             )
                         }
 
-                        // Pinned header (only team abbreviations)
+                        // Pinned header (team abbreviations + final score if available)
                         PinnedMatchupHeader(
                             awayTeam = selectedMatchup.awayTeam.abbreviation,
                             homeTeam = selectedMatchup.homeTeam.abbreviation,
+                            awayScore = selectedMatchup.results?.finalScore?.away,
+                            homeScore = selectedMatchup.results?.finalScore?.home,
                             modifier = Modifier.align(Alignment.TopCenter)
                         )
                     }
@@ -890,13 +898,17 @@ private fun NBAMatchupContent(
             }
         }
 
-        // One Month Trend Section
-        OneMonthTrendSection(
-            awayTeam = matchup.awayTeam.abbreviation,
-            homeTeam = matchup.homeTeam.abbreviation,
-            awayStats = matchup.awayTeam.stats,
-            homeStats = matchup.homeTeam.stats
-        )
+        // Show completed game results or one month trend based on game status
+        if (matchup.gameCompleted && matchup.results != null) {
+            CompletedGameSection(matchup)
+        } else {
+            OneMonthTrendSection(
+                awayTeam = matchup.awayTeam.abbreviation,
+                homeTeam = matchup.homeTeam.abbreviation,
+                awayStats = matchup.awayTeam.stats,
+                homeStats = matchup.homeTeam.stats
+            )
+        }
 
         // View Navigation
         Spacer(modifier = Modifier.height(4.dp))
@@ -2338,6 +2350,183 @@ private fun OneMonthTrendSection(
     )
 
     Spacer(modifier = Modifier.height(6.dp))
+}
+
+/**
+ * Completed game section showing box score and vs season average comparisons
+ * Final score is displayed in the pinned header
+ */
+@Composable
+private fun CompletedGameSection(
+    matchup: com.joebad.fastbreak.data.model.NBAMatchup
+) {
+    val results = matchup.results ?: return
+    val teamBoxScore = results.teamBoxScore
+    val vsSeasonAvg = results.vsSeasonAvg
+
+    // Team Box Score Section (combined with vs Season Average)
+    if (teamBoxScore != null) {
+        SectionHeader("Box Score (vs Season Avg)")
+        Spacer(modifier = Modifier.height(4.dp))
+
+        val awayBox = teamBoxScore.away
+        val homeBox = teamBoxScore.home
+        val awayComps = vsSeasonAvg?.away
+        val homeComps = vsSeasonAvg?.home
+
+        // Helper to format difference string
+        fun formatDiff(stat: com.joebad.fastbreak.data.model.NBAStatComparison?): String {
+            val diff = stat?.difference ?: return ""
+            val prefix = if (diff >= 0) "+" else ""
+            return " (${prefix}${diff.formatStat(1)})"
+        }
+
+        // FG%
+        if (awayBox?.fgPct != null || homeBox?.fgPct != null) {
+            val awayVal = awayBox?.fgPct ?: 0.0
+            val homeVal = homeBox?.fgPct ?: 0.0
+            ThreeColumnRow(
+                leftText = "${awayBox?.fgm ?: 0}/${awayBox?.fga ?: 0} ${awayVal.formatStat(0)}%${formatDiff(awayComps?.fieldGoalPct)}",
+                centerText = "FG",
+                rightText = "${homeBox?.fgm ?: 0}/${homeBox?.fga ?: 0} ${homeVal.formatStat(0)}%${formatDiff(homeComps?.fieldGoalPct)}",
+                advantage = if (awayVal > homeVal) -1 else if (homeVal > awayVal) 1 else 0
+            )
+        }
+
+        // 3P%
+        if (awayBox?.fg3Pct != null || homeBox?.fg3Pct != null) {
+            val awayVal = awayBox?.fg3Pct ?: 0.0
+            val homeVal = homeBox?.fg3Pct ?: 0.0
+            ThreeColumnRow(
+                leftText = "${awayBox?.fg3m ?: 0}/${awayBox?.fg3a ?: 0} ${awayVal.formatStat(0)}%${formatDiff(awayComps?.threePtPct)}",
+                centerText = "3PT",
+                rightText = "${homeBox?.fg3m ?: 0}/${homeBox?.fg3a ?: 0} ${homeVal.formatStat(0)}%${formatDiff(homeComps?.threePtPct)}",
+                advantage = if (awayVal > homeVal) -1 else if (homeVal > awayVal) 1 else 0
+            )
+        }
+
+        // FT%
+        if (awayBox?.ftPct != null || homeBox?.ftPct != null) {
+            val awayVal = awayBox?.ftPct ?: 0.0
+            val homeVal = homeBox?.ftPct ?: 0.0
+            ThreeColumnRow(
+                leftText = "${awayBox?.ftm ?: 0}/${awayBox?.fta ?: 0} ${awayVal.formatStat(0)}%${formatDiff(awayComps?.freeThrowPct)}",
+                centerText = "FT",
+                rightText = "${homeBox?.ftm ?: 0}/${homeBox?.fta ?: 0} ${homeVal.formatStat(0)}%${formatDiff(homeComps?.freeThrowPct)}",
+                advantage = if (awayVal > homeVal) -1 else if (homeVal > awayVal) 1 else 0
+            )
+        }
+
+        // Rebounds
+        if (awayBox?.reb != null || homeBox?.reb != null) {
+            val awayVal = awayBox?.reb ?: 0
+            val homeVal = homeBox?.reb ?: 0
+            ThreeColumnRow(
+                leftText = "$awayVal (${awayBox?.oreb ?: 0}/${awayBox?.dreb ?: 0})${formatDiff(awayComps?.rebounds)}",
+                centerText = "REB",
+                rightText = "$homeVal (${homeBox?.oreb ?: 0}/${homeBox?.dreb ?: 0})${formatDiff(homeComps?.rebounds)}",
+                advantage = if (awayVal > homeVal) -1 else if (homeVal > awayVal) 1 else 0
+            )
+        }
+
+        // Assists
+        if (awayBox?.ast != null || homeBox?.ast != null) {
+            val awayVal = awayBox?.ast ?: 0
+            val homeVal = homeBox?.ast ?: 0
+            ThreeColumnRow(
+                leftText = "$awayVal${formatDiff(awayComps?.assists)}",
+                centerText = "AST",
+                rightText = "$homeVal${formatDiff(homeComps?.assists)}",
+                advantage = if (awayVal > homeVal) -1 else if (homeVal > awayVal) 1 else 0
+            )
+        }
+
+        // Steals
+        if (awayBox?.stl != null || homeBox?.stl != null) {
+            val awayVal = awayBox?.stl ?: 0
+            val homeVal = homeBox?.stl ?: 0
+            ThreeColumnRow(
+                leftText = "$awayVal${formatDiff(awayComps?.steals)}",
+                centerText = "STL",
+                rightText = "$homeVal${formatDiff(homeComps?.steals)}",
+                advantage = if (awayVal > homeVal) -1 else if (homeVal > awayVal) 1 else 0
+            )
+        }
+
+        // Blocks
+        if (awayBox?.blk != null || homeBox?.blk != null) {
+            val awayVal = awayBox?.blk ?: 0
+            val homeVal = homeBox?.blk ?: 0
+            ThreeColumnRow(
+                leftText = "$awayVal${formatDiff(awayComps?.blocks)}",
+                centerText = "BLK",
+                rightText = "$homeVal${formatDiff(homeComps?.blocks)}",
+                advantage = if (awayVal > homeVal) -1 else if (homeVal > awayVal) 1 else 0
+            )
+        }
+
+        // Turnovers (lower is better)
+        if (awayBox?.tov != null || homeBox?.tov != null) {
+            val awayVal = awayBox?.tov ?: 0
+            val homeVal = homeBox?.tov ?: 0
+            ThreeColumnRow(
+                leftText = "$awayVal${formatDiff(awayComps?.turnovers)}",
+                centerText = "TOV",
+                rightText = "$homeVal${formatDiff(homeComps?.turnovers)}",
+                advantage = if (awayVal < homeVal) -1 else if (homeVal < awayVal) 1 else 0
+            )
+        }
+
+        // Points in Paint
+        if (awayBox?.ptsPaint != null || homeBox?.ptsPaint != null) {
+            val awayVal = awayBox?.ptsPaint ?: 0
+            val homeVal = homeBox?.ptsPaint ?: 0
+            ThreeColumnRow(
+                leftText = awayVal.toString(),
+                centerText = "Paint",
+                rightText = homeVal.toString(),
+                advantage = if (awayVal > homeVal) -1 else if (homeVal > awayVal) 1 else 0
+            )
+        }
+
+        // Fast Break Points
+        if (awayBox?.ptsFb != null || homeBox?.ptsFb != null) {
+            val awayVal = awayBox?.ptsFb ?: 0
+            val homeVal = homeBox?.ptsFb ?: 0
+            ThreeColumnRow(
+                leftText = awayVal.toString(),
+                centerText = "Fast Break",
+                rightText = homeVal.toString(),
+                advantage = if (awayVal > homeVal) -1 else if (homeVal > awayVal) 1 else 0
+            )
+        }
+
+        // TS%
+        if (awayBox?.tsPct != null || homeBox?.tsPct != null) {
+            val awayVal = awayBox?.tsPct ?: 0.0
+            val homeVal = homeBox?.tsPct ?: 0.0
+            ThreeColumnRow(
+                leftText = "${awayVal.formatStat(1)}%${formatDiff(awayComps?.tsPct)}",
+                centerText = "TS%",
+                rightText = "${homeVal.formatStat(1)}%${formatDiff(homeComps?.tsPct)}",
+                advantage = if (awayVal > homeVal) -1 else if (homeVal > awayVal) 1 else 0
+            )
+        }
+
+        // eFG%
+        if (awayBox?.efgPct != null || homeBox?.efgPct != null) {
+            val awayVal = awayBox?.efgPct ?: 0.0
+            val homeVal = homeBox?.efgPct ?: 0.0
+            ThreeColumnRow(
+                leftText = "${awayVal.formatStat(1)}%${formatDiff(awayComps?.efgPct)}",
+                centerText = "eFG%",
+                rightText = "${homeVal.formatStat(1)}%${formatDiff(homeComps?.efgPct)}",
+                advantage = if (awayVal > homeVal) -1 else if (homeVal > awayVal) 1 else 0
+            )
+        }
+
+        Spacer(modifier = Modifier.height(6.dp))
+    }
 }
 
 /**

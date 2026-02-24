@@ -84,7 +84,6 @@ let private parseSegmentsResponse (text: string) : TextSegment list =
         if startIdx >= 0 && endIdx > startIdx then
             let jsonPart = text.Substring(startIdx, endIdx - startIdx + 1)
             let sanitized = sanitizeJson jsonPart
-            printfn "      [TextSegmentConverter] Parsing JSON: %s" (sanitized.Substring(0, min 200 sanitized.Length))
             let options = JsonSerializerOptions()
             options.AllowTrailingCommas <- true
             let response = JsonSerializer.Deserialize<TextSegmentsResponse>(sanitized, options)

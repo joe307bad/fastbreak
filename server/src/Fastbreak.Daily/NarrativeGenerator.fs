@@ -51,6 +51,15 @@ type InitialNarrativeItem = {
     Summary: string
 }
 
+type StructuredNarrativeItem = {
+    [<JsonPropertyName("title")>]
+    Title: string
+    [<JsonPropertyName("summary")>]
+    Summary: string
+    [<JsonPropertyName("teams")>]
+    Teams: string[]  // 3-letter abbreviations like ["NYK", "LAL", "BOS"]
+}
+
 type DataPointsResponse = {
     [<JsonPropertyName("dataPoints")>]
     DataPoints: DataPoint[]
@@ -79,8 +88,15 @@ Create a specific, unique title that captures the main story from this analysis.
 
 Keep the summary text as provided.
 
+Extract all team abbreviations mentioned or implied in the analysis. Use standard 3-letter codes:
+- NBA: NYK, LAL, BOS, MIA, GSW, PHI, CHI, MIL, DEN, PHX, etc.
+- NFL: KC, BUF, SF, DAL, PHI, DET, BAL, MIA, CIN, etc.
+- NHL: TOR, BOS, NYR, VGK, EDM, FLA, CAR, COL, etc.
+- MLB: NYY, LAD, HOU, ATL, PHI, TEX, ARI, BAL, etc.
+- CBB: DUKE, UNC, KU, UK, CONN, PURDUE, ARIZ, etc.
+
 Respond with JSON only, no markdown:
-{{"title": "specific title about the main story", "summary": "the analysis text"}}"""
+{{"title": "specific title about the main story", "summary": "the analysis text", "teams": ["ABC", "XYZ"]}}"""
 
 // Step 3: Extract relevant data points from chart data
 let private buildDataPointsPrompt (league: string) (narrativeTitle: string) (narrativeSummary: string) (chartSummaries: string) =
@@ -166,6 +182,23 @@ let private parseJson (text: string) : InitialNarrativeItem =
     else
         { Title = "News Update"; Summary = text }
 
+let private parseStructuredJson (text: string) : StructuredNarrativeItem =
+    let startIdx = text.IndexOf('{')
+    let endIdx = text.LastIndexOf('}')
+    if startIdx >= 0 && endIdx > startIdx then
+        let jsonPart = text.Substring(startIdx, endIdx - startIdx + 1)
+        let cleaned = jsonPart.Replace("\\$", "$").Replace("\\'", "'")
+        let options = JsonSerializerOptions()
+        options.AllowTrailingCommas <- true
+        try
+            JsonSerializer.Deserialize<StructuredNarrativeItem>(cleaned, options)
+        with _ ->
+            // Fallback: parse as old format without teams
+            let oldFormat = JsonSerializer.Deserialize<InitialNarrativeItem>(cleaned, options)
+            { Title = oldFormat.Title; Summary = oldFormat.Summary; Teams = [||] }
+    else
+        { Title = "News Update"; Summary = text; Teams = [||] }
+
 // Sanitize JSON to ensure "value" fields are quoted strings (Gemini sometimes outputs numbers)
 let private sanitizeDataPointsJson (json: string) =
     // Pattern: "value": 123 or "value": 123.45 -> "value": "123" or "value": "123.45"
@@ -247,31 +280,43 @@ let private getTopics (league: string) =
     | "MLB" -> ["game results, scores, and standout player performances from recent games"; "roster moves, trades, injuries, and division race standings"]
     | _ -> ["recent news"; "upcoming events"]
 
-let private generateNarrative (client: HttpClient) (apiKey: string) (league: string) (topic: string) (chartSummaries: string) = async {
+let private generateNarrative (client: HttpClient) (apiKey: string) (league: string) (topic: string) (charts: ChartData list) = async {
     // Step 1: Get grounded search for this specific topic
     let groundedPrompt = buildTopicPrompt league topic
     let! groundedResult = CallGemini.callGeminiWithSearch client apiKey groundedPrompt
     printfn "    [%s] Got %d chars, %d links" topic groundedResult.Text.Length groundedResult.Links.Length
 
-    // Step 2: Structure into title + summary
+    // Step 2: Structure into title + summary + teams
     let structurePrompt = buildStructurePrompt league topic groundedResult.Text
     let! structuredResponse = callGemini client apiKey structurePrompt
-    let parsed = parseJson structuredResponse
+    let parsed = parseStructuredJson structuredResponse
+    printfn "      [Structure] Extracted teams: %s" (String.Join(", ", parsed.Teams))
 
-    // Step 3: Extract data points from charts
+    // Step 3: Extract data points from FILTERED charts
     let! dataPoints = async {
-        if String.IsNullOrWhiteSpace chartSummaries then
-            printfn "      [DataPoints] No chart summaries available"
+        if List.isEmpty charts then
+            printfn "      [DataPoints] No charts available"
             return []
         else
-            printfn "      [DataPoints] Chart summaries size: %d chars" chartSummaries.Length
-            let dpPrompt = buildDataPointsPrompt league parsed.Title parsed.Summary chartSummaries
-            printfn "      [DataPoints] Full prompt size: %d chars" dpPrompt.Length
-            let! dpResponse = callGemini client apiKey dpPrompt
-            printfn "      [DataPoints] Gemini response size: %d chars" dpResponse.Length
-            let parsed = parseDataPoints dpResponse
-            printfn "      [DataPoints] Parsed %d data points" (List.length parsed)
-            return parsed
+            // Filter charts based on extracted teams to reduce token count
+            let filteredSummaries =
+                charts
+                |> List.map (fun c -> summarizeChartDataForTeams c parsed.Teams)
+                |> String.concat "\n\n---\n\n"
+
+            printfn "      [DataPoints] Filtered chart summaries size: %d chars (teams: %s)"
+                filteredSummaries.Length (String.Join(", ", parsed.Teams))
+
+            if String.IsNullOrWhiteSpace filteredSummaries then
+                return []
+            else
+                let dpPrompt = buildDataPointsPrompt league parsed.Title parsed.Summary filteredSummaries
+                printfn "      [DataPoints] Full prompt size: %d chars" dpPrompt.Length
+                let! dpResponse = callGemini client apiKey dpPrompt
+                printfn "      [DataPoints] Gemini response size: %d chars" dpResponse.Length
+                let parsedDp = parseDataPoints dpResponse
+                printfn "      [DataPoints] Parsed %d data points" (List.length parsedDp)
+                return parsedDp
     }
 
     // Step 4: Generate statistical context from data points (only if we have chart data)
@@ -299,16 +344,11 @@ let generateForLeague (client: HttpClient) (apiKey: string) (league: string) (ch
     if List.isEmpty charts then
         printfn "    WARNING: No charts found for %s - data points will be empty" league
 
-    let chartSummaries =
-        charts
-        |> List.map summarizeChartData
-        |> String.concat "\n\n---\n\n"
-
     let topics = getTopics league
 
     let! narratives =
         topics
-        |> List.map (fun topic -> generateNarrative client apiKey league topic chartSummaries)
+        |> List.map (fun topic -> generateNarrative client apiKey league topic charts)
         |> Async.Sequential
 
     printfn "    Done with %s" league

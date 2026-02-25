@@ -211,6 +211,8 @@ private fun placeLabelsSmartly(
     return placedLabels
 }
 
+data class TeamLegendEntry(val label: String, val color: Color)
+
 @OptIn(ExperimentalKoalaPlotApi::class)
 @Composable
 fun QuadrantScatterPlot(
@@ -240,7 +242,9 @@ fun QuadrantScatterPlot(
     customYMax: Double? = null,
     // Optional: data to use for regression line calculation (if not provided, uses main data)
     // Use this to keep regression line fixed when filtering the displayed data
-    regressionData: List<ScatterPlotDataPoint>? = null
+    regressionData: List<ScatterPlotDataPoint>? = null,
+    // Optional: team legend items to display inside the capture area
+    teamLegendItems: List<TeamLegendEntry> = emptyList()
 ) {
     // Use MaterialTheme colorScheme to detect app theme (not system theme)
     val isDark = MaterialTheme.colorScheme.background == Color.Black ||
@@ -257,6 +261,9 @@ fun QuadrantScatterPlot(
 
     // Track selected quadrants for interactive legend
     var selectedQuadrants by remember { mutableStateOf(setOf<String>()) }
+
+    // Track selected teams for interactive team legend
+    var selectedTeamCodes by remember { mutableStateOf(setOf<String>()) }
 
     // Text colors: use theme color always
     val textColor = MaterialTheme.colorScheme.onBackground
@@ -390,7 +397,7 @@ fun QuadrantScatterPlot(
         val labels: List<LabelPosition>
     )
 
-    val quadrantData = remember(data, avgX, avgY, yMultiplier, topRightColor, topLeftColor, bottomLeftColor, bottomRightColor, subject, highlightedTeamCodes, highlightedPlayerLabels, selectedQuadrants) {
+    val quadrantData = remember(data, avgX, avgY, yMultiplier, topRightColor, topLeftColor, bottomLeftColor, bottomRightColor, subject, highlightedTeamCodes, highlightedPlayerLabels, selectedQuadrants, selectedTeamCodes) {
         println("🎨 KoalaScatterPlot - Subject: $subject, Highlighted Team Codes: $highlightedTeamCodes, Highlighted Player Labels: $highlightedPlayerLabels, Data Points: ${data.size}")
 
         val trNormal = mutableListOf<ColoredPoint>()
@@ -403,8 +410,8 @@ fun QuadrantScatterPlot(
         val brHighlighted = mutableListOf<ColoredPoint>()
         val allLabels = mutableListOf<LabelPosition>()
 
-        // Check if highlighting is active (either team codes, player labels, or legend selection)
-        val isHighlighting = highlightedTeamCodes.isNotEmpty() || highlightedPlayerLabels.isNotEmpty() || selectedQuadrants.isNotEmpty()
+        // Check if highlighting is active (either team codes, player labels, legend selection, or team legend)
+        val isHighlighting = highlightedTeamCodes.isNotEmpty() || highlightedPlayerLabels.isNotEmpty() || selectedQuadrants.isNotEmpty() || selectedTeamCodes.isNotEmpty()
 
         println("🎯 KoalaScatterPlot - Subject: $subject")
         println("🎯 KoalaScatterPlot - highlightedTeamCodes: $highlightedTeamCodes")
@@ -441,7 +448,12 @@ fun QuadrantScatterPlot(
             // Check if point matches legend selection
             val matchesLegendSelection = selectedQuadrants.isEmpty() || selectedQuadrants.contains(pointQuadrant)
 
-            val isHighlighted = matchesPlayerLabel || matchesTeamCode || (selectedQuadrants.isNotEmpty() && matchesLegendSelection)
+            // Check if point matches team legend selection
+            val matchesTeamLegend = selectedTeamCodes.isEmpty() || selectedTeamCodes.contains(point.teamCode)
+
+            val isHighlighted = matchesPlayerLabel || matchesTeamCode ||
+                (selectedQuadrants.isNotEmpty() && matchesLegendSelection) ||
+                (selectedTeamCodes.isNotEmpty() && matchesTeamLegend)
 
             if (isHighlighted) {
                 highlightedCount++
@@ -770,6 +782,34 @@ fun QuadrantScatterPlot(
                     symbol = { QuadrantSymbol(coloredPoint.color) }
                 )
             }
+                }
+
+                // Team legend (interactive - click to filter by team)
+                if (teamLegendItems.isNotEmpty()) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp, horizontal = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterHorizontally),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        teamLegendItems.forEach { item ->
+                            val isSelected = selectedTeamCodes.isEmpty() || selectedTeamCodes.contains(item.label)
+                            LegendItem(
+                                text = item.label,
+                                color = item.color,
+                                textColor = textColor,
+                                isSelected = isSelected,
+                                onClick = {
+                                    selectedTeamCodes = if (selectedTeamCodes.contains(item.label)) {
+                                        selectedTeamCodes - item.label
+                                    } else {
+                                        selectedTeamCodes + item.label
+                                    }
+                                }
+                            )
+                        }
+                    }
                 }
 
                 // Quadrant legend with regression line

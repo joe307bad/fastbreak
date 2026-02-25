@@ -236,7 +236,7 @@ fun LineChartComponent(
             verticalMinorGridLineStyle = null,
             modifier = Modifier
                 .fillMaxWidth()
-                .height(400.dp)
+                .height(220.dp)
                 .padding(start = 4.dp, end = 4.dp, top = 8.dp, bottom = 4.dp)
         ) {
             series.forEachIndexed { seriesIndex, lineSeries ->
@@ -344,6 +344,36 @@ fun LineChartComponent(
                                 } else {
                                     MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
                                 }
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Reference line legend entries
+            val labeledRefLines = referenceLines.filter { it.label != null }
+            if (labeledRefLines.isNotEmpty()) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceEvenly
+                ) {
+                    labeledRefLines.forEach { refLine ->
+                        val refColor = parseHexColor(refLine.color) ?: Color.Gray
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .width(16.dp)
+                                    .height(2.dp)
+                                    .background(refColor)
+                            )
+                            Text(
+                                text = "${refLine.label} Rating",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }

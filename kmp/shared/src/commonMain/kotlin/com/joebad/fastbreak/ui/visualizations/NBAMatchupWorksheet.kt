@@ -16,7 +16,12 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.TrendingUp
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -42,6 +47,8 @@ import com.joebad.fastbreak.data.model.ScatterPlotQuadrants
 import com.joebad.fastbreak.data.model.QuadrantConfig
 import com.joebad.fastbreak.platform.getImageExporter
 import com.joebad.fastbreak.ui.QuadrantScatterPlot
+import com.joebad.fastbreak.ui.components.MultiOptionFab
+import com.joebad.fastbreak.ui.components.FabOption
 import com.joebad.fastbreak.ui.components.ShareFab
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -209,11 +216,16 @@ fun NBAMatchupWorksheet(
     // State for Stats/Charts tab selection: 0 = Stats, 1 = Charts
     var selectedTab by remember { mutableStateOf(0) }
 
-    // Graphics layer for capturing share image
-    val graphicsLayer = rememberGraphicsLayer()
+    // Graphics layers for capturing share images (pre-game and post-game use off-screen rendering)
+    val preGameGraphicsLayer = rememberGraphicsLayer()
+    val postGameGraphicsLayer = rememberGraphicsLayer()
     val coroutineScope = rememberCoroutineScope()
     val imageExporter = remember { getImageExporter() }
     var isCapturing by remember { mutableStateOf(false) }
+
+    // Share callbacks from charts (set by chart components)
+    var netRatingShareCallback by remember { mutableStateOf<(() -> Unit)?>(null) }
+    var offDefRatingShareCallback by remember { mutableStateOf<(() -> Unit)?>(null) }
 
     // Format date and event label for share image (matching NFL format)
     val eventLabel = remember(selectedMatchup.gameDate, selectedMatchup.location) {
@@ -379,7 +391,9 @@ fun NBAMatchupWorksheet(
                             awayTeam = selectedMatchup.awayTeam.abbreviation,
                             homeTeam = selectedMatchup.homeTeam.abbreviation,
                             matchup = selectedMatchup,
-                            quadrantConfig = visualization.scatterPlotQuadrants
+                            quadrantConfig = visualization.scatterPlotQuadrants,
+                            onNetRatingShareClick = { callback -> netRatingShareCallback = callback },
+                            onOffDefRatingShareClick = { callback -> offDefRatingShareCallback = callback }
                         )
                     }
                 }
@@ -399,32 +413,88 @@ fun NBAMatchupWorksheet(
             }
         }
 
-        // Share button
-        ShareFab(
-            onClick = {
-                if (!isCapturing) {
-                    coroutineScope.launch {
-                        isCapturing = true
-                        try {
-                            // Wait for composition to complete
-                            kotlinx.coroutines.delay(100)
-                            val bitmap = graphicsLayer.toImageBitmap()
-                            println("📸 NBA Matchup Share: Captured bitmap size: ${bitmap.width}x${bitmap.height}")
-                            imageExporter.shareImage(bitmap, shareTitle)
-                        } catch (e: Exception) {
-                            e.printStackTrace()
-                        } finally {
-                            isCapturing = false
-                        }
+        // Detect theme mode for chart sharing
+        val isDark = MaterialTheme.colorScheme.background == Color.Black ||
+                     MaterialTheme.colorScheme.background == Color(0xFF0A0A0A)
+        val textColor = MaterialTheme.colorScheme.onBackground
+
+        // Share action helper for regular content
+        fun createShareAction(graphicsLayer: androidx.compose.ui.graphics.layer.GraphicsLayer, title: String): () -> Unit = {
+            if (!isCapturing) {
+                coroutineScope.launch {
+                    isCapturing = true
+                    try {
+                        kotlinx.coroutines.delay(100)
+                        val bitmap = graphicsLayer.toImageBitmap()
+                        println("📸 NBA Matchup Share: Captured bitmap size: ${bitmap.width}x${bitmap.height}")
+                        imageExporter.shareImage(bitmap, title)
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    } finally {
+                        isCapturing = false
                     }
                 }
-            },
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(16.dp)
-        )
+            }
+        }
 
-        // Off-screen shareable content for capture (wide landscape, high-res)
+        // Build FAB options based on current tab and results availability
+        val hasResults = selectedMatchup.results != null
+
+        when {
+            // Charts tab: show chart share options
+            selectedTab == 1 -> {
+                val chartOptions = listOf(
+                    FabOption(
+                        icon = Icons.Filled.TrendingUp,
+                        label = "Cumulative Net Rating",
+                        onClick = { netRatingShareCallback?.invoke() }
+                    ),
+                    FabOption(
+                        icon = Icons.Filled.Star,
+                        label = "Off Rating vs Def Rating",
+                        onClick = { offDefRatingShareCallback?.invoke() }
+                    )
+                )
+                MultiOptionFab(
+                    options = chartOptions,
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(16.dp)
+                )
+            }
+            // Stats tab with results: show Pre Game and Post Game options
+            selectedTab == 0 && hasResults -> {
+                val statsOptions = listOf(
+                    FabOption(
+                        icon = Icons.Filled.PlayArrow,
+                        label = "Pre Game",
+                        onClick = createShareAction(preGameGraphicsLayer, "$shareTitle - Pre Game")
+                    ),
+                    FabOption(
+                        icon = Icons.Filled.Check,
+                        label = "Post Game",
+                        onClick = createShareAction(postGameGraphicsLayer, "$shareTitle - Results")
+                    )
+                )
+                MultiOptionFab(
+                    options = statsOptions,
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(16.dp)
+                )
+            }
+            // Stats tab without results: immediately share Pre Game
+            else -> {
+                ShareFab(
+                    onClick = createShareAction(preGameGraphicsLayer, "$shareTitle - Pre Game"),
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(16.dp)
+                )
+            }
+        }
+
+        // Off-screen Pre Game shareable content for capture (wide landscape, high-res)
         CompositionLocalProvider(LocalDensity provides Density(2f, 1f)) {
             Box(
                 modifier = Modifier
@@ -433,10 +503,10 @@ fun NBAMatchupWorksheet(
                     .offset { IntOffset(-10000, 0) }  // Off-screen
                     .drawWithCache {
                         onDrawWithContent {
-                            graphicsLayer.record {
+                            preGameGraphicsLayer.record {
                                 this@onDrawWithContent.drawContent()
                             }
-                            drawLayer(graphicsLayer)
+                            drawLayer(preGameGraphicsLayer)
                         }
                     }
             ) {
@@ -839,6 +909,397 @@ fun NBAMatchupWorksheet(
                 )
             }
         }
+
+        // Off-screen Post Game shareable content (tall format for results)
+        CompositionLocalProvider(LocalDensity provides Density(2f, 1f)) {
+            Box(
+                modifier = Modifier
+                    .requiredWidth(400.dp)
+                    .requiredHeight(540.dp)
+                    .offset { IntOffset(-10000, 0) }  // Off-screen
+                    .drawWithCache {
+                        onDrawWithContent {
+                            postGameGraphicsLayer.record {
+                                this@onDrawWithContent.drawContent()
+                            }
+                            drawLayer(postGameGraphicsLayer)
+                        }
+                    }
+                    .background(MaterialTheme.colorScheme.background)
+            ) {
+                // Post game results content
+                if (selectedMatchup.gameCompleted && selectedMatchup.results != null) {
+                    PostGameShareContent(
+                        matchup = selectedMatchup,
+                        formattedDate = formattedDate,
+                        eventLabel = eventLabel
+                    )
+                } else {
+                    // Placeholder for games not yet completed
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "Game not yet completed",
+                            style = MaterialTheme.typography.titleLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Post game share content - TWO FONT SIZES ONLY: titleLarge for header, bodyMedium for stats
+ */
+@Composable
+private fun PostGameShareContent(
+    matchup: NBAMatchup,
+    formattedDate: String,
+    eventLabel: String
+) {
+    val results = matchup.results ?: return
+    val finalScore = results.finalScore
+    val awayBox = results.teamBoxScore?.away
+    val homeBox = results.teamBoxScore?.home
+    val vsAvg = results.vsSeasonAvg
+
+    val margin = kotlin.math.abs(finalScore.away - finalScore.home)
+    val awayWon = !finalScore.homeWon
+    val winner = if (finalScore.homeWon) matchup.homeTeam.abbreviation else matchup.awayTeam.abbreviation
+
+    // Detect dark mode and use pure black/white
+    val bg = MaterialTheme.colorScheme.background
+    val isDark = (0.299f * bg.red + 0.587f * bg.green + 0.114f * bg.blue) < 0.5f
+    val textColor = if (isDark) Color.White else Color.Black
+    val secondaryTextColor = if (isDark) Color.LightGray else Color.DarkGray
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(12.dp)
+    ) {
+        // Score row: Away left, margin center, Home right
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Away team and score (left)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = matchup.awayTeam.abbreviation,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = textColor,
+                    fontWeight = if (awayWon) FontWeight.Bold else FontWeight.Normal
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = finalScore.away.toString(),
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = textColor,
+                    fontWeight = if (awayWon) FontWeight.Bold else FontWeight.Normal
+                )
+            }
+
+            // Margin with winning team (center)
+            Text(
+                text = "$winner +$margin",
+                style = MaterialTheme.typography.bodyMedium,
+                color = secondaryTextColor
+            )
+
+            // Home team and score (right)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = finalScore.home.toString(),
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = textColor,
+                    fontWeight = if (finalScore.homeWon) FontWeight.Bold else FontWeight.Normal
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = matchup.homeTeam.abbreviation,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = textColor,
+                    fontWeight = if (finalScore.homeWon) FontWeight.Bold else FontWeight.Normal
+                )
+            }
+        }
+
+        // Date and location - SMALL SIZE (bodyMedium)
+        Text(
+            text = formattedDate,
+            style = MaterialTheme.typography.bodyMedium,
+            color = textColor,
+            modifier = Modifier.align(Alignment.CenterHorizontally)
+        )
+        matchup.location?.let { loc ->
+            Text(
+                text = loc.fullLocation ?: "${loc.stadium ?: ""}, ${loc.city ?: ""}",
+                style = MaterialTheme.typography.bodyMedium,
+                color = secondaryTextColor,
+                modifier = Modifier.align(Alignment.CenterHorizontally)
+            )
+        }
+
+        Spacer(modifier = Modifier.height(6.dp))
+
+        // Full box score table
+        if (awayBox != null && homeBox != null) {
+            // Table header - slightly larger (bodyLarge)
+            Row(modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    text = matchup.awayTeam.abbreviation,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = textColor,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    modifier = Modifier.weight(1f),
+                    textAlign = TextAlign.Center
+                )
+                Text(
+                    text = "STAT (vs avg)",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = textColor,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    modifier = Modifier.weight(1.2f),
+                    textAlign = TextAlign.Center
+                )
+                Text(
+                    text = matchup.homeTeam.abbreviation,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = textColor,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    modifier = Modifier.weight(1f),
+                    textAlign = TextAlign.Center
+                )
+            }
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            // All stats - SMALL SIZE (bodyMedium), bold the team with edge
+            CompactStatRow(awayBox.fgm?.toString() ?: "-", awayBox.fga?.toString() ?: "-", "FGM-A", homeBox.fgm?.toString() ?: "-", homeBox.fga?.toString() ?: "-")
+            CompactStatRow(awayBox.fgPct?.formatStat(1) ?: "-", "FG%", homeBox.fgPct?.formatStat(1) ?: "-", vsAvg?.away?.fieldGoalPct?.difference, vsAvg?.home?.fieldGoalPct?.difference, awayBox.fgPct, homeBox.fgPct, true)
+            CompactStatRow(awayBox.fg3m?.toString() ?: "-", awayBox.fg3a?.toString() ?: "-", "3PM-A", homeBox.fg3m?.toString() ?: "-", homeBox.fg3a?.toString() ?: "-")
+            CompactStatRow(awayBox.fg3Pct?.formatStat(1) ?: "-", "3P%", homeBox.fg3Pct?.formatStat(1) ?: "-", vsAvg?.away?.threePtPct?.difference, vsAvg?.home?.threePtPct?.difference, awayBox.fg3Pct, homeBox.fg3Pct, true)
+            CompactStatRow(awayBox.ftm?.toString() ?: "-", awayBox.fta?.toString() ?: "-", "FTM-A", homeBox.ftm?.toString() ?: "-", homeBox.fta?.toString() ?: "-")
+            CompactStatRow(awayBox.ftPct?.formatStat(1) ?: "-", "FT%", homeBox.ftPct?.formatStat(1) ?: "-", vsAvg?.away?.freeThrowPct?.difference, vsAvg?.home?.freeThrowPct?.difference, awayBox.ftPct, homeBox.ftPct, true)
+
+            CompactStatRow(awayBox.oreb?.toString() ?: "-", "OREB", homeBox.oreb?.toString() ?: "-", vsAvg?.away?.offRebounds?.difference, vsAvg?.home?.offRebounds?.difference, awayBox.oreb?.toDouble(), homeBox.oreb?.toDouble(), true)
+            CompactStatRow(awayBox.dreb?.toString() ?: "-", "DREB", homeBox.dreb?.toString() ?: "-", null, null, awayBox.dreb?.toDouble(), homeBox.dreb?.toDouble(), true)
+            CompactStatRow(awayBox.reb?.toString() ?: "-", "REB", homeBox.reb?.toString() ?: "-", vsAvg?.away?.rebounds?.difference, vsAvg?.home?.rebounds?.difference, awayBox.reb?.toDouble(), homeBox.reb?.toDouble(), true)
+            CompactStatRow(awayBox.ast?.toString() ?: "-", "AST", homeBox.ast?.toString() ?: "-", vsAvg?.away?.assists?.difference, vsAvg?.home?.assists?.difference, awayBox.ast?.toDouble(), homeBox.ast?.toDouble(), true)
+            CompactStatRow(awayBox.stl?.toString() ?: "-", "STL", homeBox.stl?.toString() ?: "-", vsAvg?.away?.steals?.difference, vsAvg?.home?.steals?.difference, awayBox.stl?.toDouble(), homeBox.stl?.toDouble(), true)
+            CompactStatRow(awayBox.blk?.toString() ?: "-", "BLK", homeBox.blk?.toString() ?: "-", vsAvg?.away?.blocks?.difference, vsAvg?.home?.blocks?.difference, awayBox.blk?.toDouble(), homeBox.blk?.toDouble(), true)
+            CompactStatRow(awayBox.tov?.toString() ?: "-", "TO", homeBox.tov?.toString() ?: "-", vsAvg?.away?.turnovers?.difference, vsAvg?.home?.turnovers?.difference, awayBox.tov?.toDouble(), homeBox.tov?.toDouble(), false)
+            CompactStatRow(awayBox.pf?.toString() ?: "-", "PF", homeBox.pf?.toString() ?: "-", null, null, awayBox.pf?.toDouble(), homeBox.pf?.toDouble(), false)
+
+            CompactStatRow(awayBox.ptsPaint?.toString() ?: "-", "PTS PAINT", homeBox.ptsPaint?.toString() ?: "-", null, null, awayBox.ptsPaint?.toDouble(), homeBox.ptsPaint?.toDouble(), true)
+            CompactStatRow(awayBox.ptsFb?.toString() ?: "-", "FAST BRK", homeBox.ptsFb?.toString() ?: "-", null, null, awayBox.ptsFb?.toDouble(), homeBox.ptsFb?.toDouble(), true)
+            CompactStatRow(awayBox.ptsOffTov?.toString() ?: "-", "PTS OFF TO", homeBox.ptsOffTov?.toString() ?: "-", null, null, awayBox.ptsOffTov?.toDouble(), homeBox.ptsOffTov?.toDouble(), true)
+            CompactStatRow(awayBox.largestLead?.toString() ?: "-", "LRG LEAD", homeBox.largestLead?.toString() ?: "-", null, null, awayBox.largestLead?.toDouble(), homeBox.largestLead?.toDouble(), true)
+
+            CompactStatRow(awayBox.tsPct?.formatStat(1) ?: "-", "TS%", homeBox.tsPct?.formatStat(1) ?: "-", vsAvg?.away?.tsPct?.difference, vsAvg?.home?.tsPct?.difference, awayBox.tsPct, homeBox.tsPct, true)
+            CompactStatRow(awayBox.efgPct?.formatStat(1) ?: "-", "EFG%", homeBox.efgPct?.formatStat(1) ?: "-", vsAvg?.away?.efgPct?.difference, vsAvg?.home?.efgPct?.difference, awayBox.efgPct, homeBox.efgPct, true)
+            CompactStatRow(awayBox.astTovRatio?.formatStat(2) ?: "-", "AST/TO", homeBox.astTovRatio?.formatStat(2) ?: "-", null, null, awayBox.astTovRatio, homeBox.astTovRatio, true)
+        }
+
+        Spacer(modifier = Modifier.weight(1f))
+
+        // Source footer - SMALL SIZE
+        Text(
+            text = "fbrk.app  •  hoopR / ESPN",
+            style = MaterialTheme.typography.bodyMedium,
+            color = secondaryTextColor,
+            modifier = Modifier.align(Alignment.CenterHorizontally)
+        )
+    }
+}
+
+/**
+ * Compact stat row for box score with edge indicator - columns: edge|value|diff | label | diff|value|edge
+ */
+@Composable
+private fun CompactStatRow(
+    awayValue: String,
+    label: String,
+    homeValue: String,
+    awayDiff: Double? = null,
+    homeDiff: Double? = null,
+    awayRaw: Double? = null,
+    homeRaw: Double? = null,
+    higherIsBetter: Boolean = true
+) {
+    // Determine edge
+    val awayHasEdge = if (awayRaw != null && homeRaw != null) {
+        if (higherIsBetter) awayRaw > homeRaw else awayRaw < homeRaw
+    } else false
+    val homeHasEdge = if (awayRaw != null && homeRaw != null) {
+        if (higherIsBetter) homeRaw > awayRaw else homeRaw < awayRaw
+    } else false
+
+    // Detect dark mode and use pure black/white
+    val bg = MaterialTheme.colorScheme.background
+    val isDark = (0.299f * bg.red + 0.587f * bg.green + 0.114f * bg.blue) < 0.5f
+    val textColor = if (isDark) Color.White else Color.Black
+    val secondaryTextColor = if (isDark) Color.LightGray else Color.DarkGray
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 1.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // Away: edge indicator column
+        Box(modifier = Modifier.width(16.dp), contentAlignment = Alignment.Center) {
+            if (awayHasEdge) {
+                Text(text = "◀", style = MaterialTheme.typography.bodyMedium, color = Color(0xFF4CAF50), maxLines = 1)
+            }
+        }
+
+        // Away: value column
+        Text(
+            text = awayValue,
+            style = MaterialTheme.typography.bodyMedium,
+            color = textColor,
+            fontWeight = if (awayHasEdge) FontWeight.Bold else FontWeight.Normal,
+            maxLines = 1,
+            modifier = Modifier.weight(0.8f),
+            textAlign = TextAlign.End
+        )
+
+        Spacer(modifier = Modifier.width(4.dp))
+
+        // Away: diff column
+        Text(
+            text = awayDiff?.let { diff -> "(${if (diff >= 0) "+" else ""}${diff.formatStat(1)})" } ?: "",
+            style = MaterialTheme.typography.labelSmall,
+            color = if ((awayDiff ?: 0.0) >= 0) Color(0xFF4CAF50) else Color(0xFFF44336),
+            maxLines = 1,
+            modifier = Modifier.weight(0.6f),
+            textAlign = TextAlign.Start
+        )
+
+        // Label column
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.Medium,
+            color = secondaryTextColor,
+            maxLines = 1,
+            modifier = Modifier.weight(1f),
+            textAlign = TextAlign.Center
+        )
+
+        // Home: diff column
+        Text(
+            text = homeDiff?.let { diff -> "(${if (diff >= 0) "+" else ""}${diff.formatStat(1)})" } ?: "",
+            style = MaterialTheme.typography.labelSmall,
+            color = if ((homeDiff ?: 0.0) >= 0) Color(0xFF4CAF50) else Color(0xFFF44336),
+            maxLines = 1,
+            modifier = Modifier.weight(0.6f),
+            textAlign = TextAlign.End
+        )
+
+        Spacer(modifier = Modifier.width(4.dp))
+
+        // Home: value column
+        Text(
+            text = homeValue,
+            style = MaterialTheme.typography.bodyMedium,
+            color = textColor,
+            fontWeight = if (homeHasEdge) FontWeight.Bold else FontWeight.Normal,
+            maxLines = 1,
+            modifier = Modifier.weight(0.8f),
+            textAlign = TextAlign.Start
+        )
+
+        // Home: edge indicator column
+        Box(modifier = Modifier.width(16.dp), contentAlignment = Alignment.Center) {
+            if (homeHasEdge) {
+                Text(text = "▶", style = MaterialTheme.typography.bodyMedium, color = Color(0xFF4CAF50), maxLines = 1)
+            }
+        }
+    }
+}
+
+/**
+ * Compact stat row for made-attempted stats (e.g., FGM-FGA) - matching column alignment
+ */
+@Composable
+private fun CompactStatRow(
+    awayMade: String,
+    awayAttempted: String,
+    label: String,
+    homeMade: String,
+    homeAttempted: String
+) {
+    // Detect dark mode and use pure black/white
+    val bg = MaterialTheme.colorScheme.background
+    val isDark = (0.299f * bg.red + 0.587f * bg.green + 0.114f * bg.blue) < 0.5f
+    val textColor = if (isDark) Color.White else Color.Black
+    val secondaryTextColor = if (isDark) Color.LightGray else Color.DarkGray
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 1.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // Away: empty edge column
+        Spacer(modifier = Modifier.width(16.dp))
+
+        // Away: value column
+        Text(
+            text = "$awayMade-$awayAttempted",
+            style = MaterialTheme.typography.bodyMedium,
+            color = textColor,
+            fontWeight = FontWeight.Normal,
+            maxLines = 1,
+            modifier = Modifier.weight(0.8f),
+            textAlign = TextAlign.End
+        )
+
+        Spacer(modifier = Modifier.width(4.dp))
+
+        // Away: empty diff column
+        Spacer(modifier = Modifier.weight(0.6f))
+
+        // Label column
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.Medium,
+            color = secondaryTextColor,
+            maxLines = 1,
+            modifier = Modifier.weight(1f),
+            textAlign = TextAlign.Center
+        )
+
+        // Home: empty diff column
+        Spacer(modifier = Modifier.weight(0.6f))
+
+        Spacer(modifier = Modifier.width(4.dp))
+
+        // Home: value column
+        Text(
+            text = "$homeMade-$homeAttempted",
+            style = MaterialTheme.typography.bodyMedium,
+            color = textColor,
+            maxLines = 1,
+            fontWeight = FontWeight.Normal,
+            modifier = Modifier.weight(0.8f),
+            textAlign = TextAlign.Start
+        )
+
+        // Home: empty edge column
+        Spacer(modifier = Modifier.width(16.dp))
     }
 }
 
@@ -1527,7 +1988,9 @@ private fun NBAChartsTab(
     awayTeam: String,
     homeTeam: String,
     matchup: NBAMatchup,
-    quadrantConfig: ScatterPlotQuadrants? = null
+    quadrantConfig: ScatterPlotQuadrants? = null,
+    onNetRatingShareClick: ((() -> Unit)?) -> Unit = {},
+    onOffDefRatingShareClick: ((()-> Unit) -> Unit)? = null
 ) {
     val scrollState = rememberScrollState()
 
@@ -1544,7 +2007,8 @@ private fun NBAChartsTab(
             homeTeam = homeTeam,
             awayStats = matchup.awayTeam.stats,
             homeStats = matchup.homeTeam.stats,
-            tenthNetRatingByWeek = matchup.tenthNetRatingByWeek
+            tenthNetRatingByWeek = matchup.tenthNetRatingByWeek,
+            onShareClick = onNetRatingShareClick
         )
 
         // Weekly Efficiency Scatter Plot
@@ -1554,7 +2018,8 @@ private fun NBAChartsTab(
             awayStats = matchup.awayTeam.stats,
             homeStats = matchup.homeTeam.stats,
             leagueStats = matchup.leagueEfficiencyStats,
-            quadrantConfig = quadrantConfig
+            quadrantConfig = quadrantConfig,
+            onShareClick = onOffDefRatingShareClick
         )
     }
 }
@@ -1568,7 +2033,8 @@ private fun CumulativeNetRatingChart(
     homeTeam: String,
     awayStats: JsonObject,
     homeStats: JsonObject,
-    tenthNetRatingByWeek: JsonObject? = null
+    tenthNetRatingByWeek: JsonObject? = null,
+    onShareClick: ((() -> Unit)?) -> Unit = {}
 ) {
     Text(
         text = "Cumulative Net Rating Over Season",
@@ -1624,7 +2090,10 @@ private fun CumulativeNetRatingChart(
             .fillMaxWidth()
             .height(250.dp),
         yAxisTitle = "Net Rating",
-        referenceLines = referenceLines
+        referenceLines = referenceLines,
+        title = "Cumulative Net Rating - $awayTeam @ $homeTeam",
+        source = "hoopR / ESPN",
+        onShareClick = onShareClick
     )
 
     // Add legend for team colors
@@ -1704,7 +2173,8 @@ private fun WeeklyEfficiencyScatterPlot(
     awayStats: JsonObject,
     homeStats: JsonObject,
     leagueStats: com.joebad.fastbreak.data.model.LeagueEfficiencyStats? = null,
-    quadrantConfig: ScatterPlotQuadrants? = null
+    quadrantConfig: ScatterPlotQuadrants? = null,
+    onShareClick: ((()-> Unit) -> Unit)? = null
 ) {
     // State for week filter: 0 = Last 10 weeks (all), 1 = Last 5 weeks, 2 = Prior 5 weeks
     var weekFilter by remember { mutableStateOf(0) }
@@ -1858,7 +2328,7 @@ private fun WeeklyEfficiencyScatterPlot(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(300.dp),
-                title = "",
+                title = "Weekly Off vs Def Rating - $awayTeam @ $homeTeam",
                 xAxisLabel = "Offensive Rating",
                 yAxisLabel = "Defensive Rating",
                 invertYAxis = true, // Lower defensive rating is better
@@ -1878,7 +2348,9 @@ private fun WeeklyEfficiencyScatterPlot(
                 customYMin = leagueStats?.minDefRating,
                 customYMax = leagueStats?.maxDefRating,
                 // Use unfiltered data for regression line so it stays fixed when filtering
-                regressionData = scatterData
+                regressionData = scatterData,
+                source = "hoopR / ESPN",
+                onShareClick = onShareClick
             )
 
             // Team Legend (interactive - click to filter by team)

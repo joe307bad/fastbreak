@@ -19,11 +19,10 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
@@ -253,9 +252,9 @@ fun QuadrantScatterPlot(
     // Use theme background for both display and capture (no more white background for capture)
     val backgroundColor = MaterialTheme.colorScheme.background
 
-    // Create graphics layer for capturing the chart
+    // On-demand capture: graphics layer only records during capture
+    // This prevents stale layer state on iOS app resume
     val graphicsLayer = rememberGraphicsLayer()
-    val coroutineScope = rememberCoroutineScope()
     val imageExporter = remember { getImageExporter() }
     var isCapturing by remember { mutableStateOf(false) }
 
@@ -554,43 +553,48 @@ fun QuadrantScatterPlot(
         )
     }
 
-    // Set up share callback if provided
+    // Set up share callback - just triggers capture mode
     LaunchedEffect(Unit) {
         onShareClick?.invoke {
-            coroutineScope.launch {
-                try {
-                    isCapturing = true
-                    val chartBitmap = graphicsLayer.toImageBitmap()
-                    // Add title programmatically to the bitmap with theme info
-                    // Convert Compose Color to ARGB Int
-                    val textColorInt = (textColor.alpha * 255).toInt() shl 24 or
-                                      ((textColor.red * 255).toInt() shl 16) or
-                                      ((textColor.green * 255).toInt() shl 8) or
-                                      (textColor.blue * 255).toInt()
-                    val bitmapWithTitle = addTitleToBitmap(chartBitmap, title, isDark, textColorInt, source)
-                    imageExporter.shareImage(bitmapWithTitle, title)
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                } finally {
-                    isCapturing = false
-                }
+            if (!isCapturing) {
+                isCapturing = true
+            }
+        }
+    }
+
+    // Capture effect - runs when isCapturing becomes true
+    LaunchedEffect(isCapturing) {
+        if (isCapturing) {
+            // Wait for the frame with recording to complete
+            kotlinx.coroutines.delay(50)
+            try {
+                val chartBitmap = graphicsLayer.toImageBitmap()
+                // Add title programmatically to the bitmap with theme info
+                val textColorInt = (textColor.alpha * 255).toInt() shl 24 or
+                                  ((textColor.red * 255).toInt() shl 16) or
+                                  ((textColor.green * 255).toInt() shl 8) or
+                                  (textColor.blue * 255).toInt()
+                val bitmapWithTitle = addTitleToBitmap(chartBitmap, title, isDark, textColorInt, source)
+                imageExporter.shareImage(bitmapWithTitle, title)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            } finally {
+                isCapturing = false
             }
         }
     }
 
     Box(modifier = modifier) {
-        // Wrap chart and legend in a Box with graphics layer for capture
+        // Chart and legend - only records to graphics layer when capturing
         Box(
             modifier = Modifier
                 .background(backgroundColor)
-                .drawWithCache {
-                    // Record the content into the graphics layer
-                    onDrawWithContent {
-                        // Draw content
-                        drawContent()
-                        // Record to graphics layer for captures
+                .drawWithContent {
+                    drawContent()
+                    // Only record when capturing - avoids stale layer on iOS resume
+                    if (isCapturing) {
                         graphicsLayer.record {
-                            this@onDrawWithContent.drawContent()
+                            this@drawWithContent.drawContent()
                         }
                     }
                 }

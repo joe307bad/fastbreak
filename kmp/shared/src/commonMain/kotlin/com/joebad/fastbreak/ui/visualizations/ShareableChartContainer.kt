@@ -14,28 +14,28 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.layer.drawLayer
 import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.unit.dp
 import com.joebad.fastbreak.platform.addTitleToBitmap
 import com.joebad.fastbreak.platform.getImageExporter
-import kotlinx.coroutines.launch
 
 /**
  * A container that wraps chart content and provides sharing functionality.
  *
  * This composable handles:
- * - Capturing the chart as a bitmap using graphics layer
+ * - Capturing the chart as a bitmap using graphics layer (on-demand only)
  * - Adding a title to the captured image
  * - Displaying a floating action button for sharing
  * - Triggering the platform-specific share dialog
+ *
+ * Note: Graphics layer recording only occurs during capture to avoid
+ * stale layer state on iOS app resume.
  *
  * @param title The title to add to the shared image
  * @param source Optional source attribution text
@@ -60,18 +60,17 @@ fun ShareableChartContainer(
     val backgroundColor = MaterialTheme.colorScheme.background
     val textColor = MaterialTheme.colorScheme.onBackground
 
-    // Create graphics layer for capturing the chart
+    // Graphics layer for on-demand capture only
     val graphicsLayer = rememberGraphicsLayer()
-    val coroutineScope = rememberCoroutineScope()
     val imageExporter = remember { getImageExporter() }
     var isCapturing by remember { mutableStateOf(false) }
-    var shareCallback by remember { mutableStateOf<(() -> Unit)?>(null) }
 
-    // Share function
-    val onShare: () -> Unit = {
-        coroutineScope.launch {
+    // Capture effect - runs when isCapturing becomes true
+    LaunchedEffect(isCapturing) {
+        if (isCapturing) {
+            // Wait for the frame with recording to complete
+            kotlinx.coroutines.delay(50)
             try {
-                isCapturing = true
                 val chartBitmap = graphicsLayer.toImageBitmap()
 
                 // Convert Compose Color to ARGB Int
@@ -88,7 +87,13 @@ fun ShareableChartContainer(
                 isCapturing = false
             }
         }
-        Unit
+    }
+
+    // Share function - just triggers capture mode
+    val onShare: () -> Unit = {
+        if (!isCapturing) {
+            isCapturing = true
+        }
     }
 
     // Pass the share handler to parent when not showing internal button
@@ -101,16 +106,17 @@ fun ShareableChartContainer(
     }
 
     Box(modifier = modifier) {
-        // Wrap chart content with graphics layer for capture
+        // Chart content with on-demand capture
+        // Only records to graphics layer when isCapturing is true
         Box(
             modifier = Modifier
                 .background(backgroundColor)
-                .drawWithCache {
-                    onDrawWithContent {
-                        drawContent()
-                        // Record to graphics layer for captures
+                .drawWithContent {
+                    drawContent()
+                    // Only record when capturing - avoids stale layer on iOS resume
+                    if (isCapturing) {
                         graphicsLayer.record {
-                            this@onDrawWithContent.drawContent()
+                            this@drawWithContent.drawContent()
                         }
                     }
                 }

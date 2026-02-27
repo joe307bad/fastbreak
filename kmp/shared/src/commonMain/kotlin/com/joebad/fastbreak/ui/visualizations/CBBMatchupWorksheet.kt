@@ -13,7 +13,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.layer.drawLayer
 import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.platform.LocalDensity
@@ -158,10 +158,11 @@ fun CBBMatchupWorksheet(
 
     var viewSelection by remember { mutableStateOf(0) }
 
+    // On-demand capture: graphics layer and content only exist during capture
+    // This prevents stale layer state on iOS app resume
+    var captureTitle by remember { mutableStateOf<String?>(null) }
     val graphicsLayer = rememberGraphicsLayer()
-    val coroutineScope = rememberCoroutineScope()
     val imageExporter = remember { getImageExporter() }
-    var isCapturing by remember { mutableStateOf(false) }
 
     val eventLabel = remember(selectedMatchup.gameDate, selectedMatchup.location) {
         val location = selectedMatchup.location?.fullLocation
@@ -293,43 +294,41 @@ fun CBBMatchupWorksheet(
         }
 
         ShareFab(
-            onClick = {
-                if (!isCapturing) {
-                    coroutineScope.launch {
-                        isCapturing = true
-                        try {
-                            kotlinx.coroutines.delay(100)
-                            val bitmap = graphicsLayer.toImageBitmap()
-                            imageExporter.shareImage(bitmap, shareTitle)
-                        } catch (e: Exception) {
-                            e.printStackTrace()
-                        } finally {
-                            isCapturing = false
-                        }
-                    }
-                }
-            },
+            onClick = { captureTitle = shareTitle },
             modifier = Modifier
                 .align(Alignment.BottomEnd)
                 .padding(16.dp)
         )
 
-        // Off-screen shareable content for capture
-        CompositionLocalProvider(LocalDensity provides Density(2f, 1f)) {
-            Box(
-                modifier = Modifier
-                    .requiredWidth(3400.dp)
-                    .requiredHeight(1900.dp)
-                    .offset { IntOffset(-10000, 0) }
-                    .drawWithCache {
-                        onDrawWithContent {
+        // On-demand capture: off-screen content only composed when capturing
+        // This prevents stale graphics layer state on iOS app resume
+        captureTitle?.let { title ->
+            // Capture after content is drawn
+            LaunchedEffect(title) {
+                kotlinx.coroutines.delay(50)
+                try {
+                    val bitmap = graphicsLayer.toImageBitmap()
+                    imageExporter.shareImage(bitmap, title)
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                } finally {
+                    captureTitle = null
+                }
+            }
+
+            CompositionLocalProvider(LocalDensity provides Density(2f, 1f)) {
+                Box(
+                    modifier = Modifier
+                        .requiredWidth(3400.dp)
+                        .requiredHeight(1900.dp)
+                        .offset { IntOffset(-10000, 0) }
+                        .drawWithContent {
                             graphicsLayer.record {
-                                this@onDrawWithContent.drawContent()
+                                this@drawWithContent.drawContent()
                             }
                             drawLayer(graphicsLayer)
                         }
-                    }
-            ) {
+                ) {
                 val gameInfo = ShareGameInfo(
                     awayTeam = selectedMatchup.awayTeam.abbreviation,
                     homeTeam = selectedMatchup.homeTeam.abbreviation,
@@ -375,6 +374,7 @@ fun CBBMatchupWorksheet(
                     statBoxes = statBoxes,
                     modifier = Modifier.fillMaxSize()
                 )
+                }
             }
         }
     }

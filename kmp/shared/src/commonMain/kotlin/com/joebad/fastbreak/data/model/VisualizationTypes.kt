@@ -510,6 +510,14 @@ data class MatchupV2Visualization(
 
 // NBA Matchup data structures (MATCHUP_V2 for NBA)
 @Serializable
+data class PlayoffProbability(
+    val playoffProb: Double? = null,
+    val confChampProb: Double? = null,
+    val finalsProb: Double? = null,
+    val champProb: Double? = null
+)
+
+@Serializable
 data class NBATeamInfo(
     val id: String,
     val name: String,
@@ -519,7 +527,8 @@ data class NBATeamInfo(
     val wins: Int? = null,
     val losses: Int? = null,
     val conferenceRank: Int? = null,
-    val conference: String? = null
+    val conference: String? = null,
+    val playoffProbability: PlayoffProbability? = null
 )
 
 @Serializable

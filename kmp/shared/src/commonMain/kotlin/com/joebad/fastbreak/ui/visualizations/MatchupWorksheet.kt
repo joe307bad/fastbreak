@@ -16,7 +16,7 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.layer.drawLayer
 import androidx.compose.ui.graphics.rememberGraphicsLayer
@@ -544,11 +544,11 @@ fun MatchupWorksheet(
     modifier: Modifier = Modifier,
     highlightedTeamCodes: Set<String> = emptySet()
 ) {
-    // Graphics layer for capturing share image
+    // On-demand capture: graphics layer and content only exist during capture
+    // This prevents stale layer state on iOS app resume
+    var captureTitle by remember { mutableStateOf<String?>(null) }
     val graphicsLayer = rememberGraphicsLayer()
-    val coroutineScope = rememberCoroutineScope()
     val imageExporter = remember { getImageExporter() }
-    var isCapturing by remember { mutableStateOf(false) }
 
     // Reorder matchups to put highlighted team matchups first, but sort by game time within each group
     val matchups = remember(visualization.dataPoints, highlightedTeamCodes) {
@@ -714,44 +714,42 @@ fun MatchupWorksheet(
 
         // Share FAB positioned at bottom-end
         ShareFab(
-            onClick = {
-                coroutineScope.launch {
-                    isCapturing = true
-                    try {
-                        val bitmap = graphicsLayer.toImageBitmap()
-                        println("📸 Matchup Share: Captured bitmap size: ${bitmap.width}x${bitmap.height} (width x height)")
-                        println("📸 Matchup Share: Expected landscape - width should be > height")
-                        imageExporter.shareImage(bitmap, shareTitle)
-                    } catch (e: Exception) {
-                        e.printStackTrace()
-                    } finally {
-                        isCapturing = false
-                    }
-                }
-            },
+            onClick = { captureTitle = shareTitle },
             modifier = Modifier
                 .align(Alignment.BottomEnd)
                 .padding(16.dp)
         )
 
-        // Off-screen shareable content for capture (wide landscape, high-res)
-        // Using requiredSize to force exact dimensions regardless of parent constraints
-        // Higher density (2.0) renders crisper text
-        CompositionLocalProvider(LocalDensity provides Density(2f, 1f)) {
-            Box(
-                modifier = Modifier
-                    .requiredWidth(3400.dp)
-                    .requiredHeight(1800.dp)
-                    .offset { IntOffset(-10000, 0) }  // Off-screen
-                    .drawWithCache {
-                        onDrawWithContent {
+        // On-demand capture: off-screen content only composed when capturing
+        // This prevents stale graphics layer state on iOS app resume
+        captureTitle?.let { title ->
+            // Capture after content is drawn
+            LaunchedEffect(title) {
+                kotlinx.coroutines.delay(50)
+                try {
+                    val bitmap = graphicsLayer.toImageBitmap()
+                    println("📸 Matchup Share: Captured bitmap size: ${bitmap.width}x${bitmap.height}")
+                    imageExporter.shareImage(bitmap, title)
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                } finally {
+                    captureTitle = null
+                }
+            }
+
+            CompositionLocalProvider(LocalDensity provides Density(2f, 1f)) {
+                Box(
+                    modifier = Modifier
+                        .requiredWidth(3400.dp)
+                        .requiredHeight(1800.dp)
+                        .offset { IntOffset(-10000, 0) }
+                        .drawWithContent {
                             graphicsLayer.record {
-                                this@onDrawWithContent.drawContent()
+                                this@drawWithContent.drawContent()
                             }
                             drawLayer(graphicsLayer)
                         }
-                    }
-            ) {
+                ) {
                 val awayTeamData = selectedMatchup.teams[awayTeam.lowercase()]
                 val homeTeamData = selectedMatchup.teams[homeTeam.lowercase()]
 
@@ -869,12 +867,13 @@ fun MatchupWorksheet(
                     ))
                 }
 
-                GenericMatchupShareImage(
-                    gameInfo = gameInfo,
-                    odds = odds,
-                    statBoxes = statBoxes,
-                    modifier = Modifier.fillMaxSize()
-                )
+                    GenericMatchupShareImage(
+                        gameInfo = gameInfo,
+                        odds = odds,
+                        statBoxes = statBoxes,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
             }
         }
     }

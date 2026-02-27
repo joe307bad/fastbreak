@@ -34,6 +34,11 @@ data class ShareGameInfo(
     val homeConferenceRank: Int? = null,
     val awayConference: String? = null, // e.g., "Eastern" or "Western" for NBA, conference name for CBB
     val homeConference: String? = null,
+    // Playoff probability (NBA)
+    val awayPlayoffProb: Double? = null,
+    val homePlayoffProb: Double? = null,
+    val awayChampProb: Double? = null,
+    val homeChampProb: Double? = null,
     // CBB-specific fields
     val awayApRank: Int? = null, // AP ranking (1-25)
     val homeApRank: Int? = null,
@@ -144,6 +149,30 @@ private fun getShareTeamRankColor(rank: Int?): Color = shareTeamRankColors[rank 
 private fun getSharePlayerRankColor(rank: Int?): Color {
     if (rank == null || rank == 0) return Color.Transparent
     return sharePlayerRankColors[rank] ?: Color(139, 0, 0)
+}
+
+/**
+ * Get color for playoff probability - dark red/orange (0-5%) to dark green (>5%)
+ */
+private fun getShareProbabilityColor(prob: Double?): Color {
+    if (prob == null) return Color.Gray
+    val p = prob.coerceIn(0.0, 100.0)
+    return when {
+        p <= 5.0 -> {
+            // Dark red to orange (0% to 5%)
+            val t = (p / 5.0).toFloat()  // 0 to 1
+            Color(
+                red = 0.7f + 0.2f * t,  // 0.7 to 0.9 (dark red to orange-red)
+                green = 0.1f + 0.4f * t,  // 0.1 to 0.5 (adding orange)
+                blue = 0f,
+                alpha = 1f
+            )
+        }
+        else -> {
+            // Dark green for anything > 5%
+            Color(0xFF228B22)  // Forest green
+        }
+    }
 }
 
 /**
@@ -791,6 +820,82 @@ fun GenericMatchupShareImage(
                             }
                         }
                     }
+                }
+            }
+        }
+
+        // Playoff probability row (NBA only)
+        if (gameInfo.awayPlayoffProb != null || gameInfo.homePlayoffProb != null) {
+            Spacer(modifier = Modifier.height(4.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Away team playoff probability
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "PO:",
+                        fontSize = 32.sp,
+                        color = textColor.copy(alpha = 0.6f)
+                    )
+                    Text(
+                        text = gameInfo.awayPlayoffProb?.let {
+                            if (it >= 99.5) ">99%" else "${it.toInt()}%"
+                        } ?: "-",
+                        fontSize = 32.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = getShareProbabilityColor(gameInfo.awayPlayoffProb)
+                    )
+                    Text(
+                        text = "Ch:",
+                        fontSize = 32.sp,
+                        color = textColor.copy(alpha = 0.6f)
+                    )
+                    Text(
+                        text = gameInfo.awayChampProb?.let {
+                            if (it >= 99.5) ">99%" else "${it.toInt()}%"
+                        } ?: "-",
+                        fontSize = 32.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = getShareProbabilityColor(gameInfo.awayChampProb)
+                    )
+                }
+
+                // Home team playoff probability
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "PO:",
+                        fontSize = 32.sp,
+                        color = textColor.copy(alpha = 0.6f)
+                    )
+                    Text(
+                        text = gameInfo.homePlayoffProb?.let {
+                            if (it >= 99.5) ">99%" else "${it.toInt()}%"
+                        } ?: "-",
+                        fontSize = 32.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = getShareProbabilityColor(gameInfo.homePlayoffProb)
+                    )
+                    Text(
+                        text = "Ch:",
+                        fontSize = 32.sp,
+                        color = textColor.copy(alpha = 0.6f)
+                    )
+                    Text(
+                        text = gameInfo.homeChampProb?.let {
+                            if (it >= 99.5) ">99%" else "${it.toInt()}%"
+                        } ?: "-",
+                        fontSize = 32.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = getShareProbabilityColor(gameInfo.homeChampProb)
+                    )
                 }
             }
         }

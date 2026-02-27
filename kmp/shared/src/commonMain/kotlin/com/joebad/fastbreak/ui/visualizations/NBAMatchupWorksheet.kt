@@ -26,7 +26,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.layer.drawLayer
 import androidx.compose.ui.graphics.rememberGraphicsLayer
@@ -42,6 +42,7 @@ import com.joebad.fastbreak.data.model.LineChartDataPoint
 import com.joebad.fastbreak.data.model.LineChartSeries
 import com.joebad.fastbreak.data.model.NBAMatchup
 import com.joebad.fastbreak.data.model.NBAMatchupVisualization
+import com.joebad.fastbreak.data.model.PlayoffProbability
 import com.joebad.fastbreak.data.model.ScatterPlotDataPoint
 import com.joebad.fastbreak.data.model.ScatterPlotQuadrants
 import com.joebad.fastbreak.data.model.QuadrantConfig
@@ -61,6 +62,23 @@ import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import kotlin.time.Clock
 import kotlin.math.round
+
+/**
+ * Capture target for on-demand share image generation.
+ * Off-screen content is only composed when actively capturing.
+ */
+private enum class NbaCaptureTarget {
+    PRE_GAME,
+    POST_GAME
+}
+
+/**
+ * Data class to hold capture state and title for sharing
+ */
+private data class CaptureRequest(
+    val target: NbaCaptureTarget,
+    val title: String
+)
 
 /**
  * Data class to hold schedule toggle state and handler
@@ -217,12 +235,11 @@ fun NBAMatchupWorksheet(
     // State for Stats/Charts tab selection: 0 = Stats, 1 = Charts
     var selectedTab by remember { mutableStateOf(0) }
 
-    // Graphics layers for capturing share images (pre-game and post-game use off-screen rendering)
-    val preGameGraphicsLayer = rememberGraphicsLayer()
-    val postGameGraphicsLayer = rememberGraphicsLayer()
-    val coroutineScope = rememberCoroutineScope()
+    // On-demand capture: graphics layer and content only exist during capture
+    // This avoids stale layer state when app is backgrounded on iOS
+    var captureRequest by remember { mutableStateOf<CaptureRequest?>(null) }
+    val graphicsLayer = rememberGraphicsLayer()
     val imageExporter = remember { getImageExporter() }
-    var isCapturing by remember { mutableStateOf(false) }
 
     // Share callbacks from charts (set by chart components)
     var netRatingShareCallback by remember { mutableStateOf<(() -> Unit)?>(null) }
@@ -368,6 +385,13 @@ fun NBAMatchupWorksheet(
                                 homeConference = selectedMatchup.homeTeam.conference
                             )
 
+                            PlayoffProbabilitySection(
+                                awayTeam = selectedMatchup.awayTeam.abbreviation,
+                                homeTeam = selectedMatchup.homeTeam.abbreviation,
+                                awayProb = selectedMatchup.awayTeam.playoffProbability,
+                                homeProb = selectedMatchup.homeTeam.playoffProbability
+                            )
+
                             Spacer(modifier = Modifier.height(8.dp))
 
                             NBAMatchupContent(
@@ -419,25 +443,6 @@ fun NBAMatchupWorksheet(
                      MaterialTheme.colorScheme.background == Color(0xFF0A0A0A)
         val textColor = MaterialTheme.colorScheme.onBackground
 
-        // Share action helper for regular content
-        fun createShareAction(graphicsLayer: androidx.compose.ui.graphics.layer.GraphicsLayer, title: String): () -> Unit = {
-            if (!isCapturing) {
-                coroutineScope.launch {
-                    isCapturing = true
-                    try {
-                        kotlinx.coroutines.delay(100)
-                        val bitmap = graphicsLayer.toImageBitmap()
-                        println("📸 NBA Matchup Share: Captured bitmap size: ${bitmap.width}x${bitmap.height}")
-                        imageExporter.shareImage(bitmap, title)
-                    } catch (e: Exception) {
-                        e.printStackTrace()
-                    } finally {
-                        isCapturing = false
-                    }
-                }
-            }
-        }
-
         // Build FAB options based on current tab and results availability
         val hasResults = selectedMatchup.results != null
 
@@ -469,12 +474,12 @@ fun NBAMatchupWorksheet(
                     FabOption(
                         icon = Icons.Filled.PlayArrow,
                         label = "Pre Game",
-                        onClick = createShareAction(preGameGraphicsLayer, "$shareTitle - Pre Game")
+                        onClick = { captureRequest = CaptureRequest(NbaCaptureTarget.PRE_GAME, "$shareTitle - Pre Game") }
                     ),
                     FabOption(
                         icon = Icons.Filled.Check,
                         label = "Post Game",
-                        onClick = createShareAction(postGameGraphicsLayer, "$shareTitle - Results")
+                        onClick = { captureRequest = CaptureRequest(NbaCaptureTarget.POST_GAME, "$shareTitle - Results") }
                     )
                 )
                 MultiOptionFab(
@@ -487,7 +492,7 @@ fun NBAMatchupWorksheet(
             // Stats tab without results: immediately share Pre Game
             else -> {
                 ShareFab(
-                    onClick = createShareAction(preGameGraphicsLayer, "$shareTitle - Pre Game"),
+                    onClick = { captureRequest = CaptureRequest(NbaCaptureTarget.PRE_GAME, "$shareTitle - Pre Game") },
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
                         .padding(16.dp)
@@ -495,29 +500,51 @@ fun NBAMatchupWorksheet(
             }
         }
 
-        // Off-screen Pre Game shareable content for capture (wide landscape, high-res)
-        CompositionLocalProvider(LocalDensity provides Density(2f, 1f)) {
-            Box(
-                modifier = Modifier
-                    .requiredWidth(3400.dp)
-                    .requiredHeight(1900.dp)
-                    .offset { IntOffset(-10000, 0) }  // Off-screen
-                    .drawWithCache {
-                        onDrawWithContent {
-                            preGameGraphicsLayer.record {
-                                this@onDrawWithContent.drawContent()
-                            }
-                            drawLayer(preGameGraphicsLayer)
-                        }
-                    }
-            ) {
+        // On-demand capture: off-screen content only composed when capturing
+        // This prevents stale graphics layer state on iOS app resume
+        captureRequest?.let { request ->
+            val (captureWidth, captureHeight) = when (request.target) {
+                NbaCaptureTarget.PRE_GAME -> 3400.dp to 1900.dp
+                NbaCaptureTarget.POST_GAME -> 400.dp to 540.dp
+            }
+
+            // Capture after content is drawn
+            LaunchedEffect(request) {
+                // Wait for next frame to ensure content is fully rendered
+                kotlinx.coroutines.delay(50)  // Small delay for layout
+                try {
+                    val bitmap = graphicsLayer.toImageBitmap()
+                    println("📸 NBA Matchup Share: Captured bitmap size: ${bitmap.width}x${bitmap.height}")
+                    imageExporter.shareImage(bitmap, request.title)
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                } finally {
+                    captureRequest = null
+                }
+            }
+
+            when (request.target) {
+                NbaCaptureTarget.PRE_GAME -> {
+                    CompositionLocalProvider(LocalDensity provides Density(2f, 1f)) {
+                        Box(
+                            modifier = Modifier
+                                .requiredWidth(captureWidth)
+                                .requiredHeight(captureHeight)
+                                .offset { IntOffset(-10000, 0) }
+                                .drawWithContent {
+                                    graphicsLayer.record {
+                                        this@drawWithContent.drawContent()
+                                    }
+                                    drawLayer(graphicsLayer)
+                                }
+                        ) {
                 // Build stat boxes from NBA matchup data
                 val gameInfo = ShareGameInfo(
                     awayTeam = selectedMatchup.awayTeam.abbreviation,
                     homeTeam = selectedMatchup.homeTeam.abbreviation,
                     eventLabel = eventLabel,
                     formattedDate = formattedDate,
-                    source = "hoopR / ESPN",
+                    source = "hoopR / ESPN / PlayoffStatus.com",
                     awayRecord = selectedMatchup.awayTeam.wins?.let { w ->
                         selectedMatchup.awayTeam.losses?.let { l -> "$w-$l" }
                     },
@@ -527,7 +554,11 @@ fun NBAMatchupWorksheet(
                     awayConferenceRank = selectedMatchup.awayTeam.conferenceRank,
                     homeConferenceRank = selectedMatchup.homeTeam.conferenceRank,
                     awayConference = selectedMatchup.awayTeam.conference,
-                    homeConference = selectedMatchup.homeTeam.conference
+                    homeConference = selectedMatchup.homeTeam.conference,
+                    awayPlayoffProb = selectedMatchup.awayTeam.playoffProbability?.playoffProb,
+                    homePlayoffProb = selectedMatchup.homeTeam.playoffProbability?.playoffProb,
+                    awayChampProb = selectedMatchup.awayTeam.playoffProbability?.champProb,
+                    homeChampProb = selectedMatchup.homeTeam.playoffProbability?.champProb
                 )
 
                 val odds = selectedMatchup.odds?.let {
@@ -902,50 +933,52 @@ fun NBAMatchupWorksheet(
                     ShareStatBox(title = "", fiveColStats = emptyList())
                 }
 
-                GenericMatchupShareImage(
-                    gameInfo = gameInfo,
-                    odds = odds,
-                    statBoxes = finalStatBoxes.take(6),
-                    modifier = Modifier.fillMaxSize()
-                )
-            }
-        }
-
-        // Off-screen Post Game shareable content (tall format for results)
-        CompositionLocalProvider(LocalDensity provides Density(2f, 1f)) {
-            Box(
-                modifier = Modifier
-                    .requiredWidth(400.dp)
-                    .requiredHeight(540.dp)
-                    .offset { IntOffset(-10000, 0) }  // Off-screen
-                    .drawWithCache {
-                        onDrawWithContent {
-                            postGameGraphicsLayer.record {
-                                this@onDrawWithContent.drawContent()
-                            }
-                            drawLayer(postGameGraphicsLayer)
+                            GenericMatchupShareImage(
+                                gameInfo = gameInfo,
+                                odds = odds,
+                                statBoxes = finalStatBoxes.take(6),
+                                modifier = Modifier.fillMaxSize()
+                            )
                         }
                     }
-                    .background(MaterialTheme.colorScheme.background)
-            ) {
-                // Post game results content
-                if (selectedMatchup.gameCompleted && selectedMatchup.results != null) {
-                    PostGameShareContent(
-                        matchup = selectedMatchup,
-                        formattedDate = formattedDate,
-                        eventLabel = eventLabel
-                    )
-                } else {
-                    // Placeholder for games not yet completed
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "Game not yet completed",
-                            style = MaterialTheme.typography.titleLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                }
+
+                NbaCaptureTarget.POST_GAME -> {
+                    CompositionLocalProvider(LocalDensity provides Density(2f, 1f)) {
+                        Box(
+                            modifier = Modifier
+                                .requiredWidth(captureWidth)
+                                .requiredHeight(captureHeight)
+                                .offset { IntOffset(-10000, 0) }
+                                .drawWithContent {
+                                    graphicsLayer.record {
+                                        this@drawWithContent.drawContent()
+                                    }
+                                    drawLayer(graphicsLayer)
+                                }
+                                .background(MaterialTheme.colorScheme.background)
+                        ) {
+                            // Post game results content
+                            if (selectedMatchup.gameCompleted && selectedMatchup.results != null) {
+                                PostGameShareContent(
+                                    matchup = selectedMatchup,
+                                    formattedDate = formattedDate,
+                                    eventLabel = eventLabel
+                                )
+                            } else {
+                                // Placeholder for games not yet completed
+                                Box(
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = "Game not yet completed",
+                                        style = MaterialTheme.typography.titleLarge,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -1745,6 +1778,120 @@ private fun RecordAndConferenceSection(
                 }
             }
         }
+    }
+}
+
+/**
+ * Playoff probability section showing chances for each team
+ */
+@Composable
+private fun PlayoffProbabilitySection(
+    awayTeam: String,
+    homeTeam: String,
+    awayProb: PlayoffProbability?,
+    homeProb: PlayoffProbability?
+) {
+    // Only show if at least one team has probability data
+    if (awayProb != null || homeProb != null) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 8.dp, vertical = 1.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Away team probabilities
+            PlayoffProbabilityText(
+                playoffProb = awayProb?.playoffProb,
+                champProb = awayProb?.champProb,
+                alignment = TextAlign.Start
+            )
+
+            // Home team probabilities
+            PlayoffProbabilityText(
+                playoffProb = homeProb?.playoffProb,
+                champProb = homeProb?.champProb,
+                alignment = TextAlign.End
+            )
+        }
+    }
+}
+
+/**
+ * Get color for probability value - dark red/orange (0-5%) to dark green (>5%)
+ */
+private fun getProbabilityColor(prob: Double?): Color {
+    if (prob == null) return Color.Gray
+    val p = prob.coerceIn(0.0, 100.0)
+    return when {
+        p <= 5.0 -> {
+            // Dark red to orange (0% to 5%)
+            val t = (p / 5.0).toFloat()  // 0 to 1
+            Color(
+                red = 0.7f + 0.2f * t,  // 0.7 to 0.9 (dark red to orange-red)
+                green = 0.1f + 0.4f * t,  // 0.1 to 0.5 (adding orange)
+                blue = 0f,
+                alpha = 1f
+            )
+        }
+        else -> {
+            // Dark green for anything > 5%
+            Color(0xFF228B22)  // Forest green
+        }
+    }
+}
+
+/**
+ * Format probability value as string
+ */
+private fun formatProbability(prob: Double?): String {
+    return if (prob != null) {
+        if (prob >= 99.5) ">99%" else "${prob.toInt()}%"
+    } else {
+        "-"
+    }
+}
+
+/**
+ * Composable for displaying playoff and championship probability with colors
+ */
+@Composable
+private fun PlayoffProbabilityText(
+    playoffProb: Double?,
+    champProb: Double?,
+    alignment: TextAlign
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = if (alignment == TextAlign.End) Arrangement.End else Arrangement.Start,
+        modifier = Modifier.widthIn(min = 80.dp)
+    ) {
+        Text(
+            text = "PO:",
+            style = MaterialTheme.typography.labelSmall,
+            fontSize = 10.sp,
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+        )
+        Text(
+            text = formatProbability(playoffProb),
+            style = MaterialTheme.typography.labelSmall,
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Medium,
+            color = getProbabilityColor(playoffProb)
+        )
+        Text(
+            text = " Ch:",
+            style = MaterialTheme.typography.labelSmall,
+            fontSize = 10.sp,
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+        )
+        Text(
+            text = formatProbability(champProb),
+            style = MaterialTheme.typography.labelSmall,
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Medium,
+            color = getProbabilityColor(champProb)
+        )
     }
 }
 

@@ -6,6 +6,7 @@ library(tidyr)
 library(jsonlite)
 library(httr)
 library(lubridate)
+library(rvest)
 
 # Script runs in production mode by default
 
@@ -221,6 +222,132 @@ compare_to_season_avg <- function(game_value, season_avg, stat_name, higher_is_b
     aboveAverage = above_avg,
     label = label
   )
+}
+
+# Team name to abbreviation mapping for playoff probability scraping
+# Includes common alternate names (Sixers, Cavs, Mavs, Blazers, Wolves)
+TEAM_NAME_TO_ABBREV <- c(
+  "76ers" = "PHI", "Sixers" = "PHI",
+  "Bucks" = "MIL", "Bulls" = "CHI",
+  "Cavaliers" = "CLE", "Cavs" = "CLE",
+  "Celtics" = "BOS", "Clippers" = "LAC", "Grizzlies" = "MEM", "Hawks" = "ATL",
+  "Heat" = "MIA", "Hornets" = "CHA", "Jazz" = "UTAH", "Kings" = "SAC",
+  "Knicks" = "NY", "Lakers" = "LAL", "Magic" = "ORL",
+  "Mavericks" = "DAL", "Mavs" = "DAL",
+  "Nets" = "BKN", "Nuggets" = "DEN", "Pacers" = "IND",
+  "Pelicans" = "NOP",
+  "Pistons" = "DET", "Raptors" = "TOR", "Rockets" = "HOU", "Spurs" = "SA",
+  "Suns" = "PHX", "Thunder" = "OKC",
+  "Timberwolves" = "MIN", "Wolves" = "MIN", "T. Wolves" = "MIN",
+  "Trail Blazers" = "POR", "Blazers" = "POR",
+  "Warriors" = "GS", "Wizards" = "WSH"
+)
+
+# Helper function to scrape playoff probabilities from playoffstatus.com
+scrape_playoff_probabilities <- function() {
+  url <- "https://www.playoffstatus.com/nba/nbapostseasonprob.html"
+
+  tryCatch({
+    cat("Scraping playoff probabilities from playoffstatus.com...\n")
+
+    page <- read_html(url)
+
+    # Find the main probability table
+    tables <- page %>% html_elements("table")
+
+    if (length(tables) == 0) {
+      cat("Warning: No tables found on playoff probability page\n")
+      return(NULL)
+    }
+
+    # The probability table is typically the largest table on the page
+    prob_table <- NULL
+    for (tbl in tables) {
+      rows <- tbl %>% html_elements("tr")
+      if (length(rows) > 20) {  # Looking for the table with all 30 teams
+        prob_table <- tbl
+        break
+      }
+    }
+
+    if (is.null(prob_table)) {
+      # Fall back to first table
+      prob_table <- tables[[1]]
+    }
+
+    rows <- prob_table %>% html_elements("tr")
+
+    results <- list()
+
+    for (row in rows) {
+      cells <- row %>% html_elements("td")
+      if (length(cells) >= 10) {
+        # Extract team name from first cell (usually has a link)
+        team_link <- cells[[1]] %>% html_element("a")
+        team_name <- if (!is.na(team_link)) {
+          team_link %>% html_text(trim = TRUE)
+        } else {
+          cells[[1]] %>% html_text(trim = TRUE)
+        }
+
+        # Clean up team name
+        team_name <- gsub("^\\s+|\\s+$", "", team_name)
+
+        # Skip header rows
+        if (team_name == "" || grepl("Team|Conference", team_name, ignore.case = TRUE)) {
+          next
+        }
+
+        # Map team name to abbreviation
+        team_abbrev <- TEAM_NAME_TO_ABBREV[team_name]
+        if (is.na(team_abbrev)) {
+          # Try partial match
+          for (name in names(TEAM_NAME_TO_ABBREV)) {
+            if (grepl(name, team_name, ignore.case = TRUE) || grepl(team_name, name, ignore.case = TRUE)) {
+              team_abbrev <- TEAM_NAME_TO_ABBREV[name]
+              break
+            }
+          }
+        }
+
+        if (is.na(team_abbrev)) {
+          cat("Warning: Could not map team name:", team_name, "\n")
+          next
+        }
+
+        # Parse percentage values (remove % sign and convert)
+        parse_pct <- function(cell) {
+          text <- cell %>% html_text(trim = TRUE)
+          text <- gsub("[%<>]", "", text)
+          text <- gsub("\\s+", "", text)
+          val <- suppressWarnings(as.numeric(text))
+          if (is.na(val)) 0 else val
+        }
+
+        # Columns: Team, Conf, W, L, CurrentSeries, Champs, Finals, ConfChamp, Round2, Round1
+        # Index:   1     2     3  4  5              6       7       8         9       10
+        # Note: Data columns are in REVERSE order (Champs first, Round1 last)
+        champ_prob <- if (length(cells) >= 6) parse_pct(cells[[6]]) else 0       # NBA Champions
+        finals_prob <- if (length(cells) >= 7) parse_pct(cells[[7]]) else 0      # NBA Finals
+        conf_champ_prob <- if (length(cells) >= 8) parse_pct(cells[[8]]) else 0  # Conference Championship
+        playoff_prob <- if (length(cells) >= 10) parse_pct(cells[[10]]) else 0   # Round 1 / Playoff
+
+        results[[team_abbrev]] <- list(
+          playoffProb = playoff_prob,
+          confChampProb = conf_champ_prob,
+          finalsProb = finals_prob,
+          champProb = champ_prob
+        )
+      }
+    }
+
+    cat("Successfully scraped playoff probabilities for", length(results), "teams\n")
+    return(results)
+
+  }, error = function(e) {
+    cat("Error scraping playoff probabilities:", e$message, "\n")
+    return(NULL)
+  })
 }
 
 # Helper function to build results data for a completed game
@@ -815,6 +942,22 @@ if (!is.null(four_factors_stats)) {
 end_timer()
 
 # ============================================================================
+# STEP 1a: Scrape playoff probabilities from playoffstatus.com
+# ============================================================================
+start_timer("STEP 1a: Scrape playoff probabilities")
+cat("\n1a. Scraping playoff probabilities...\n")
+
+playoff_probabilities <- scrape_playoff_probabilities()
+
+if (!is.null(playoff_probabilities)) {
+  cat("Playoff probabilities available for", length(playoff_probabilities), "teams\n")
+} else {
+  cat("Warning: Could not load playoff probabilities - will continue without them\n")
+}
+
+end_timer()
+
+# ============================================================================
 # STEP 1b: Calculate cumulative net rating and weekly efficiency by week
 # ============================================================================
 start_timer("STEP 1b: Calculate cumulative net rating")
@@ -859,8 +1002,10 @@ cat("Calculated cumulative net rating for", length(unique(cum_net_rating_by_team
 
 # Calculate the #10 ranked cumulative net rating for each week (for reference line on chart)
 # This represents the "playoff cutoff" level - top 10 teams have positive ratings generally
+# Only include weeks where at least 25 teams have data to ensure representative #10 value
 tenth_net_rating_by_week <- cum_net_rating_by_team %>%
   group_by(week_num) %>%
+  filter(n() >= 25) %>%  # Only weeks with at least 25 teams having data
   arrange(desc(cum_net_rating)) %>%
   slice(10) %>%  # Get the 10th best team's rating
   ungroup() %>%
@@ -2081,6 +2226,17 @@ for (game in all_games) {
     list()
   }
 
+  # Add playoff probability for home team
+  if (!is.null(playoff_probabilities) && !is.null(playoff_probabilities[[game$home_team_abbrev]])) {
+    home_prob <- playoff_probabilities[[game$home_team_abbrev]]
+    home_team_data$playoffProbability <- list(
+      playoffProb = home_prob$playoffProb,
+      confChampProb = home_prob$confChampProb,
+      finalsProb = home_prob$finalsProb,
+      champProb = home_prob$champProb
+    )
+  }
+
   away_team_data <- list(
     id = game$away_team_id,
     name = game$away_team_name,
@@ -2241,6 +2397,17 @@ for (game in all_games) {
     )
   } else {
     list()
+  }
+
+  # Add playoff probability for away team
+  if (!is.null(playoff_probabilities) && !is.null(playoff_probabilities[[game$away_team_abbrev]])) {
+    away_prob <- playoff_probabilities[[game$away_team_abbrev]]
+    away_team_data$playoffProbability <- list(
+      playoffProb = away_prob$playoffProb,
+      confChampProb = away_prob$confChampProb,
+      finalsProb = away_prob$finalsProb,
+      champProb = away_prob$champProb
+    )
   }
 
   # Build player data (use seq_len to handle empty player lists)
@@ -2523,7 +2690,7 @@ output_data <- list(
   subtitle = paste("Games from the past", DAYS_BEHIND, "days and next", DAYS_AHEAD, "days with results and stats"),
   description = paste0("Detailed matchup statistics including team performance metrics, player stats, and betting odds.\n\nTEAM STATS:\n\n • Points Per Game: Average points scored per game\n\n • Field Goal %: Percentage of field goals made\n\n • 3-Point %: Percentage of three-point shots made\n\n • Rebounds Per Game: Average rebounds per game (offensive + defensive)\n\n • Assists Per Game: Average assists per game\n\n • Steals Per Game: Average steals per game\n\n • Blocks Per Game: Average blocks per game\n\n • Turnovers Per Game: Average turnovers per game (lower is better)\n\n • Offensive Rating: Points scored per 100 possessions (higher is better)\n\n • Defensive Rating: Points allowed per 100 possessions (lower is better)\n\n • Net Rating: Offensive Rating - Defensive Rating (higher is better)\n\nPLAYER STATS:\n\n • Points Per Game: Average points scored per game\n\n • Rebounds Per Game: Average rebounds per game\n\n • Assists Per Game: Average assists per game\n\n • Steals Per Game: Average steals per game\n\n • Blocks Per Game: Average blocks per game\n\n • Field Goal %: Percentage of field goals made\n\n • 3-Point %: Percentage of three-point shots made\n\nAll stats are season totals through the current date. Players must have played at least ", MIN_GAMES_PLAYED, " games to be included."),
   lastUpdated = format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC"),
-  source = "hoopR / ESPN",
+  source = "hoopR / ESPN / PlayoffStatus.com",
   tags = list(
     list(label = "team", layout = "left", color = "#4CAF50"),
     list(label = "player", layout = "left", color = "#2196F3"),

@@ -70,9 +70,22 @@ let private buildTopicPrompt (league: string) (topic: string) =
     let today = DateTime.Now.ToString("MMMM d, yyyy")
     $"""Today is {today}. Search for the latest {league} news about: {topic}
 
-Write one paragraph (2-3 sentences) with specific facts, names, dates, scores and statistics from your search results. Prioritize relevance, current events, future analysis. Make the narrative hard hitting about data and results.
+Write 3-5 short sections with specific facts, names, dates, scores and statistics from your search results. Prioritize relevance, current events, future analysis. Make the narrative hard hitting about data and results. Avoid events that are greater than 2 weeks old.
 
-IMPORTANT: Start directly with the content. Do not include any preamble like "Okay, I will search" or "Here is" - just write the paragraph immediately."""
+FORMAT REQUIREMENTS:
+- Each section should be 1-2 sentences covering a single topic or thought
+- Separate each section with a blank line
+- Each section should stand alone as a distinct piece of news or analysis
+- Do not provide an opinion. Stick to the facts and verifiable trends.
+
+IMPORTANT: Each section should be formatted as such, be sure to include the line breaks:
+
+### Three word header
+<line break>
+<content>
+<line break>
+
+IMPORTANT: Start directly with the content. Do not include any preamble like "Okay, I will search" or "Here is" - just write the sections immediately."""
 
 // Structure a single narrative from grounded text
 let private buildStructurePrompt (league: string) (topic: string) (rawText: string) =
@@ -113,7 +126,7 @@ CRITICAL RULES - READ CAREFULLY:
 1. ONLY use values that EXACTLY appear in the chart data above
 2. The "team" field MUST be the EXACT 3-letter abbreviation from the chart (e.g., "NYK", "LAL", "BOS")
 3. The "value" field MUST be the EXACT number from the chart data - do NOT make up values
-4. The "metric" must match what the chart measures (check the chart title and description)
+4. The "metric" should be a concise one or two word text depending on if the stat is describing a player's performance or a team's performance. To determine if it is player or team, look at the chart title. If it is a player stat the "metric" should be <player name> / <stat name eg. Assists>. If it is a team stat the "metric" should just be <stat name eg. Off rating>
 5. The "id" MUST be the exact chart ID from the data (e.g., "nfl__offense_vs_defense")
 6. Double-check: Is this team abbreviation actually in this chart? Is this value actually listed?
 
@@ -144,6 +157,7 @@ IMPORTANT REQUIREMENTS:
 3. Try to connect stats to the narrative but don't try to stretch the analysis too much. We don't want to be too verbose.
 5. Read the description of the chart, it has important context for the stats. For instance, for some stats, lower means better
 6. When mentioning stats, mention the team's positioning across the league. e.g. Team X is in the top third/bottom quarter in stat Y
+7. Do not provide an opinion. Stick to the facts and verifiable trends.
 
 Example good output: "The Celtics lead the league with a 45-12 record and rank first in offensive rating at 118.2, while the Lakers sit at 32-25 with the 8th-ranked defense."
 

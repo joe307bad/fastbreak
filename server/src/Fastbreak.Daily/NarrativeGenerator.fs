@@ -78,13 +78,6 @@ FORMAT REQUIREMENTS:
 - Each section should stand alone as a distinct piece of news or analysis
 - Do not provide an opinion. Stick to the facts and verifiable trends.
 
-IMPORTANT: Each section should be formatted as such, be sure to include the line breaks:
-
-### Three word header
-<line break>
-<content>
-<line break>
-
 IMPORTANT: Start directly with the content. Do not include any preamble like "Okay, I will search" or "Here is" - just write the sections immediately."""
 
 // Structure a single narrative from grounded text

@@ -120,6 +120,9 @@ fun DataTableComponent(
             is NBAMatchupVisualization -> {
                 // NBAMatchup doesn't need a data table - it's handled by NBAMatchupWorksheet
             }
+            is NHLMatchupVisualization -> {
+                // NHLMatchup doesn't need a data table - it's handled by NHLMatchupWorksheet
+            }
             is CBBMatchupVisualization -> {
                 // CBBMatchup doesn't need a data table - it's handled by CBBMatchupWorksheet
             }

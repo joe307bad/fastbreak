@@ -774,6 +774,166 @@ data class CBBMatchupVisualization(
     val dataPoints: List<CBBMatchup>
 ) : VisualizationType
 
+// NHL Matchup Visualization data structures
+@Serializable
+data class NHLTeamInfo(
+    val id: String,
+    val name: String,
+    val abbreviation: String,
+    val logo: String? = null,
+    val division: String? = null,
+    val conference: String? = null,
+    val wins: Int? = null,
+    val losses: Int? = null,
+    val otLosses: Int? = null,
+    val points: Int? = null,
+    val conferenceRank: Int? = null,
+    val divisionRank: Int? = null,
+    val streak: String? = null,
+    val last10: String? = null,
+    val playoffProbability: PlayoffProbability? = null,
+    val stats: JsonObject = JsonObject(emptyMap())
+)
+
+@Serializable
+data class NHLPlayerStatValue(
+    val value: Double? = null,
+    val rank: Int? = null,
+    val rankDisplay: String? = null
+)
+
+@Serializable
+data class NHLPlayerInfo(
+    val name: String,
+    val position: String,
+    @Serializable(with = com.joebad.fastbreak.data.serializers.NHLPlayerStatValueSerializer::class)
+    val gamesPlayed: NHLPlayerStatValue = NHLPlayerStatValue(),
+    val goals: NHLPlayerStatValue = NHLPlayerStatValue(),
+    val assists: NHLPlayerStatValue = NHLPlayerStatValue(),
+    val points: NHLPlayerStatValue = NHLPlayerStatValue(),
+    val plusMinus: NHLPlayerStatValue = NHLPlayerStatValue(),
+    @Serializable(with = com.joebad.fastbreak.data.serializers.NHLPlayerStatValueSerializer::class)
+    val pointsPerGame: NHLPlayerStatValue = NHLPlayerStatValue()
+)
+
+@Serializable
+data class NHLFinalScore(
+    val home: Int,
+    val away: Int,
+    val winner: String,
+    val margin: Int? = null,
+    val homeWon: Boolean
+)
+
+@Serializable
+data class NHLTeamBoxScore(
+    val goals: Int? = null,
+    val sog: Int? = null,
+    val hits: Int? = null,
+    val pim: Int? = null,
+    val blocks: Int? = null,
+    val powerPlayGoals: Int? = null,
+    val giveaways: Int? = null,
+    val takeaways: Int? = null,
+    val faceoffWinPct: Double? = null,
+    val saves: Int? = null,
+    val savePct: Double? = null
+)
+
+@Serializable
+data class NHLTeamBoxScores(
+    val home: NHLTeamBoxScore? = null,
+    val away: NHLTeamBoxScore? = null
+)
+
+@Serializable
+data class NHLPeriodScore(
+    val period: Int,
+    val home: Int,
+    val away: Int
+)
+
+@Serializable
+data class NHLStatComparison(
+    val gameValue: Double? = null,
+    val seasonAvg: Double? = null,
+    val difference: Double? = null,
+    val percentDiff: Double? = null,
+    val aboveAverage: Boolean? = null,
+    val label: String? = null
+)
+
+@Serializable
+data class NHLTeamSeasonComparison(
+    val goals: NHLStatComparison? = null,
+    val goalsAgainst: NHLStatComparison? = null,
+    val shots: NHLStatComparison? = null,
+    val shotsAgainst: NHLStatComparison? = null,
+    val hits: NHLStatComparison? = null,
+    val blocks: NHLStatComparison? = null,
+    val giveaways: NHLStatComparison? = null,
+    val takeaways: NHLStatComparison? = null,
+    val faceoffPct: NHLStatComparison? = null,
+    val pim: NHLStatComparison? = null,
+    val ppGoals: NHLStatComparison? = null,
+    val savePct: NHLStatComparison? = null
+)
+
+@Serializable
+data class NHLSeasonAvgComparison(
+    val home: NHLTeamSeasonComparison? = null,
+    val away: NHLTeamSeasonComparison? = null
+)
+
+@Serializable
+data class NHLGameResults(
+    val finalScore: NHLFinalScore,
+    val teamBoxScore: NHLTeamBoxScores? = null,
+    val periodScores: List<NHLPeriodScore>? = null,
+    val vsSeasonAvg: NHLSeasonAvgComparison? = null
+)
+
+@Serializable
+data class NHLMatchupOdds(
+    val spread: Double? = null,
+    val overUnder: Double? = null,
+    val homeMoneyline: Int? = null,
+    val awayMoneyline: Int? = null,
+    val provider: String? = null
+)
+
+@Serializable
+data class NHLMatchup(
+    val gameId: String,
+    val gameDate: String,
+    val gameName: String,
+    val gameState: String? = null,
+    val gameCompleted: Boolean = false,
+    val homeTeam: NHLTeamInfo,
+    val awayTeam: NHLTeamInfo,
+    val homePlayers: List<NHLPlayerInfo> = emptyList(),
+    val awayPlayers: List<NHLPlayerInfo> = emptyList(),
+    val location: MatchupLocation? = null,
+    val odds: NHLMatchupOdds? = null,
+    val comparisons: MatchupComparisons? = null,
+    val results: NHLGameResults? = null
+)
+
+@Serializable
+data class NHLMatchupVisualization(
+    override val sport: String,
+    override val visualizationType: String,
+    override val title: String,
+    override val subtitle: String,
+    override val description: String,
+    override val lastUpdated: Instant,
+    override val source: String? = null,
+    @Serializable(with = TagListSerializer::class)
+    override val tags: List<Tag>? = null,
+    override val sortOrder: Int? = null,
+    val dataPoints: List<NHLMatchup>
+) : VisualizationType
+
 // Hello World visualization (placeholder for future features)
 @Serializable
 data class HelloWorldVisualization(

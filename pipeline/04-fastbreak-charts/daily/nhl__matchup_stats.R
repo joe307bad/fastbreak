@@ -5,6 +5,7 @@ library(dplyr)
 library(tidyr)
 library(jsonlite)
 library(lubridate)
+library(rvest)
 
 # Script runs in production mode by default
 
@@ -69,16 +70,40 @@ is_valid_value <- function(x) {
   !is.null(x) && length(x) > 0 && !is.na(x[1])
 }
 
-# Helper function to create tied ranks
+# Helper function to create tied ranks using dense ranking
+# Dense ranking ensures ranks never exceed the number of unique values
+# Example: values [10, 20, 20, 30] get ranks [1, 2, 2, 3] not [1, 2, 2, 4]
 tied_rank <- function(x) {
-  numeric_ranks <- rank(x, ties.method = "min", na.last = "keep")
-  rank_counts <- table(numeric_ranks[!is.na(numeric_ranks)])
+  # Handle all NA case
+  if (all(is.na(x))) {
+    return(list(rank = rep(NA_integer_, length(x)), rankDisplay = rep(NA_character_, length(x))))
+  }
 
-  display_ranks <- sapply(numeric_ranks, function(r) {
-    if (is.na(r)) {
+  # Get unique non-NA values and sort them
+  unique_vals <- sort(unique(x[!is.na(x)]))
+
+  # Create a mapping from value to dense rank
+  value_to_rank <- setNames(seq_along(unique_vals), as.character(unique_vals))
+
+  # Count occurrences of each value to identify ties
+  value_counts <- table(x[!is.na(x)])
+
+  # Assign dense ranks
+  numeric_ranks <- sapply(x, function(v) {
+    if (is.na(v)) {
+      return(NA_integer_)
+    }
+    as.integer(value_to_rank[as.character(v)])
+  })
+
+  # Create display ranks with "T" prefix for ties
+  display_ranks <- sapply(seq_along(x), function(i) {
+    v <- x[i]
+    r <- numeric_ranks[i]
+    if (is.na(v) || is.na(r)) {
       return(NA_character_)
     }
-    if (rank_counts[as.character(r)] > 1) {
+    if (value_counts[as.character(v)] > 1) {
       paste0("T", r)
     } else {
       as.character(r)
@@ -141,6 +166,137 @@ TEAM_CONFERENCES <- c(
   "TOR" = "Eastern", "UTA" = "Western", "VAN" = "Western",
   "VGK" = "Western", "WSH" = "Eastern", "WPG" = "Western"
 )
+
+# Team name mapping for playoffstatus.com (short team names to abbreviations)
+NHL_TEAM_NAME_TO_ABBREV <- c(
+  "Ducks" = "ANA", "Coyotes" = "ARI",
+  "Bruins" = "BOS", "Sabres" = "BUF",
+  "Flames" = "CGY", "Hurricanes" = "CAR",
+  "Blackhawks" = "CHI", "Avalanche" = "COL",
+  "Blue Jackets" = "CBJ", "Stars" = "DAL",
+  "Red Wings" = "DET", "Oilers" = "EDM",
+  "Panthers" = "FLA", "Kings" = "LAK",
+  "Wild" = "MIN", "Canadiens" = "MTL",
+  "Predators" = "NSH", "Devils" = "NJD",
+  "Islanders" = "NYI", "Rangers" = "NYR",
+  "Senators" = "OTT", "Flyers" = "PHI",
+  "Penguins" = "PIT", "Sharks" = "SJS",
+  "Kraken" = "SEA", "Blues" = "STL",
+  "Lightning" = "TBL", "Maple Leafs" = "TOR",
+  "Utah" = "UTA", "Utah HC" = "UTA", "Hockey Club" = "UTA", "Mammoth" = "UTA",
+  "Canucks" = "VAN", "Golden Knights" = "VGK",
+  "Capitals" = "WSH", "Jets" = "WPG"
+)
+
+# Helper function to scrape NHL playoff probabilities from playoffstatus.com
+scrape_nhl_playoff_probabilities <- function() {
+  url <- "https://www.playoffstatus.com/nhl/nhlpostseasonprob.html"
+
+  tryCatch({
+    cat("Scraping NHL playoff probabilities from playoffstatus.com...\n")
+
+    page <- read_html(url)
+
+    # Find the main probability table
+    tables <- page %>% html_elements("table")
+
+    if (length(tables) == 0) {
+      cat("Warning: No tables found on NHL playoff probability page\n")
+      return(NULL)
+    }
+
+    # The probability table is typically the largest table on the page
+    prob_table <- NULL
+    for (tbl in tables) {
+      rows <- tbl %>% html_elements("tr")
+      if (length(rows) > 20) {  # Looking for the table with all 32 teams
+        prob_table <- tbl
+        break
+      }
+    }
+
+    if (is.null(prob_table)) {
+      # Fall back to first table
+      prob_table <- tables[[1]]
+    }
+
+    rows <- prob_table %>% html_elements("tr")
+
+    results <- list()
+
+    for (row in rows) {
+      cells <- row %>% html_elements("td")
+      if (length(cells) >= 10) {
+        # Extract team name from first cell (usually has a link)
+        team_link <- cells[[1]] %>% html_element("a")
+        team_name <- if (!is.na(team_link)) {
+          team_link %>% html_text(trim = TRUE)
+        } else {
+          cells[[1]] %>% html_text(trim = TRUE)
+        }
+
+        # Clean up team name
+        team_name <- gsub("^\\s+|\\s+$", "", team_name)
+
+        # Skip header rows
+        if (team_name == "" || grepl("Team|Conference", team_name, ignore.case = TRUE)) {
+          next
+        }
+
+        # Map team name to abbreviation
+        team_abbrev <- NHL_TEAM_NAME_TO_ABBREV[team_name]
+        if (is.na(team_abbrev)) {
+          # Try partial match
+          for (name in names(NHL_TEAM_NAME_TO_ABBREV)) {
+            if (grepl(name, team_name, ignore.case = TRUE) || grepl(team_name, name, ignore.case = TRUE)) {
+              team_abbrev <- NHL_TEAM_NAME_TO_ABBREV[name]
+              break
+            }
+          }
+        }
+
+        if (is.na(team_abbrev)) {
+          cat("Warning: Could not map NHL team name:", team_name, "\n")
+          next
+        }
+
+        # Parse percentage values (remove % sign and convert)
+        parse_pct <- function(cell) {
+          text <- cell %>% html_text(trim = TRUE)
+          text <- gsub("[%<>]", "", text)
+          text <- gsub("\\s+", "", text)
+          val <- suppressWarnings(as.numeric(text))
+          if (is.na(val)) 0 else val
+        }
+
+        # NHL Columns: Team, Conf, W, L, OTL, Pts, CurrentSeries, StanleyCupWinners, StanleyCup, ConfChamp, Round2, Round1
+        # Index:       1     2     3  4  5    6    7              8                  9           10        11      12
+        # Note: Column 7 is "Current Series" (empty during regular season)
+        # Probabilities decrease from right to left: Round1 (highest) -> StanleyCupWinners (lowest)
+        champ_prob <- if (length(cells) >= 8) parse_pct(cells[[8]]) else 0        # Stanley Cup Winners (championship)
+        finals_prob <- if (length(cells) >= 9) parse_pct(cells[[9]]) else 0       # Stanley Cup (finals)
+        conf_champ_prob <- if (length(cells) >= 10) parse_pct(cells[[10]]) else 0 # Conference Championship
+        round2_prob <- if (length(cells) >= 11) parse_pct(cells[[11]]) else 0     # Round 2
+        playoff_prob <- if (length(cells) >= 12) parse_pct(cells[[12]]) else 0    # Round 1 / Playoff
+
+        results[[team_abbrev]] <- list(
+          playoffProb = playoff_prob,
+          round2Prob = round2_prob,
+          confChampProb = conf_champ_prob,
+          finalsProb = finals_prob,
+          champProb = champ_prob
+        )
+      }
+    }
+
+    cat("Successfully scraped NHL playoff probabilities for", length(results), "teams\n")
+    return(results)
+
+  }, error = function(e) {
+    cat("Error scraping NHL playoff probabilities:", e$message, "\n")
+    return(NULL)
+  })
+}
 
 # Helper function to compare game stats to season averages
 compare_to_season_avg <- function(game_value, season_avg, stat_name, higher_is_better = TRUE) {
@@ -383,11 +539,31 @@ build_game_results <- function(game, home_season_stats, away_season_stats) {
     result$vsSeasonAvg <- list(
       home = list(
         goals = compare_to_season_avg(game$home_score, home_season_stats$goals_per_game, "goals"),
-        goalsAgainst = compare_to_season_avg(game$away_score, home_season_stats$goals_against_per_game, "goalsAgainst", higher_is_better = FALSE)
+        goalsAgainst = compare_to_season_avg(game$away_score, home_season_stats$goals_against_per_game, "goalsAgainst", higher_is_better = FALSE),
+        shots = compare_to_season_avg(home_box$sog, home_season_stats$shots_for_per_game, "shots"),
+        shotsAgainst = compare_to_season_avg(away_box$sog, home_season_stats$shots_against_per_game, "shotsAgainst", higher_is_better = FALSE),
+        hits = compare_to_season_avg(home_box$hits, home_season_stats$hits_per_game, "hits"),
+        blocks = compare_to_season_avg(home_box$blocks, home_season_stats$blocks_per_game, "blocks"),
+        giveaways = compare_to_season_avg(home_box$giveaways, home_season_stats$giveaways_per_game, "giveaways", higher_is_better = FALSE),
+        takeaways = compare_to_season_avg(home_box$takeaways, home_season_stats$takeaways_per_game, "takeaways"),
+        faceoffPct = compare_to_season_avg(home_box$faceoffWinPct * 100, home_season_stats$faceoff_win_pct, "faceoffPct"),
+        pim = compare_to_season_avg(home_box$pim, home_season_stats$pim_per_game, "pim", higher_is_better = FALSE),
+        ppGoals = compare_to_season_avg(home_box$powerPlayGoals, home_season_stats$pp_goals_per_game, "ppGoals"),
+        savePct = compare_to_season_avg(if (!is.null(home_box$savePct)) home_box$savePct * 100 else NULL, home_season_stats$save_pct_season, "savePct")
       ),
       away = list(
         goals = compare_to_season_avg(game$away_score, away_season_stats$goals_per_game, "goals"),
-        goalsAgainst = compare_to_season_avg(game$home_score, away_season_stats$goals_against_per_game, "goalsAgainst", higher_is_better = FALSE)
+        goalsAgainst = compare_to_season_avg(game$home_score, away_season_stats$goals_against_per_game, "goalsAgainst", higher_is_better = FALSE),
+        shots = compare_to_season_avg(away_box$sog, away_season_stats$shots_for_per_game, "shots"),
+        shotsAgainst = compare_to_season_avg(home_box$sog, away_season_stats$shots_against_per_game, "shotsAgainst", higher_is_better = FALSE),
+        hits = compare_to_season_avg(away_box$hits, away_season_stats$hits_per_game, "hits"),
+        blocks = compare_to_season_avg(away_box$blocks, away_season_stats$blocks_per_game, "blocks"),
+        giveaways = compare_to_season_avg(away_box$giveaways, away_season_stats$giveaways_per_game, "giveaways", higher_is_better = FALSE),
+        takeaways = compare_to_season_avg(away_box$takeaways, away_season_stats$takeaways_per_game, "takeaways"),
+        faceoffPct = compare_to_season_avg(away_box$faceoffWinPct * 100, away_season_stats$faceoff_win_pct, "faceoffPct"),
+        pim = compare_to_season_avg(away_box$pim, away_season_stats$pim_per_game, "pim", higher_is_better = FALSE),
+        ppGoals = compare_to_season_avg(away_box$powerPlayGoals, away_season_stats$pp_goals_per_game, "ppGoals"),
+        savePct = compare_to_season_avg(if (!is.null(away_box$savePct)) away_box$savePct * 100 else NULL, away_season_stats$save_pct_season, "savePct")
       )
     )
 
@@ -444,6 +620,35 @@ team_stats <- tryCatch({
 
 cat("Loaded stats for", nrow(team_stats), "teams\n")
 
+# Fetch realtime stats (hits, blocks, giveaways, takeaways)
+realtime_stats <- tryCatch({
+  api_url <- sprintf(
+    "https://api.nhle.com/stats/rest/en/team/realtime?cayenneExp=seasonId=%s%%20and%%20gameTypeId=2",
+    NHL_SEASON_ID
+  )
+  cat("Fetching realtime stats from NHL API:", api_url, "\n")
+
+  response <- GET(api_url)
+  if (status_code(response) != 200) {
+    cat("Warning: Realtime stats API returned status", status_code(response), "\n")
+    NULL
+  } else {
+    result <- fromJSON(content(response, "text", encoding = "UTF-8"))
+    if (!is.null(result$data) && nrow(result$data) > 0) {
+      result$data
+    } else {
+      NULL
+    }
+  }
+}, error = function(e) {
+  cat("Warning: Could not fetch realtime stats:", e$message, "\n")
+  NULL
+})
+
+if (!is.null(realtime_stats)) {
+  cat("Loaded realtime stats for", nrow(realtime_stats), "teams\n")
+}
+
 # Process team stats
 team_stats <- team_stats %>%
   mutate(
@@ -471,6 +676,145 @@ team_stats <- team_stats %>%
   ) %>%
   filter(!is.na(team_abbreviation))
 
+# Merge realtime stats if available (hits, blocks, giveaways, takeaways)
+if (!is.null(realtime_stats)) {
+  realtime_processed <- realtime_stats %>%
+    mutate(
+      team_name_rt = teamFullName,
+      hits_total = as.numeric(hits),
+      blocked_shots_total = as.numeric(blockedShots),
+      giveaways_total = as.numeric(giveaways),
+      takeaways_total = as.numeric(takeaways),
+      games_played_rt = as.numeric(gamesPlayed)
+    ) %>%
+    mutate(
+      hits_per_game = hits_total / games_played_rt,
+      blocks_per_game = blocked_shots_total / games_played_rt,
+      giveaways_per_game = giveaways_total / games_played_rt,
+      takeaways_per_game = takeaways_total / games_played_rt
+    ) %>%
+    select(team_name_rt, hits_per_game, blocks_per_game, giveaways_per_game, takeaways_per_game)
+
+  team_stats <- team_stats %>%
+    left_join(realtime_processed, by = c("team_name" = "team_name_rt"))
+
+  cat("Merged realtime stats with team stats\n")
+} else {
+  # Add NA columns if realtime stats not available
+  team_stats <- team_stats %>%
+    mutate(
+      hits_per_game = NA_real_,
+      blocks_per_game = NA_real_,
+      giveaways_per_game = NA_real_,
+      takeaways_per_game = NA_real_
+    )
+}
+
+# Fetch penalty stats for PIM per game
+penalty_stats <- tryCatch({
+  api_url <- sprintf(
+    "https://api.nhle.com/stats/rest/en/team/penalties?cayenneExp=seasonId=%s%%20and%%20gameTypeId=2",
+    NHL_SEASON_ID
+  )
+  cat("Fetching penalty stats from NHL API:", api_url, "\n")
+
+  response <- GET(api_url)
+  if (status_code(response) != 200) {
+    cat("Warning: Penalty stats API returned status", status_code(response), "\n")
+    NULL
+  } else {
+    result <- fromJSON(content(response, "text", encoding = "UTF-8"))
+    if (!is.null(result$data) && nrow(result$data) > 0) {
+      result$data
+    } else {
+      NULL
+    }
+  }
+}, error = function(e) {
+  cat("Warning: Could not fetch penalty stats:", e$message, "\n")
+  NULL
+})
+
+if (!is.null(penalty_stats)) {
+  cat("Loaded penalty stats for", nrow(penalty_stats), "teams\n")
+  penalty_processed <- penalty_stats %>%
+    mutate(
+      team_name_pen = teamFullName,
+      pim_total = as.numeric(penaltyMinutes),
+      games_played_pen = as.numeric(gamesPlayed),
+      pim_per_game = pim_total / games_played_pen
+    ) %>%
+    select(team_name_pen, pim_per_game)
+
+  team_stats <- team_stats %>%
+    left_join(penalty_processed, by = c("team_name" = "team_name_pen"))
+  cat("Merged penalty stats with team stats\n")
+} else {
+  team_stats <- team_stats %>%
+    mutate(pim_per_game = NA_real_)
+}
+
+# Fetch powerplay stats for PP goals per game
+powerplay_stats <- tryCatch({
+  api_url <- sprintf(
+    "https://api.nhle.com/stats/rest/en/team/powerplay?cayenneExp=seasonId=%s%%20and%%20gameTypeId=2",
+    NHL_SEASON_ID
+  )
+  cat("Fetching powerplay stats from NHL API:", api_url, "\n")
+
+  response <- GET(api_url)
+  if (status_code(response) != 200) {
+    cat("Warning: Powerplay stats API returned status", status_code(response), "\n")
+    NULL
+  } else {
+    result <- fromJSON(content(response, "text", encoding = "UTF-8"))
+    if (!is.null(result$data) && nrow(result$data) > 0) {
+      result$data
+    } else {
+      NULL
+    }
+  }
+}, error = function(e) {
+  cat("Warning: Could not fetch powerplay stats:", e$message, "\n")
+  NULL
+})
+
+if (!is.null(powerplay_stats)) {
+  cat("Loaded powerplay stats for", nrow(powerplay_stats), "teams\n")
+  pp_processed <- powerplay_stats %>%
+    mutate(
+      team_name_pp = teamFullName,
+      pp_goals_per_game = as.numeric(ppGoalsPerGame)  # Pre-computed by NHL API
+    ) %>%
+    select(team_name_pp, pp_goals_per_game)
+
+  team_stats <- team_stats %>%
+    left_join(pp_processed, by = c("team_name" = "team_name_pp"))
+  cat("Merged powerplay stats with team stats\n")
+} else {
+  team_stats <- team_stats %>%
+    mutate(pp_goals_per_game = NA_real_)
+}
+
+# Fetch goalie stats for save %
+goalie_stats <- tryCatch({
+  api_url <- sprintf(
+    "https://api.nhle.com/stats/rest/en/team/summary?cayenneExp=seasonId=%s%%20and%%20gameTypeId=2",
+    NHL_SEASON_ID
+  )
+  # The summary endpoint already has savePct - let's check if we have it
+  # If not, we use a dedicated goalie endpoint
+  NULL  # We'll handle this differently - use the existing data if available
+}, error = function(e) {
+  NULL
+})
+
+# Save % is typically calculated per goalie, not per team
+# We can estimate team save % from goals against and shots against if needed
+# For now, set to NA - would require additional goalie data
+team_stats <- team_stats %>%
+  mutate(save_pct_season = NA_real_)
+
 cat("Processed stats for", nrow(team_stats), "teams\n")
 
 # Calculate ranks for team stats
@@ -491,6 +835,17 @@ pk_pct_ranks <- tied_rank(-team_stats$penalty_kill_pct)
 pts_pct_ranks <- tied_rank(-team_stats$points_pct)
 goal_diff_ranks <- tied_rank(-team_stats$goal_diff_per_game)
 
+# New stat ranks (from realtime, penalty, and powerplay endpoints)
+# Higher is better: hits, blocks, takeaways, pp_goals
+hits_ranks <- tied_rank(-team_stats$hits_per_game)
+blocks_ranks <- tied_rank(-team_stats$blocks_per_game)
+takeaways_ranks <- tied_rank(-team_stats$takeaways_per_game)
+pp_goals_ranks <- tied_rank(-team_stats$pp_goals_per_game)
+
+# Lower is better: giveaways, pim
+giveaways_ranks <- tied_rank(team_stats$giveaways_per_game)
+pim_ranks <- tied_rank(team_stats$pim_per_game)
+
 team_stats <- team_stats %>%
   mutate(
     goals_per_game_rank = gpg_ranks$rank,
@@ -510,7 +865,20 @@ team_stats <- team_stats %>%
     points_pct_rank = pts_pct_ranks$rank,
     points_pct_rankDisplay = pts_pct_ranks$rankDisplay,
     goal_diff_per_game_rank = goal_diff_ranks$rank,
-    goal_diff_per_game_rankDisplay = goal_diff_ranks$rankDisplay
+    goal_diff_per_game_rankDisplay = goal_diff_ranks$rankDisplay,
+    # New stat ranks
+    hits_per_game_rank = hits_ranks$rank,
+    hits_per_game_rankDisplay = hits_ranks$rankDisplay,
+    blocks_per_game_rank = blocks_ranks$rank,
+    blocks_per_game_rankDisplay = blocks_ranks$rankDisplay,
+    takeaways_per_game_rank = takeaways_ranks$rank,
+    takeaways_per_game_rankDisplay = takeaways_ranks$rankDisplay,
+    giveaways_per_game_rank = giveaways_ranks$rank,
+    giveaways_per_game_rankDisplay = giveaways_ranks$rankDisplay,
+    pim_per_game_rank = pim_ranks$rank,
+    pim_per_game_rankDisplay = pim_ranks$rankDisplay,
+    pp_goals_per_game_rank = pp_goals_ranks$rank,
+    pp_goals_per_game_rankDisplay = pp_goals_ranks$rankDisplay
   )
 
 end_timer()
@@ -674,6 +1042,22 @@ if (!is.null(month_games_data) && nrow(month_games_data) > 0) {
 end_timer()
 
 # ============================================================================
+# STEP 1a: Scrape playoff probabilities
+# ============================================================================
+start_timer("STEP 1a: Scrape playoff probabilities")
+cat("\n1a. Scraping NHL playoff probabilities...\n")
+
+playoff_probabilities <- scrape_nhl_playoff_probabilities()
+
+if (!is.null(playoff_probabilities)) {
+  cat("Playoff probabilities available for", length(playoff_probabilities), "teams\n")
+} else {
+  cat("Warning: Playoff probabilities not available\n")
+}
+
+end_timer()
+
+# ============================================================================
 # STEP 2: Load player stats
 # ============================================================================
 start_timer("STEP 2: Load player stats")
@@ -731,6 +1115,8 @@ if (!is.null(skater_stats)) {
   player_goals_ranks <- tied_rank(-player_stats$goals)
   player_assists_ranks <- tied_rank(-player_stats$assists)
   player_pm_ranks <- tied_rank(-player_stats$plus_minus)
+  player_gp_ranks <- tied_rank(-player_stats$games_played)
+  player_ppg_ranks <- tied_rank(-player_stats$points_per_game)
 
   player_stats <- player_stats %>%
     mutate(
@@ -741,7 +1127,11 @@ if (!is.null(skater_stats)) {
       assists_rank = player_assists_ranks$rank,
       assists_rankDisplay = player_assists_ranks$rankDisplay,
       plus_minus_rank = player_pm_ranks$rank,
-      plus_minus_rankDisplay = player_pm_ranks$rankDisplay
+      plus_minus_rankDisplay = player_pm_ranks$rankDisplay,
+      games_played_rank = player_gp_ranks$rank,
+      games_played_rankDisplay = player_gp_ranks$rankDisplay,
+      points_per_game_rank = player_ppg_ranks$rank,
+      points_per_game_rankDisplay = player_ppg_ranks$rankDisplay
     )
 } else {
   player_stats <- NULL
@@ -1042,7 +1432,10 @@ build_nhl_comparisons <- function(home_stats, away_stats, home_team, away_team) 
     list(key = "goalsPerGame", label = "Goals/Game", value_home = home_stats$goals_per_game, rank_home = home_stats$goals_per_game_rank, rankDisplay_home = home_stats$goals_per_game_rankDisplay, value_away = away_stats$goals_per_game, rank_away = away_stats$goals_per_game_rank, rankDisplay_away = away_stats$goals_per_game_rankDisplay),
     list(key = "shotsForPerGame", label = "Shots/Game", value_home = home_stats$shots_for_per_game, rank_home = home_stats$shots_for_per_game_rank, rankDisplay_home = home_stats$shots_for_per_game_rankDisplay, value_away = away_stats$shots_for_per_game, rank_away = away_stats$shots_for_per_game_rank, rankDisplay_away = away_stats$shots_for_per_game_rankDisplay),
     list(key = "powerPlayPct", label = "Power Play %", value_home = home_stats$power_play_pct, rank_home = home_stats$power_play_pct_rank, rankDisplay_home = home_stats$power_play_pct_rankDisplay, value_away = away_stats$power_play_pct, rank_away = away_stats$power_play_pct_rank, rankDisplay_away = away_stats$power_play_pct_rankDisplay),
-    list(key = "faceoffWinPct", label = "Faceoff Win %", value_home = home_stats$faceoff_win_pct, rank_home = home_stats$faceoff_win_pct_rank, rankDisplay_home = home_stats$faceoff_win_pct_rankDisplay, value_away = away_stats$faceoff_win_pct, rank_away = away_stats$faceoff_win_pct_rank, rankDisplay_away = away_stats$faceoff_win_pct_rankDisplay)
+    list(key = "ppGoalsPerGame", label = "PP Goals/Game", value_home = home_stats$pp_goals_per_game, rank_home = home_stats$pp_goals_per_game_rank, rankDisplay_home = home_stats$pp_goals_per_game_rankDisplay, value_away = away_stats$pp_goals_per_game, rank_away = away_stats$pp_goals_per_game_rank, rankDisplay_away = away_stats$pp_goals_per_game_rankDisplay),
+    list(key = "faceoffWinPct", label = "Faceoff Win %", value_home = home_stats$faceoff_win_pct, rank_home = home_stats$faceoff_win_pct_rank, rankDisplay_home = home_stats$faceoff_win_pct_rankDisplay, value_away = away_stats$faceoff_win_pct, rank_away = away_stats$faceoff_win_pct_rank, rankDisplay_away = away_stats$faceoff_win_pct_rankDisplay),
+    list(key = "hitsPerGame", label = "Hits/Game", value_home = home_stats$hits_per_game, rank_home = home_stats$hits_per_game_rank, rankDisplay_home = home_stats$hits_per_game_rankDisplay, value_away = away_stats$hits_per_game, rank_away = away_stats$hits_per_game_rank, rankDisplay_away = away_stats$hits_per_game_rankDisplay),
+    list(key = "takeawaysPerGame", label = "Takeaways/Game", value_home = home_stats$takeaways_per_game, rank_home = home_stats$takeaways_per_game_rank, rankDisplay_home = home_stats$takeaways_per_game_rankDisplay, value_away = away_stats$takeaways_per_game, rank_away = away_stats$takeaways_per_game_rank, rankDisplay_away = away_stats$takeaways_per_game_rankDisplay)
   )
 
   for (stat in off_stats) {
@@ -1066,7 +1459,10 @@ build_nhl_comparisons <- function(home_stats, away_stats, home_team, away_team) 
   def_stats <- list(
     list(key = "goalsAgainstPerGame", label = "Goals Against/Game", value_home = home_stats$goals_against_per_game, rank_home = home_stats$goals_against_per_game_rank, rankDisplay_home = home_stats$goals_against_per_game_rankDisplay, value_away = away_stats$goals_against_per_game, rank_away = away_stats$goals_against_per_game_rank, rankDisplay_away = away_stats$goals_against_per_game_rankDisplay),
     list(key = "shotsAgainstPerGame", label = "Shots Against/Game", value_home = home_stats$shots_against_per_game, rank_home = home_stats$shots_against_per_game_rank, rankDisplay_home = home_stats$shots_against_per_game_rankDisplay, value_away = away_stats$shots_against_per_game, rank_away = away_stats$shots_against_per_game_rank, rankDisplay_away = away_stats$shots_against_per_game_rankDisplay),
-    list(key = "penaltyKillPct", label = "Penalty Kill %", value_home = home_stats$penalty_kill_pct, rank_home = home_stats$penalty_kill_pct_rank, rankDisplay_home = home_stats$penalty_kill_pct_rankDisplay, value_away = away_stats$penalty_kill_pct, rank_away = away_stats$penalty_kill_pct_rank, rankDisplay_away = away_stats$penalty_kill_pct_rankDisplay)
+    list(key = "penaltyKillPct", label = "Penalty Kill %", value_home = home_stats$penalty_kill_pct, rank_home = home_stats$penalty_kill_pct_rank, rankDisplay_home = home_stats$penalty_kill_pct_rankDisplay, value_away = away_stats$penalty_kill_pct, rank_away = away_stats$penalty_kill_pct_rank, rankDisplay_away = away_stats$penalty_kill_pct_rankDisplay),
+    list(key = "blocksPerGame", label = "Blocks/Game", value_home = home_stats$blocks_per_game, rank_home = home_stats$blocks_per_game_rank, rankDisplay_home = home_stats$blocks_per_game_rankDisplay, value_away = away_stats$blocks_per_game, rank_away = away_stats$blocks_per_game_rank, rankDisplay_away = away_stats$blocks_per_game_rankDisplay),
+    list(key = "giveawaysPerGame", label = "Giveaways/Game", value_home = home_stats$giveaways_per_game, rank_home = home_stats$giveaways_per_game_rank, rankDisplay_home = home_stats$giveaways_per_game_rankDisplay, value_away = away_stats$giveaways_per_game, rank_away = away_stats$giveaways_per_game_rank, rankDisplay_away = away_stats$giveaways_per_game_rankDisplay),
+    list(key = "pimPerGame", label = "PIM/Game", value_home = home_stats$pim_per_game, rank_home = home_stats$pim_per_game_rank, rankDisplay_home = home_stats$pim_per_game_rankDisplay, value_away = away_stats$pim_per_game, rank_away = away_stats$pim_per_game_rank, rankDisplay_away = away_stats$pim_per_game_rankDisplay)
   )
 
   for (stat in def_stats) {
@@ -1099,6 +1495,17 @@ build_nhl_comparisons <- function(home_stats, away_stats, home_team, away_team) 
       def_rankDisplay = "goals_against_per_game_rankDisplay"
     ),
     list(
+      key = "shots",
+      off_label = "Shots/Game",
+      def_label = "Shots Against/Game",
+      off_stat = "shots_for_per_game",
+      def_stat = "shots_against_per_game",
+      off_rank = "shots_for_per_game_rank",
+      def_rank = "shots_against_per_game_rank",
+      off_rankDisplay = "shots_for_per_game_rankDisplay",
+      def_rankDisplay = "shots_against_per_game_rankDisplay"
+    ),
+    list(
       key = "powerPlay",
       off_label = "Power Play %",
       def_label = "Penalty Kill %",
@@ -1110,15 +1517,26 @@ build_nhl_comparisons <- function(home_stats, away_stats, home_team, away_team) 
       def_rankDisplay = "penalty_kill_pct_rankDisplay"
     ),
     list(
-      key = "shots",
-      off_label = "Shots/Game",
-      def_label = "Shots Against/Game",
-      off_stat = "shots_for_per_game",
-      def_stat = "shots_against_per_game",
-      off_rank = "shots_for_per_game_rank",
-      def_rank = "shots_against_per_game_rank",
-      off_rankDisplay = "shots_for_per_game_rankDisplay",
-      def_rankDisplay = "shots_against_per_game_rankDisplay"
+      key = "ppGoals",
+      off_label = "PP Goals/G",
+      def_label = "Penalty Kill %",
+      off_stat = "pp_goals_per_game",
+      def_stat = "penalty_kill_pct",
+      off_rank = "pp_goals_per_game_rank",
+      def_rank = "penalty_kill_pct_rank",
+      off_rankDisplay = "pp_goals_per_game_rankDisplay",
+      def_rankDisplay = "penalty_kill_pct_rankDisplay"
+    ),
+    list(
+      key = "faceoffs",
+      off_label = "Faceoff %",
+      def_label = "Faceoff %",
+      off_stat = "faceoff_win_pct",
+      def_stat = "faceoff_win_pct",
+      off_rank = "faceoff_win_pct_rank",
+      def_rank = "faceoff_win_pct_rank",
+      off_rankDisplay = "faceoff_win_pct_rankDisplay",
+      def_rankDisplay = "faceoff_win_pct_rankDisplay"
     )
   )
 
@@ -1324,6 +1742,17 @@ for (game in all_games) {
     }
   }
 
+  # Add playoff probability for home team
+  if (!is.null(playoff_probabilities) && !is.null(playoff_probabilities[[game$home_team_abbrev]])) {
+    home_prob <- playoff_probabilities[[game$home_team_abbrev]]
+    home_team_data$playoffProbability <- list(
+      playoffProb = home_prob$playoffProb,
+      confChampProb = home_prob$confChampProb,
+      finalsProb = home_prob$finalsProb,
+      champProb = home_prob$champProb
+    )
+  }
+
   away_team_data <- list(
     id = game$away_team_id,
     name = game$away_team_name,
@@ -1404,6 +1833,17 @@ for (game in all_games) {
     }
   }
 
+  # Add playoff probability for away team
+  if (!is.null(playoff_probabilities) && !is.null(playoff_probabilities[[game$away_team_abbrev]])) {
+    away_prob <- playoff_probabilities[[game$away_team_abbrev]]
+    away_team_data$playoffProbability <- list(
+      playoffProb = away_prob$playoffProb,
+      confChampProb = away_prob$confChampProb,
+      finalsProb = away_prob$finalsProb,
+      champProb = away_prob$champProb
+    )
+  }
+
   # Build player data
   home_players_data <- if (!is.null(home_players) && nrow(home_players) > 0) {
     lapply(seq_len(nrow(home_players)), function(i) {
@@ -1413,7 +1853,11 @@ for (game in all_games) {
       list(
         name = p$player_name,
         position = p$position,
-        gamesPlayed = as.integer(p$games_played),
+        gamesPlayed = list(
+          value = as.integer(p$games_played),
+          rank = na_to_null(as.integer(p$games_played_rank)),
+          rankDisplay = na_to_null(p$games_played_rankDisplay)
+        ),
         goals = list(
           value = as.integer(p$goals),
           rank = na_to_null(as.integer(p$goals_rank)),
@@ -1434,7 +1878,11 @@ for (game in all_games) {
           rank = na_to_null(as.integer(p$plus_minus_rank)),
           rankDisplay = na_to_null(p$plus_minus_rankDisplay)
         ),
-        pointsPerGame = round(p$points_per_game, 2)
+        pointsPerGame = list(
+          value = round(p$points_per_game, 2),
+          rank = na_to_null(as.integer(p$points_per_game_rank)),
+          rankDisplay = na_to_null(p$points_per_game_rankDisplay)
+        )
       )
     })
   } else {
@@ -1449,7 +1897,11 @@ for (game in all_games) {
       list(
         name = p$player_name,
         position = p$position,
-        gamesPlayed = as.integer(p$games_played),
+        gamesPlayed = list(
+          value = as.integer(p$games_played),
+          rank = na_to_null(as.integer(p$games_played_rank)),
+          rankDisplay = na_to_null(p$games_played_rankDisplay)
+        ),
         goals = list(
           value = as.integer(p$goals),
           rank = na_to_null(as.integer(p$goals_rank)),
@@ -1470,7 +1922,11 @@ for (game in all_games) {
           rank = na_to_null(as.integer(p$plus_minus_rank)),
           rankDisplay = na_to_null(p$plus_minus_rankDisplay)
         ),
-        pointsPerGame = round(p$points_per_game, 2)
+        pointsPerGame = list(
+          value = round(p$points_per_game, 2),
+          rank = na_to_null(as.integer(p$points_per_game_rank)),
+          rankDisplay = na_to_null(p$points_per_game_rankDisplay)
+        )
       )
     })
   } else {
@@ -1546,7 +2002,7 @@ output_data <- list(
   subtitle = paste("Games from the past", DAYS_BEHIND, "days and next", DAYS_AHEAD, "days with results and stats"),
   description = paste0("Detailed NHL matchup statistics including team performance metrics, player stats, and recent form.\n\nTEAM STATS:\n\n \u2022 Goals Per Game: Average goals scored per game\n\n \u2022 Goals Against Per Game: Average goals allowed per game (lower is better)\n\n \u2022 Goal Differential: Goals For - Goals Against per game\n\n \u2022 Shots Per Game: Average shots on goal per game\n\n \u2022 Power Play %: Success rate on power plays\n\n \u2022 Penalty Kill %: Success rate killing penalties\n\n \u2022 Faceoff Win %: Percentage of faceoffs won\n\nPLAYER STATS:\n\n \u2022 Goals: Total goals scored\n\n \u2022 Assists: Total assists\n\n \u2022 Points: Goals + Assists\n\n \u2022 Plus/Minus: Goal differential when on ice\n\nAll stats are season totals through the current date. Players must have played at least ", MIN_GAMES_PLAYED, " games to be included."),
   lastUpdated = format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC"),
-  source = "NHL Stats API",
+  source = "NHL Stats API / PlayoffStatus.com",
   tags = list(
     list(label = "team", layout = "left", color = "#4CAF50"),
     list(label = "player", layout = "left", color = "#2196F3"),

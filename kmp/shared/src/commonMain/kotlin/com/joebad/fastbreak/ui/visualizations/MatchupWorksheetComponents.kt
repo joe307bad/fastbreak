@@ -180,6 +180,62 @@ fun getCBBTeamRankColor(rank: Int?): Color {
 }
 
 /**
+ * Pre-computed rank colors for NHL team stats (1-32 scale)
+ * - Ranks 1-10: Green gradient
+ * - Ranks 11-20: Orange gradient
+ * - Ranks 21-32: Red gradient
+ */
+val nhlTeamRankColors: Map<Int, Color> = buildMap {
+    put(0, Color.Transparent) // For null ranks
+
+    // Darkest red color for rank 32+
+    val darkestRed = Color(139, 0, 0)
+
+    for (rank in 1..32) {
+        val color = when {
+            rank <= 10 -> {
+                // Green gradient (ranks 1-10): Bright green to darker green
+                val ratio = (rank - 1) / 9f
+                val red = (0 + ratio * 80).toInt()
+                val green = (150 + ratio * 30).toInt()
+                val blue = 0
+                Color(red, green, blue)
+            }
+            rank <= 20 -> {
+                // Orange to dark orange gradient (ranks 11-20)
+                val ratio = (rank - 11) / 9f
+                val red = (255 - ratio * 55).toInt()
+                val green = (140 - ratio * 40).toInt()
+                val blue = 0
+                Color(red, green, blue)
+            }
+            else -> {
+                // Red to dark red gradient (ranks 21-32)
+                val ratio = (rank - 21) / 11f
+                val red = (200 - ratio * 61).toInt()
+                val green = (0 + ratio * 0).toInt()
+                val blue = 0
+                Color(red, green, blue)
+            }
+        }
+        put(rank, color)
+    }
+
+    // Add explicit mapping for ranks > 32 to use the darkest red
+    for (rank in 33..50) {
+        put(rank, darkestRed)
+    }
+}
+
+/**
+ * Get color for NHL team rank (1-32 scale)
+ */
+fun getNHLTeamRankColor(rank: Int?): Color {
+    if (rank == null || rank <= 0) return Color.Transparent
+    return nhlTeamRankColors[rank.coerceIn(1, 50)] ?: Color.Transparent
+}
+
+/**
  * Get color for AP rank (1-25 scale)
  * - Ranks 1-8: Green gradient
  * - Ranks 9-17: Orange gradient
@@ -350,7 +406,8 @@ fun FiveColumnRowWithRanks(
     advantage: Int = 0,
     useNBARanks: Boolean = true, // true for NBA (30 teams), false for NFL (32 teams)
     usePlayerRanks: Boolean = false, // true for player ranks (1-100+ scale), overrides useNBARanks
-    useCBBRanks: Boolean = false // true for CBB (64 teams), overrides useNBARanks
+    useCBBRanks: Boolean = false, // true for CBB (64 teams), overrides useNBARanks
+    useNHLRanks: Boolean = false // true for NHL (32 teams), overrides useNBARanks
 ) {
     Row(
         modifier = Modifier
@@ -391,6 +448,7 @@ fun FiveColumnRowWithRanks(
                     when {
                         usePlayerRanks -> getNBAPlayerRankColor(leftRank)
                         useCBBRanks -> getCBBTeamRankColor(leftRank)
+                        useNHLRanks -> getNHLTeamRankColor(leftRank)
                         useNBARanks -> getNBATeamRankColor(leftRank)
                         else -> Color.Gray
                     },
@@ -433,6 +491,7 @@ fun FiveColumnRowWithRanks(
                     when {
                         usePlayerRanks -> getNBAPlayerRankColor(rightRank)
                         useCBBRanks -> getCBBTeamRankColor(rightRank)
+                        useNHLRanks -> getNHLTeamRankColor(rightRank)
                         useNBARanks -> getNBATeamRankColor(rightRank)
                         else -> Color.Gray
                     },
@@ -759,18 +818,28 @@ fun <T> PlayerComparisonSection(
             }
         } ?: "-"
 
-        FiveColumnRowWithRanks(
-            leftValue = awayText,
-            leftRank = awayRank,
-            leftRankDisplay = awayRankDisplay,
-            centerText = config.label,
-            rightValue = homeText,
-            rightRank = homeRank,
-            rightRankDisplay = homeRankDisplay,
-            advantage = advantage,
-            useNBARanks = !usePlayerRanks,
-            usePlayerRanks = usePlayerRanks
-        )
+        // Use ThreeColumnRow when no ranks are available, otherwise use FiveColumnRowWithRanks
+        if (awayRank == null && homeRank == null) {
+            ThreeColumnRow(
+                leftText = awayText,
+                centerText = config.label,
+                rightText = homeText,
+                advantage = advantage
+            )
+        } else {
+            FiveColumnRowWithRanks(
+                leftValue = awayText,
+                leftRank = awayRank,
+                leftRankDisplay = awayRankDisplay,
+                centerText = config.label,
+                rightValue = homeText,
+                rightRank = homeRank,
+                rightRankDisplay = homeRankDisplay,
+                advantage = advantage,
+                useNBARanks = !usePlayerRanks,
+                usePlayerRanks = usePlayerRanks
+            )
+        }
     }
 
     Spacer(modifier = Modifier.height(4.dp))

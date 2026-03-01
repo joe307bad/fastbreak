@@ -15,6 +15,7 @@ enum class VizType {
     MATCHUP,
     MATCHUP_V2,
     NBA_MATCHUP,
+    NHL_MATCHUP,
     CBB_MATCHUP,
     HELLO_WORLD
 }

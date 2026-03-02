@@ -450,9 +450,15 @@ fun QuadrantScatterPlot(
             // Check if point matches team legend selection
             val matchesTeamLegend = selectedTeamCodes.isEmpty() || selectedTeamCodes.contains(point.teamCode)
 
-            val isHighlighted = matchesPlayerLabel || matchesTeamCode ||
-                (selectedQuadrants.isNotEmpty() && matchesLegendSelection) ||
-                (selectedTeamCodes.isNotEmpty() && matchesTeamLegend)
+            // When interactive filters (legend clicks) are active, they act as AND
+            // filters that narrow down results. Static highlights are ignored when
+            // interactive filters are in use so clicking a team or quadrant works.
+            val hasInteractiveFilters = selectedQuadrants.isNotEmpty() || selectedTeamCodes.isNotEmpty()
+            val isHighlighted = if (hasInteractiveFilters) {
+                matchesLegendSelection && matchesTeamLegend
+            } else {
+                matchesPlayerLabel || matchesTeamCode
+            }
 
             if (isHighlighted) {
                 highlightedCount++

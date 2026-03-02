@@ -670,6 +670,16 @@ data class LeagueEfficiencyStats(
 )
 
 @Serializable
+data class LeagueXgVsPointsStats(
+    val avgXgPct: Double,
+    val avgPointsPct: Double,
+    val minXgPct: Double,
+    val maxXgPct: Double,
+    val minPointsPct: Double,
+    val maxPointsPct: Double
+)
+
+@Serializable
 data class NBAMatchup(
     val gameId: String,
     val gameDate: String,  // ISO 8601 format
@@ -837,7 +847,9 @@ data class NHLTeamBoxScore(
     val takeaways: Int? = null,
     val faceoffWinPct: Double? = null,
     val saves: Int? = null,
-    val savePct: Double? = null
+    val savePct: Double? = null,
+    val xgf: Double? = null,
+    val xga: Double? = null
 )
 
 @Serializable
@@ -916,7 +928,9 @@ data class NHLMatchup(
     val location: MatchupLocation? = null,
     val odds: NHLMatchupOdds? = null,
     val comparisons: MatchupComparisons? = null,
-    val results: NHLGameResults? = null
+    val results: NHLGameResults? = null,
+    val tenthXgfPctByWeek: JsonObject? = null,
+    val leagueXgVsPointsStats: LeagueXgVsPointsStats? = null
 )
 
 @Serializable

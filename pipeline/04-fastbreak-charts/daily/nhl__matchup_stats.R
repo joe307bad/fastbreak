@@ -118,6 +118,13 @@ add_api_delay <- function() {
   Sys.sleep(0.3)
 }
 
+# Helper function for NST-specific rate limiting (longer delays to avoid bans)
+add_nst_delay <- function() {
+  delay <- runif(1, min = 5, max = 10)
+  cat(sprintf("[NST] Waiting %.1f seconds for rate limiting...\n", delay))
+  Sys.sleep(delay)
+}
+
 # NHL team abbreviation mapping
 TEAM_ABBREVS <- c(
   "Anaheim Ducks" = "ANA", "Arizona Coyotes" = "ARI", "Boston Bruins" = "BOS",
@@ -294,6 +301,120 @@ scrape_nhl_playoff_probabilities <- function() {
 
   }, error = function(e) {
     cat("Error scraping NHL playoff probabilities:", e$message, "\n")
+    return(NULL)
+  })
+}
+
+# Helper function to scrape team xG data from Natural Stat Trick
+scrape_nst_team_xg <- function(from_date, to_date, season_id) {
+  tryCatch({
+    url <- sprintf(
+      "https://www.naturalstattrick.com/teamtable.php?fromseason=%s&thruseason=%s&stype=2&sit=5v5&score=all&rate=n&team=all&loc=B&gpf=410&fd=%s&td=%s",
+      season_id, season_id,
+      format(from_date, "%Y-%m-%d"),
+      format(to_date, "%Y-%m-%d")
+    )
+
+    add_nst_delay()
+    page <- read_html(url)
+
+    tables <- page %>% html_elements("table")
+    if (length(tables) == 0) {
+      cat("Warning: No tables found on NST page\n")
+      return(NULL)
+    }
+
+    # Parse the first table (team stats table)
+    tbl <- html_table(tables[[1]], fill = TRUE)
+
+    if (nrow(tbl) == 0) {
+      cat("Warning: Empty table from NST\n")
+      return(NULL)
+    }
+
+    # Find relevant columns - NST uses "Team", "xGF", "xGA", "xGF%"
+    col_names <- colnames(tbl)
+    team_col <- which(col_names == "Team")[1]
+    xgf_col <- which(col_names == "xGF")[1]
+    xga_col <- which(col_names == "xGA")[1]
+    xgf_pct_col <- which(col_names == "xGF%")[1]
+    gp_col <- which(col_names == "GP")[1]
+
+    if (is.na(team_col) || is.na(xgf_pct_col)) {
+      cat("Warning: Could not find expected columns in NST table. Found:", paste(col_names, collapse = ", "), "\n")
+      return(NULL)
+    }
+
+    result <- data.frame(
+      team_name_nst = tbl[[team_col]],
+      xgf = as.numeric(tbl[[xgf_col]]),
+      xga = as.numeric(tbl[[xga_col]]),
+      xgf_pct = as.numeric(tbl[[xgf_pct_col]]) / 100,  # Convert from percentage to decimal
+      gp = if (!is.na(gp_col)) as.integer(tbl[[gp_col]]) else NA_integer_,
+      stringsAsFactors = FALSE
+    )
+
+    # Map NST team names to abbreviations using TEAM_ABBREVS
+    result$team_abbreviation <- sapply(result$team_name_nst, function(name) {
+      # Direct match first
+      abbrev <- TEAM_ABBREVS[name]
+      if (!is.na(abbrev)) return(abbrev)
+
+      # Fuzzy fallback - check if NST name contains or is contained in known names
+      for (known_name in names(TEAM_ABBREVS)) {
+        if (grepl(name, known_name, ignore.case = TRUE) || grepl(known_name, name, ignore.case = TRUE)) {
+          return(TEAM_ABBREVS[known_name])
+        }
+      }
+      NA_character_
+    })
+
+    result <- result %>% filter(!is.na(team_abbreviation))
+    cat("Scraped xG data for", nrow(result), "teams from NST (", format(from_date), "to", format(to_date), ")\n")
+    return(result)
+
+  }, error = function(e) {
+    cat("Error scraping NST team xG:", e$message, "\n")
+    return(NULL)
+  })
+}
+
+# Helper function to scrape per-game xG data from Natural Stat Trick
+scrape_nst_game_xg <- function(nhl_game_id) {
+  tryCatch({
+    url <- sprintf("https://www.naturalstattrick.com/game.php?season=%s&game=%s&view=limited",
+                   NHL_SEASON_ID, nhl_game_id)
+
+    add_nst_delay()
+    page <- read_html(url)
+
+    tables <- page %>% html_elements("table")
+    if (length(tables) == 0) {
+      return(NULL)
+    }
+
+    # Look for 5v5 team summary table - typically has xGF/xGA columns
+    for (tbl_el in tables) {
+      tbl <- html_table(tbl_el, fill = TRUE)
+      col_names <- colnames(tbl)
+
+      if ("xGF" %in% col_names && "xGA" %in% col_names && nrow(tbl) >= 2) {
+        # First row is usually away, second row is home (or vice versa - check Team col)
+        away_row <- 1
+        home_row <- 2
+
+        return(list(
+          away_xgf = as.numeric(tbl$xGF[away_row]),
+          away_xga = as.numeric(tbl$xGA[away_row]),
+          home_xgf = as.numeric(tbl$xGF[home_row]),
+          home_xga = as.numeric(tbl$xGA[home_row])
+        ))
+      }
+    }
+
+    return(NULL)
+  }, error = function(e) {
+    cat("Warning: Could not scrape game xG for", nhl_game_id, ":", e$message, "\n")
     return(NULL)
   })
 }
@@ -881,17 +1002,26 @@ team_stats <- team_stats %>%
     pp_goals_per_game_rankDisplay = pp_goals_ranks$rankDisplay
   )
 
+# Note: xG% ranks will be added after STEP 1c when NST data is available.
+# Initialize xG columns with NA so downstream code works regardless.
+team_stats <- team_stats %>%
+  mutate(
+    xgf_pct = NA_real_,
+    xgf_pct_rank = NA_integer_,
+    xgf_pct_rankDisplay = NA_character_
+  )
+
 end_timer()
 
 # ============================================================================
 # STEP 1b: Calculate 1-month trend rankings (last 4 weeks)
 # ============================================================================
 start_timer("STEP 1b: Fetch recent game data for trends")
-cat("\n1b. Fetching recent game data for 1-month trends...\n")
+cat("\n1b. Fetching recent game data for 10-week trends...\n")
 
-# Calculate date range for last month (approximately 4 weeks)
+# Calculate date range for last 10 weeks (70 days) — covers both month trend and weekly Points%
 today <- Sys.Date()
-month_start_date <- today - days(28)
+month_start_date <- today - days(70)
 
 # Fetch team game-by-game stats for trend calculation
 # Use the NHL API game log endpoint
@@ -941,13 +1071,20 @@ month_games_data <- tryCatch({
 
                 if (is.null(home_abbrev) || is.null(away_abbrev)) next
 
+                # Capture period type (REG, OT, SO) for OTL point calculation
+                period_type <- tryCatch({
+                  pt <- game$gameOutcome.lastPeriodType
+                  if (is.null(pt) || is.na(pt)) "REG" else as.character(pt)
+                }, error = function(e) "REG")
+
                 game_info <- list(
                   game_id = game$id,
                   game_date = day_date,
                   home_team_abbrev = home_abbrev,
                   away_team_abbrev = away_abbrev,
                   home_score = as.integer(game$homeTeam.score),
-                  away_score = as.integer(game$awayTeam.score)
+                  away_score = as.integer(game$awayTeam.score),
+                  period_type = period_type
                 )
                 trend_games[[length(trend_games) + 1]] <- game_info
               }
@@ -971,12 +1108,15 @@ month_games_data <- tryCatch({
 })
 
 # Calculate month trend stats if we have game data
+# Filter to last 28 days for month trend (full dataset covers 70 days for weekly Points%)
 month_trend_stats <- NULL
+month_cutoff <- as.character(today - days(28))
 if (!is.null(month_games_data) && nrow(month_games_data) > 0) {
-  cat("Loaded", nrow(month_games_data), "recent games for trend analysis\n")
+  month_games_filtered <- month_games_data %>% filter(game_date >= month_cutoff)
+  cat("Loaded", nrow(month_games_filtered), "recent games (last 28 days) for trend analysis\n")
 
   # Build per-team stats from games
-  home_stats <- month_games_data %>%
+  home_stats <- month_games_filtered %>%
     group_by(team_abbreviation = home_team_abbrev) %>%
     summarise(
       games = n(),
@@ -987,7 +1127,7 @@ if (!is.null(month_games_data) && nrow(month_games_data) > 0) {
       .groups = "drop"
     )
 
-  away_stats <- month_games_data %>%
+  away_stats <- month_games_filtered %>%
     group_by(team_abbreviation = away_team_abbrev) %>%
     summarise(
       games = n(),
@@ -1039,6 +1179,75 @@ if (!is.null(month_games_data) && nrow(month_games_data) > 0) {
   cat("No recent game data available for trend analysis\n")
 }
 
+# Compute per-team per-week Points% (W*2 + OTL) / (GP*2) for last 10 weeks
+# Uses the same 10-week window structure as weekly xG%
+NUM_TREND_WEEKS <- 10
+weekly_points_pct <- list()
+
+if (!is.null(month_games_data) && nrow(month_games_data) > 0) {
+  trend_start_pts <- today - weeks(NUM_TREND_WEEKS)
+
+  for (week_num in 1:NUM_TREND_WEEKS) {
+    week_end <- trend_start_pts + weeks(week_num)
+    if (week_end > today) week_end <- today
+    week_start <- week_end - days(6)
+
+    week_key <- paste0("week-", week_num)
+
+    # Filter games to this 7-day window
+    week_games <- month_games_data %>%
+      filter(game_date >= as.character(week_start) & game_date <= as.character(week_end))
+
+    if (nrow(week_games) == 0) next
+
+    # Build per-team W/L/OTL from this week's games
+    all_teams <- unique(c(week_games$home_team_abbrev, week_games$away_team_abbrev))
+
+    for (team in all_teams) {
+      team_home <- week_games %>% filter(home_team_abbrev == team)
+      team_away <- week_games %>% filter(away_team_abbrev == team)
+
+      wins <- 0L
+      otl <- 0L
+      gp <- 0L
+
+      # Home games
+      if (nrow(team_home) > 0) {
+        for (g in seq_len(nrow(team_home))) {
+          gp <- gp + 1L
+          if (team_home$home_score[g] > team_home$away_score[g]) {
+            wins <- wins + 1L
+          } else if (team_home$period_type[g] %in% c("OT", "SO")) {
+            otl <- otl + 1L
+          }
+        }
+      }
+
+      # Away games
+      if (nrow(team_away) > 0) {
+        for (g in seq_len(nrow(team_away))) {
+          gp <- gp + 1L
+          if (team_away$away_score[g] > team_away$home_score[g]) {
+            wins <- wins + 1L
+          } else if (team_away$period_type[g] %in% c("OT", "SO")) {
+            otl <- otl + 1L
+          }
+        }
+      }
+
+      if (gp > 0) {
+        pts_pct <- (wins * 2 + otl) / (gp * 2)
+        if (is.null(weekly_points_pct[[team]])) {
+          weekly_points_pct[[team]] <- list()
+        }
+        weekly_points_pct[[team]][[week_key]] <- round(pts_pct * 100, 1)
+      }
+    }
+  }
+
+  cat("Computed weekly Points% for", length(weekly_points_pct), "teams\n")
+}
+
 end_timer()
 
 # ============================================================================
@@ -1056,6 +1265,160 @@ if (!is.null(playoff_probabilities)) {
 }
 
 end_timer()
+
+# ============================================================================
+# STEP 1c: Fetch xG data from Natural Stat Trick
+# ============================================================================
+start_timer("STEP 1c: Fetch NST xG data")
+cat("\n1c. Fetching Expected Goals (xG) data from Natural Stat Trick...\n")
+
+# Season start date for NHL (first game typically early October)
+nhl_season_start <- as.Date(paste0(NHL_SEASON_START, "-10-01"))
+
+# 1. Season-to-date xG
+nst_season_xg <- scrape_nst_team_xg(nhl_season_start, today, NHL_SEASON_ID)
+
+# 2. Last 10 weeks (70 days) xG for month trend
+nst_last_10_weeks_start <- today - days(70)
+nst_last_10_weeks_xg <- scrape_nst_team_xg(nst_last_10_weeks_start, today, NHL_SEASON_ID)
+
+# Calculate last-10-weeks xG ranks
+if (!is.null(nst_last_10_weeks_xg) && nrow(nst_last_10_weeks_xg) > 0) {
+  last_10_weeks_xgf_pct_ranks <- tied_rank(-nst_last_10_weeks_xg$xgf_pct)
+  nst_last_10_weeks_xg <- nst_last_10_weeks_xg %>%
+    mutate(
+      xgf_pct_rank = last_10_weeks_xgf_pct_ranks$rank,
+      xgf_pct_rankDisplay = last_10_weeks_xgf_pct_ranks$rankDisplay
+    )
+  cat("Calculated last-10-weeks xG% ranks for", nrow(nst_last_10_weeks_xg), "teams\n")
+}
+
+# 3. Week-by-week xG% for last 10 weeks only
+NUM_TREND_WEEKS <- 10
+cum_xgf_pct_by_week <- list()
+weekly_xgf_pct <- list()
+
+# Start 10 weeks back from today
+trend_start <- today - weeks(NUM_TREND_WEEKS)
+
+for (week_num in 1:NUM_TREND_WEEKS) {
+  week_end <- trend_start + weeks(week_num)
+  if (week_end > today) week_end <- today
+
+  week_key <- paste0("week-", week_num)
+
+  # Cumulative: season start through this week
+  cum_data <- scrape_nst_team_xg(nhl_season_start, week_end, NHL_SEASON_ID)
+  if (!is.null(cum_data) && nrow(cum_data) > 0) {
+    for (i in seq_len(nrow(cum_data))) {
+      team <- cum_data$team_abbreviation[i]
+      if (!is.null(team) && !is.na(team)) {
+        if (is.null(cum_xgf_pct_by_week[[team]])) {
+          cum_xgf_pct_by_week[[team]] <- list()
+        }
+        cum_xgf_pct_by_week[[team]][[week_key]] <- round(cum_data$xgf_pct[i] * 100, 1)
+      }
+    }
+  }
+
+  # Weekly snapshot: just this week's 7-day window
+  week_start <- week_end - days(6)
+  snap_data <- scrape_nst_team_xg(week_start, week_end, NHL_SEASON_ID)
+  if (!is.null(snap_data) && nrow(snap_data) > 0) {
+    for (i in seq_len(nrow(snap_data))) {
+      team <- snap_data$team_abbreviation[i]
+      if (!is.null(team) && !is.na(team)) {
+        if (is.null(weekly_xgf_pct[[team]])) {
+          weekly_xgf_pct[[team]] <- list()
+        }
+        weekly_xgf_pct[[team]][[week_key]] <- round(snap_data$xgf_pct[i] * 100, 1)
+      }
+    }
+  }
+}
+
+cat("Computed week-by-week xG% for last", NUM_TREND_WEEKS, "weeks\n")
+
+# 4. Compute 10th-best xG% reference line per week (from cumulative data)
+tenth_xgf_pct_by_week <- list()
+if (length(cum_xgf_pct_by_week) > 0) {
+  all_week_keys <- unique(unlist(lapply(cum_xgf_pct_by_week, names)))
+  all_week_keys <- sort(all_week_keys)
+
+  for (wk in all_week_keys) {
+    week_values <- c()
+    for (team in names(cum_xgf_pct_by_week)) {
+      val <- cum_xgf_pct_by_week[[team]][[wk]]
+      if (!is.null(val) && !is.na(val)) {
+        week_values <- c(week_values, val)
+      }
+    }
+    if (length(week_values) >= 25) {
+      sorted_vals <- sort(week_values, decreasing = TRUE)
+      if (length(sorted_vals) >= 10) {
+        tenth_xgf_pct_by_week[[wk]] <- sorted_vals[10]
+      }
+    }
+  }
+  cat("Computed 10th-best xG% reference line for", length(tenth_xgf_pct_by_week), "weeks\n")
+}
+
+# Join season xG% data to team_stats and compute ranks
+if (!is.null(nst_season_xg) && nrow(nst_season_xg) > 0) {
+  nst_join <- nst_season_xg %>%
+    select(team_abbreviation, xgf_pct_nst = xgf_pct)
+
+  team_stats <- team_stats %>%
+    left_join(nst_join, by = "team_abbreviation") %>%
+    mutate(
+      xgf_pct = ifelse(!is.na(xgf_pct_nst), xgf_pct_nst, xgf_pct)
+    ) %>%
+    select(-xgf_pct_nst)
+
+  # Compute xG% ranks
+  xgf_pct_ranks <- tied_rank(-team_stats$xgf_pct)
+  team_stats <- team_stats %>%
+    mutate(
+      xgf_pct_rank = xgf_pct_ranks$rank,
+      xgf_pct_rankDisplay = xgf_pct_ranks$rankDisplay
+    )
+  cat("Joined season xG% data and computed ranks for", sum(!is.na(team_stats$xgf_pct)), "teams\n")
+}
+
+end_timer()
+
+# Compute league-wide averages and bounds for xG% vs Points% scatter plot
+# so all matchup charts use consistent quadrant placement and axis scaling
+league_xg_vs_pts <- NULL
+if (length(weekly_xgf_pct) > 0 && length(weekly_points_pct) > 0) {
+  all_xg_vals <- c()
+  all_pts_vals <- c()
+
+  for (team in names(weekly_xgf_pct)) {
+    for (wk in names(weekly_xgf_pct[[team]])) {
+      xg_val <- weekly_xgf_pct[[team]][[wk]]
+      pts_val <- weekly_points_pct[[team]][[wk]]
+      if (!is.null(xg_val) && !is.null(pts_val) && !is.na(xg_val) && !is.na(pts_val)) {
+        all_xg_vals <- c(all_xg_vals, xg_val)
+        all_pts_vals <- c(all_pts_vals, pts_val)
+      }
+    }
+  }
+
+  if (length(all_xg_vals) > 0) {
+    league_xg_vs_pts <- list(
+      avgXgPct = round(mean(all_xg_vals), 1),
+      avgPointsPct = round(mean(all_pts_vals), 1),
+      minXgPct = round(min(all_xg_vals), 1),
+      maxXgPct = round(max(all_xg_vals), 1),
+      minPointsPct = round(min(all_pts_vals), 1),
+      maxPointsPct = round(max(all_pts_vals), 1)
+    )
+    cat("League xG% vs Points% bounds: xG [", league_xg_vs_pts$minXgPct, "-",
+        league_xg_vs_pts$maxXgPct, "], Points [", league_xg_vs_pts$minPointsPct, "-",
+        league_xg_vs_pts$maxPointsPct, "]\n")
+  }
+}
 
 # ============================================================================
 # STEP 2: Load player stats
@@ -1429,13 +1792,16 @@ build_nhl_comparisons <- function(home_stats, away_stats, home_team, away_team) 
   # Offensive comparison (side-by-side team offense)
   off_comparison <- list()
   off_stats <- list(
+    list(key = "pointsPct", label = "Points %", value_home = home_stats$points_pct, rank_home = home_stats$points_pct_rank, rankDisplay_home = home_stats$points_pct_rankDisplay, value_away = away_stats$points_pct, rank_away = away_stats$points_pct_rank, rankDisplay_away = away_stats$points_pct_rankDisplay),
     list(key = "goalsPerGame", label = "Goals/Game", value_home = home_stats$goals_per_game, rank_home = home_stats$goals_per_game_rank, rankDisplay_home = home_stats$goals_per_game_rankDisplay, value_away = away_stats$goals_per_game, rank_away = away_stats$goals_per_game_rank, rankDisplay_away = away_stats$goals_per_game_rankDisplay),
+    list(key = "goalDiffPerGame", label = "Goal Diff/Game", value_home = home_stats$goal_diff_per_game, rank_home = home_stats$goal_diff_per_game_rank, rankDisplay_home = home_stats$goal_diff_per_game_rankDisplay, value_away = away_stats$goal_diff_per_game, rank_away = away_stats$goal_diff_per_game_rank, rankDisplay_away = away_stats$goal_diff_per_game_rankDisplay),
     list(key = "shotsForPerGame", label = "Shots/Game", value_home = home_stats$shots_for_per_game, rank_home = home_stats$shots_for_per_game_rank, rankDisplay_home = home_stats$shots_for_per_game_rankDisplay, value_away = away_stats$shots_for_per_game, rank_away = away_stats$shots_for_per_game_rank, rankDisplay_away = away_stats$shots_for_per_game_rankDisplay),
     list(key = "powerPlayPct", label = "Power Play %", value_home = home_stats$power_play_pct, rank_home = home_stats$power_play_pct_rank, rankDisplay_home = home_stats$power_play_pct_rankDisplay, value_away = away_stats$power_play_pct, rank_away = away_stats$power_play_pct_rank, rankDisplay_away = away_stats$power_play_pct_rankDisplay),
     list(key = "ppGoalsPerGame", label = "PP Goals/Game", value_home = home_stats$pp_goals_per_game, rank_home = home_stats$pp_goals_per_game_rank, rankDisplay_home = home_stats$pp_goals_per_game_rankDisplay, value_away = away_stats$pp_goals_per_game, rank_away = away_stats$pp_goals_per_game_rank, rankDisplay_away = away_stats$pp_goals_per_game_rankDisplay),
     list(key = "faceoffWinPct", label = "Faceoff Win %", value_home = home_stats$faceoff_win_pct, rank_home = home_stats$faceoff_win_pct_rank, rankDisplay_home = home_stats$faceoff_win_pct_rankDisplay, value_away = away_stats$faceoff_win_pct, rank_away = away_stats$faceoff_win_pct_rank, rankDisplay_away = away_stats$faceoff_win_pct_rankDisplay),
     list(key = "hitsPerGame", label = "Hits/Game", value_home = home_stats$hits_per_game, rank_home = home_stats$hits_per_game_rank, rankDisplay_home = home_stats$hits_per_game_rankDisplay, value_away = away_stats$hits_per_game, rank_away = away_stats$hits_per_game_rank, rankDisplay_away = away_stats$hits_per_game_rankDisplay),
-    list(key = "takeawaysPerGame", label = "Takeaways/Game", value_home = home_stats$takeaways_per_game, rank_home = home_stats$takeaways_per_game_rank, rankDisplay_home = home_stats$takeaways_per_game_rankDisplay, value_away = away_stats$takeaways_per_game, rank_away = away_stats$takeaways_per_game_rank, rankDisplay_away = away_stats$takeaways_per_game_rankDisplay)
+    list(key = "takeawaysPerGame", label = "Takeaways/Game", value_home = home_stats$takeaways_per_game, rank_home = home_stats$takeaways_per_game_rank, rankDisplay_home = home_stats$takeaways_per_game_rankDisplay, value_away = away_stats$takeaways_per_game, rank_away = away_stats$takeaways_per_game_rank, rankDisplay_away = away_stats$takeaways_per_game_rankDisplay),
+    list(key = "xgfPct", label = "xG% (5v5)", value_home = home_stats$xgf_pct, rank_home = home_stats$xgf_pct_rank, rankDisplay_home = home_stats$xgf_pct_rankDisplay, value_away = away_stats$xgf_pct, rank_away = away_stats$xgf_pct_rank, rankDisplay_away = away_stats$xgf_pct_rankDisplay)
   )
 
   for (stat in off_stats) {
@@ -1705,9 +2071,23 @@ for (game in all_games) {
       faceoffWinPctRankDisplay = home_stats_row$faceoff_win_pct_rankDisplay,
       pointsPct = round(home_stats_row$points_pct, 4),
       pointsPctRank = as.integer(home_stats_row$points_pct_rank),
-      pointsPctRankDisplay = home_stats_row$points_pct_rankDisplay
+      pointsPctRankDisplay = home_stats_row$points_pct_rankDisplay,
+      xgfPct = if (!is.na(home_stats_row$xgf_pct)) round(home_stats_row$xgf_pct, 4) else NULL,
+      xgfPctRank = if (!is.na(home_stats_row$xgf_pct_rank)) as.integer(home_stats_row$xgf_pct_rank) else NULL,
+      xgfPctRankDisplay = if (!is.na(home_stats_row$xgf_pct_rankDisplay)) home_stats_row$xgf_pct_rankDisplay else NULL
     )
   )
+
+  # Add week-by-week xG% data for home team
+  if (!is.null(cum_xgf_pct_by_week[[game$home_team_abbrev]])) {
+    home_team_data$stats$cumXgfPctByWeek <- cum_xgf_pct_by_week[[game$home_team_abbrev]]
+  }
+  if (!is.null(weekly_xgf_pct[[game$home_team_abbrev]])) {
+    home_team_data$stats$weeklyXgfPct <- weekly_xgf_pct[[game$home_team_abbrev]]
+  }
+  if (!is.null(weekly_points_pct[[game$home_team_abbrev]])) {
+    home_team_data$stats$weeklyPointsPct <- weekly_points_pct[[game$home_team_abbrev]]
+  }
 
   # Add month trend for home team
   if (!is.null(month_trend_stats)) {
@@ -1739,6 +2119,18 @@ for (game in all_games) {
           rankDisplay = home_month_trend$goal_diff_rankDisplay
         )
       )
+
+      # Add last-10-weeks xG% to home team's monthTrend
+      if (!is.null(nst_last_10_weeks_xg) && nrow(nst_last_10_weeks_xg) > 0) {
+        home_trend_xg <- nst_last_10_weeks_xg %>% filter(team_abbreviation == game$home_team_abbrev)
+        if (nrow(home_trend_xg) > 0) {
+          home_team_data$stats$monthTrend$xgfPct <- list(
+            value = round(home_trend_xg$xgf_pct, 4),
+            rank = as.integer(home_trend_xg$xgf_pct_rank),
+            rankDisplay = home_trend_xg$xgf_pct_rankDisplay
+          )
+        }
+      }
     }
   }
 
@@ -1796,9 +2188,23 @@ for (game in all_games) {
       faceoffWinPctRankDisplay = away_stats_row$faceoff_win_pct_rankDisplay,
       pointsPct = round(away_stats_row$points_pct, 4),
       pointsPctRank = as.integer(away_stats_row$points_pct_rank),
-      pointsPctRankDisplay = away_stats_row$points_pct_rankDisplay
+      pointsPctRankDisplay = away_stats_row$points_pct_rankDisplay,
+      xgfPct = if (!is.na(away_stats_row$xgf_pct)) round(away_stats_row$xgf_pct, 4) else NULL,
+      xgfPctRank = if (!is.na(away_stats_row$xgf_pct_rank)) as.integer(away_stats_row$xgf_pct_rank) else NULL,
+      xgfPctRankDisplay = if (!is.na(away_stats_row$xgf_pct_rankDisplay)) away_stats_row$xgf_pct_rankDisplay else NULL
     )
   )
+
+  # Add week-by-week xG% data for away team
+  if (!is.null(cum_xgf_pct_by_week[[game$away_team_abbrev]])) {
+    away_team_data$stats$cumXgfPctByWeek <- cum_xgf_pct_by_week[[game$away_team_abbrev]]
+  }
+  if (!is.null(weekly_xgf_pct[[game$away_team_abbrev]])) {
+    away_team_data$stats$weeklyXgfPct <- weekly_xgf_pct[[game$away_team_abbrev]]
+  }
+  if (!is.null(weekly_points_pct[[game$away_team_abbrev]])) {
+    away_team_data$stats$weeklyPointsPct <- weekly_points_pct[[game$away_team_abbrev]]
+  }
 
   # Add month trend for away team
   if (!is.null(month_trend_stats)) {
@@ -1830,6 +2236,18 @@ for (game in all_games) {
           rankDisplay = away_month_trend$goal_diff_rankDisplay
         )
       )
+
+      # Add last-10-weeks xG% to away team's monthTrend
+      if (!is.null(nst_last_10_weeks_xg) && nrow(nst_last_10_weeks_xg) > 0) {
+        away_trend_xg <- nst_last_10_weeks_xg %>% filter(team_abbreviation == game$away_team_abbrev)
+        if (nrow(away_trend_xg) > 0) {
+          away_team_data$stats$monthTrend$xgfPct <- list(
+            value = round(away_trend_xg$xgf_pct, 4),
+            rank = as.integer(away_trend_xg$xgf_pct_rank),
+            rankDisplay = away_trend_xg$xgf_pct_rankDisplay
+          )
+        }
+      }
     }
   }
 
@@ -1973,11 +2391,32 @@ for (game in all_games) {
     )
   }
 
+  # Add 10th xG% reference line at matchup level
+  if (length(tenth_xgf_pct_by_week) > 0) {
+    matchup$tenthXgfPctByWeek <- tenth_xgf_pct_by_week
+  }
+
+  # Add league-wide xG% vs Points% stats for consistent scatter plot scaling
+  if (!is.null(league_xg_vs_pts)) {
+    matchup$leagueXgVsPointsStats <- league_xg_vs_pts
+  }
+
   # Add results for completed games (with rate limiting)
   if (isTRUE(game$game_completed) && results_fetched < MAX_RESULTS_GAMES) {
     result_start <- Sys.time()
     cat("  -> Game completed, fetching results... (", results_fetched + 1, ")\n")
     matchup$results <- build_game_results(game, home_stats_row, away_stats_row)
+
+    # Add per-game xG from NST
+    game_xg <- scrape_nst_game_xg(game$game_id)
+    if (!is.null(game_xg)) {
+      matchup$results$teamBoxScore$home$xgf <- round(game_xg$home_xgf, 2)
+      matchup$results$teamBoxScore$home$xga <- round(game_xg$home_xga, 2)
+      matchup$results$teamBoxScore$away$xgf <- round(game_xg$away_xgf, 2)
+      matchup$results$teamBoxScore$away$xga <- round(game_xg$away_xga, 2)
+      cat("  -> Added per-game xG data from NST\n")
+    }
+
     result_duration <- as.numeric(Sys.time() - result_start, units = "secs")
     total_results_time <- total_results_time + result_duration
     cat("  -> Results fetched in", sprintf("%.1f seconds", result_duration), "\n")
@@ -2000,9 +2439,9 @@ output_data <- list(
   visualizationType = "NHL_MATCHUP",
   title = paste0("NHL Matchups - ", format(start_date, "%b %d"), " - ", format(end_date, "%b %d")),
   subtitle = paste("Games from the past", DAYS_BEHIND, "days and next", DAYS_AHEAD, "days with results and stats"),
-  description = paste0("Detailed NHL matchup statistics including team performance metrics, player stats, and recent form.\n\nTEAM STATS:\n\n \u2022 Goals Per Game: Average goals scored per game\n\n \u2022 Goals Against Per Game: Average goals allowed per game (lower is better)\n\n \u2022 Goal Differential: Goals For - Goals Against per game\n\n \u2022 Shots Per Game: Average shots on goal per game\n\n \u2022 Power Play %: Success rate on power plays\n\n \u2022 Penalty Kill %: Success rate killing penalties\n\n \u2022 Faceoff Win %: Percentage of faceoffs won\n\nPLAYER STATS:\n\n \u2022 Goals: Total goals scored\n\n \u2022 Assists: Total assists\n\n \u2022 Points: Goals + Assists\n\n \u2022 Plus/Minus: Goal differential when on ice\n\nAll stats are season totals through the current date. Players must have played at least ", MIN_GAMES_PLAYED, " games to be included."),
+  description = paste0("Detailed NHL matchup statistics including team performance metrics, player stats, and recent form.\n\nTEAM STATS:\n\n \u2022 Goals Per Game: Average goals scored per game\n\n \u2022 Goals Against Per Game: Average goals allowed per game (lower is better)\n\n \u2022 Goal Differential: Goals For - Goals Against per game\n\n \u2022 Shots Per Game: Average shots on goal per game\n\n \u2022 Power Play %: Success rate on power plays\n\n \u2022 Penalty Kill %: Success rate killing penalties\n\n \u2022 Faceoff Win %: Percentage of faceoffs won\n\nCHARTS:\n\n \u2022 xG% (Expected Goals Percentage): Measures the share of expected goals a team generates at 5v5. Unlike actual goals, xG is based on shot quality (location, type, and game context), making it a better indicator of underlying team strength because it filters out luck and goaltending variance. Teams with a high xG% are consistently creating more dangerous chances than they allow, regardless of whether those chances happen to go in.\n\n \u2022 Points %: A team's points earned as a percentage of points available, calculated as (W\u00d72 + OTL) / (GP\u00d72). This captures actual results including overtime/shootout loser points, giving a complete picture of standings performance. Together, xG% vs Points% reveals whether a team's results match their underlying play\u2014teams with high xG% but low Points% are likely underperforming their talent (unlucky), while the reverse suggests overperformance that may not be sustainable.\n\nPLAYER STATS:\n\n \u2022 Goals: Total goals scored\n\n \u2022 Assists: Total assists\n\n \u2022 Points: Goals + Assists\n\n \u2022 Plus/Minus: Goal differential when on ice\n\nAll stats are season totals through the current date. Players must have played at least ", MIN_GAMES_PLAYED, " games to be included."),
   lastUpdated = format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC"),
-  source = "NHL Stats API / PlayoffStatus.com",
+  source = "NHL Stats API / PlayoffStatus.com / Natural Stat Trick",
   tags = list(
     list(label = "team", layout = "left", color = "#4CAF50"),
     list(label = "player", layout = "left", color = "#2196F3"),

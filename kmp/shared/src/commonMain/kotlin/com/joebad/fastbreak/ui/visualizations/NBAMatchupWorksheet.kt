@@ -406,6 +406,19 @@ fun NBAMatchupWorksheet(
                                 viewSelection = viewSelection,
                                 onViewSelectionChange = { viewSelection = it }
                             )
+
+                            // Source attribution at bottom of scrollable content
+                            visualization.source?.let { source ->
+                                Text(
+                                    text = "Source: $source",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontSize = 9.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 8.dp, vertical = 8.dp)
+                                )
+                            }
                         }
 
                         // Pinned header (team abbreviations + final score if available)
@@ -424,24 +437,12 @@ fun NBAMatchupWorksheet(
                             homeTeam = selectedMatchup.homeTeam.abbreviation,
                             matchup = selectedMatchup,
                             quadrantConfig = visualization.scatterPlotQuadrants,
+                            source = visualization.source,
                             onNetRatingShareClick = { callback -> netRatingShareCallback = callback },
                             onOffDefRatingShareClick = { callback -> offDefRatingShareCallback = callback }
                         )
                     }
                 }
-            }
-
-            // Source attribution
-            visualization.source?.let { source ->
-                Text(
-                    text = "Source: $source",
-                    style = MaterialTheme.typography.bodySmall,
-                    fontSize = 9.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 8.dp, vertical = 2.dp)
-                )
             }
         }
 
@@ -2148,6 +2149,7 @@ private fun NBAChartsTab(
     homeTeam: String,
     matchup: NBAMatchup,
     quadrantConfig: ScatterPlotQuadrants? = null,
+    source: String? = null,
     onNetRatingShareClick: ((() -> Unit)?) -> Unit = {},
     onOffDefRatingShareClick: ((()-> Unit) -> Unit)? = null
 ) {
@@ -2180,6 +2182,19 @@ private fun NBAChartsTab(
             quadrantConfig = quadrantConfig,
             onShareClick = onOffDefRatingShareClick
         )
+
+        // Source attribution at bottom of scrollable content
+        source?.let {
+            Text(
+                text = "Source: $it",
+                style = MaterialTheme.typography.bodySmall,
+                fontSize = 9.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 8.dp, vertical = 8.dp)
+            )
+        }
     }
 }
 
@@ -2708,12 +2723,20 @@ private fun CompletedGameSection(
         val awayComps = vsSeasonAvg?.away
         val homeComps = vsSeasonAvg?.home
 
-        // Helper to format difference string (diff is in 0-1 scale, multiply by 100 for display)
+        // Helper to format difference string (appended after value on left/away side)
         fun formatDiff(stat: com.joebad.fastbreak.data.model.NBAStatComparison?, isPct: Boolean = false): String {
             val diff = stat?.difference ?: return ""
             val displayDiff = if (isPct) diff * 100 else diff
             val prefix = if (displayDiff >= 0) "+" else ""
             return " (${prefix}${displayDiff.formatStat(1)})"
+        }
+
+        // Helper to format difference string (prepended before value on right/home side for mirrored layout)
+        fun formatDiffPrefix(stat: com.joebad.fastbreak.data.model.NBAStatComparison?, isPct: Boolean = false): String {
+            val diff = stat?.difference ?: return ""
+            val displayDiff = if (isPct) diff * 100 else diff
+            val prefix = if (displayDiff >= 0) "+" else ""
+            return "(${prefix}${displayDiff.formatStat(1)}) "
         }
 
         // FG%
@@ -2723,7 +2746,7 @@ private fun CompletedGameSection(
             ThreeColumnRow(
                 leftText = "${awayBox?.fgm ?: 0}/${awayBox?.fga ?: 0} ${(awayVal * 100).formatStat(0)}%${formatDiff(awayComps?.fieldGoalPct, isPct = true)}",
                 centerText = "FG",
-                rightText = "${homeBox?.fgm ?: 0}/${homeBox?.fga ?: 0} ${(homeVal * 100).formatStat(0)}%${formatDiff(homeComps?.fieldGoalPct, isPct = true)}",
+                rightText = "${formatDiffPrefix(homeComps?.fieldGoalPct, isPct = true)}${homeBox?.fgm ?: 0}/${homeBox?.fga ?: 0} ${(homeVal * 100).formatStat(0)}%",
                 advantage = if (awayVal > homeVal) -1 else if (homeVal > awayVal) 1 else 0
             )
         }
@@ -2735,7 +2758,7 @@ private fun CompletedGameSection(
             ThreeColumnRow(
                 leftText = "${awayBox?.fg3m ?: 0}/${awayBox?.fg3a ?: 0} ${(awayVal * 100).formatStat(0)}%${formatDiff(awayComps?.threePtPct, isPct = true)}",
                 centerText = "3PT",
-                rightText = "${homeBox?.fg3m ?: 0}/${homeBox?.fg3a ?: 0} ${(homeVal * 100).formatStat(0)}%${formatDiff(homeComps?.threePtPct, isPct = true)}",
+                rightText = "${formatDiffPrefix(homeComps?.threePtPct, isPct = true)}${homeBox?.fg3m ?: 0}/${homeBox?.fg3a ?: 0} ${(homeVal * 100).formatStat(0)}%",
                 advantage = if (awayVal > homeVal) -1 else if (homeVal > awayVal) 1 else 0
             )
         }
@@ -2747,7 +2770,7 @@ private fun CompletedGameSection(
             ThreeColumnRow(
                 leftText = "${awayBox?.ftm ?: 0}/${awayBox?.fta ?: 0} ${(awayVal * 100).formatStat(0)}%${formatDiff(awayComps?.freeThrowPct, isPct = true)}",
                 centerText = "FT",
-                rightText = "${homeBox?.ftm ?: 0}/${homeBox?.fta ?: 0} ${(homeVal * 100).formatStat(0)}%${formatDiff(homeComps?.freeThrowPct, isPct = true)}",
+                rightText = "${formatDiffPrefix(homeComps?.freeThrowPct, isPct = true)}${homeBox?.ftm ?: 0}/${homeBox?.fta ?: 0} ${(homeVal * 100).formatStat(0)}%",
                 advantage = if (awayVal > homeVal) -1 else if (homeVal > awayVal) 1 else 0
             )
         }
@@ -2759,7 +2782,7 @@ private fun CompletedGameSection(
             ThreeColumnRow(
                 leftText = "$awayVal (${awayBox?.oreb ?: 0}/${awayBox?.dreb ?: 0})${formatDiff(awayComps?.rebounds)}",
                 centerText = "REB",
-                rightText = "$homeVal (${homeBox?.oreb ?: 0}/${homeBox?.dreb ?: 0})${formatDiff(homeComps?.rebounds)}",
+                rightText = "${formatDiffPrefix(homeComps?.rebounds)}$homeVal (${homeBox?.oreb ?: 0}/${homeBox?.dreb ?: 0})",
                 advantage = if (awayVal > homeVal) -1 else if (homeVal > awayVal) 1 else 0
             )
         }
@@ -2771,7 +2794,7 @@ private fun CompletedGameSection(
             ThreeColumnRow(
                 leftText = "$awayVal${formatDiff(awayComps?.assists)}",
                 centerText = "AST",
-                rightText = "$homeVal${formatDiff(homeComps?.assists)}",
+                rightText = "${formatDiffPrefix(homeComps?.assists)}$homeVal",
                 advantage = if (awayVal > homeVal) -1 else if (homeVal > awayVal) 1 else 0
             )
         }
@@ -2783,7 +2806,7 @@ private fun CompletedGameSection(
             ThreeColumnRow(
                 leftText = "$awayVal${formatDiff(awayComps?.steals)}",
                 centerText = "STL",
-                rightText = "$homeVal${formatDiff(homeComps?.steals)}",
+                rightText = "${formatDiffPrefix(homeComps?.steals)}$homeVal",
                 advantage = if (awayVal > homeVal) -1 else if (homeVal > awayVal) 1 else 0
             )
         }
@@ -2795,7 +2818,7 @@ private fun CompletedGameSection(
             ThreeColumnRow(
                 leftText = "$awayVal${formatDiff(awayComps?.blocks)}",
                 centerText = "BLK",
-                rightText = "$homeVal${formatDiff(homeComps?.blocks)}",
+                rightText = "${formatDiffPrefix(homeComps?.blocks)}$homeVal",
                 advantage = if (awayVal > homeVal) -1 else if (homeVal > awayVal) 1 else 0
             )
         }
@@ -2807,7 +2830,7 @@ private fun CompletedGameSection(
             ThreeColumnRow(
                 leftText = "$awayVal${formatDiff(awayComps?.turnovers)}",
                 centerText = "TOV",
-                rightText = "$homeVal${formatDiff(homeComps?.turnovers)}",
+                rightText = "${formatDiffPrefix(homeComps?.turnovers)}$homeVal",
                 advantage = if (awayVal < homeVal) -1 else if (homeVal < awayVal) 1 else 0
             )
         }
@@ -2843,7 +2866,7 @@ private fun CompletedGameSection(
             ThreeColumnRow(
                 leftText = "${(awayVal * 100).formatStat(1)}%${formatDiff(awayComps?.tsPct, isPct = true)}",
                 centerText = "TS%",
-                rightText = "${(homeVal * 100).formatStat(1)}%${formatDiff(homeComps?.tsPct, isPct = true)}",
+                rightText = "${formatDiffPrefix(homeComps?.tsPct, isPct = true)}${(homeVal * 100).formatStat(1)}%",
                 advantage = if (awayVal > homeVal) -1 else if (homeVal > awayVal) 1 else 0
             )
         }
@@ -2855,7 +2878,7 @@ private fun CompletedGameSection(
             ThreeColumnRow(
                 leftText = "${(awayVal * 100).formatStat(1)}%${formatDiff(awayComps?.efgPct, isPct = true)}",
                 centerText = "eFG%",
-                rightText = "${(homeVal * 100).formatStat(1)}%${formatDiff(homeComps?.efgPct, isPct = true)}",
+                rightText = "${formatDiffPrefix(homeComps?.efgPct, isPct = true)}${(homeVal * 100).formatStat(1)}%",
                 advantage = if (awayVal > homeVal) -1 else if (homeVal > awayVal) 1 else 0
             )
         }

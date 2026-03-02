@@ -17,6 +17,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.TrendingUp
 import androidx.compose.material3.*
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.runtime.*
@@ -33,10 +35,17 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.joebad.fastbreak.data.model.LineChartDataPoint
+import com.joebad.fastbreak.data.model.LineChartSeries
 import com.joebad.fastbreak.data.model.NHLMatchup
 import com.joebad.fastbreak.data.model.NHLMatchupVisualization
 import com.joebad.fastbreak.data.model.NHLPlayerInfo
 import com.joebad.fastbreak.data.model.PlayoffProbability
+import com.joebad.fastbreak.data.model.QuadrantConfig
+import com.joebad.fastbreak.data.model.LeagueXgVsPointsStats
+import com.joebad.fastbreak.data.model.ScatterPlotDataPoint
+import com.joebad.fastbreak.ui.QuadrantScatterPlot
+import com.joebad.fastbreak.ui.TeamLegendEntry
 import com.joebad.fastbreak.platform.getImageExporter
 import com.joebad.fastbreak.ui.components.MultiOptionFab
 import com.joebad.fastbreak.ui.components.FabOption
@@ -224,6 +233,10 @@ fun NHLMatchupWorksheet(
     val graphicsLayer = rememberGraphicsLayer()
     val imageExporter = remember { getImageExporter() }
 
+    // Share callbacks from charts (set by chart components)
+    var cumXgfShareCallback by remember { mutableStateOf<(() -> Unit)?>(null) }
+    var xgVsPointsShareCallback by remember { mutableStateOf<(() -> Unit)?>(null) }
+
     // Format date and event label for share image
     val eventLabel = remember(selectedMatchup.gameDate, selectedMatchup.location) {
         val location = selectedMatchup.location?.fullLocation
@@ -380,6 +393,19 @@ fun NHLMatchupWorksheet(
                                 viewSelection = viewSelection,
                                 onViewSelectionChange = { viewSelection = it }
                             )
+
+                            // Source attribution at bottom of scrollable content
+                            visualization.source?.let { source ->
+                                Text(
+                                    text = "Source: $source",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontSize = 9.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 8.dp, vertical = 8.dp)
+                                )
+                            }
                         }
 
                         // Pinned header
@@ -392,32 +418,17 @@ fun NHLMatchupWorksheet(
                         )
                     }
                     1 -> {
-                        // Charts Tab (placeholder for future)
-                        Box(
-                            modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = "Charts coming soon",
-                                style = MaterialTheme.typography.bodyLarge,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
+                        // Charts Tab
+                        NHLChartsTab(
+                            awayTeam = selectedMatchup.awayTeam.abbreviation,
+                            homeTeam = selectedMatchup.homeTeam.abbreviation,
+                            matchup = selectedMatchup,
+                            source = visualization.source,
+                            onCumXgfShareClick = { callback -> cumXgfShareCallback = callback },
+                            onXgVsPointsShareClick = { callback -> xgVsPointsShareCallback = callback }
+                        )
                     }
                 }
-            }
-
-            // Source attribution
-            visualization.source?.let { source ->
-                Text(
-                    text = "Source: $source",
-                    style = MaterialTheme.typography.bodySmall,
-                    fontSize = 9.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 8.dp, vertical = 2.dp)
-                )
             }
         }
 
@@ -425,6 +436,28 @@ fun NHLMatchupWorksheet(
         val hasResults = selectedMatchup.results != null
 
         when {
+            // Charts tab: show chart share options
+            selectedTab == 1 -> {
+                val chartOptions = listOf(
+                    FabOption(
+                        icon = Icons.Filled.TrendingUp,
+                        label = "Cumulative xG%",
+                        onClick = { cumXgfShareCallback?.invoke() }
+                    ),
+                    FabOption(
+                        icon = Icons.Filled.Star,
+                        label = "xG% vs Points%",
+                        onClick = { xgVsPointsShareCallback?.invoke() }
+                    )
+                )
+                MultiOptionFab(
+                    options = chartOptions,
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(16.dp)
+                )
+            }
+            // Stats tab with results: show Pre Game and Post Game options
             selectedTab == 0 && hasResults -> {
                 val statsOptions = listOf(
                     FabOption(
@@ -761,7 +794,7 @@ private fun buildNHLShareStatBoxes(matchup: NHLMatchup): List<ShareStatBox> {
             ))
         }
 
-        // Box 6: One Month Trend
+        // Box 6: Recent Trend
         val awayTrend = parseNHLMonthTrend(matchup.awayTeam.stats)
         val homeTrend = parseNHLMonthTrend(matchup.homeTeam.stats)
         val rankAdv = { a: Int?, h: Int? ->
@@ -770,7 +803,7 @@ private fun buildNHLShareStatBoxes(matchup: NHLMatchup): List<ShareStatBox> {
             } else 0
         }
         add(ShareStatBox(
-            title = "One Month Trend",
+            title = "Recent Trend (Last 10 Weeks)",
             fiveColStats = listOfNotNull(
                 ShareFiveColStat(
                     leftValue = awayTrend?.let { "${it.wins}-${it.losses}" } ?: "-",
@@ -817,7 +850,19 @@ private fun buildNHLShareStatBoxes(matchup: NHLMatchup): List<ShareStatBox> {
                     rightRank = homeTrend?.goalDiffRank,
                     rightRankDisplay = homeTrend?.goalDiffRankDisplay,
                     advantage = rankAdv(awayTrend?.goalDiffRank, homeTrend?.goalDiffRank)
-                )
+                ),
+                if (awayTrend?.xgfPct != null || homeTrend?.xgfPct != null) {
+                    ShareFiveColStat(
+                        leftValue = awayTrend?.xgfPct.formatPct(1),
+                        leftRank = awayTrend?.xgfPctRank,
+                        leftRankDisplay = awayTrend?.xgfPctRankDisplay,
+                        centerText = "xG% (5v5)",
+                        rightValue = homeTrend?.xgfPct.formatPct(1),
+                        rightRank = homeTrend?.xgfPctRank,
+                        rightRankDisplay = homeTrend?.xgfPctRankDisplay,
+                        advantage = rankAdv(awayTrend?.xgfPctRank, homeTrend?.xgfPctRank)
+                    )
+                } else null
             ).take(9)
         ))
 
@@ -976,6 +1021,12 @@ private fun NHLPostGameShareImage(
             NHLCompactStatRow(awayBox.giveaways?.toString() ?: "-", "GIVEAWAYS", homeBox.giveaways?.toString() ?: "-", vsAvg?.away?.giveaways?.difference, vsAvg?.home?.giveaways?.difference, awayBox.giveaways?.toDouble(), homeBox.giveaways?.toDouble(), false)
             NHLCompactStatRow(awayBox.faceoffWinPct?.let { (it * 100).formatStat(1) + "%" } ?: "-", "FO%", homeBox.faceoffWinPct?.let { (it * 100).formatStat(1) + "%" } ?: "-", pctDiffToDisplay(vsAvg?.away?.faceoffPct), pctDiffToDisplay(vsAvg?.home?.faceoffPct), awayBox.faceoffWinPct, homeBox.faceoffWinPct, true)
             NHLCompactStatRow(awayBox.savePct?.let { (it * 100).formatStat(1) + "%" } ?: "-", "SV%", homeBox.savePct?.let { (it * 100).formatStat(1) + "%" } ?: "-", pctDiffToDisplay(vsAvg?.away?.savePct), pctDiffToDisplay(vsAvg?.home?.savePct), awayBox.savePct, homeBox.savePct, true)
+            if (awayBox.xgf != null || homeBox.xgf != null) {
+                NHLCompactStatRow(awayBox.xgf?.formatStat(2) ?: "-", "xGF", homeBox.xgf?.formatStat(2) ?: "-", null, null, awayBox.xgf, homeBox.xgf, true)
+            }
+            if (awayBox.xga != null || homeBox.xga != null) {
+                NHLCompactStatRow(awayBox.xga?.formatStat(2) ?: "-", "xGA", homeBox.xga?.formatStat(2) ?: "-", null, null, awayBox.xga, homeBox.xga, false)
+            }
         }
 
         Spacer(modifier = Modifier.weight(1f))
@@ -1580,7 +1631,7 @@ private fun NHLMonthTrendSection(
         return
     }
 
-    NHLSectionHeader("One Month Trend")
+    NHLSectionHeader("Recent Trend (Last 10 Weeks)")
     Spacer(modifier = Modifier.height(4.dp))
 
     // Record
@@ -1682,6 +1733,31 @@ private fun NHLMonthTrendSection(
         useNBARanks = false,
         useNHLRanks = true
     )
+
+    // xG% (5v5)
+    if (awayTrend?.xgfPct != null || homeTrend?.xgfPct != null) {
+        val xgAdvantage = when {
+            awayTrend?.xgfPctRank != null && homeTrend?.xgfPctRank != null ->
+                when {
+                    awayTrend.xgfPctRank < homeTrend.xgfPctRank -> -1
+                    homeTrend.xgfPctRank < awayTrend.xgfPctRank -> 1
+                    else -> 0
+                }
+            else -> 0
+        }
+        FiveColumnRowWithRanks(
+            leftValue = awayTrend?.xgfPct.formatPct(1),
+            leftRank = awayTrend?.xgfPctRank,
+            leftRankDisplay = awayTrend?.xgfPctRankDisplay,
+            centerText = "xG% (5v5)",
+            rightValue = homeTrend?.xgfPct.formatPct(1),
+            rightRank = homeTrend?.xgfPctRank,
+            rightRankDisplay = homeTrend?.xgfPctRankDisplay,
+            advantage = xgAdvantage,
+            useNBARanks = false,
+            useNHLRanks = true
+        )
+    }
 }
 
 /**
@@ -1700,7 +1776,10 @@ private data class NHLMonthTrend(
     val goalsAgainstRankDisplay: String?,
     val goalDiff: Double?,
     val goalDiffRank: Int?,
-    val goalDiffRankDisplay: String?
+    val goalDiffRankDisplay: String?,
+    val xgfPct: Double?,
+    val xgfPctRank: Int?,
+    val xgfPctRankDisplay: String?
 )
 
 /**
@@ -1730,6 +1809,11 @@ private fun parseNHLMonthTrend(stats: JsonObject): NHLMonthTrend? {
     val goalDiffRank = (goalDiffObj?.get("rank") as? JsonPrimitive)?.intOrNull
     val goalDiffRankDisplay = (goalDiffObj?.get("rankDisplay") as? JsonPrimitive)?.content
 
+    val xgfPctObj = monthTrend["xgfPct"] as? JsonObject
+    val xgfPct = (xgfPctObj?.get("value") as? JsonPrimitive)?.doubleOrNull
+    val xgfPctRank = (xgfPctObj?.get("rank") as? JsonPrimitive)?.intOrNull
+    val xgfPctRankDisplay = (xgfPctObj?.get("rankDisplay") as? JsonPrimitive)?.content
+
     return NHLMonthTrend(
         wins = wins,
         losses = losses,
@@ -1743,7 +1827,10 @@ private fun parseNHLMonthTrend(stats: JsonObject): NHLMonthTrend? {
         goalsAgainstRankDisplay = goalsAgainstRankDisplay,
         goalDiff = goalDiff,
         goalDiffRank = goalDiffRank,
-        goalDiffRankDisplay = goalDiffRankDisplay
+        goalDiffRankDisplay = goalDiffRankDisplay,
+        xgfPct = xgfPct,
+        xgfPctRank = xgfPctRank,
+        xgfPctRankDisplay = xgfPctRankDisplay
     )
 }
 
@@ -1763,11 +1850,18 @@ private fun NHLCompletedGameSection(matchup: NHLMatchup) {
         val awayBox = teamBoxScore.away
         val homeBox = teamBoxScore.home
 
-        // Helper to format difference string
+        // Helper to format difference string (appended after value for left/away side)
         fun formatDiff(diff: Double?): String {
             if (diff == null) return ""
             val prefix = if (diff >= 0) "+" else ""
             return " (${prefix}${diff.formatStat(1)})"
+        }
+
+        // Helper to format difference string (prepended before value for right/home side)
+        fun formatDiffPrefix(diff: Double?): String {
+            if (diff == null) return ""
+            val prefix = if (diff >= 0) "+" else ""
+            return "(${prefix}${diff.formatStat(1)}) "
         }
 
         // Goals with vs Season Avg
@@ -1779,7 +1873,7 @@ private fun NHLCompletedGameSection(matchup: NHLMatchup) {
             ThreeColumnRow(
                 leftText = "$awayVal${formatDiff(awayDiff)}",
                 centerText = "Goals",
-                rightText = "$homeVal${formatDiff(homeDiff)}",
+                rightText = "${formatDiffPrefix(homeDiff)}$homeVal",
                 advantage = if (awayVal > homeVal) -1 else if (homeVal > awayVal) 1 else 0
             )
         }
@@ -1793,7 +1887,7 @@ private fun NHLCompletedGameSection(matchup: NHLMatchup) {
             ThreeColumnRow(
                 leftText = "$awayVal${formatDiff(awayDiff)}",
                 centerText = "SOG",
-                rightText = "$homeVal${formatDiff(homeDiff)}",
+                rightText = "${formatDiffPrefix(homeDiff)}$homeVal",
                 advantage = if (awayVal > homeVal) -1 else if (homeVal > awayVal) 1 else 0
             )
         }
@@ -1807,7 +1901,7 @@ private fun NHLCompletedGameSection(matchup: NHLMatchup) {
             ThreeColumnRow(
                 leftText = "$awayVal${formatDiff(awayDiff)}",
                 centerText = "PP Goals",
-                rightText = "$homeVal${formatDiff(homeDiff)}",
+                rightText = "${formatDiffPrefix(homeDiff)}$homeVal",
                 advantage = if (awayVal > homeVal) -1 else if (homeVal > awayVal) 1 else 0
             )
         }
@@ -1821,7 +1915,7 @@ private fun NHLCompletedGameSection(matchup: NHLMatchup) {
             ThreeColumnRow(
                 leftText = "$awayVal${formatDiff(awayDiff)}",
                 centerText = "Hits",
-                rightText = "$homeVal${formatDiff(homeDiff)}",
+                rightText = "${formatDiffPrefix(homeDiff)}$homeVal",
                 advantage = if (awayVal > homeVal) -1 else if (homeVal > awayVal) 1 else 0
             )
         }
@@ -1835,7 +1929,7 @@ private fun NHLCompletedGameSection(matchup: NHLMatchup) {
             ThreeColumnRow(
                 leftText = "$awayVal${formatDiff(awayDiff)}",
                 centerText = "Blocks",
-                rightText = "$homeVal${formatDiff(homeDiff)}",
+                rightText = "${formatDiffPrefix(homeDiff)}$homeVal",
                 advantage = if (awayVal > homeVal) -1 else if (homeVal > awayVal) 1 else 0
             )
         }
@@ -1849,7 +1943,7 @@ private fun NHLCompletedGameSection(matchup: NHLMatchup) {
             ThreeColumnRow(
                 leftText = "$awayVal${formatDiff(awayDiff)}",
                 centerText = "PIM",
-                rightText = "$homeVal${formatDiff(homeDiff)}",
+                rightText = "${formatDiffPrefix(homeDiff)}$homeVal",
                 advantage = if (awayVal < homeVal) -1 else if (homeVal < awayVal) 1 else 0
             )
         }
@@ -1863,7 +1957,7 @@ private fun NHLCompletedGameSection(matchup: NHLMatchup) {
             ThreeColumnRow(
                 leftText = "$awayVal${formatDiff(awayDiff)}",
                 centerText = "Takeaways",
-                rightText = "$homeVal${formatDiff(homeDiff)}",
+                rightText = "${formatDiffPrefix(homeDiff)}$homeVal",
                 advantage = if (awayVal > homeVal) -1 else if (homeVal > awayVal) 1 else 0
             )
         }
@@ -1877,7 +1971,7 @@ private fun NHLCompletedGameSection(matchup: NHLMatchup) {
             ThreeColumnRow(
                 leftText = "$awayVal${formatDiff(awayDiff)}",
                 centerText = "Giveaways",
-                rightText = "$homeVal${formatDiff(homeDiff)}",
+                rightText = "${formatDiffPrefix(homeDiff)}$homeVal",
                 advantage = if (awayVal < homeVal) -1 else if (homeVal < awayVal) 1 else 0
             )
         }
@@ -1891,7 +1985,7 @@ private fun NHLCompletedGameSection(matchup: NHLMatchup) {
             ThreeColumnRow(
                 leftText = "${(awayVal * 100).formatStat(1)}%${formatDiff(awayDiff)}",
                 centerText = "Faceoff %",
-                rightText = "${(homeVal * 100).formatStat(1)}%${formatDiff(homeDiff)}",
+                rightText = "${formatDiffPrefix(homeDiff)}${(homeVal * 100).formatStat(1)}%",
                 advantage = if (awayVal > homeVal) -1 else if (homeVal > awayVal) 1 else 0
             )
         }
@@ -1905,8 +1999,32 @@ private fun NHLCompletedGameSection(matchup: NHLMatchup) {
             ThreeColumnRow(
                 leftText = "${(awayVal * 100).formatStat(1)}%${formatDiff(awayDiff)}",
                 centerText = "Save %",
-                rightText = "${(homeVal * 100).formatStat(1)}%${formatDiff(homeDiff)}",
+                rightText = "${formatDiffPrefix(homeDiff)}${(homeVal * 100).formatStat(1)}%",
                 advantage = if (awayVal > homeVal) -1 else if (homeVal > awayVal) 1 else 0
+            )
+        }
+
+        // xGF (5v5) - higher is better
+        if (awayBox?.xgf != null || homeBox?.xgf != null) {
+            val awayVal = awayBox?.xgf ?: 0.0
+            val homeVal = homeBox?.xgf ?: 0.0
+            ThreeColumnRow(
+                leftText = awayVal.formatStat(2),
+                centerText = "xGF (5v5)",
+                rightText = homeVal.formatStat(2),
+                advantage = if (awayVal > homeVal) -1 else if (homeVal > awayVal) 1 else 0
+            )
+        }
+
+        // xGA (5v5) - lower is better
+        if (awayBox?.xga != null || homeBox?.xga != null) {
+            val awayVal = awayBox?.xga ?: 0.0
+            val homeVal = homeBox?.xga ?: 0.0
+            ThreeColumnRow(
+                leftText = awayVal.formatStat(2),
+                centerText = "xGA (5v5)",
+                rightText = homeVal.formatStat(2),
+                advantage = if (awayVal < homeVal) -1 else if (homeVal < awayVal) 1 else 0
             )
         }
 
@@ -2160,4 +2278,315 @@ private fun NHLPlayoffProbabilityText(
             )
         }
     }
+}
+
+// ============================================================================
+// Charts Tab
+// ============================================================================
+
+@Composable
+private fun NHLChartsTab(
+    awayTeam: String,
+    homeTeam: String,
+    matchup: NHLMatchup,
+    source: String? = null,
+    onCumXgfShareClick: ((() -> Unit)?) -> Unit = {},
+    onXgVsPointsShareClick: ((()-> Unit) -> Unit)? = null
+) {
+    val scrollState = rememberScrollState()
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(scrollState)
+            .padding(top = 16.dp, bottom = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        CumulativeXgfPctChart(
+            awayTeam = awayTeam,
+            homeTeam = homeTeam,
+            awayStats = matchup.awayTeam.stats,
+            homeStats = matchup.homeTeam.stats,
+            tenthXgfPctByWeek = matchup.tenthXgfPctByWeek,
+            onShareClick = onCumXgfShareClick
+        )
+
+        XgVsPointsPctScatter(
+            awayTeam = awayTeam,
+            homeTeam = homeTeam,
+            awayStats = matchup.awayTeam.stats,
+            homeStats = matchup.homeTeam.stats,
+            leagueStats = matchup.leagueXgVsPointsStats,
+            onShareClick = onXgVsPointsShareClick
+        )
+
+        // Source attribution at bottom of scrollable content
+        source?.let {
+            Text(
+                text = "Source: $it",
+                style = MaterialTheme.typography.bodySmall,
+                fontSize = 9.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 8.dp, vertical = 8.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun CumulativeXgfPctChart(
+    awayTeam: String,
+    homeTeam: String,
+    awayStats: JsonObject,
+    homeStats: JsonObject,
+    tenthXgfPctByWeek: JsonObject? = null,
+    onShareClick: ((() -> Unit)?) -> Unit = {}
+) {
+    Text(
+        text = "Cumulative xG% - Last 10 Weeks (5v5)",
+        style = MaterialTheme.typography.titleSmall,
+        fontWeight = FontWeight.Bold,
+        modifier = Modifier.padding(bottom = 4.dp)
+    )
+
+    val awayDataPoints = parseXgfPctByWeek(awayStats, "cumXgfPctByWeek")
+    val homeDataPoints = parseXgfPctByWeek(homeStats, "cumXgfPctByWeek")
+
+    if (awayDataPoints.isEmpty() && homeDataPoints.isEmpty()) {
+        Text(
+            text = "Cumulative xG% (last 10 weeks) data not available",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        return
+    }
+
+    val tenthPoints = parseTenthXgfPctByWeek(tenthXgfPctByWeek)
+    val referenceLines = if (tenthPoints.isNotEmpty()) {
+        listOf(
+            HorizontalReferenceLine(
+                yValue = tenthPoints,
+                color = "#4CAF50",
+                label = "#10"
+            )
+        )
+    } else {
+        emptyList()
+    }
+
+    val series = listOf(
+        LineChartSeries(
+            label = awayTeam,
+            dataPoints = awayDataPoints,
+            color = "#2196F3"
+        ),
+        LineChartSeries(
+            label = homeTeam,
+            dataPoints = homeDataPoints,
+            color = "#FF5722"
+        )
+    )
+
+    LineChartComponent(
+        series = series,
+        modifier = Modifier.fillMaxWidth(),
+        yAxisTitle = "xG%",
+        referenceLines = referenceLines,
+        title = "Cumulative xG% (Last 10 Wks) - $awayTeam @ $homeTeam",
+        source = "Natural Stat Trick",
+        onShareClick = onShareClick
+    )
+}
+
+@Composable
+private fun XgVsPointsPctScatter(
+    awayTeam: String,
+    homeTeam: String,
+    awayStats: JsonObject,
+    homeStats: JsonObject,
+    leagueStats: LeagueXgVsPointsStats? = null,
+    onShareClick: ((()-> Unit) -> Unit)? = null
+) {
+    var weekFilter by remember { mutableStateOf(0) }
+
+    // Parse weekly xG% and Points% for each team
+    val awayXg = parseWeeklyValues(awayStats, "weeklyXgfPct")
+    val homeXg = parseWeeklyValues(homeStats, "weeklyXgfPct")
+    val awayPts = parseWeeklyValues(awayStats, "weeklyPointsPct")
+    val homePts = parseWeeklyValues(homeStats, "weeklyPointsPct")
+
+    // Build scatter data points — only include weeks that have both xG% and Points%
+    val allPoints = mutableListOf<ScatterPlotDataPoint>()
+
+    for (week in 1..10) {
+        val axg = awayXg[week]
+        val apts = awayPts[week]
+        if (axg != null && apts != null) {
+            allPoints.add(
+                ScatterPlotDataPoint(
+                    label = "$awayTeam W$week",
+                    x = apts,
+                    y = axg,
+                    sum = 0.0,
+                    teamCode = awayTeam,
+                    color = "#2196F3"
+                )
+            )
+        }
+
+        val hxg = homeXg[week]
+        val hpts = homePts[week]
+        if (hxg != null && hpts != null) {
+            allPoints.add(
+                ScatterPlotDataPoint(
+                    label = "$homeTeam W$week",
+                    x = hpts,
+                    y = hxg,
+                    sum = 0.0,
+                    teamCode = homeTeam,
+                    color = "#FF5722"
+                )
+            )
+        }
+    }
+
+    // Apply week filter
+    val filteredPoints = when (weekFilter) {
+        1 -> allPoints.filter { pt ->
+            val weekNum = pt.label.substringAfter("W").toIntOrNull() ?: 0
+            weekNum in 6..10
+        }
+        2 -> allPoints.filter { pt ->
+            val weekNum = pt.label.substringAfter("W").toIntOrNull() ?: 0
+            weekNum in 1..5
+        }
+        else -> allPoints
+    }
+
+    Column {
+        Text(
+            text = "xG% vs Points% by Week (5v5)",
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(bottom = 8.dp)
+        )
+
+        // Filter badges
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                TeamStatsNavBadge(
+                    text = "All 10 Wks",
+                    isSelected = weekFilter == 0,
+                    onClick = { weekFilter = 0 }
+                )
+                TeamStatsNavBadge(
+                    text = "Last 5 Wks",
+                    isSelected = weekFilter == 1,
+                    onClick = { weekFilter = 1 }
+                )
+                TeamStatsNavBadge(
+                    text = "Prior 5 Wks",
+                    isSelected = weekFilter == 2,
+                    onClick = { weekFilter = 2 }
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        if (filteredPoints.isEmpty()) {
+            Text(
+                text = "xG% vs Points% data not available",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        } else {
+            QuadrantScatterPlot(
+                data = filteredPoints,
+                modifier = Modifier.fillMaxWidth(),
+                title = "xG% vs Points% (Last 10 Wks) - $awayTeam @ $homeTeam",
+                xAxisLabel = "Points %",
+                yAxisLabel = "xG% 5v5",
+                highlightedTeamCodes = setOf(awayTeam, homeTeam),
+                quadrantTopRight = QuadrantConfig(label = "Elite", color = "#4CAF50", lightModeColor = "#4CAF50"),
+                quadrantTopLeft = QuadrantConfig(label = "Unlucky", color = "#2196F3", lightModeColor = "#2196F3"),
+                quadrantBottomLeft = QuadrantConfig(label = "Struggling", color = "#F44336", lightModeColor = "#F44336"),
+                quadrantBottomRight = QuadrantConfig(label = "Overperforming", color = "#FF9800", lightModeColor = "#FF9800"),
+                customCenterX = leagueStats?.avgPointsPct ?: 50.0,
+                customCenterY = leagueStats?.avgXgPct ?: 50.0,
+                customXMin = leagueStats?.minPointsPct,
+                customXMax = leagueStats?.maxPointsPct,
+                customYMin = leagueStats?.minXgPct,
+                customYMax = leagueStats?.maxXgPct,
+                source = "Natural Stat Trick / NHL API",
+                onShareClick = onShareClick,
+                teamLegendItems = listOf(
+                    TeamLegendEntry(awayTeam, Color(0xFF2196F3)),
+                    TeamLegendEntry(homeTeam, Color(0xFFFF5722))
+                )
+            )
+        }
+    }
+}
+
+/**
+ * Parse weekly values (xG% or Points%) from stats JSON.
+ * Returns a map of weekNum -> value.
+ */
+private fun parseWeeklyValues(stats: JsonObject, key: String): Map<Int, Double> {
+    val result = mutableMapOf<Int, Double>()
+    val weekData = stats[key]
+    if (weekData is JsonObject) {
+        weekData.forEach { (weekKey, value) ->
+            val weekNum = weekKey.removePrefix("week-").toIntOrNull()
+            val v = (value as? JsonPrimitive)?.doubleOrNull
+            if (weekNum != null && v != null) {
+                result[weekNum] = v
+            }
+        }
+    }
+    return result
+}
+
+// ============================================================================
+// JSON Parsing Helpers for xG% Charts
+// ============================================================================
+
+private fun parseXgfPctByWeek(stats: JsonObject, key: String): List<LineChartDataPoint> {
+    val dataPoints = mutableListOf<LineChartDataPoint>()
+
+    val weekData = stats[key]
+    if (weekData is JsonObject) {
+        weekData.forEach { (weekKey, value) ->
+            val weekNum = weekKey.removePrefix("week-").toIntOrNull()
+            val xgfPct = (value as? JsonPrimitive)?.doubleOrNull
+            if (weekNum != null && xgfPct != null) {
+                dataPoints.add(LineChartDataPoint(x = weekNum.toDouble(), y = xgfPct))
+            }
+        }
+    }
+
+    return dataPoints.sortedBy { it.x }
+}
+
+private fun parseTenthXgfPctByWeek(data: JsonObject?): List<Pair<Double, Double>> {
+    if (data == null) return emptyList()
+
+    val points = mutableListOf<Pair<Double, Double>>()
+
+    data.forEach { (weekKey, value) ->
+        val weekNum = weekKey.removePrefix("week-").toIntOrNull()
+        val xgfPct = (value as? JsonPrimitive)?.doubleOrNull
+        if (weekNum != null && xgfPct != null) {
+            points.add(Pair(weekNum.toDouble(), xgfPct))
+        }
+    }
+
+    return points.sortedBy { it.first }
 }

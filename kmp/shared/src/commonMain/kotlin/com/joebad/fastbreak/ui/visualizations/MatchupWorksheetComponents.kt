@@ -85,31 +85,24 @@ fun getNBATeamRankColor(rank: Int?): Color {
 val nbaPlayerRankColors: Map<Int, Color> = buildMap {
     put(0, Color.Transparent) // For null ranks
 
-    // Dark red for ranks 61+
-    val darkestRed = Color(139, 0, 0)
+    val darkGreen = Color(0, 120, 0)
+    val darkOrange = Color(200, 120, 0)
+    val darkRed = Color(139, 0, 0)
 
     for (rank in 1..100) {
         val color = when {
+            rank <= 5 -> darkGreen
+            rank <= 15 -> darkOrange
             rank <= 30 -> {
-                // Green gradient (ranks 1-30): Dark green to lighter green
-                val ratio = (rank - 1) / 29f
-                val red = (0 + ratio * 100).toInt()
-                val green = (100 + ratio * 80).toInt()
-                val blue = 0
-                Color(red, green, blue)
+                // Gradient from dark orange to dark red (ranks 16-30)
+                val ratio = (rank - 16) / 14f
+                Color(
+                    (200 + ratio * (139 - 200)).toInt(),
+                    (120 - ratio * 120).toInt(),
+                    0
+                )
             }
-            rank <= 60 -> {
-                // Orange to red gradient (ranks 31-60)
-                val ratio = (rank - 31) / 29f
-                val red = (200 + ratio * 15).toInt()
-                val green = (180 - ratio * 180).toInt()
-                val blue = 0
-                Color(red, green, blue)
-            }
-            else -> {
-                // Dark red for ranks 61+
-                darkestRed
-            }
+            else -> darkRed
         }
         put(rank, color)
     }

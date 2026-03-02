@@ -17,6 +17,7 @@ import com.joebad.fastbreak.ui.container.RegistryContainer
 import com.joebad.fastbreak.ui.theme.SystemThemeDetector
 import com.joebad.fastbreak.ui.theme.ThemeRepository
 import com.russhwolf.settings.Settings
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -29,8 +30,12 @@ fun MainViewController(): UIViewController {
         systemThemeDetector = SystemThemeDetector()
     )
 
-    // Create coroutine scope
-    val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
+    // Create coroutine scope with exception handler to prevent unhandled exceptions from crashing the app
+    val exceptionHandler = CoroutineExceptionHandler { _, exception ->
+        println("❌ Unhandled coroutine exception: ${exception.message}")
+        exception.printStackTrace()
+    }
+    val scope = CoroutineScope(Dispatchers.Main + SupervisorJob() + exceptionHandler)
 
     // Create repositories
     val registryRepository = RegistryRepository(settings)

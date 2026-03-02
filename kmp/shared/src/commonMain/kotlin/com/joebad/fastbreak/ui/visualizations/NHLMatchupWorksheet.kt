@@ -69,6 +69,13 @@ private data class NhlCaptureRequest(
 )
 
 /**
+ * Helper to format percentage values stored as 0-1 decimals
+ */
+private fun Double?.formatPct(decimals: Int = 1): String {
+    return this?.let { (it * 100).formatStat(decimals) + "%" } ?: "-"
+}
+
+/**
  * Helper to format doubles with specified decimal places
  */
 private fun Double.formatStat(decimals: Int = 1): String {
@@ -571,8 +578,9 @@ private fun buildNHLShareStatBoxes(matchup: NHLMatchup): List<ShareStatBox> {
         add(ShareStatBox(
             title = "Offensive Stats",
             fiveColStats = matchup.comparisons?.sideBySide?.offense?.mapNotNull { (_, stat) ->
-                val awayValue = stat.away.value?.formatStat(2) ?: return@mapNotNull null
-                val homeValue = stat.home.value?.formatStat(2) ?: return@mapNotNull null
+                val isPct = stat.label.contains("%")
+                val awayValue = stat.away.value?.let { if (isPct) (it * 100).formatStat(1) + "%" else it.formatStat(2) } ?: return@mapNotNull null
+                val homeValue = stat.home.value?.let { if (isPct) (it * 100).formatStat(1) + "%" else it.formatStat(2) } ?: return@mapNotNull null
                 val advantage = if (stat.away.rank != null && stat.home.rank != null) {
                     when {
                         stat.away.rank < stat.home.rank -> -1
@@ -598,8 +606,9 @@ private fun buildNHLShareStatBoxes(matchup: NHLMatchup): List<ShareStatBox> {
         add(ShareStatBox(
             title = "Defensive Stats",
             fiveColStats = matchup.comparisons?.sideBySide?.defense?.mapNotNull { (_, stat) ->
-                val awayValue = stat.away.value?.formatStat(2) ?: return@mapNotNull null
-                val homeValue = stat.home.value?.formatStat(2) ?: return@mapNotNull null
+                val isPct = stat.label.contains("%")
+                val awayValue = stat.away.value?.let { if (isPct) (it * 100).formatStat(1) + "%" else it.formatStat(2) } ?: return@mapNotNull null
+                val homeValue = stat.home.value?.let { if (isPct) (it * 100).formatStat(1) + "%" else it.formatStat(2) } ?: return@mapNotNull null
                 val advantage = if (stat.away.rank != null && stat.home.rank != null) {
                     when {
                         stat.away.rank < stat.home.rank -> -1
@@ -628,8 +637,9 @@ private fun buildNHLShareStatBoxes(matchup: NHLMatchup): List<ShareStatBox> {
             middleLabel = "vs",
             rightLabel = "${matchup.homeTeam.abbreviation} Def",
             fiveColStats = matchup.comparisons?.awayOffVsHomeDef?.mapNotNull { (_, stat) ->
-                val offValue = stat.offense.value?.formatStat(2) ?: return@mapNotNull null
-                val defValue = stat.defense.value?.formatStat(2) ?: return@mapNotNull null
+                val isPct = stat.offLabel.contains("%")
+                val offValue = stat.offense.value?.let { if (isPct) (it * 100).formatStat(1) + "%" else it.formatStat(2) } ?: return@mapNotNull null
+                val defValue = stat.defense.value?.let { if (isPct) (it * 100).formatStat(1) + "%" else it.formatStat(2) } ?: return@mapNotNull null
 
                 ShareFiveColStat(
                     leftValue = offValue,
@@ -653,8 +663,9 @@ private fun buildNHLShareStatBoxes(matchup: NHLMatchup): List<ShareStatBox> {
             leftColor = Team2Color,
             rightColor = Team1Color,
             fiveColStats = matchup.comparisons?.homeOffVsAwayDef?.mapNotNull { (_, stat) ->
-                val offValue = stat.offense.value?.formatStat(2) ?: return@mapNotNull null
-                val defValue = stat.defense.value?.formatStat(2) ?: return@mapNotNull null
+                val isPct = stat.offLabel.contains("%")
+                val offValue = stat.offense.value?.let { if (isPct) (it * 100).formatStat(1) + "%" else it.formatStat(2) } ?: return@mapNotNull null
+                val defValue = stat.defense.value?.let { if (isPct) (it * 100).formatStat(1) + "%" else it.formatStat(2) } ?: return@mapNotNull null
 
                 ShareFiveColStat(
                     leftValue = offValue,
@@ -750,86 +761,65 @@ private fun buildNHLShareStatBoxes(matchup: NHLMatchup): List<ShareStatBox> {
             ))
         }
 
-        // Box 6: Key Player #2 (if exists)
-        if (matchup.awayPlayers.size > 1 && matchup.homePlayers.size > 1) {
-            val awayPlayer = matchup.awayPlayers[1]
-            val homePlayer = matchup.homePlayers[1]
-
-            add(ShareStatBox(
-                title = "${awayPlayer.name} vs ${homePlayer.name}",
-                leftLabel = awayPlayer.name,
-                middleLabel = "vs",
-                rightLabel = homePlayer.name,
-                fiveColStats = listOfNotNull(
-                    ShareFiveColStat(
-                        leftValue = awayPlayer.goals.value?.toInt()?.toString() ?: "-",
-                        leftRank = awayPlayer.goals.rank,
-                        leftRankDisplay = awayPlayer.goals.rankDisplay,
-                        centerText = "Goals",
-                        rightValue = homePlayer.goals.value?.toInt()?.toString() ?: "-",
-                        rightRank = homePlayer.goals.rank,
-                        rightRankDisplay = homePlayer.goals.rankDisplay,
-                        advantage = 0,
-                        usePlayerRanks = true
-                    ),
-                    ShareFiveColStat(
-                        leftValue = awayPlayer.assists.value?.toInt()?.toString() ?: "-",
-                        leftRank = awayPlayer.assists.rank,
-                        leftRankDisplay = awayPlayer.assists.rankDisplay,
-                        centerText = "Assists",
-                        rightValue = homePlayer.assists.value?.toInt()?.toString() ?: "-",
-                        rightRank = homePlayer.assists.rank,
-                        rightRankDisplay = homePlayer.assists.rankDisplay,
-                        advantage = 0,
-                        usePlayerRanks = true
-                    ),
-                    ShareFiveColStat(
-                        leftValue = awayPlayer.points.value?.toInt()?.toString() ?: "-",
-                        leftRank = awayPlayer.points.rank,
-                        leftRankDisplay = awayPlayer.points.rankDisplay,
-                        centerText = "Points",
-                        rightValue = homePlayer.points.value?.toInt()?.toString() ?: "-",
-                        rightRank = homePlayer.points.rank,
-                        rightRankDisplay = homePlayer.points.rankDisplay,
-                        advantage = 0,
-                        usePlayerRanks = true
-                    ),
-                    ShareFiveColStat(
-                        leftValue = awayPlayer.plusMinus.value?.let { if (it >= 0) "+${it.toInt()}" else it.toInt().toString() } ?: "-",
-                        leftRank = awayPlayer.plusMinus.rank,
-                        leftRankDisplay = awayPlayer.plusMinus.rankDisplay,
-                        centerText = "+/-",
-                        rightValue = homePlayer.plusMinus.value?.let { if (it >= 0) "+${it.toInt()}" else it.toInt().toString() } ?: "-",
-                        rightRank = homePlayer.plusMinus.rank,
-                        rightRankDisplay = homePlayer.plusMinus.rankDisplay,
-                        advantage = 0,
-                        usePlayerRanks = true
-                    ),
-                    ShareFiveColStat(
-                        leftValue = awayPlayer.pointsPerGame.value?.formatStat(2) ?: "-",
-                        leftRank = awayPlayer.pointsPerGame.rank,
-                        leftRankDisplay = awayPlayer.pointsPerGame.rankDisplay,
-                        centerText = "Pts/Game",
-                        rightValue = homePlayer.pointsPerGame.value?.formatStat(2) ?: "-",
-                        rightRank = homePlayer.pointsPerGame.rank,
-                        rightRankDisplay = homePlayer.pointsPerGame.rankDisplay,
-                        advantage = 0,
-                        usePlayerRanks = true
-                    ),
-                    ShareFiveColStat(
-                        leftValue = awayPlayer.gamesPlayed.value?.toInt()?.toString() ?: "-",
-                        leftRank = awayPlayer.gamesPlayed.rank,
-                        leftRankDisplay = awayPlayer.gamesPlayed.rankDisplay,
-                        centerText = "Games",
-                        rightValue = homePlayer.gamesPlayed.value?.toInt()?.toString() ?: "-",
-                        rightRank = homePlayer.gamesPlayed.rank,
-                        rightRankDisplay = homePlayer.gamesPlayed.rankDisplay,
-                        advantage = 0,
-                        usePlayerRanks = true
-                    )
-                ).take(9)
-            ))
+        // Box 6: One Month Trend
+        val awayTrend = parseNHLMonthTrend(matchup.awayTeam.stats)
+        val homeTrend = parseNHLMonthTrend(matchup.homeTeam.stats)
+        val rankAdv = { a: Int?, h: Int? ->
+            if (a != null && h != null) when {
+                a < h -> -1; h < a -> 1; else -> 0
+            } else 0
         }
+        add(ShareStatBox(
+            title = "One Month Trend",
+            fiveColStats = listOfNotNull(
+                ShareFiveColStat(
+                    leftValue = awayTrend?.let { "${it.wins}-${it.losses}" } ?: "-",
+                    leftRank = awayTrend?.recordRank,
+                    leftRankDisplay = awayTrend?.recordRankDisplay,
+                    centerText = "Record",
+                    rightValue = homeTrend?.let { "${it.wins}-${it.losses}" } ?: "-",
+                    rightRank = homeTrend?.recordRank,
+                    rightRankDisplay = homeTrend?.recordRankDisplay,
+                    advantage = rankAdv(awayTrend?.recordRank, homeTrend?.recordRank)
+                ),
+                ShareFiveColStat(
+                    leftValue = awayTrend?.goalsFor?.formatStat(2) ?: "-",
+                    leftRank = awayTrend?.goalsForRank,
+                    leftRankDisplay = awayTrend?.goalsForRankDisplay,
+                    centerText = "GF/G",
+                    rightValue = homeTrend?.goalsFor?.formatStat(2) ?: "-",
+                    rightRank = homeTrend?.goalsForRank,
+                    rightRankDisplay = homeTrend?.goalsForRankDisplay,
+                    advantage = rankAdv(awayTrend?.goalsForRank, homeTrend?.goalsForRank)
+                ),
+                ShareFiveColStat(
+                    leftValue = awayTrend?.goalsAgainst?.formatStat(2) ?: "-",
+                    leftRank = awayTrend?.goalsAgainstRank,
+                    leftRankDisplay = awayTrend?.goalsAgainstRankDisplay,
+                    centerText = "GA/G",
+                    rightValue = homeTrend?.goalsAgainst?.formatStat(2) ?: "-",
+                    rightRank = homeTrend?.goalsAgainstRank,
+                    rightRankDisplay = homeTrend?.goalsAgainstRankDisplay,
+                    advantage = rankAdv(awayTrend?.goalsAgainstRank, homeTrend?.goalsAgainstRank)
+                ),
+                ShareFiveColStat(
+                    leftValue = awayTrend?.goalDiff?.let {
+                        val sign = if (it > 0) "+" else ""
+                        "$sign${it.formatStat(2)}"
+                    } ?: "-",
+                    leftRank = awayTrend?.goalDiffRank,
+                    leftRankDisplay = awayTrend?.goalDiffRankDisplay,
+                    centerText = "Goal Diff/G",
+                    rightValue = homeTrend?.goalDiff?.let {
+                        val sign = if (it > 0) "+" else ""
+                        "$sign${it.formatStat(2)}"
+                    } ?: "-",
+                    rightRank = homeTrend?.goalDiffRank,
+                    rightRankDisplay = homeTrend?.goalDiffRankDisplay,
+                    advantage = rankAdv(awayTrend?.goalDiffRank, homeTrend?.goalDiffRank)
+                )
+            ).take(9)
+        ))
 
         // Fill to exactly 6 boxes if needed
         while (size < 6) {
@@ -984,8 +974,8 @@ private fun NHLPostGameShareImage(
             NHLCompactStatRow(awayBox.pim?.toString() ?: "-", "PIM", homeBox.pim?.toString() ?: "-", vsAvg?.away?.pim?.difference, vsAvg?.home?.pim?.difference, awayBox.pim?.toDouble(), homeBox.pim?.toDouble(), false)
             NHLCompactStatRow(awayBox.takeaways?.toString() ?: "-", "TAKEAWAYS", homeBox.takeaways?.toString() ?: "-", vsAvg?.away?.takeaways?.difference, vsAvg?.home?.takeaways?.difference, awayBox.takeaways?.toDouble(), homeBox.takeaways?.toDouble(), true)
             NHLCompactStatRow(awayBox.giveaways?.toString() ?: "-", "GIVEAWAYS", homeBox.giveaways?.toString() ?: "-", vsAvg?.away?.giveaways?.difference, vsAvg?.home?.giveaways?.difference, awayBox.giveaways?.toDouble(), homeBox.giveaways?.toDouble(), false)
-            NHLCompactStatRow(awayBox.faceoffWinPct?.let { (it * 100).formatStat(1) + "%" } ?: "-", "FO%", homeBox.faceoffWinPct?.let { (it * 100).formatStat(1) + "%" } ?: "-", vsAvg?.away?.faceoffPct?.difference, vsAvg?.home?.faceoffPct?.difference, awayBox.faceoffWinPct, homeBox.faceoffWinPct, true)
-            NHLCompactStatRow(awayBox.savePct?.let { (it * 100).formatStat(1) + "%" } ?: "-", "SV%", homeBox.savePct?.let { (it * 100).formatStat(1) + "%" } ?: "-", vsAvg?.away?.savePct?.difference, vsAvg?.home?.savePct?.difference, awayBox.savePct, homeBox.savePct, true)
+            NHLCompactStatRow(awayBox.faceoffWinPct?.let { (it * 100).formatStat(1) + "%" } ?: "-", "FO%", homeBox.faceoffWinPct?.let { (it * 100).formatStat(1) + "%" } ?: "-", pctDiffToDisplay(vsAvg?.away?.faceoffPct), pctDiffToDisplay(vsAvg?.home?.faceoffPct), awayBox.faceoffWinPct, homeBox.faceoffWinPct, true)
+            NHLCompactStatRow(awayBox.savePct?.let { (it * 100).formatStat(1) + "%" } ?: "-", "SV%", homeBox.savePct?.let { (it * 100).formatStat(1) + "%" } ?: "-", pctDiffToDisplay(vsAvg?.away?.savePct), pctDiffToDisplay(vsAvg?.home?.savePct), awayBox.savePct, homeBox.savePct, true)
         }
 
         Spacer(modifier = Modifier.weight(1f))
@@ -1183,7 +1173,7 @@ private fun NHLRecordSection(
                         text = awayRecordLine ?: "",
                         style = MaterialTheme.typography.bodySmall.copy(lineHeight = 12.sp),
                         fontSize = 10.sp,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                        color = MaterialTheme.colorScheme.onSurface,
                         maxLines = 1
                     )
                 }
@@ -1192,7 +1182,7 @@ private fun NHLRecordSection(
                         text = awayConfRank,
                         style = MaterialTheme.typography.bodySmall.copy(lineHeight = 12.sp),
                         fontSize = 10.sp,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                        color = MaterialTheme.colorScheme.onSurface,
                         maxLines = 1,
                         modifier = Modifier.padding(start = if (awayConferenceRank != null) 10.dp else 0.dp)
                     )
@@ -1212,7 +1202,7 @@ private fun NHLRecordSection(
                         text = homeRecordLine ?: "",
                         style = MaterialTheme.typography.bodySmall.copy(lineHeight = 12.sp),
                         fontSize = 10.sp,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                        color = MaterialTheme.colorScheme.onSurface,
                         textAlign = TextAlign.End,
                         maxLines = 1
                     )
@@ -1233,7 +1223,7 @@ private fun NHLRecordSection(
                         text = homeConfRank,
                         style = MaterialTheme.typography.bodySmall.copy(lineHeight = 12.sp),
                         fontSize = 10.sp,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                        color = MaterialTheme.colorScheme.onSurface,
                         textAlign = TextAlign.End,
                         maxLines = 1,
                         modifier = Modifier.padding(end = if (homeConferenceRank != null) 10.dp else 0.dp)
@@ -1392,8 +1382,9 @@ private fun NHLTeamStatsView(matchup: NHLMatchup) {
                 }
             } else 0
 
-            val awayText = awayValue?.formatStat(2) ?: "-"
-            val homeText = homeValue?.formatStat(2) ?: "-"
+            val isPct = label.contains("%")
+            val awayText = if (isPct) awayValue.formatPct(1) else awayValue?.formatStat(2) ?: "-"
+            val homeText = if (isPct) homeValue.formatPct(1) else homeValue?.formatStat(2) ?: "-"
 
             FiveColumnRowWithRanks(
                 leftValue = awayText,
@@ -1432,8 +1423,9 @@ private fun NHLTeamStatsView(matchup: NHLMatchup) {
                 }
             } else 0
 
-            val awayText = awayValue?.formatStat(2) ?: "-"
-            val homeText = homeValue?.formatStat(2) ?: "-"
+            val isPct = label.contains("%")
+            val awayText = if (isPct) awayValue.formatPct(1) else awayValue?.formatStat(2) ?: "-"
+            val homeText = if (isPct) homeValue.formatPct(1) else homeValue?.formatStat(2) ?: "-"
 
             FiveColumnRowWithRanks(
                 leftValue = awayText,
@@ -1486,12 +1478,13 @@ private fun NHLVersusView(
                 val defRankDisplay = stat.defense.rankDisplay
 
                 if (offValue != null && defValue != null) {
+                    val isPct = offLabel.contains("%")
                     FiveColumnRowWithRanks(
-                        leftValue = offValue.formatStat(2),
+                        leftValue = if (isPct) (offValue * 100).formatStat(1) + "%" else offValue.formatStat(2),
                         leftRank = offRank,
                         leftRankDisplay = offRankDisplay,
                         centerText = offLabel,
-                        rightValue = defValue.formatStat(2),
+                        rightValue = if (isPct) (defValue * 100).formatStat(1) + "%" else defValue.formatStat(2),
                         rightRank = defRank,
                         rightRankDisplay = defRankDisplay,
                         advantage = advantage,
@@ -1893,8 +1886,8 @@ private fun NHLCompletedGameSection(matchup: NHLMatchup) {
         if (awayBox?.faceoffWinPct != null || homeBox?.faceoffWinPct != null) {
             val awayVal = awayBox?.faceoffWinPct ?: 0.0
             val homeVal = homeBox?.faceoffWinPct ?: 0.0
-            val awayDiff = vsSeasonAvg?.away?.faceoffPct?.difference
-            val homeDiff = vsSeasonAvg?.home?.faceoffPct?.difference
+            val awayDiff = pctDiffToDisplay(vsSeasonAvg?.away?.faceoffPct)
+            val homeDiff = pctDiffToDisplay(vsSeasonAvg?.home?.faceoffPct)
             ThreeColumnRow(
                 leftText = "${(awayVal * 100).formatStat(1)}%${formatDiff(awayDiff)}",
                 centerText = "Faceoff %",
@@ -1907,8 +1900,8 @@ private fun NHLCompletedGameSection(matchup: NHLMatchup) {
         if (awayBox?.savePct != null || homeBox?.savePct != null) {
             val awayVal = awayBox?.savePct ?: 0.0
             val homeVal = homeBox?.savePct ?: 0.0
-            val awayDiff = vsSeasonAvg?.away?.savePct?.difference
-            val homeDiff = vsSeasonAvg?.home?.savePct?.difference
+            val awayDiff = pctDiffToDisplay(vsSeasonAvg?.away?.savePct)
+            val homeDiff = pctDiffToDisplay(vsSeasonAvg?.home?.savePct)
             ThreeColumnRow(
                 leftText = "${(awayVal * 100).formatStat(1)}%${formatDiff(awayDiff)}",
                 centerText = "Save %",
@@ -2053,6 +2046,14 @@ private fun NHLPlayoffProbabilitySection(
 }
 
 /**
+ * Convert a 0-1 scale percentage difference to display scale (percentage points).
+ * Backend now stores all percentage diffs in 0-1 scale consistently.
+ */
+private fun pctDiffToDisplay(stat: com.joebad.fastbreak.data.model.NHLStatComparison?): Double? {
+    return stat?.difference?.let { it * 100 }
+}
+
+/**
  * Format probability value as string
  */
 private fun formatNHLProbability(prob: Double?): String {
@@ -2116,30 +2117,47 @@ private fun NHLPlayoffProbabilityText(
         modifier = Modifier.widthIn(min = 80.dp)
     ) {
         Text(
-            text = "PO: ",
+            text = "PO ",
             style = MaterialTheme.typography.bodySmall.copy(lineHeight = 12.sp),
             fontSize = 10.sp,
             color = textColor
         )
+        Box(
+            modifier = Modifier
+                .background(playoffColor, RoundedCornerShape(4.dp))
+                .padding(horizontal = 4.dp, vertical = 2.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = formatNHLProbability(playoffProb),
+                style = MaterialTheme.typography.bodySmall.copy(lineHeight = 12.sp),
+                fontSize = 9.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.White,
+                maxLines = 1
+            )
+        }
+        Spacer(modifier = Modifier.width(4.dp))
         Text(
-            text = formatNHLProbability(playoffProb),
-            style = MaterialTheme.typography.bodySmall.copy(lineHeight = 12.sp),
-            fontSize = 10.sp,
-            fontWeight = FontWeight.Medium,
-            color = playoffColor
-        )
-        Text(
-            text = "  Cup: ",
+            text = "Cup ",
             style = MaterialTheme.typography.bodySmall.copy(lineHeight = 12.sp),
             fontSize = 10.sp,
             color = textColor
         )
-        Text(
-            text = formatNHLProbability(champProb),
-            style = MaterialTheme.typography.bodySmall.copy(lineHeight = 12.sp),
-            fontSize = 10.sp,
-            fontWeight = FontWeight.Medium,
-            color = champColor
-        )
+        Box(
+            modifier = Modifier
+                .background(champColor, RoundedCornerShape(4.dp))
+                .padding(horizontal = 4.dp, vertical = 2.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = formatNHLProbability(champProb),
+                style = MaterialTheme.typography.bodySmall.copy(lineHeight = 12.sp),
+                fontSize = 9.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.White,
+                maxLines = 1
+            )
+        }
     }
 }

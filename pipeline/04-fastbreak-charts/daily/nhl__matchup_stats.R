@@ -299,11 +299,11 @@ scrape_nhl_playoff_probabilities <- function() {
 }
 
 # Helper function to compare game stats to season averages
-compare_to_season_avg <- function(game_value, season_avg, stat_name, higher_is_better = TRUE) {
+compare_to_season_avg <- function(game_value, season_avg, stat_name, higher_is_better = TRUE, decimals = 2) {
   if (is.na(game_value) || is.na(season_avg) || is.null(game_value) || is.null(season_avg)) {
     return(list(
-      gameValue = if (!is.null(game_value) && !is.na(game_value)) round(game_value, 2) else NULL,
-      seasonAvg = if (!is.null(season_avg) && !is.na(season_avg)) round(season_avg, 2) else NULL,
+      gameValue = if (!is.null(game_value) && !is.na(game_value)) round(game_value, decimals) else NULL,
+      seasonAvg = if (!is.null(season_avg) && !is.na(season_avg)) round(season_avg, decimals) else NULL,
       difference = NULL,
       percentDiff = NULL,
       aboveAverage = NULL,
@@ -324,9 +324,9 @@ compare_to_season_avg <- function(game_value, season_avg, stat_name, higher_is_b
   }
 
   list(
-    gameValue = round(game_value, 2),
-    seasonAvg = round(season_avg, 2),
-    difference = round(diff, 2),
+    gameValue = round(game_value, decimals),
+    seasonAvg = round(season_avg, decimals),
+    difference = round(diff, decimals),
     percentDiff = round(pct_diff, 1),
     aboveAverage = above_avg,
     label = label
@@ -467,7 +467,7 @@ build_game_results <- function(game, home_season_stats, away_season_stats) {
             if (!is.null(g$goalsAgainst) && !is.na(g$goalsAgainst)) goalie_goals_against <- goalie_goals_against + as.integer(g$goalsAgainst)
             # Use starter's save percentage
             if (!is.null(g$starter) && g$starter == TRUE && !is.null(g$savePctg) && !is.na(g$savePctg)) {
-              goalie_save_pct <- round(as.numeric(g$savePctg), 3)
+              goalie_save_pct <- round(as.numeric(g$savePctg), 4)
             }
           }
         } else if (is.list(goalies)) {
@@ -477,14 +477,14 @@ build_game_results <- function(game, home_season_stats, away_season_stats) {
             if (!is.null(g$shotsAgainst) && !is.na(g$shotsAgainst)) goalie_shots_against <- goalie_shots_against + as.integer(g$shotsAgainst)
             if (!is.null(g$goalsAgainst) && !is.na(g$goalsAgainst)) goalie_goals_against <- goalie_goals_against + as.integer(g$goalsAgainst)
             if (!is.null(g$starter) && g$starter == TRUE && !is.null(g$savePctg) && !is.na(g$savePctg)) {
-              goalie_save_pct <- round(as.numeric(g$savePctg), 3)
+              goalie_save_pct <- round(as.numeric(g$savePctg), 4)
             }
           }
         }
       }
 
       # Calculate team faceoff percentage
-      team_faceoff_pct <- if (total_faceoffs_taken > 0) round(total_faceoff_wins / total_faceoffs_taken, 3) else NULL
+      team_faceoff_pct <- if (total_faceoffs_taken > 0) round(total_faceoff_wins / total_faceoffs_taken, 4) else NULL
 
       list(
         hits = total_hits,
@@ -546,10 +546,10 @@ build_game_results <- function(game, home_season_stats, away_season_stats) {
         blocks = compare_to_season_avg(home_box$blocks, home_season_stats$blocks_per_game, "blocks"),
         giveaways = compare_to_season_avg(home_box$giveaways, home_season_stats$giveaways_per_game, "giveaways", higher_is_better = FALSE),
         takeaways = compare_to_season_avg(home_box$takeaways, home_season_stats$takeaways_per_game, "takeaways"),
-        faceoffPct = compare_to_season_avg(home_box$faceoffWinPct * 100, home_season_stats$faceoff_win_pct, "faceoffPct"),
+        faceoffPct = compare_to_season_avg(home_box$faceoffWinPct, home_season_stats$faceoff_win_pct, "faceoffPct", decimals = 4),
         pim = compare_to_season_avg(home_box$pim, home_season_stats$pim_per_game, "pim", higher_is_better = FALSE),
         ppGoals = compare_to_season_avg(home_box$powerPlayGoals, home_season_stats$pp_goals_per_game, "ppGoals"),
-        savePct = compare_to_season_avg(if (!is.null(home_box$savePct)) home_box$savePct * 100 else NULL, home_season_stats$save_pct_season, "savePct")
+        savePct = compare_to_season_avg(home_box$savePct, home_season_stats$save_pct_season, "savePct", decimals = 4)
       ),
       away = list(
         goals = compare_to_season_avg(game$away_score, away_season_stats$goals_per_game, "goals"),
@@ -560,10 +560,10 @@ build_game_results <- function(game, home_season_stats, away_season_stats) {
         blocks = compare_to_season_avg(away_box$blocks, away_season_stats$blocks_per_game, "blocks"),
         giveaways = compare_to_season_avg(away_box$giveaways, away_season_stats$giveaways_per_game, "giveaways", higher_is_better = FALSE),
         takeaways = compare_to_season_avg(away_box$takeaways, away_season_stats$takeaways_per_game, "takeaways"),
-        faceoffPct = compare_to_season_avg(away_box$faceoffWinPct * 100, away_season_stats$faceoff_win_pct, "faceoffPct"),
+        faceoffPct = compare_to_season_avg(away_box$faceoffWinPct, away_season_stats$faceoff_win_pct, "faceoffPct", decimals = 4),
         pim = compare_to_season_avg(away_box$pim, away_season_stats$pim_per_game, "pim", higher_is_better = FALSE),
         ppGoals = compare_to_season_avg(away_box$powerPlayGoals, away_season_stats$pp_goals_per_game, "ppGoals"),
-        savePct = compare_to_season_avg(if (!is.null(away_box$savePct)) away_box$savePct * 100 else NULL, away_season_stats$save_pct_season, "savePct")
+        savePct = compare_to_season_avg(away_box$savePct, away_season_stats$save_pct_season, "savePct", decimals = 4)
       )
     )
 
@@ -1442,12 +1442,12 @@ build_nhl_comparisons <- function(home_stats, away_stats, home_team, away_team) 
     off_comparison[[stat$key]] <- list(
       label = stat$label,
       home = list(
-        value = if (!is.na(stat$value_home)) round(stat$value_home, 2) else NULL,
+        value = if (!is.na(stat$value_home)) round(stat$value_home, 4) else NULL,
         rank = if (!is.na(stat$rank_home)) as.integer(stat$rank_home) else NULL,
         rankDisplay = if (!is.na(stat$rankDisplay_home)) stat$rankDisplay_home else NULL
       ),
       away = list(
-        value = if (!is.na(stat$value_away)) round(stat$value_away, 2) else NULL,
+        value = if (!is.na(stat$value_away)) round(stat$value_away, 4) else NULL,
         rank = if (!is.na(stat$rank_away)) as.integer(stat$rank_away) else NULL,
         rankDisplay = if (!is.na(stat$rankDisplay_away)) stat$rankDisplay_away else NULL
       )
@@ -1469,12 +1469,12 @@ build_nhl_comparisons <- function(home_stats, away_stats, home_team, away_team) 
     def_comparison[[stat$key]] <- list(
       label = stat$label,
       home = list(
-        value = if (!is.na(stat$value_home)) round(stat$value_home, 2) else NULL,
+        value = if (!is.na(stat$value_home)) round(stat$value_home, 4) else NULL,
         rank = if (!is.na(stat$rank_home)) as.integer(stat$rank_home) else NULL,
         rankDisplay = if (!is.na(stat$rankDisplay_home)) stat$rankDisplay_home else NULL
       ),
       away = list(
-        value = if (!is.na(stat$value_away)) round(stat$value_away, 2) else NULL,
+        value = if (!is.na(stat$value_away)) round(stat$value_away, 4) else NULL,
         rank = if (!is.na(stat$rank_away)) as.integer(stat$rank_away) else NULL,
         rankDisplay = if (!is.na(stat$rankDisplay_away)) stat$rankDisplay_away else NULL
       )
@@ -1564,13 +1564,13 @@ build_nhl_comparisons <- function(home_stats, away_stats, home_team, away_team) 
         defLabel = matchup$def_label,
         offense = list(
           team = home_team,
-          value = round(off_val, 2),
+          value = round(off_val, 4),
           rank = as.integer(off_rank),
           rankDisplay = home_stats[[matchup$off_rankDisplay]]
         ),
         defense = list(
           team = away_team,
-          value = round(def_val, 2),
+          value = round(def_val, 4),
           rank = as.integer(def_rank),
           rankDisplay = away_stats[[matchup$def_rankDisplay]]
         ),
@@ -1603,13 +1603,13 @@ build_nhl_comparisons <- function(home_stats, away_stats, home_team, away_team) 
         defLabel = matchup$def_label,
         offense = list(
           team = away_team,
-          value = round(off_val, 2),
+          value = round(off_val, 4),
           rank = as.integer(off_rank),
           rankDisplay = away_stats[[matchup$off_rankDisplay]]
         ),
         defense = list(
           team = home_team,
-          value = round(def_val, 2),
+          value = round(def_val, 4),
           rank = as.integer(def_rank),
           rankDisplay = home_stats[[matchup$def_rankDisplay]]
         ),
@@ -1694,16 +1694,16 @@ for (game in all_games) {
       shotsAgainstPerGame = round(home_stats_row$shots_against_per_game, 2),
       shotsAgainstPerGameRank = as.integer(home_stats_row$shots_against_per_game_rank),
       shotsAgainstPerGameRankDisplay = home_stats_row$shots_against_per_game_rankDisplay,
-      powerPlayPct = round(home_stats_row$power_play_pct, 2),
+      powerPlayPct = round(home_stats_row$power_play_pct, 4),
       powerPlayPctRank = as.integer(home_stats_row$power_play_pct_rank),
       powerPlayPctRankDisplay = home_stats_row$power_play_pct_rankDisplay,
-      penaltyKillPct = round(home_stats_row$penalty_kill_pct, 2),
+      penaltyKillPct = round(home_stats_row$penalty_kill_pct, 4),
       penaltyKillPctRank = as.integer(home_stats_row$penalty_kill_pct_rank),
       penaltyKillPctRankDisplay = home_stats_row$penalty_kill_pct_rankDisplay,
-      faceoffWinPct = round(home_stats_row$faceoff_win_pct, 2),
+      faceoffWinPct = round(home_stats_row$faceoff_win_pct, 4),
       faceoffWinPctRank = as.integer(home_stats_row$faceoff_win_pct_rank),
       faceoffWinPctRankDisplay = home_stats_row$faceoff_win_pct_rankDisplay,
-      pointsPct = round(home_stats_row$points_pct, 3),
+      pointsPct = round(home_stats_row$points_pct, 4),
       pointsPctRank = as.integer(home_stats_row$points_pct_rank),
       pointsPctRankDisplay = home_stats_row$points_pct_rankDisplay
     )
@@ -1785,16 +1785,16 @@ for (game in all_games) {
       shotsAgainstPerGame = round(away_stats_row$shots_against_per_game, 2),
       shotsAgainstPerGameRank = as.integer(away_stats_row$shots_against_per_game_rank),
       shotsAgainstPerGameRankDisplay = away_stats_row$shots_against_per_game_rankDisplay,
-      powerPlayPct = round(away_stats_row$power_play_pct, 2),
+      powerPlayPct = round(away_stats_row$power_play_pct, 4),
       powerPlayPctRank = as.integer(away_stats_row$power_play_pct_rank),
       powerPlayPctRankDisplay = away_stats_row$power_play_pct_rankDisplay,
-      penaltyKillPct = round(away_stats_row$penalty_kill_pct, 2),
+      penaltyKillPct = round(away_stats_row$penalty_kill_pct, 4),
       penaltyKillPctRank = as.integer(away_stats_row$penalty_kill_pct_rank),
       penaltyKillPctRankDisplay = away_stats_row$penalty_kill_pct_rankDisplay,
-      faceoffWinPct = round(away_stats_row$faceoff_win_pct, 2),
+      faceoffWinPct = round(away_stats_row$faceoff_win_pct, 4),
       faceoffWinPctRank = as.integer(away_stats_row$faceoff_win_pct_rank),
       faceoffWinPctRankDisplay = away_stats_row$faceoff_win_pct_rankDisplay,
-      pointsPct = round(away_stats_row$points_pct, 3),
+      pointsPct = round(away_stats_row$points_pct, 4),
       pointsPctRank = as.integer(away_stats_row$points_pct_rank),
       pointsPctRankDisplay = away_stats_row$points_pct_rankDisplay
     )

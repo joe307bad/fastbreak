@@ -88,41 +88,55 @@ class PinnedTeamsContainer(
             )
         }
 
-        val results = teamRosterSynchronizer.downloadAllTeamRosters()
+        try {
+            val results = teamRosterSynchronizer.downloadAllTeamRosters()
 
-        // Separate successes and failures
-        val successes = results.filterValues { it.isSuccess }
-            .mapValues { (_, result) -> result.getOrNull()!! }
-        val failures = results.filterValues { it.isFailure }
+            // Separate successes and failures using safe null handling
+            val successes = results.mapNotNull { (sport, result) ->
+                result.getOrNull()?.let { sport to it }
+            }.toMap()
+            val failures = results.filterValues { it.isFailure }
 
-        println("✅ Successfully downloaded ${successes.size} team rosters")
-        println("❌ Failed to download ${failures.size} team rosters")
+            println("✅ Successfully downloaded ${successes.size} team rosters")
+            println("❌ Failed to download ${failures.size} team rosters")
 
-        if (failures.isNotEmpty()) {
-            failures.forEach { (sport, result) ->
-                println("   ❌ $sport: ${result.exceptionOrNull()?.message}")
+            if (failures.isNotEmpty()) {
+                failures.forEach { (sport, result) ->
+                    println("   ❌ $sport: ${result.exceptionOrNull()?.message}")
+                }
             }
-        }
 
-        reduce {
-            state.copy(
-                teamRosters = successes,
-                isSyncing = false,
-                error = if (failures.isNotEmpty()) {
-                    "Failed to download ${failures.size} team rosters"
-                } else null
-            )
-        }
+            reduce {
+                state.copy(
+                    teamRosters = successes,
+                    isSyncing = false,
+                    error = if (failures.isNotEmpty()) {
+                        "Failed to download ${failures.size} team rosters"
+                    } else null
+                )
+            }
 
-        if (failures.isNotEmpty()) {
+            if (failures.isNotEmpty()) {
+                postSideEffect(PinnedTeamsSideEffect.ShowError(
+                    "Failed to download team rosters for: ${failures.keys.joinToString()}"
+                ))
+            } else {
+                postSideEffect(PinnedTeamsSideEffect.SyncCompleted)
+            }
+
+            println("   ✅ downloadTeamRosters complete")
+        } catch (e: Exception) {
+            println("❌ downloadTeamRosters failed with exception: ${e.message}")
+            reduce {
+                state.copy(
+                    isSyncing = false,
+                    error = "Failed to download team rosters: ${e.message}"
+                )
+            }
             postSideEffect(PinnedTeamsSideEffect.ShowError(
-                "Failed to download team rosters for: ${failures.keys.joinToString()}"
+                "Failed to download team rosters: ${e.message}"
             ))
-        } else {
-            postSideEffect(PinnedTeamsSideEffect.SyncCompleted)
         }
-
-        println("   ✅ downloadTeamRosters complete")
     }
 
     /**

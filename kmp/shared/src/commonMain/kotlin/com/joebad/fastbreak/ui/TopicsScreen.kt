@@ -143,7 +143,7 @@ fun TopicsScreen(
                     val totalNarratives = topics.narratives.size
                     val readCount = readIndices.size
                     Text(
-                        text = "Daily at 10am ET - updated ${formatRelativeTime(topicsUpdatedAt)} - $readCount/$totalNarratives read",
+                        text = "Daily at 7am ET - updated ${formatRelativeTime(topicsUpdatedAt)} - $readCount/$totalNarratives read",
                         style = MaterialTheme.typography.labelSmall,
                         fontSize = 10.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,

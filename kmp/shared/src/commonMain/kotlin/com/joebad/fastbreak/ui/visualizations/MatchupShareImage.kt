@@ -123,26 +123,27 @@ private val shareTeamRankColors: Map<Int, Color> = buildMap {
  */
 private val sharePlayerRankColors: Map<Int, Color> = buildMap {
     put(0, Color.Transparent)
-    val darkestRed = Color(139, 0, 0)
+    val darkGreen = Color(0, 120, 0)
+    val darkOrange = Color(200, 120, 0)
+    val darkRed = Color(139, 0, 0)
     for (rank in 1..80) {
-        val clampedRank = if (rank > 64) 64 else rank
         val color = when {
-            clampedRank <= 21 -> {
-                val ratio = (clampedRank - 1) / 20f
-                Color((0 + ratio * 50).toInt(), (100 + ratio * 105).toInt(), (0 + ratio * 50).toInt())
+            rank <= 5 -> darkGreen
+            rank <= 15 -> darkOrange
+            rank <= 30 -> {
+                // Gradient from dark orange to dark red (ranks 16-30)
+                val ratio = (rank - 16) / 14f
+                Color(
+                    (200 + ratio * (139 - 200)).toInt(),
+                    (120 - ratio * 120).toInt(),
+                    0
+                )
             }
-            clampedRank <= 43 -> {
-                val ratio = (clampedRank - 22) / 21f
-                Color((180 + ratio * 75).toInt(), (140 - ratio * 41).toInt(), (50 - ratio * 21).toInt())
-            }
-            else -> {
-                val ratio = (clampedRank - 44) / 20f
-                Color((205 - ratio * 66).toInt(), (92 - ratio * 92).toInt(), (92 - ratio * 92).toInt())
-            }
+            else -> darkRed
         }
         put(rank, color)
     }
-    for (rank in 81..300) put(rank, darkestRed)
+    for (rank in 81..300) put(rank, darkRed)
 }
 
 private fun getShareTeamRankColor(rank: Int?): Color = shareTeamRankColors[rank ?: 0] ?: Color.Transparent

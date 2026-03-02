@@ -116,6 +116,13 @@ private fun Double.formatStat(decimals: Int = 1): String {
 }
 
 /**
+ * Helper to format a 0-1 decimal percentage as "XX.X%" (multiply by 100 and append %)
+ */
+private fun Double?.formatPct(decimals: Int = 1): String {
+    return this?.let { (it * 100).formatStat(decimals) + "%" } ?: "-"
+}
+
+/**
  * NBA Matchup Worksheet component with two-row navigation:
  * - First row: Date badges to filter games by date
  * - Second row: Matchup badges for the selected date
@@ -581,8 +588,9 @@ fun NBAMatchupWorksheet(
                     add(ShareStatBox(
                         title = "Offensive Stats",
                         fiveColStats = selectedMatchup.comparisons?.sideBySide?.offense?.mapNotNull { (key, stat) ->
-                            val awayValue = stat.away.value?.formatStat(2) ?: return@mapNotNull null
-                            val homeValue = stat.home.value?.formatStat(2) ?: return@mapNotNull null
+                            val isPct = stat.label.contains("%")
+                            val awayValue = stat.away.value?.let { if (isPct) (it * 100).formatStat(1) else it.formatStat(2) } ?: return@mapNotNull null
+                            val homeValue = stat.home.value?.let { if (isPct) (it * 100).formatStat(1) else it.formatStat(2) } ?: return@mapNotNull null
                             val advantage = if (stat.away.rank != null && stat.home.rank != null) {
                                 when {
                                     stat.away.rank < stat.home.rank -> -1
@@ -609,8 +617,9 @@ fun NBAMatchupWorksheet(
                     add(ShareStatBox(
                         title = "Defensive Stats",
                         fiveColStats = selectedMatchup.comparisons?.sideBySide?.defense?.mapNotNull { (key, stat) ->
-                            val awayValue = stat.away.value?.formatStat(2) ?: return@mapNotNull null
-                            val homeValue = stat.home.value?.formatStat(2) ?: return@mapNotNull null
+                            val isPct = stat.label.contains("%")
+                            val awayValue = stat.away.value?.let { if (isPct) (it * 100).formatStat(1) else it.formatStat(2) } ?: return@mapNotNull null
+                            val homeValue = stat.home.value?.let { if (isPct) (it * 100).formatStat(1) else it.formatStat(2) } ?: return@mapNotNull null
                             val advantage = if (stat.away.rank != null && stat.home.rank != null) {
                                 when {
                                     stat.away.rank < stat.home.rank -> -1
@@ -640,8 +649,9 @@ fun NBAMatchupWorksheet(
                         middleLabel = "vs",
                         rightLabel = "${selectedMatchup.homeTeam.abbreviation} Def",
                         fiveColStats = selectedMatchup.comparisons?.awayOffVsHomeDef?.mapNotNull { (key, stat) ->
-                            val offValue = stat.offense.value?.formatStat(2) ?: return@mapNotNull null
-                            val defValue = stat.defense.value?.formatStat(2) ?: return@mapNotNull null
+                            val isPct = stat.offLabel.contains("%")
+                            val offValue = stat.offense.value?.let { if (isPct) (it * 100).formatStat(1) else it.formatStat(2) } ?: return@mapNotNull null
+                            val defValue = stat.defense.value?.let { if (isPct) (it * 100).formatStat(1) else it.formatStat(2) } ?: return@mapNotNull null
 
                             ShareFiveColStat(
                                 leftValue = offValue,
@@ -666,8 +676,9 @@ fun NBAMatchupWorksheet(
                         leftColor = Team2Color,  // Home team
                         rightColor = Team1Color, // Away team
                         fiveColStats = selectedMatchup.comparisons?.homeOffVsAwayDef?.mapNotNull { (key, stat) ->
-                            val offValue = stat.offense.value?.formatStat(2) ?: return@mapNotNull null
-                            val defValue = stat.defense.value?.formatStat(2) ?: return@mapNotNull null
+                            val isPct = stat.offLabel.contains("%")
+                            val offValue = stat.offense.value?.let { if (isPct) (it * 100).formatStat(1) else it.formatStat(2) } ?: return@mapNotNull null
+                            val defValue = stat.defense.value?.let { if (isPct) (it * 100).formatStat(1) else it.formatStat(2) } ?: return@mapNotNull null
 
                             ShareFiveColStat(
                                 leftValue = offValue,
@@ -728,11 +739,11 @@ fun NBAMatchupWorksheet(
                                     usePlayerRanks = true
                                 ),
                                 ShareFiveColStat(
-                                    leftValue = awayPlayer.field_goal_pct.value?.formatStat(1) ?: "-",
+                                    leftValue = awayPlayer.field_goal_pct.value.formatPct(1),
                                     leftRank = awayPlayer.field_goal_pct.rank,
                                     leftRankDisplay = awayPlayer.field_goal_pct.rankDisplay,
                                     centerText = "FG%",
-                                    rightValue = homePlayer.field_goal_pct.value?.formatStat(1) ?: "-",
+                                    rightValue = homePlayer.field_goal_pct.value.formatPct(1),
                                     rightRank = homePlayer.field_goal_pct.rank,
                                     rightRankDisplay = homePlayer.field_goal_pct.rankDisplay,
                                     advantage = 0,
@@ -741,11 +752,11 @@ fun NBAMatchupWorksheet(
                                 awayPlayer.true_shooting_pct.value?.let { awayTS ->
                                     homePlayer.true_shooting_pct.value?.let { homeTS ->
                                         ShareFiveColStat(
-                                            leftValue = (awayTS * 100).formatStat(1),
+                                            leftValue = (awayTS * 100).formatStat(1) + "%",
                                             leftRank = awayPlayer.true_shooting_pct.rank,
                                             leftRankDisplay = awayPlayer.true_shooting_pct.rankDisplay,
                                             centerText = "TS%",
-                                            rightValue = (homeTS * 100).formatStat(1),
+                                            rightValue = (homeTS * 100).formatStat(1) + "%",
                                             rightRank = homePlayer.true_shooting_pct.rank,
                                             rightRankDisplay = homePlayer.true_shooting_pct.rankDisplay,
                                             advantage = 0,
@@ -776,11 +787,11 @@ fun NBAMatchupWorksheet(
                                     usePlayerRanks = true
                                 ),
                                 ShareFiveColStat(
-                                    leftValue = awayPlayer.three_pt_pct.value?.formatStat(1) ?: "-",
+                                    leftValue = awayPlayer.three_pt_pct.value.formatPct(1),
                                     leftRank = awayPlayer.three_pt_pct.rank,
                                     leftRankDisplay = awayPlayer.three_pt_pct.rankDisplay,
                                     centerText = "3PT%",
-                                    rightValue = homePlayer.three_pt_pct.value?.formatStat(1) ?: "-",
+                                    rightValue = homePlayer.three_pt_pct.value.formatPct(1),
                                     rightRank = homePlayer.three_pt_pct.rank,
                                     rightRankDisplay = homePlayer.three_pt_pct.rankDisplay,
                                     advantage = 0,
@@ -789,11 +800,11 @@ fun NBAMatchupWorksheet(
                                 awayPlayer.usage_pct.value?.let { awayUsage ->
                                     homePlayer.usage_pct.value?.let { homeUsage ->
                                         ShareFiveColStat(
-                                            leftValue = (awayUsage * 100).formatStat(1),
+                                            leftValue = (awayUsage * 100).formatStat(1) + "%",
                                             leftRank = awayPlayer.usage_pct.rank,
                                             leftRankDisplay = awayPlayer.usage_pct.rankDisplay,
                                             centerText = "Usage%",
-                                            rightValue = (homeUsage * 100).formatStat(1),
+                                            rightValue = (homeUsage * 100).formatStat(1) + "%",
                                             rightRank = homePlayer.usage_pct.rank,
                                             rightRankDisplay = homePlayer.usage_pct.rankDisplay,
                                             advantage = 0,
@@ -805,127 +816,99 @@ fun NBAMatchupWorksheet(
                         ))
                     }
 
-                    // Box 6: Key Player #2 (if exists)
-                    if (selectedMatchup.awayPlayers.size > 1 && selectedMatchup.homePlayers.size > 1) {
-                        val awayPlayer = selectedMatchup.awayPlayers[1]
-                        val homePlayer = selectedMatchup.homePlayers[1]
-
-                        add(ShareStatBox(
-                            title = "${awayPlayer.name} vs ${homePlayer.name}",
-                            leftLabel = awayPlayer.name,
-                            middleLabel = "vs",
-                            rightLabel = homePlayer.name,
-                            fiveColStats = listOfNotNull(
-                                ShareFiveColStat(
-                                    leftValue = awayPlayer.points_per_game.value?.formatStat(1) ?: "-",
-                                    leftRank = awayPlayer.points_per_game.rank,
-                                    leftRankDisplay = awayPlayer.points_per_game.rankDisplay,
-                                    centerText = "Pts/Game",
-                                    rightValue = homePlayer.points_per_game.value?.formatStat(1) ?: "-",
-                                    rightRank = homePlayer.points_per_game.rank,
-                                    rightRankDisplay = homePlayer.points_per_game.rankDisplay,
-                                    advantage = 0,
-                                    usePlayerRanks = true
-                                ),
-                                ShareFiveColStat(
-                                    leftValue = awayPlayer.rebounds_per_game.value?.formatStat(1) ?: "-",
-                                    leftRank = awayPlayer.rebounds_per_game.rank,
-                                    leftRankDisplay = awayPlayer.rebounds_per_game.rankDisplay,
-                                    centerText = "Reb/Game",
-                                    rightValue = homePlayer.rebounds_per_game.value?.formatStat(1) ?: "-",
-                                    rightRank = homePlayer.rebounds_per_game.rank,
-                                    rightRankDisplay = homePlayer.rebounds_per_game.rankDisplay,
-                                    advantage = 0,
-                                    usePlayerRanks = true
-                                ),
-                                ShareFiveColStat(
-                                    leftValue = awayPlayer.assists_per_game.value?.formatStat(1) ?: "-",
-                                    leftRank = awayPlayer.assists_per_game.rank,
-                                    leftRankDisplay = awayPlayer.assists_per_game.rankDisplay,
-                                    centerText = "Ast/Game",
-                                    rightValue = homePlayer.assists_per_game.value?.formatStat(1) ?: "-",
-                                    rightRank = homePlayer.assists_per_game.rank,
-                                    rightRankDisplay = homePlayer.assists_per_game.rankDisplay,
-                                    advantage = 0,
-                                    usePlayerRanks = true
-                                ),
-                                ShareFiveColStat(
-                                    leftValue = awayPlayer.field_goal_pct.value?.formatStat(1) ?: "-",
-                                    leftRank = awayPlayer.field_goal_pct.rank,
-                                    leftRankDisplay = awayPlayer.field_goal_pct.rankDisplay,
-                                    centerText = "FG%",
-                                    rightValue = homePlayer.field_goal_pct.value?.formatStat(1) ?: "-",
-                                    rightRank = homePlayer.field_goal_pct.rank,
-                                    rightRankDisplay = homePlayer.field_goal_pct.rankDisplay,
-                                    advantage = 0,
-                                    usePlayerRanks = true
-                                ),
-                                awayPlayer.true_shooting_pct.value?.let { awayTS ->
-                                    homePlayer.true_shooting_pct.value?.let { homeTS ->
-                                        ShareFiveColStat(
-                                            leftValue = (awayTS * 100).formatStat(1),
-                                            leftRank = awayPlayer.true_shooting_pct.rank,
-                                            leftRankDisplay = awayPlayer.true_shooting_pct.rankDisplay,
-                                            centerText = "TS%",
-                                            rightValue = (homeTS * 100).formatStat(1),
-                                            rightRank = homePlayer.true_shooting_pct.rank,
-                                            rightRankDisplay = homePlayer.true_shooting_pct.rankDisplay,
-                                            advantage = 0,
-                                            usePlayerRanks = true
-                                        )
-                                    }
-                                },
-                                ShareFiveColStat(
-                                    leftValue = awayPlayer.steals_per_game.value?.formatStat(1) ?: "-",
-                                    leftRank = awayPlayer.steals_per_game.rank,
-                                    leftRankDisplay = awayPlayer.steals_per_game.rankDisplay,
-                                    centerText = "Stl/Game",
-                                    rightValue = homePlayer.steals_per_game.value?.formatStat(1) ?: "-",
-                                    rightRank = homePlayer.steals_per_game.rank,
-                                    rightRankDisplay = homePlayer.steals_per_game.rankDisplay,
-                                    advantage = 0,
-                                    usePlayerRanks = true
-                                ),
-                                ShareFiveColStat(
-                                    leftValue = awayPlayer.blocks_per_game.value?.formatStat(1) ?: "-",
-                                    leftRank = awayPlayer.blocks_per_game.rank,
-                                    leftRankDisplay = awayPlayer.blocks_per_game.rankDisplay,
-                                    centerText = "Blk/Game",
-                                    rightValue = homePlayer.blocks_per_game.value?.formatStat(1) ?: "-",
-                                    rightRank = homePlayer.blocks_per_game.rank,
-                                    rightRankDisplay = homePlayer.blocks_per_game.rankDisplay,
-                                    advantage = 0,
-                                    usePlayerRanks = true
-                                ),
-                                ShareFiveColStat(
-                                    leftValue = awayPlayer.three_pt_pct.value?.formatStat(1) ?: "-",
-                                    leftRank = awayPlayer.three_pt_pct.rank,
-                                    leftRankDisplay = awayPlayer.three_pt_pct.rankDisplay,
-                                    centerText = "3PT%",
-                                    rightValue = homePlayer.three_pt_pct.value?.formatStat(1) ?: "-",
-                                    rightRank = homePlayer.three_pt_pct.rank,
-                                    rightRankDisplay = homePlayer.three_pt_pct.rankDisplay,
-                                    advantage = 0,
-                                    usePlayerRanks = true
-                                ),
-                                awayPlayer.usage_pct.value?.let { awayUsage ->
-                                    homePlayer.usage_pct.value?.let { homeUsage ->
-                                        ShareFiveColStat(
-                                            leftValue = (awayUsage * 100).formatStat(1),
-                                            leftRank = awayPlayer.usage_pct.rank,
-                                            leftRankDisplay = awayPlayer.usage_pct.rankDisplay,
-                                            centerText = "Usage%",
-                                            rightValue = (homeUsage * 100).formatStat(1),
-                                            rightRank = homePlayer.usage_pct.rank,
-                                            rightRankDisplay = homePlayer.usage_pct.rankDisplay,
-                                            advantage = 0,
-                                            usePlayerRanks = true
-                                        )
-                                    }
-                                }
-                            ).take(9)
-                        ))
+                    // Box 6: One Month Trend
+                    val awayTrend = parseMonthTrend(selectedMatchup.awayTeam.stats)
+                    val homeTrend = parseMonthTrend(selectedMatchup.homeTeam.stats)
+                    val rankAdv = { a: Int?, h: Int? ->
+                        if (a != null && h != null) when {
+                            a < h -> -1; h < a -> 1; else -> 0
+                        } else 0
                     }
+                    add(ShareStatBox(
+                        title = "One Month Trend",
+                        fiveColStats = listOfNotNull(
+                            ShareFiveColStat(
+                                leftValue = awayTrend?.let { "${it.wins}-${it.losses}" } ?: "-",
+                                leftRank = awayTrend?.recordRank,
+                                leftRankDisplay = awayTrend?.recordRankDisplay,
+                                centerText = "Record",
+                                rightValue = homeTrend?.let { "${it.wins}-${it.losses}" } ?: "-",
+                                rightRank = homeTrend?.recordRank,
+                                rightRankDisplay = homeTrend?.recordRankDisplay,
+                                advantage = rankAdv(awayTrend?.recordRank, homeTrend?.recordRank)
+                            ),
+                            ShareFiveColStat(
+                                leftValue = awayTrend?.netRating?.formatStat(1) ?: "-",
+                                leftRank = awayTrend?.netRatingRank,
+                                leftRankDisplay = awayTrend?.netRatingRankDisplay,
+                                centerText = "Net Rtg",
+                                rightValue = homeTrend?.netRating?.formatStat(1) ?: "-",
+                                rightRank = homeTrend?.netRatingRank,
+                                rightRankDisplay = homeTrend?.netRatingRankDisplay,
+                                advantage = rankAdv(awayTrend?.netRatingRank, homeTrend?.netRatingRank)
+                            ),
+                            ShareFiveColStat(
+                                leftValue = awayTrend?.offRating?.formatStat(1) ?: "-",
+                                leftRank = awayTrend?.offRatingRank,
+                                leftRankDisplay = awayTrend?.offRatingRankDisplay,
+                                centerText = "Off Rtg",
+                                rightValue = homeTrend?.offRating?.formatStat(1) ?: "-",
+                                rightRank = homeTrend?.offRatingRank,
+                                rightRankDisplay = homeTrend?.offRatingRankDisplay,
+                                advantage = rankAdv(awayTrend?.offRatingRank, homeTrend?.offRatingRank)
+                            ),
+                            ShareFiveColStat(
+                                leftValue = awayTrend?.defRating?.formatStat(1) ?: "-",
+                                leftRank = awayTrend?.defRatingRank,
+                                leftRankDisplay = awayTrend?.defRatingRankDisplay,
+                                centerText = "Def Rtg",
+                                rightValue = homeTrend?.defRating?.formatStat(1) ?: "-",
+                                rightRank = homeTrend?.defRatingRank,
+                                rightRankDisplay = homeTrend?.defRatingRankDisplay,
+                                advantage = rankAdv(awayTrend?.defRatingRank, homeTrend?.defRatingRank)
+                            ),
+                            ShareFiveColStat(
+                                leftValue = awayTrend?.ppg?.formatStat(1) ?: "-",
+                                leftRank = awayTrend?.ppgRank,
+                                leftRankDisplay = awayTrend?.ppgRankDisplay,
+                                centerText = "PPG",
+                                rightValue = homeTrend?.ppg?.formatStat(1) ?: "-",
+                                rightRank = homeTrend?.ppgRank,
+                                rightRankDisplay = homeTrend?.ppgRankDisplay,
+                                advantage = rankAdv(awayTrend?.ppgRank, homeTrend?.ppgRank)
+                            ),
+                            ShareFiveColStat(
+                                leftValue = awayTrend?.apg?.formatStat(1) ?: "-",
+                                leftRank = awayTrend?.apgRank,
+                                leftRankDisplay = awayTrend?.apgRankDisplay,
+                                centerText = "APG",
+                                rightValue = homeTrend?.apg?.formatStat(1) ?: "-",
+                                rightRank = homeTrend?.apgRank,
+                                rightRankDisplay = homeTrend?.apgRankDisplay,
+                                advantage = rankAdv(awayTrend?.apgRank, homeTrend?.apgRank)
+                            ),
+                            ShareFiveColStat(
+                                leftValue = awayTrend?.tpg?.formatStat(1) ?: "-",
+                                leftRank = awayTrend?.tpgRank,
+                                leftRankDisplay = awayTrend?.tpgRankDisplay,
+                                centerText = "TOV",
+                                rightValue = homeTrend?.tpg?.formatStat(1) ?: "-",
+                                rightRank = homeTrend?.tpgRank,
+                                rightRankDisplay = homeTrend?.tpgRankDisplay,
+                                advantage = rankAdv(awayTrend?.tpgRank, homeTrend?.tpgRank)
+                            ),
+                            ShareFiveColStat(
+                                leftValue = awayTrend?.tovDiff?.let { if (it >= 0) "+${it.formatStat(1)}" else it.formatStat(1) } ?: "-",
+                                leftRank = awayTrend?.tovDiffRank,
+                                leftRankDisplay = awayTrend?.tovDiffRankDisplay,
+                                centerText = "TOV Diff",
+                                rightValue = homeTrend?.tovDiff?.let { if (it >= 0) "+${it.formatStat(1)}" else it.formatStat(1) } ?: "-",
+                                rightRank = homeTrend?.tovDiffRank,
+                                rightRankDisplay = homeTrend?.tovDiffRankDisplay,
+                                advantage = rankAdv(awayTrend?.tovDiffRank, homeTrend?.tovDiffRank)
+                            )
+                        ).take(9)
+                    ))
                 }
 
                 // Ensure we have exactly 6 boxes by filling with empty boxes if needed
@@ -1119,11 +1102,11 @@ private fun PostGameShareContent(
 
             // All stats - SMALL SIZE (bodyMedium), bold the team with edge
             CompactStatRow(awayBox.fgm?.toString() ?: "-", awayBox.fga?.toString() ?: "-", "FGM-A", homeBox.fgm?.toString() ?: "-", homeBox.fga?.toString() ?: "-")
-            CompactStatRow(awayBox.fgPct?.formatStat(1) ?: "-", "FG%", homeBox.fgPct?.formatStat(1) ?: "-", vsAvg?.away?.fieldGoalPct?.difference, vsAvg?.home?.fieldGoalPct?.difference, awayBox.fgPct, homeBox.fgPct, true)
+            CompactStatRow(awayBox.fgPct.formatPct(1), "FG%", homeBox.fgPct.formatPct(1), vsAvg?.away?.fieldGoalPct?.difference?.let { it * 100 }, vsAvg?.home?.fieldGoalPct?.difference?.let { it * 100 }, awayBox.fgPct?.let { it * 100 }, homeBox.fgPct?.let { it * 100 }, true)
             CompactStatRow(awayBox.fg3m?.toString() ?: "-", awayBox.fg3a?.toString() ?: "-", "3PM-A", homeBox.fg3m?.toString() ?: "-", homeBox.fg3a?.toString() ?: "-")
-            CompactStatRow(awayBox.fg3Pct?.formatStat(1) ?: "-", "3P%", homeBox.fg3Pct?.formatStat(1) ?: "-", vsAvg?.away?.threePtPct?.difference, vsAvg?.home?.threePtPct?.difference, awayBox.fg3Pct, homeBox.fg3Pct, true)
+            CompactStatRow(awayBox.fg3Pct.formatPct(1), "3P%", homeBox.fg3Pct.formatPct(1), vsAvg?.away?.threePtPct?.difference?.let { it * 100 }, vsAvg?.home?.threePtPct?.difference?.let { it * 100 }, awayBox.fg3Pct?.let { it * 100 }, homeBox.fg3Pct?.let { it * 100 }, true)
             CompactStatRow(awayBox.ftm?.toString() ?: "-", awayBox.fta?.toString() ?: "-", "FTM-A", homeBox.ftm?.toString() ?: "-", homeBox.fta?.toString() ?: "-")
-            CompactStatRow(awayBox.ftPct?.formatStat(1) ?: "-", "FT%", homeBox.ftPct?.formatStat(1) ?: "-", vsAvg?.away?.freeThrowPct?.difference, vsAvg?.home?.freeThrowPct?.difference, awayBox.ftPct, homeBox.ftPct, true)
+            CompactStatRow(awayBox.ftPct.formatPct(1), "FT%", homeBox.ftPct.formatPct(1), vsAvg?.away?.freeThrowPct?.difference?.let { it * 100 }, vsAvg?.home?.freeThrowPct?.difference?.let { it * 100 }, awayBox.ftPct?.let { it * 100 }, homeBox.ftPct?.let { it * 100 }, true)
 
             CompactStatRow(awayBox.oreb?.toString() ?: "-", "OREB", homeBox.oreb?.toString() ?: "-", vsAvg?.away?.offRebounds?.difference, vsAvg?.home?.offRebounds?.difference, awayBox.oreb?.toDouble(), homeBox.oreb?.toDouble(), true)
             CompactStatRow(awayBox.dreb?.toString() ?: "-", "DREB", homeBox.dreb?.toString() ?: "-", null, null, awayBox.dreb?.toDouble(), homeBox.dreb?.toDouble(), true)
@@ -1139,8 +1122,8 @@ private fun PostGameShareContent(
             CompactStatRow(awayBox.ptsOffTov?.toString() ?: "-", "PTS OFF TO", homeBox.ptsOffTov?.toString() ?: "-", null, null, awayBox.ptsOffTov?.toDouble(), homeBox.ptsOffTov?.toDouble(), true)
             CompactStatRow(awayBox.largestLead?.toString() ?: "-", "LRG LEAD", homeBox.largestLead?.toString() ?: "-", null, null, awayBox.largestLead?.toDouble(), homeBox.largestLead?.toDouble(), true)
 
-            CompactStatRow(awayBox.tsPct?.formatStat(1) ?: "-", "TS%", homeBox.tsPct?.formatStat(1) ?: "-", vsAvg?.away?.tsPct?.difference, vsAvg?.home?.tsPct?.difference, awayBox.tsPct, homeBox.tsPct, true)
-            CompactStatRow(awayBox.efgPct?.formatStat(1) ?: "-", "EFG%", homeBox.efgPct?.formatStat(1) ?: "-", vsAvg?.away?.efgPct?.difference, vsAvg?.home?.efgPct?.difference, awayBox.efgPct, homeBox.efgPct, true)
+            CompactStatRow(awayBox.tsPct.formatPct(1), "TS%", homeBox.tsPct.formatPct(1), vsAvg?.away?.tsPct?.difference?.let { it * 100 }, vsAvg?.home?.tsPct?.difference?.let { it * 100 }, awayBox.tsPct?.let { it * 100 }, homeBox.tsPct?.let { it * 100 }, true)
+            CompactStatRow(awayBox.efgPct.formatPct(1), "EFG%", homeBox.efgPct.formatPct(1), vsAvg?.away?.efgPct?.difference?.let { it * 100 }, vsAvg?.home?.efgPct?.difference?.let { it * 100 }, awayBox.efgPct?.let { it * 100 }, homeBox.efgPct?.let { it * 100 }, true)
             CompactStatRow(awayBox.astTovRatio?.formatStat(2) ?: "-", "AST/TO", homeBox.astTovRatio?.formatStat(2) ?: "-", null, null, awayBox.astTovRatio, homeBox.astTovRatio, true)
         }
 
@@ -1477,8 +1460,9 @@ private fun TeamStatsView(matchup: com.joebad.fastbreak.data.model.NBAMatchup) {
                 }
             } else 0
 
-            val awayText = awayValue?.formatStat(2) ?: "-"
-            val homeText = homeValue?.formatStat(2) ?: "-"
+            val isPct = label.contains("%")
+            val awayText = if (isPct) awayValue.formatPct(1) else awayValue?.formatStat(2) ?: "-"
+            val homeText = if (isPct) homeValue.formatPct(1) else homeValue?.formatStat(2) ?: "-"
 
             FiveColumnRowWithRanks(
                 leftValue = awayText,
@@ -1517,8 +1501,9 @@ private fun TeamStatsView(matchup: com.joebad.fastbreak.data.model.NBAMatchup) {
                 }
             } else 0
 
-            val awayText = awayValue?.formatStat(2) ?: "-"
-            val homeText = homeValue?.formatStat(2) ?: "-"
+            val isPct = label.contains("%")
+            val awayText = if (isPct) awayValue.formatPct(1) else awayValue?.formatStat(2) ?: "-"
+            val homeText = if (isPct) homeValue.formatPct(1) else homeValue?.formatStat(2) ?: "-"
 
             FiveColumnRowWithRanks(
                 leftValue = awayText,
@@ -1571,12 +1556,13 @@ private fun VersusView(
                 val defRankDisplay = stat.defense.rankDisplay
 
                 if (offValue != null && defValue != null) {
+                    val isPct = offLabel.contains("%")
                     FiveColumnRowWithRanks(
-                        leftValue = offValue.formatStat(2),
+                        leftValue = if (isPct) (offValue * 100).formatStat(1) + "%" else offValue.formatStat(2),
                         leftRank = offRank,
                         leftRankDisplay = offRankDisplay,
                         centerText = offLabel,
-                        rightValue = defValue.formatStat(2),
+                        rightValue = if (isPct) (defValue * 100).formatStat(1) + "%" else defValue.formatStat(2),
                         rightRank = defRank,
                         rightRankDisplay = defRankDisplay,
                         advantage = advantage,
@@ -1634,12 +1620,18 @@ private fun PlayerStatsView(matchup: com.joebad.fastbreak.data.model.NBAMatchup)
         PlayerStatConfig(
             label = "FG%",
             decimals = 1,
-            accessor = { player -> PlayerStatValue(player.field_goal_pct.value, player.field_goal_pct.rank, player.field_goal_pct.rankDisplay) }
+            accessor = { player ->
+                val value = player.field_goal_pct.value?.let { it * 100 }
+                PlayerStatValue(value, player.field_goal_pct.rank, player.field_goal_pct.rankDisplay)
+            }
         ),
         PlayerStatConfig(
             label = "3P%",
             decimals = 1,
-            accessor = { player -> PlayerStatValue(player.three_pt_pct.value, player.three_pt_pct.rank, player.three_pt_pct.rankDisplay) }
+            accessor = { player ->
+                val value = player.three_pt_pct.value?.let { it * 100 }
+                PlayerStatValue(value, player.three_pt_pct.rank, player.three_pt_pct.rankDisplay)
+            }
         ),
         PlayerStatConfig(
             label = "TS%",
@@ -1746,7 +1738,7 @@ private fun RecordAndConferenceSection(
                     text = awayRecord ?: "",
                     style = MaterialTheme.typography.bodySmall.copy(lineHeight = 12.sp),
                     fontSize = 11.sp,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                    color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1
                 )
             }
@@ -1761,7 +1753,7 @@ private fun RecordAndConferenceSection(
                     text = homeRecord ?: "",
                     style = MaterialTheme.typography.bodySmall.copy(lineHeight = 12.sp),
                     fontSize = 11.sp,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                    color = MaterialTheme.colorScheme.onSurface,
                     textAlign = TextAlign.End,
                     maxLines = 1
                 )
@@ -1861,37 +1853,56 @@ private fun PlayoffProbabilityText(
     champProb: Double?,
     alignment: TextAlign
 ) {
+    val textColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = if (alignment == TextAlign.End) Arrangement.End else Arrangement.Start,
         modifier = Modifier.widthIn(min = 80.dp)
     ) {
         Text(
-            text = "PO:",
+            text = "PO ",
             style = MaterialTheme.typography.labelSmall,
             fontSize = 10.sp,
-            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+            color = textColor
         )
+        Box(
+            modifier = Modifier
+                .background(getProbabilityColor(playoffProb), RoundedCornerShape(4.dp))
+                .padding(horizontal = 4.dp, vertical = 2.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = formatProbability(playoffProb),
+                style = MaterialTheme.typography.labelSmall,
+                fontSize = 9.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.White,
+                maxLines = 1
+            )
+        }
+        Spacer(modifier = Modifier.width(4.dp))
         Text(
-            text = formatProbability(playoffProb),
+            text = "Ch ",
             style = MaterialTheme.typography.labelSmall,
             fontSize = 10.sp,
-            fontWeight = FontWeight.Medium,
-            color = getProbabilityColor(playoffProb)
+            color = textColor
         )
-        Text(
-            text = " Ch:",
-            style = MaterialTheme.typography.labelSmall,
-            fontSize = 10.sp,
-            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-        )
-        Text(
-            text = formatProbability(champProb),
-            style = MaterialTheme.typography.labelSmall,
-            fontSize = 10.sp,
-            fontWeight = FontWeight.Medium,
-            color = getProbabilityColor(champProb)
-        )
+        Box(
+            modifier = Modifier
+                .background(getProbabilityColor(champProb), RoundedCornerShape(4.dp))
+                .padding(horizontal = 4.dp, vertical = 2.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = formatProbability(champProb),
+                style = MaterialTheme.typography.labelSmall,
+                fontSize = 9.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.White,
+                maxLines = 1
+            )
+        }
     }
 }
 
@@ -2697,11 +2708,12 @@ private fun CompletedGameSection(
         val awayComps = vsSeasonAvg?.away
         val homeComps = vsSeasonAvg?.home
 
-        // Helper to format difference string
-        fun formatDiff(stat: com.joebad.fastbreak.data.model.NBAStatComparison?): String {
+        // Helper to format difference string (diff is in 0-1 scale, multiply by 100 for display)
+        fun formatDiff(stat: com.joebad.fastbreak.data.model.NBAStatComparison?, isPct: Boolean = false): String {
             val diff = stat?.difference ?: return ""
-            val prefix = if (diff >= 0) "+" else ""
-            return " (${prefix}${diff.formatStat(1)})"
+            val displayDiff = if (isPct) diff * 100 else diff
+            val prefix = if (displayDiff >= 0) "+" else ""
+            return " (${prefix}${displayDiff.formatStat(1)})"
         }
 
         // FG%
@@ -2709,9 +2721,9 @@ private fun CompletedGameSection(
             val awayVal = awayBox?.fgPct ?: 0.0
             val homeVal = homeBox?.fgPct ?: 0.0
             ThreeColumnRow(
-                leftText = "${awayBox?.fgm ?: 0}/${awayBox?.fga ?: 0} ${awayVal.formatStat(0)}%${formatDiff(awayComps?.fieldGoalPct)}",
+                leftText = "${awayBox?.fgm ?: 0}/${awayBox?.fga ?: 0} ${(awayVal * 100).formatStat(0)}%${formatDiff(awayComps?.fieldGoalPct, isPct = true)}",
                 centerText = "FG",
-                rightText = "${homeBox?.fgm ?: 0}/${homeBox?.fga ?: 0} ${homeVal.formatStat(0)}%${formatDiff(homeComps?.fieldGoalPct)}",
+                rightText = "${homeBox?.fgm ?: 0}/${homeBox?.fga ?: 0} ${(homeVal * 100).formatStat(0)}%${formatDiff(homeComps?.fieldGoalPct, isPct = true)}",
                 advantage = if (awayVal > homeVal) -1 else if (homeVal > awayVal) 1 else 0
             )
         }
@@ -2721,9 +2733,9 @@ private fun CompletedGameSection(
             val awayVal = awayBox?.fg3Pct ?: 0.0
             val homeVal = homeBox?.fg3Pct ?: 0.0
             ThreeColumnRow(
-                leftText = "${awayBox?.fg3m ?: 0}/${awayBox?.fg3a ?: 0} ${awayVal.formatStat(0)}%${formatDiff(awayComps?.threePtPct)}",
+                leftText = "${awayBox?.fg3m ?: 0}/${awayBox?.fg3a ?: 0} ${(awayVal * 100).formatStat(0)}%${formatDiff(awayComps?.threePtPct, isPct = true)}",
                 centerText = "3PT",
-                rightText = "${homeBox?.fg3m ?: 0}/${homeBox?.fg3a ?: 0} ${homeVal.formatStat(0)}%${formatDiff(homeComps?.threePtPct)}",
+                rightText = "${homeBox?.fg3m ?: 0}/${homeBox?.fg3a ?: 0} ${(homeVal * 100).formatStat(0)}%${formatDiff(homeComps?.threePtPct, isPct = true)}",
                 advantage = if (awayVal > homeVal) -1 else if (homeVal > awayVal) 1 else 0
             )
         }
@@ -2733,9 +2745,9 @@ private fun CompletedGameSection(
             val awayVal = awayBox?.ftPct ?: 0.0
             val homeVal = homeBox?.ftPct ?: 0.0
             ThreeColumnRow(
-                leftText = "${awayBox?.ftm ?: 0}/${awayBox?.fta ?: 0} ${awayVal.formatStat(0)}%${formatDiff(awayComps?.freeThrowPct)}",
+                leftText = "${awayBox?.ftm ?: 0}/${awayBox?.fta ?: 0} ${(awayVal * 100).formatStat(0)}%${formatDiff(awayComps?.freeThrowPct, isPct = true)}",
                 centerText = "FT",
-                rightText = "${homeBox?.ftm ?: 0}/${homeBox?.fta ?: 0} ${homeVal.formatStat(0)}%${formatDiff(homeComps?.freeThrowPct)}",
+                rightText = "${homeBox?.ftm ?: 0}/${homeBox?.fta ?: 0} ${(homeVal * 100).formatStat(0)}%${formatDiff(homeComps?.freeThrowPct, isPct = true)}",
                 advantage = if (awayVal > homeVal) -1 else if (homeVal > awayVal) 1 else 0
             )
         }
@@ -2829,9 +2841,9 @@ private fun CompletedGameSection(
             val awayVal = awayBox?.tsPct ?: 0.0
             val homeVal = homeBox?.tsPct ?: 0.0
             ThreeColumnRow(
-                leftText = "${awayVal.formatStat(1)}%${formatDiff(awayComps?.tsPct)}",
+                leftText = "${(awayVal * 100).formatStat(1)}%${formatDiff(awayComps?.tsPct, isPct = true)}",
                 centerText = "TS%",
-                rightText = "${homeVal.formatStat(1)}%${formatDiff(homeComps?.tsPct)}",
+                rightText = "${(homeVal * 100).formatStat(1)}%${formatDiff(homeComps?.tsPct, isPct = true)}",
                 advantage = if (awayVal > homeVal) -1 else if (homeVal > awayVal) 1 else 0
             )
         }
@@ -2841,9 +2853,9 @@ private fun CompletedGameSection(
             val awayVal = awayBox?.efgPct ?: 0.0
             val homeVal = homeBox?.efgPct ?: 0.0
             ThreeColumnRow(
-                leftText = "${awayVal.formatStat(1)}%${formatDiff(awayComps?.efgPct)}",
+                leftText = "${(awayVal * 100).formatStat(1)}%${formatDiff(awayComps?.efgPct, isPct = true)}",
                 centerText = "eFG%",
-                rightText = "${homeVal.formatStat(1)}%${formatDiff(homeComps?.efgPct)}",
+                rightText = "${(homeVal * 100).formatStat(1)}%${formatDiff(homeComps?.efgPct, isPct = true)}",
                 advantage = if (awayVal > homeVal) -1 else if (homeVal > awayVal) 1 else 0
             )
         }

@@ -190,11 +190,11 @@ extract_win_probability <- function(plays, home_team_id) {
 }
 
 # Helper function to compare game stats to season averages
-compare_to_season_avg <- function(game_value, season_avg, stat_name, higher_is_better = TRUE) {
+compare_to_season_avg <- function(game_value, season_avg, stat_name, higher_is_better = TRUE, decimals = 1) {
   if (is.na(game_value) || is.na(season_avg) || is.null(game_value) || is.null(season_avg)) {
     return(list(
-      gameValue = if (!is.null(game_value) && !is.na(game_value)) round(game_value, 1) else NULL,
-      seasonAvg = if (!is.null(season_avg) && !is.na(season_avg)) round(season_avg, 1) else NULL,
+      gameValue = if (!is.null(game_value) && !is.na(game_value)) round(game_value, decimals) else NULL,
+      seasonAvg = if (!is.null(season_avg) && !is.na(season_avg)) round(season_avg, decimals) else NULL,
       difference = NULL,
       percentDiff = NULL,
       aboveAverage = NULL,
@@ -215,9 +215,9 @@ compare_to_season_avg <- function(game_value, season_avg, stat_name, higher_is_b
   }
 
   list(
-    gameValue = round(game_value, 1),
-    seasonAvg = round(season_avg, 1),
-    difference = round(diff, 1),
+    gameValue = round(game_value, decimals),
+    seasonAvg = round(season_avg, decimals),
+    difference = round(diff, decimals),
     percentDiff = round(pct_diff, 1),
     aboveAverage = above_avg,
     label = label
@@ -389,14 +389,20 @@ build_game_results <- function(game, home_season_stats, away_season_stats, team_
         # Calculate TS% and eFG% for teams
         calc_ts_pct <- function(pts, fga, fta) {
           if (!is.null(pts) && !is.null(fga) && !is.null(fta) && (fga + 0.44 * fta) > 0) {
-            round(pts / (2 * (fga + 0.44 * fta)) * 100, 1)
+            round(pts / (2 * (fga + 0.44 * fta)), 4)
           } else NULL
         }
 
         calc_efg_pct <- function(fgm, fg3m, fga) {
           if (!is.null(fgm) && !is.null(fg3m) && !is.null(fga) && fga > 0) {
-            round((fgm + 0.5 * fg3m) / fga * 100, 1)
+            round((fgm + 0.5 * fg3m) / fga, 4)
           } else NULL
+        }
+
+        # Helper to convert ESPN percentage (0-100) to decimal (0-1)
+        pct_to_decimal <- function(x) {
+          val <- safe_num(x)
+          if (is.null(val)) NULL else round(val / 100, 4)
         }
 
         # Home team box score
@@ -422,13 +428,13 @@ build_game_results <- function(game, home_season_stats, away_season_stats, team_
             pts = home_pts,
             fgm = home_fgm,
             fga = home_fga,
-            fgPct = safe_num(home_box$field_goal_pct),
+            fgPct = pct_to_decimal(home_box$field_goal_pct),
             fg3m = home_fg3m,
             fg3a = home_fg3a,
-            fg3Pct = safe_num(home_box$three_point_field_goal_pct),
+            fg3Pct = pct_to_decimal(home_box$three_point_field_goal_pct),
             ftm = home_ftm,
             fta = home_fta,
-            ftPct = safe_num(home_box$free_throw_pct),
+            ftPct = pct_to_decimal(home_box$free_throw_pct),
             oreb = safe_int(home_box$offensive_rebounds),
             dreb = safe_int(home_box$defensive_rebounds),
             reb = safe_int(home_box$total_rebounds),
@@ -452,13 +458,13 @@ build_game_results <- function(game, home_season_stats, away_season_stats, team_
             pts = away_pts,
             fgm = away_fgm,
             fga = away_fga,
-            fgPct = safe_num(away_box$field_goal_pct),
+            fgPct = pct_to_decimal(away_box$field_goal_pct),
             fg3m = away_fg3m,
             fg3a = away_fg3a,
-            fg3Pct = safe_num(away_box$three_point_field_goal_pct),
+            fg3Pct = pct_to_decimal(away_box$three_point_field_goal_pct),
             ftm = away_ftm,
             fta = away_fta,
-            ftPct = safe_num(away_box$free_throw_pct),
+            ftPct = pct_to_decimal(away_box$free_throw_pct),
             oreb = safe_int(away_box$offensive_rebounds),
             dreb = safe_int(away_box$defensive_rebounds),
             reb = safe_int(away_box$total_rebounds),
@@ -481,36 +487,37 @@ build_game_results <- function(game, home_season_stats, away_season_stats, team_
         )
 
         # Compare to season averages
-        # Note: ESPN returns percentages as integers (43 = 43%), season stats are also percentages
-        # ts_pct and efg_pct in season stats are decimals (0.60 = 60%), so multiply by 100
+        # All percentage stats use 0-1 decimal scale with 4 decimal places
+        # ESPN returns percentages as 0-100, so divide by 100
+        # ts_pct and efg_pct from NBA API are already 0-1 decimals
         result$vsSeasonAvg <- list(
           home = list(
             points = compare_to_season_avg(game$home_score, home_season_stats$points_per_game, "points"),
-            fieldGoalPct = compare_to_season_avg(safe_num(home_box$field_goal_pct), home_season_stats$fg_pct, "fg_pct"),
-            threePtPct = compare_to_season_avg(safe_num(home_box$three_point_field_goal_pct), home_season_stats$three_pt_pct, "three_pt_pct"),
-            freeThrowPct = compare_to_season_avg(safe_num(home_box$free_throw_pct), home_season_stats$ft_pct, "ft_pct"),
+            fieldGoalPct = compare_to_season_avg(safe_num(home_box$field_goal_pct) / 100, home_season_stats$fg_pct / 100, "fg_pct", decimals = 4),
+            threePtPct = compare_to_season_avg(safe_num(home_box$three_point_field_goal_pct) / 100, home_season_stats$three_pt_pct / 100, "three_pt_pct", decimals = 4),
+            freeThrowPct = compare_to_season_avg(safe_num(home_box$free_throw_pct) / 100, home_season_stats$ft_pct / 100, "ft_pct", decimals = 4),
             rebounds = compare_to_season_avg(safe_num(home_box$total_rebounds), home_season_stats$rebounds_per_game, "rebounds"),
             offRebounds = compare_to_season_avg(safe_num(home_box$offensive_rebounds), home_season_stats$offensive_rebounds_total / home_season_stats$games_played, "oreb"),
             assists = compare_to_season_avg(safe_num(home_box$assists), home_season_stats$assists_per_game, "assists"),
             steals = compare_to_season_avg(safe_num(home_box$steals), home_season_stats$steals_per_game, "steals"),
             blocks = compare_to_season_avg(safe_num(home_box$blocks), home_season_stats$blocks_per_game, "blocks"),
             turnovers = compare_to_season_avg(safe_num(home_box$turnovers), home_season_stats$turnovers_per_game, "turnovers", higher_is_better = FALSE),
-            tsPct = compare_to_season_avg(calc_ts_pct(home_pts, home_fga, home_fta), home_season_stats$ts_pct * 100, "ts_pct"),
-            efgPct = compare_to_season_avg(calc_efg_pct(home_fgm, home_fg3m, home_fga), home_season_stats$efg_pct * 100, "efg_pct")
+            tsPct = compare_to_season_avg(calc_ts_pct(home_pts, home_fga, home_fta), home_season_stats$ts_pct, "ts_pct", decimals = 4),
+            efgPct = compare_to_season_avg(calc_efg_pct(home_fgm, home_fg3m, home_fga), home_season_stats$efg_pct, "efg_pct", decimals = 4)
           ),
           away = list(
             points = compare_to_season_avg(game$away_score, away_season_stats$points_per_game, "points"),
-            fieldGoalPct = compare_to_season_avg(safe_num(away_box$field_goal_pct), away_season_stats$fg_pct, "fg_pct"),
-            threePtPct = compare_to_season_avg(safe_num(away_box$three_point_field_goal_pct), away_season_stats$three_pt_pct, "three_pt_pct"),
-            freeThrowPct = compare_to_season_avg(safe_num(away_box$free_throw_pct), away_season_stats$ft_pct, "ft_pct"),
+            fieldGoalPct = compare_to_season_avg(safe_num(away_box$field_goal_pct) / 100, away_season_stats$fg_pct / 100, "fg_pct", decimals = 4),
+            threePtPct = compare_to_season_avg(safe_num(away_box$three_point_field_goal_pct) / 100, away_season_stats$three_pt_pct / 100, "three_pt_pct", decimals = 4),
+            freeThrowPct = compare_to_season_avg(safe_num(away_box$free_throw_pct) / 100, away_season_stats$ft_pct / 100, "ft_pct", decimals = 4),
             rebounds = compare_to_season_avg(safe_num(away_box$total_rebounds), away_season_stats$rebounds_per_game, "rebounds"),
             offRebounds = compare_to_season_avg(safe_num(away_box$offensive_rebounds), away_season_stats$offensive_rebounds_total / away_season_stats$games_played, "oreb"),
             assists = compare_to_season_avg(safe_num(away_box$assists), away_season_stats$assists_per_game, "assists"),
             steals = compare_to_season_avg(safe_num(away_box$steals), away_season_stats$steals_per_game, "steals"),
             blocks = compare_to_season_avg(safe_num(away_box$blocks), away_season_stats$blocks_per_game, "blocks"),
             turnovers = compare_to_season_avg(safe_num(away_box$turnovers), away_season_stats$turnovers_per_game, "turnovers", higher_is_better = FALSE),
-            tsPct = compare_to_season_avg(calc_ts_pct(away_pts, away_fga, away_fta), away_season_stats$ts_pct * 100, "ts_pct"),
-            efgPct = compare_to_season_avg(calc_efg_pct(away_fgm, away_fg3m, away_fga), away_season_stats$efg_pct * 100, "efg_pct")
+            tsPct = compare_to_season_avg(calc_ts_pct(away_pts, away_fga, away_fta), away_season_stats$ts_pct, "ts_pct", decimals = 4),
+            efgPct = compare_to_season_avg(calc_efg_pct(away_fgm, away_fg3m, away_fga), away_season_stats$efg_pct, "efg_pct", decimals = 4)
           )
         )
       }
@@ -534,14 +541,14 @@ build_game_results <- function(game, home_season_stats, away_season_stats, team_
         fgm <- safe_int(p$field_goals_made)
         fg3m <- safe_int(p$three_point_field_goals_made)
 
-        # Calculate TS%: PTS / (2 * (FGA + 0.44 * FTA))
+        # Calculate TS%: PTS / (2 * (FGA + 0.44 * FTA)) - stored as 0-1 decimal
         ts_pct <- if (!is.null(pts) && !is.null(fga) && !is.null(fta) && (fga + 0.44 * fta) > 0) {
-          round(pts / (2 * (fga + 0.44 * fta)) * 100, 1)
+          round(pts / (2 * (fga + 0.44 * fta)), 4)
         } else NULL
 
-        # Calculate eFG%: (FGM + 0.5 * FG3M) / FGA
+        # Calculate eFG%: (FGM + 0.5 * FG3M) / FGA - stored as 0-1 decimal
         efg_pct <- if (!is.null(fgm) && !is.null(fg3m) && !is.null(fga) && fga > 0) {
-          round((fgm + 0.5 * fg3m) / fga * 100, 1)
+          round((fgm + 0.5 * fg3m) / fga, 4)
         } else NULL
 
         list(
@@ -1787,8 +1794,8 @@ build_nba_comparisons <- function(home_stats, away_stats, home_team, away_team) 
   off_comparison <- list()
   off_stats <- list(
     list(key = "pointsPerGame", label = "Points/Game", value_home = home_stats$points_per_game, rank_home = home_stats$points_per_game_rank, rankDisplay_home = home_stats$points_per_game_rankDisplay, value_away = away_stats$points_per_game, rank_away = away_stats$points_per_game_rank, rankDisplay_away = away_stats$points_per_game_rankDisplay),
-    list(key = "fieldGoalPct", label = "Field Goal %", value_home = home_stats$fg_pct, rank_home = home_stats$fg_pct_rank, rankDisplay_home = home_stats$fg_pct_rankDisplay, value_away = away_stats$fg_pct, rank_away = away_stats$fg_pct_rank, rankDisplay_away = away_stats$fg_pct_rankDisplay),
-    list(key = "threePtPct", label = "3-Point %", value_home = home_stats$three_pt_pct, rank_home = home_stats$three_pt_pct_rank, rankDisplay_home = home_stats$three_pt_pct_rankDisplay, value_away = away_stats$three_pt_pct, rank_away = away_stats$three_pt_pct_rank, rankDisplay_away = away_stats$three_pt_pct_rankDisplay),
+    list(key = "fieldGoalPct", label = "Field Goal %", value_home = home_stats$fg_pct / 100, rank_home = home_stats$fg_pct_rank, rankDisplay_home = home_stats$fg_pct_rankDisplay, value_away = away_stats$fg_pct / 100, rank_away = away_stats$fg_pct_rank, rankDisplay_away = away_stats$fg_pct_rankDisplay),
+    list(key = "threePtPct", label = "3-Point %", value_home = home_stats$three_pt_pct / 100, rank_home = home_stats$three_pt_pct_rank, rankDisplay_home = home_stats$three_pt_pct_rankDisplay, value_away = away_stats$three_pt_pct / 100, rank_away = away_stats$three_pt_pct_rank, rankDisplay_away = away_stats$three_pt_pct_rankDisplay),
     list(key = "assistsPerGame", label = "Assists/Game", value_home = home_stats$assists_per_game, rank_home = home_stats$assists_per_game_rank, rankDisplay_home = home_stats$assists_per_game_rankDisplay, value_away = away_stats$assists_per_game, rank_away = away_stats$assists_per_game_rank, rankDisplay_away = away_stats$assists_per_game_rankDisplay),
     list(key = "reboundsPerGame", label = "Rebounds/Game", value_home = home_stats$rebounds_per_game, rank_home = home_stats$rebounds_per_game_rank, rankDisplay_home = home_stats$rebounds_per_game_rankDisplay, value_away = away_stats$rebounds_per_game, rank_away = away_stats$rebounds_per_game_rank, rankDisplay_away = away_stats$rebounds_per_game_rankDisplay)
   )
@@ -1806,12 +1813,12 @@ build_nba_comparisons <- function(home_stats, away_stats, home_team, away_team) 
     off_comparison[[stat$key]] <- list(
       label = stat$label,
       home = list(
-        value = if (!is.na(stat$value_home)) round(stat$value_home, 2) else NULL,
+        value = if (!is.na(stat$value_home)) round(stat$value_home, 4) else NULL,
         rank = if (!is.na(stat$rank_home)) as.integer(stat$rank_home) else NULL,
         rankDisplay = if (!is.na(stat$rankDisplay_home)) stat$rankDisplay_home else NULL
       ),
       away = list(
-        value = if (!is.na(stat$value_away)) round(stat$value_away, 2) else NULL,
+        value = if (!is.na(stat$value_away)) round(stat$value_away, 4) else NULL,
         rank = if (!is.na(stat$rank_away)) as.integer(stat$rank_away) else NULL,
         rankDisplay = if (!is.na(stat$rankDisplay_away)) stat$rankDisplay_away else NULL
       )
@@ -1822,8 +1829,8 @@ build_nba_comparisons <- function(home_stats, away_stats, home_team, away_team) 
   def_comparison <- list()
   def_stats <- list(
     list(key = "oppPointsPerGame", label = "Opp Points/Game", value_home = home_stats$opp_points_per_game, rank_home = home_stats$opp_points_per_game_rank, rankDisplay_home = home_stats$opp_points_per_game_rankDisplay, value_away = away_stats$opp_points_per_game, rank_away = away_stats$opp_points_per_game_rank, rankDisplay_away = away_stats$opp_points_per_game_rankDisplay),
-    list(key = "oppFieldGoalPct", label = "Opp Field Goal %", value_home = home_stats$opp_fg_pct, rank_home = home_stats$opp_fg_pct_rank, rankDisplay_home = home_stats$opp_fg_pct_rankDisplay, value_away = away_stats$opp_fg_pct, rank_away = away_stats$opp_fg_pct_rank, rankDisplay_away = away_stats$opp_fg_pct_rankDisplay),
-    list(key = "oppThreePtPct", label = "Opp 3-Point %", value_home = home_stats$opp_three_pt_pct, rank_home = home_stats$opp_three_pt_pct_rank, rankDisplay_home = home_stats$opp_three_pt_pct_rankDisplay, value_away = away_stats$opp_three_pt_pct, rank_away = away_stats$opp_three_pt_pct_rank, rankDisplay_away = away_stats$opp_three_pt_pct_rankDisplay),
+    list(key = "oppFieldGoalPct", label = "Opp Field Goal %", value_home = home_stats$opp_fg_pct / 100, rank_home = home_stats$opp_fg_pct_rank, rankDisplay_home = home_stats$opp_fg_pct_rankDisplay, value_away = away_stats$opp_fg_pct / 100, rank_away = away_stats$opp_fg_pct_rank, rankDisplay_away = away_stats$opp_fg_pct_rankDisplay),
+    list(key = "oppThreePtPct", label = "Opp 3-Point %", value_home = home_stats$opp_three_pt_pct / 100, rank_home = home_stats$opp_three_pt_pct_rank, rankDisplay_home = home_stats$opp_three_pt_pct_rankDisplay, value_away = away_stats$opp_three_pt_pct / 100, rank_away = away_stats$opp_three_pt_pct_rank, rankDisplay_away = away_stats$opp_three_pt_pct_rankDisplay),
     list(key = "stealsPerGame", label = "Steals/Game", value_home = home_stats$steals_per_game, rank_home = home_stats$steals_per_game_rank, rankDisplay_home = home_stats$steals_per_game_rankDisplay, value_away = away_stats$steals_per_game, rank_away = away_stats$steals_per_game_rank, rankDisplay_away = away_stats$steals_per_game_rankDisplay),
     list(key = "blocksPerGame", label = "Blocks/Game", value_home = home_stats$blocks_per_game, rank_home = home_stats$blocks_per_game_rank, rankDisplay_home = home_stats$blocks_per_game_rankDisplay, value_away = away_stats$blocks_per_game, rank_away = away_stats$blocks_per_game_rank, rankDisplay_away = away_stats$blocks_per_game_rankDisplay),
     list(key = "oppAssistsPerGame", label = "Opp Assists/Game", value_home = home_stats$opp_assists_per_game, rank_home = home_stats$opp_assists_per_game_rank, rankDisplay_home = home_stats$opp_assists_per_game_rankDisplay, value_away = away_stats$opp_assists_per_game, rank_away = away_stats$opp_assists_per_game_rank, rankDisplay_away = away_stats$opp_assists_per_game_rankDisplay),
@@ -1847,12 +1854,12 @@ build_nba_comparisons <- function(home_stats, away_stats, home_team, away_team) 
     def_comparison[[stat$key]] <- list(
       label = stat$label,
       home = list(
-        value = if (!is.na(stat$value_home)) round(stat$value_home, 2) else NULL,
+        value = if (!is.na(stat$value_home)) round(stat$value_home, 4) else NULL,
         rank = if (!is.na(stat$rank_home)) as.integer(stat$rank_home) else NULL,
         rankDisplay = if (!is.na(stat$rankDisplay_home)) stat$rankDisplay_home else NULL
       ),
       away = list(
-        value = if (!is.na(stat$value_away)) round(stat$value_away, 2) else NULL,
+        value = if (!is.na(stat$value_away)) round(stat$value_away, 4) else NULL,
         rank = if (!is.na(stat$rank_away)) as.integer(stat$rank_away) else NULL,
         rankDisplay = if (!is.na(stat$rankDisplay_away)) stat$rankDisplay_away else NULL
       )
@@ -1885,7 +1892,8 @@ build_nba_comparisons <- function(home_stats, away_stats, home_team, away_team) 
       off_rank = "fg_pct_rank",
       def_rank = "opp_fg_pct_rank",
       off_rankDisplay = "fg_pct_rankDisplay",
-      def_rankDisplay = "opp_fg_pct_rankDisplay"
+      def_rankDisplay = "opp_fg_pct_rankDisplay",
+      is_pct_100 = TRUE
     ),
     list(
       key = "threePtPct",
@@ -1896,7 +1904,8 @@ build_nba_comparisons <- function(home_stats, away_stats, home_team, away_team) 
       off_rank = "three_pt_pct_rank",
       def_rank = "opp_three_pt_pct_rank",
       off_rankDisplay = "three_pt_pct_rankDisplay",
-      def_rankDisplay = "opp_three_pt_pct_rankDisplay"
+      def_rankDisplay = "opp_three_pt_pct_rankDisplay",
+      is_pct_100 = TRUE
     ),
     list(
       key = "effectiveFgPct",
@@ -1961,19 +1970,23 @@ build_nba_comparisons <- function(home_stats, away_stats, home_team, away_team) 
         }
       }
 
+      # Convert 0-100 percentage stats to 0-1 decimal scale
+      off_val_out <- if (!is.null(matchup$is_pct_100) && matchup$is_pct_100) round(off_val / 100, 4) else round(off_val, 4)
+      def_val_out <- if (!is.null(matchup$is_pct_100) && matchup$is_pct_100) round(def_val / 100, 4) else round(def_val, 4)
+
       home_off_vs_away_def[[matchup$key]] <- list(
         statKey = matchup$key,
         offLabel = matchup$off_label,
         defLabel = matchup$def_label,
         offense = list(
           team = home_team,
-          value = round(off_val, 2),
+          value = off_val_out,
           rank = as.integer(off_rank),
           rankDisplay = home_stats[[matchup$off_rankDisplay]]
         ),
         defense = list(
           team = away_team,
-          value = round(def_val, 2),
+          value = def_val_out,
           rank = as.integer(def_rank),
           rankDisplay = away_stats[[matchup$def_rankDisplay]]
         ),
@@ -2002,19 +2015,23 @@ build_nba_comparisons <- function(home_stats, away_stats, home_team, away_team) 
         }
       }
 
+      # Convert 0-100 percentage stats to 0-1 decimal scale
+      off_val_out <- if (!is.null(matchup$is_pct_100) && matchup$is_pct_100) round(off_val / 100, 4) else round(off_val, 4)
+      def_val_out <- if (!is.null(matchup$is_pct_100) && matchup$is_pct_100) round(def_val / 100, 4) else round(def_val, 4)
+
       away_off_vs_home_def[[matchup$key]] <- list(
         statKey = matchup$key,
         offLabel = matchup$off_label,
         defLabel = matchup$def_label,
         offense = list(
           team = away_team,
-          value = round(off_val, 2),
+          value = off_val_out,
           rank = as.integer(off_rank),
           rankDisplay = away_stats[[matchup$off_rankDisplay]]
         ),
         defense = list(
           team = home_team,
-          value = round(def_val, 2),
+          value = def_val_out,
           rank = as.integer(def_rank),
           rankDisplay = home_stats[[matchup$def_rankDisplay]]
         ),
@@ -2078,10 +2095,10 @@ for (game in all_games) {
       pointsPerGame = round(home_stats$points_per_game, 1),
       pointsPerGameRank = home_stats$points_per_game_rank,
       pointsPerGameRankDisplay = home_stats$points_per_game_rankDisplay,
-      fieldGoalPct = round(home_stats$fg_pct, 1),
+      fieldGoalPct = round(home_stats$fg_pct / 100, 4),
       fieldGoalPctRank = home_stats$fg_pct_rank,
       fieldGoalPctRankDisplay = home_stats$fg_pct_rankDisplay,
-      threePtPct = round(home_stats$three_pt_pct, 1),
+      threePtPct = round(home_stats$three_pt_pct / 100, 4),
       threePtPctRank = home_stats$three_pt_pct_rank,
       threePtPctRankDisplay = home_stats$three_pt_pct_rankDisplay,
       reboundsPerGame = round(home_stats$rebounds_per_game, 1),
@@ -2251,10 +2268,10 @@ for (game in all_games) {
       pointsPerGame = round(away_stats$points_per_game, 1),
       pointsPerGameRank = away_stats$points_per_game_rank,
       pointsPerGameRankDisplay = away_stats$points_per_game_rankDisplay,
-      fieldGoalPct = round(away_stats$fg_pct, 1),
+      fieldGoalPct = round(away_stats$fg_pct / 100, 4),
       fieldGoalPctRank = away_stats$fg_pct_rank,
       fieldGoalPctRankDisplay = away_stats$fg_pct_rankDisplay,
-      threePtPct = round(away_stats$three_pt_pct, 1),
+      threePtPct = round(away_stats$three_pt_pct / 100, 4),
       threePtPctRank = away_stats$three_pt_pct_rank,
       threePtPctRankDisplay = away_stats$three_pt_pct_rankDisplay,
       reboundsPerGame = round(away_stats$rebounds_per_game, 1),
@@ -2446,18 +2463,18 @@ for (game in all_games) {
         rankDisplay = na_to_null(p$blocks_per_game_rankDisplay)
       ),
       field_goal_pct = list(
-        value = na_to_null(round(p$fg_pct, 2)),
+        value = na_to_null(if (!is.na(p$fg_pct)) round(p$fg_pct / 100, 4) else NA),
         rank = na_to_null(as.integer(p$fg_pct_rank)),
         rankDisplay = na_to_null(p$fg_pct_rankDisplay)
       ),
       three_pt_pct = list(
-        value = na_to_null(round(p$three_pt_pct, 2)),
+        value = na_to_null(if (!is.na(p$three_pt_pct)) round(p$three_pt_pct / 100, 4) else NA),
         rank = na_to_null(as.integer(p$three_pt_pct_rank)),
         rankDisplay = na_to_null(p$three_pt_pct_rankDisplay)
       ),
       true_shooting_pct = if ("player_ts_pct" %in% names(p) && is_valid_value(p$player_ts_pct)) {
         list(
-          value = na_to_null(round(p$player_ts_pct, 2)),
+          value = na_to_null(round(p$player_ts_pct, 4)),
           rank = na_to_null(as.integer(p$player_ts_pct_rank)),
           rankDisplay = na_to_null(p$player_ts_pct_rankDisplay)
         )
@@ -2466,7 +2483,7 @@ for (game in all_games) {
       },
       effective_fg_pct = if ("player_efg_pct" %in% names(p) && is_valid_value(p$player_efg_pct)) {
         list(
-          value = na_to_null(round(p$player_efg_pct, 2)),
+          value = na_to_null(round(p$player_efg_pct, 4)),
           rank = na_to_null(as.integer(p$player_efg_pct_rank)),
           rankDisplay = na_to_null(p$player_efg_pct_rankDisplay)
         )
@@ -2475,7 +2492,7 @@ for (game in all_games) {
       },
       pie = if ("player_pie" %in% names(p) && is_valid_value(p$player_pie)) {
         list(
-          value = na_to_null(round(p$player_pie, 2)),
+          value = na_to_null(round(p$player_pie, 4)),
           rank = na_to_null(as.integer(p$player_pie_rank)),
           rankDisplay = na_to_null(p$player_pie_rankDisplay)
         )
@@ -2484,7 +2501,7 @@ for (game in all_games) {
       },
       usage_pct = if ("player_usg_pct" %in% names(p) && is_valid_value(p$player_usg_pct)) {
         list(
-          value = na_to_null(round(p$player_usg_pct, 2)),
+          value = na_to_null(round(p$player_usg_pct, 4)),
           rank = na_to_null(as.integer(p$player_usg_pct_rank)),
           rankDisplay = na_to_null(p$player_usg_pct_rankDisplay)
         )
@@ -2539,18 +2556,18 @@ for (game in all_games) {
         rankDisplay = na_to_null(p$blocks_per_game_rankDisplay)
       ),
       field_goal_pct = list(
-        value = na_to_null(round(p$fg_pct, 2)),
+        value = na_to_null(if (!is.na(p$fg_pct)) round(p$fg_pct / 100, 4) else NA),
         rank = na_to_null(as.integer(p$fg_pct_rank)),
         rankDisplay = na_to_null(p$fg_pct_rankDisplay)
       ),
       three_pt_pct = list(
-        value = na_to_null(round(p$three_pt_pct, 2)),
+        value = na_to_null(if (!is.na(p$three_pt_pct)) round(p$three_pt_pct / 100, 4) else NA),
         rank = na_to_null(as.integer(p$three_pt_pct_rank)),
         rankDisplay = na_to_null(p$three_pt_pct_rankDisplay)
       ),
       true_shooting_pct = if ("player_ts_pct" %in% names(p) && is_valid_value(p$player_ts_pct)) {
         list(
-          value = na_to_null(round(p$player_ts_pct, 2)),
+          value = na_to_null(round(p$player_ts_pct, 4)),
           rank = na_to_null(as.integer(p$player_ts_pct_rank)),
           rankDisplay = na_to_null(p$player_ts_pct_rankDisplay)
         )
@@ -2559,7 +2576,7 @@ for (game in all_games) {
       },
       effective_fg_pct = if ("player_efg_pct" %in% names(p) && is_valid_value(p$player_efg_pct)) {
         list(
-          value = na_to_null(round(p$player_efg_pct, 2)),
+          value = na_to_null(round(p$player_efg_pct, 4)),
           rank = na_to_null(as.integer(p$player_efg_pct_rank)),
           rankDisplay = na_to_null(p$player_efg_pct_rankDisplay)
         )
@@ -2568,7 +2585,7 @@ for (game in all_games) {
       },
       pie = if ("player_pie" %in% names(p) && is_valid_value(p$player_pie)) {
         list(
-          value = na_to_null(round(p$player_pie, 2)),
+          value = na_to_null(round(p$player_pie, 4)),
           rank = na_to_null(as.integer(p$player_pie_rank)),
           rankDisplay = na_to_null(p$player_pie_rankDisplay)
         )
@@ -2577,7 +2594,7 @@ for (game in all_games) {
       },
       usage_pct = if ("player_usg_pct" %in% names(p) && is_valid_value(p$player_usg_pct)) {
         list(
-          value = na_to_null(round(p$player_usg_pct, 2)),
+          value = na_to_null(round(p$player_usg_pct, 4)),
           rank = na_to_null(as.integer(p$player_usg_pct_rank)),
           rankDisplay = na_to_null(p$player_usg_pct_rankDisplay)
         )

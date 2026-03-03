@@ -1020,6 +1020,14 @@ tenth_net_rating_by_week <- cum_net_rating_by_team %>%
 
 cat("Calculated #10 net rating reference line for", nrow(tenth_net_rating_by_week), "weeks\n")
 
+# Calculate league-wide min/max cumulative net rating for consistent chart scaling
+league_cum_net_rating_stats <- list(
+  minCumNetRating = round(min(cum_net_rating_by_team$cum_net_rating, na.rm = TRUE), 1),
+  maxCumNetRating = round(max(cum_net_rating_by_team$cum_net_rating, na.rm = TRUE), 1)
+)
+cat("League cumulative net rating bounds: [", league_cum_net_rating_stats$minCumNetRating, "-",
+    league_cum_net_rating_stats$maxCumNetRating, "]\n")
+
 # Calculate weekly efficiency (off_rating and def_rating per week) - last 10 weeks
 # This averages the ratings for all games within each week
 weekly_efficiency <- game_ratings %>%
@@ -2667,6 +2675,9 @@ for (game in all_games) {
   } else {
     list()
   }
+
+  # Add league-wide cumulative net rating bounds for consistent line chart scaling
+  matchup$leagueCumNetRatingStats <- league_cum_net_rating_stats
 
   # Add league-wide efficiency stats for consistent scatter plot scaling
   matchup$leagueEfficiencyStats <- list(

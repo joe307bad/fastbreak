@@ -680,6 +680,18 @@ data class LeagueXgVsPointsStats(
 )
 
 @Serializable
+data class LeagueCumXgStats(
+    val minCumXgPct: Double,
+    val maxCumXgPct: Double
+)
+
+@Serializable
+data class LeagueCumNetRatingStats(
+    val minCumNetRating: Double,
+    val maxCumNetRating: Double
+)
+
+@Serializable
 data class NBAMatchup(
     val gameId: String,
     val gameDate: String,  // ISO 8601 format
@@ -695,6 +707,7 @@ data class NBAMatchup(
     val comparisons: MatchupComparisons? = null,
     val tenthNetRatingByWeek: JsonObject? = null,  // #10 ranked cumulative net rating by week for reference line
     val leagueEfficiencyStats: LeagueEfficiencyStats? = null,  // League-wide stats for consistent scatter plot scaling
+    val leagueCumNetRatingStats: LeagueCumNetRatingStats? = null,  // League-wide cumulative net rating bounds
     val results: NBAGameResults? = null  // Results data for completed games
 )
 
@@ -930,7 +943,8 @@ data class NHLMatchup(
     val comparisons: MatchupComparisons? = null,
     val results: NHLGameResults? = null,
     val tenthXgfPctByWeek: JsonObject? = null,
-    val leagueXgVsPointsStats: LeagueXgVsPointsStats? = null
+    val leagueXgVsPointsStats: LeagueXgVsPointsStats? = null,
+    val leagueCumXgStats: LeagueCumXgStats? = null
 )
 
 @Serializable

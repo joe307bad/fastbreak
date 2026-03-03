@@ -38,6 +38,7 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.joebad.fastbreak.data.model.LeagueCumNetRatingStats
 import com.joebad.fastbreak.data.model.LineChartDataPoint
 import com.joebad.fastbreak.data.model.LineChartSeries
 import com.joebad.fastbreak.data.model.NBAMatchup
@@ -2169,6 +2170,7 @@ private fun NBAChartsTab(
             awayStats = matchup.awayTeam.stats,
             homeStats = matchup.homeTeam.stats,
             tenthNetRatingByWeek = matchup.tenthNetRatingByWeek,
+            leagueCumNetRatingStats = matchup.leagueCumNetRatingStats,
             onShareClick = onNetRatingShareClick
         )
 
@@ -2208,6 +2210,7 @@ private fun CumulativeNetRatingChart(
     awayStats: JsonObject,
     homeStats: JsonObject,
     tenthNetRatingByWeek: JsonObject? = null,
+    leagueCumNetRatingStats: LeagueCumNetRatingStats? = null,
     onShareClick: ((() -> Unit)?) -> Unit = {}
 ) {
     Text(
@@ -2266,7 +2269,9 @@ private fun CumulativeNetRatingChart(
         referenceLines = referenceLines,
         title = "Cumulative Net Rating - $awayTeam @ $homeTeam",
         source = "hoopR / ESPN",
-        onShareClick = onShareClick
+        onShareClick = onShareClick,
+        customYMin = leagueCumNetRatingStats?.minCumNetRating?.toFloat(),
+        customYMax = leagueCumNetRatingStats?.maxCumNetRating?.toFloat()
     )
 }
 

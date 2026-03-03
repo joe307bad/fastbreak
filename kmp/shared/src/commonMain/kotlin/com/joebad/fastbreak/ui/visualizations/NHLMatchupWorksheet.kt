@@ -42,6 +42,7 @@ import com.joebad.fastbreak.data.model.NHLMatchupVisualization
 import com.joebad.fastbreak.data.model.NHLPlayerInfo
 import com.joebad.fastbreak.data.model.PlayoffProbability
 import com.joebad.fastbreak.data.model.QuadrantConfig
+import com.joebad.fastbreak.data.model.LeagueCumXgStats
 import com.joebad.fastbreak.data.model.LeagueXgVsPointsStats
 import com.joebad.fastbreak.data.model.ScatterPlotDataPoint
 import com.joebad.fastbreak.ui.QuadrantScatterPlot
@@ -2190,9 +2191,9 @@ private fun getPlayoffProbColor(prob: Double?): Color {
     if (prob == null) return Color.Gray
     val isDarkTheme = isSystemInDarkTheme()
     return when {
-        prob >= 90 -> if (isDarkTheme) Color(0xFFA5D6A7) else Color(0xFF1B5E20)  // Green - very likely
-        prob >= 75 -> if (isDarkTheme) Color(0xFFC8E6C9) else Color(0xFF2E7D32)  // Green - likely
-        prob >= 60 -> if (isDarkTheme) Color(0xFFE8F5E9) else Color(0xFF4CAF50)  // Light green - good chances
+        prob >= 90 -> if (isDarkTheme) Color(0xFF1B5E20) else Color(0xFF1B5E20)  // Green - very likely
+        prob >= 75 -> if (isDarkTheme) Color(0xFF2E7D32) else Color(0xFF2E7D32)  // Green - likely
+        prob >= 60 -> if (isDarkTheme) Color(0xFF388E3C) else Color(0xFF4CAF50)  // Light green - good chances
         prob >= 40 -> Color(0xFFFF8C00)  // Orange - toss up
         prob >= 20 -> Color(0xFFE65100)  // Dark orange - unlikely
         else -> Color(0xFFC62828)        // Red - very unlikely
@@ -2207,9 +2208,9 @@ private fun getChampProbColor(prob: Double?): Color {
     if (prob == null) return Color.Gray
     val isDarkTheme = isSystemInDarkTheme()
     return when {
-        prob >= 20 -> if (isDarkTheme) Color(0xFFA5D6A7) else Color(0xFF1B5E20)  // Green - strong contender
-        prob >= 10 -> if (isDarkTheme) Color(0xFFC8E6C9) else Color(0xFF2E7D32)  // Green - solid contender
-        prob >= 5 -> if (isDarkTheme) Color(0xFFE8F5E9) else Color(0xFF4CAF50)   // Light green - contender
+        prob >= 20 -> if (isDarkTheme) Color(0xFF1B5E20) else Color(0xFF1B5E20)  // Green - strong contender
+        prob >= 10 -> if (isDarkTheme) Color(0xFF2E7D32) else Color(0xFF2E7D32)  // Green - solid contender
+        prob >= 5 -> if (isDarkTheme) Color(0xFF388E3C) else Color(0xFF4CAF50)   // Light green - contender
         prob >= 2 -> Color(0xFFFF8C00)   // Orange - outside shot
         prob > 1 -> Color(0xFFE65100)    // Dark orange - long shot (>1%, not >=1%)
         else -> Color(0xFFC62828)        // Red - very unlikely (includes 1% and below)
@@ -2308,6 +2309,7 @@ private fun NHLChartsTab(
             awayStats = matchup.awayTeam.stats,
             homeStats = matchup.homeTeam.stats,
             tenthXgfPctByWeek = matchup.tenthXgfPctByWeek,
+            leagueCumXgStats = matchup.leagueCumXgStats,
             onShareClick = onCumXgfShareClick
         )
 
@@ -2342,6 +2344,7 @@ private fun CumulativeXgfPctChart(
     awayStats: JsonObject,
     homeStats: JsonObject,
     tenthXgfPctByWeek: JsonObject? = null,
+    leagueCumXgStats: LeagueCumXgStats? = null,
     onShareClick: ((() -> Unit)?) -> Unit = {}
 ) {
     Text(
@@ -2396,7 +2399,9 @@ private fun CumulativeXgfPctChart(
         referenceLines = referenceLines,
         title = "Cumulative xG% (Last 10 Wks) - $awayTeam @ $homeTeam",
         source = "Natural Stat Trick",
-        onShareClick = onShareClick
+        onShareClick = onShareClick,
+        customYMin = leagueCumXgStats?.minCumXgPct?.toFloat(),
+        customYMax = leagueCumXgStats?.maxCumXgPct?.toFloat()
     )
 }
 

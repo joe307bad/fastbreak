@@ -1363,6 +1363,29 @@ if (length(cum_xgf_pct_by_week) > 0) {
   cat("Computed 10th-best xG% reference line for", length(tenth_xgf_pct_by_week), "weeks\n")
 }
 
+# 5. Compute league-wide min/max for cumulative xG% chart scaling
+# so all matchup charts use the same Y-axis range
+league_cum_xg_stats <- NULL
+if (length(cum_xgf_pct_by_week) > 0) {
+  all_cum_vals <- c()
+  for (team in names(cum_xgf_pct_by_week)) {
+    for (wk in names(cum_xgf_pct_by_week[[team]])) {
+      val <- cum_xgf_pct_by_week[[team]][[wk]]
+      if (!is.null(val) && !is.na(val)) {
+        all_cum_vals <- c(all_cum_vals, val)
+      }
+    }
+  }
+  if (length(all_cum_vals) > 0) {
+    league_cum_xg_stats <- list(
+      minCumXgPct = round(min(all_cum_vals), 1),
+      maxCumXgPct = round(max(all_cum_vals), 1)
+    )
+    cat("League cumulative xG% bounds: [", league_cum_xg_stats$minCumXgPct, "-",
+        league_cum_xg_stats$maxCumXgPct, "]\n")
+  }
+}
+
 # Join season xG% data to team_stats and compute ranks
 if (!is.null(nst_season_xg) && nrow(nst_season_xg) > 0) {
   nst_join <- nst_season_xg %>%
@@ -1563,13 +1586,22 @@ start_date <- today - days(DAYS_BEHIND)
 end_date <- today + days(DAYS_AHEAD)
 
 # Fetch schedule from NHL API
-# Optimization: Each API call returns ~1 week of games, so we only need 2 calls
-# to cover our 11-day range (3 days back + 7 days ahead)
+# Each API call returns ~1 week of games, so we step through the range
+# in 7-day increments to ensure full coverage with no gaps
 all_games <- list()
 seen_game_ids <- character(0)  # Track game IDs to avoid duplicates
 
-# Make 2 API calls: one at the start of range, one at the end
-schedule_dates <- c(format(start_date, "%Y-%m-%d"), format(end_date, "%Y-%m-%d"))
+# Generate dates every 7 days across the range to ensure no gaps
+schedule_dates <- character(0)
+d <- start_date
+while (d <= end_date) {
+  schedule_dates <- c(schedule_dates, format(d, "%Y-%m-%d"))
+  d <- d + days(7)
+}
+# Always include end_date to cover the tail
+if (as.Date(tail(schedule_dates, 1)) < end_date) {
+  schedule_dates <- c(schedule_dates, format(end_date, "%Y-%m-%d"))
+}
 
 for (date_string in schedule_dates) {
 
@@ -2399,6 +2431,11 @@ for (game in all_games) {
   # Add league-wide xG% vs Points% stats for consistent scatter plot scaling
   if (!is.null(league_xg_vs_pts)) {
     matchup$leagueXgVsPointsStats <- league_xg_vs_pts
+  }
+
+  # Add league-wide cumulative xG% bounds for consistent line chart scaling
+  if (!is.null(league_cum_xg_stats)) {
+    matchup$leagueCumXgStats <- league_cum_xg_stats
   }
 
   # Add results for completed games (with rate limiting)

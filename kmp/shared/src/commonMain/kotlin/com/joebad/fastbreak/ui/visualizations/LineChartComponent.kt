@@ -98,7 +98,9 @@ fun LineChartComponent(
     onShareClick: ((() -> Unit)?) -> Unit = {},
     source: String = "",
     yAxisAbsoluteLabels: Boolean = false,
-    referenceLines: List<HorizontalReferenceLine> = emptyList()
+    referenceLines: List<HorizontalReferenceLine> = emptyList(),
+    customYMin: Float? = null,
+    customYMax: Float? = null
 ) {
     if (series.isEmpty() || series.all { it.dataPoints.isEmpty() }) return
 
@@ -126,18 +128,18 @@ fun LineChartComponent(
     }
 
     // Calculate axis bounds
-    val bounds = remember(series) {
+    val bounds = remember(series, customYMin, customYMax) {
         val allPoints = series.flatMap { it.dataPoints }
         val xValues = allPoints.map { it.x.toFloat() }
         val yValues = allPoints.map { it.y.toFloat() }
 
         val minX = xValues.minOrNull() ?: 0f
         val maxX = xValues.maxOrNull() ?: 1f
-        val minY = yValues.minOrNull() ?: 0f
-        val maxY = yValues.maxOrNull() ?: 1f
+        val minY = customYMin ?: (yValues.minOrNull() ?: 0f)
+        val maxY = customYMax ?: (yValues.maxOrNull() ?: 1f)
 
         val xPadding = (maxX - minX) * 0.05f
-        val yPadding = (maxY - minY) * 0.1f
+        val yPadding = (maxY - minY) * 0.05f
 
         object {
             val xMin = (minX - xPadding)

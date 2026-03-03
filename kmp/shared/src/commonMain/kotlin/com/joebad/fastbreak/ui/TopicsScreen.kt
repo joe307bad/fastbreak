@@ -13,6 +13,8 @@ import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.UnfoldLess
+import androidx.compose.material.icons.filled.UnfoldMore
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.snapshots.SnapshotStateList
@@ -104,6 +106,24 @@ fun TopicsScreen(
                     }
                 },
                 actions = {
+                    if (topics != null && topics.narratives.isNotEmpty()) {
+                        val allCollapsed = topics.narratives.indices.all { it in collapsedIndices }
+                        IconButton(onClick = {
+                            if (allCollapsed) {
+                                // Expand all — do not touch readIndices
+                                collapsedIndices.clear()
+                            } else {
+                                // Collapse all — do not touch readIndices
+                                collapsedIndices.clear()
+                                collapsedIndices.addAll(topics.narratives.indices.toList())
+                            }
+                        }) {
+                            Icon(
+                                if (allCollapsed) Icons.Default.UnfoldMore else Icons.Default.UnfoldLess,
+                                contentDescription = if (allCollapsed) "Expand All" else "Collapse All"
+                            )
+                        }
+                    }
                     if (topics?.descriptionSegments?.isNotEmpty() == true || topics?.description?.isNotBlank() == true) {
                         IconButton(onClick = { showInfoSheet = true }) {
                             Icon(Icons.Default.Info, contentDescription = "Topics Info")

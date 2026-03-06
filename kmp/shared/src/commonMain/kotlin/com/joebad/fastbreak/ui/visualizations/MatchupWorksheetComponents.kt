@@ -1107,10 +1107,7 @@ fun StatRankingsBottomSheet(
     var isReversed by remember { mutableStateOf(false) }
     val displayEntries = if (isReversed) entries.reversed() else entries
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    var selectedTeams by remember { mutableStateOf(emptySet<String>()) }
-    val allHighlightedTeams = remember(highlightedTeams, selectedTeams) {
-        highlightedTeams + selectedTeams
-    }
+    var selectedTeams by remember { mutableStateOf(highlightedTeams) }
 
     // Share capture state
     var shareRange by remember { mutableStateOf<ShareRange?>(null) }
@@ -1165,7 +1162,7 @@ fun StatRankingsBottomSheet(
                     entries = shareEntries,
                     rankColorFn = rankColorFn,
                     isPct = isPct,
-                    highlightedTeams = allHighlightedTeams
+                    highlightedTeams = selectedTeams
                 )
             }
         }
@@ -1258,14 +1255,13 @@ fun StatRankingsBottomSheet(
                     }
 
                     displayEntries.forEach { entry ->
-                        val isHighlighted = entry.team in highlightedTeams
                         val isSelected = entry.team in selectedTeams
                         val rankColor = rankColorFn(entry.rank)
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .then(
-                                    if (isSelected || isHighlighted) Modifier.background(
+                                    if (isSelected) Modifier.background(
                                         MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
                                         RoundedCornerShape(4.dp)
                                     ) else Modifier
@@ -1315,7 +1311,7 @@ fun StatRankingsBottomSheet(
                                 text = entry.team,
                                 style = MaterialTheme.typography.bodySmall,
                                 fontSize = 11.sp,
-                                fontWeight = if (isHighlighted || isSelected) FontWeight.Bold else FontWeight.Medium,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                                 fontFamily = FontFamily.Monospace,
                                 modifier = Modifier.width(40.dp)
                             )
@@ -1327,7 +1323,7 @@ fun StatRankingsBottomSheet(
                                 text = if (isPct) formatPctValue(entry.value) else formatStatValue(entry.value),
                                 style = MaterialTheme.typography.bodySmall,
                                 fontSize = 11.sp,
-                                fontWeight = if (isHighlighted || isSelected) FontWeight.Bold else FontWeight.Normal,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
                                 textAlign = TextAlign.End,
                                 modifier = Modifier.width(60.dp)
                             )
@@ -1394,10 +1390,7 @@ fun PlayoffChancesBottomSheet(
     var isReversed by remember { mutableStateOf(false) }
     val displayEntries = if (isReversed) entries.reversed() else entries
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    var selectedTeams by remember { mutableStateOf(emptySet<String>()) }
-    val allHighlightedTeams = remember(highlightedTeams, selectedTeams) {
-        highlightedTeams + selectedTeams
-    }
+    var selectedTeams by remember { mutableStateOf(highlightedTeams) }
 
     // Share capture state
     var shareRange by remember { mutableStateOf<ShareRange?>(null) }
@@ -1453,7 +1446,7 @@ fun PlayoffChancesBottomSheet(
                     entries = shareEntries,
                     probColorFn = probColorFn,
                     champProbColorFn = champProbColorFn,
-                    highlightedTeams = allHighlightedTeams
+                    highlightedTeams = selectedTeams
                 )
             }
         }
@@ -1536,14 +1529,13 @@ fun PlayoffChancesBottomSheet(
                     }
 
                     displayEntries.forEach { entry ->
-                        val isHighlighted = entry.team in highlightedTeams
                         val isSelected = entry.team in selectedTeams
                         val playoffColor = probColorFn(entry.playoffProb)
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .then(
-                                    if (isSelected || isHighlighted) Modifier.background(
+                                    if (isSelected) Modifier.background(
                                         MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
                                         RoundedCornerShape(4.dp)
                                     ) else Modifier
@@ -1573,7 +1565,7 @@ fun PlayoffChancesBottomSheet(
                                 text = entry.team,
                                 style = MaterialTheme.typography.bodySmall,
                                 fontSize = 11.sp,
-                                fontWeight = if (isHighlighted || isSelected) FontWeight.Bold else FontWeight.Medium,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                                 fontFamily = FontFamily.Monospace,
                                 modifier = Modifier.width(40.dp)
                             )

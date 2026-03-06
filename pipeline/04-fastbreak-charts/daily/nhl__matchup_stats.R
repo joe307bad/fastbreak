@@ -145,6 +145,9 @@ TEAM_ABBREVS <- c(
 # Reverse mapping: abbreviation to full name
 ABBREV_TO_NAME <- setNames(names(TEAM_ABBREVS), TEAM_ABBREVS)
 
+# Valid NHL abbreviations (used to filter out international/all-star teams)
+VALID_NHL_ABBREVS <- unique(unname(TEAM_ABBREVS))
+
 # NHL division and conference mapping
 TEAM_DIVISIONS <- c(
   "ANA" = "Pacific", "ARI" = "Central", "BOS" = "Atlantic",
@@ -245,17 +248,20 @@ scrape_nhl_playoff_probabilities <- function() {
         # Clean up team name
         team_name <- gsub("^\\s+|\\s+$", "", team_name)
 
-        # Skip header rows
+        # Skip header rows and international/all-star teams
         if (team_name == "" || grepl("Team|Conference", team_name, ignore.case = TRUE)) {
+          next
+        }
+        if (grepl("^USA$|^Canada$|^Sweden$|^Finland$|^Latvia$|^Czechia$|^Czech Republic$|^Switzerland$|^Germany$|^Slovakia$|^Denmark$|^Norway$|^Austria$|^France$|^All-Star|^Atlantic$|^Metropolitan$|^Central$|^Pacific$|^Eastern$|^Western$|^World$|^North America$|4 Nations|Face-?Off", team_name, ignore.case = TRUE)) {
           next
         }
 
         # Map team name to abbreviation
         team_abbrev <- NHL_TEAM_NAME_TO_ABBREV[team_name]
         if (is.na(team_abbrev)) {
-          # Try partial match
+          # Try partial match (only check if known name appears in scraped name, not reverse)
           for (name in names(NHL_TEAM_NAME_TO_ABBREV)) {
-            if (grepl(name, team_name, ignore.case = TRUE) || grepl(team_name, name, ignore.case = TRUE)) {
+            if (grepl(name, team_name, ignore.case = TRUE)) {
               team_abbrev <- NHL_TEAM_NAME_TO_ABBREV[name]
               break
             }
@@ -360,9 +366,9 @@ scrape_nst_team_xg <- function(from_date, to_date, season_id) {
       abbrev <- TEAM_ABBREVS[name]
       if (!is.na(abbrev)) return(abbrev)
 
-      # Fuzzy fallback - check if NST name contains or is contained in known names
+      # Fuzzy fallback - check if known name appears in NST name (not reverse, to avoid false matches)
       for (known_name in names(TEAM_ABBREVS)) {
-        if (grepl(name, known_name, ignore.case = TRUE) || grepl(known_name, name, ignore.case = TRUE)) {
+        if (grepl(known_name, name, ignore.case = TRUE)) {
           return(TEAM_ABBREVS[known_name])
         }
       }
@@ -1071,6 +1077,9 @@ month_games_data <- tryCatch({
 
                 if (is.null(home_abbrev) || is.null(away_abbrev)) next
 
+                # Skip international/non-NHL teams (4 Nations Face-Off etc.)
+                if (!(home_abbrev %in% VALID_NHL_ABBREVS) || !(away_abbrev %in% VALID_NHL_ABBREVS)) next
+
                 # Capture period type (REG, OT, SO) for OTL point calculation
                 period_type <- tryCatch({
                   pt <- game$gameOutcome.lastPeriodType
@@ -1138,8 +1147,9 @@ if (!is.null(month_games_data) && nrow(month_games_data) > 0) {
       .groups = "drop"
     )
 
-  # Combine home and away stats
+  # Combine home and away stats, filtering out international teams (4 Nations Face-Off etc.)
   month_trend_stats <- bind_rows(home_stats, away_stats) %>%
+    filter(team_abbreviation %in% VALID_NHL_ABBREVS) %>%
     group_by(team_abbreviation) %>%
     summarise(
       games_played = sum(games, na.rm = TRUE),
@@ -1200,8 +1210,9 @@ if (!is.null(month_games_data) && nrow(month_games_data) > 0) {
 
     if (nrow(week_games) == 0) next
 
-    # Build per-team W/L/OTL from this week's games
+    # Build per-team W/L/OTL from this week's games (exclude international teams)
     all_teams <- unique(c(week_games$home_team_abbrev, week_games$away_team_abbrev))
+    all_teams <- all_teams[all_teams %in% VALID_NHL_ABBREVS]
 
     for (team in all_teams) {
       team_home <- week_games %>% filter(home_team_abbrev == team)
@@ -1259,6 +1270,8 @@ cat("\n1a. Scraping NHL playoff probabilities...\n")
 playoff_probabilities <- scrape_nhl_playoff_probabilities()
 
 if (!is.null(playoff_probabilities)) {
+  # Filter to only known NHL team abbreviations
+  playoff_probabilities <- playoff_probabilities[names(playoff_probabilities) %in% VALID_NHL_ABBREVS]
   cat("Playoff probabilities available for", length(playoff_probabilities), "teams\n")
 } else {
   cat("Warning: Playoff probabilities not available\n")
@@ -2471,6 +2484,79 @@ end_timer()
 start_timer("STEP 6: Generate output JSON")
 cat("\n6. Generating output JSON...\n")
 
+# Build rankings dictionary: for each stat, an array of all teams sorted by rank
+build_rankings <- function(team_stats, stat_col, rank_col, rankDisplay_col) {
+  valid <- !is.na(team_stats[[rank_col]])
+  if (!any(valid)) return(list())
+
+  df <- data.frame(
+    team = team_stats$team_abbreviation[valid],
+    rank = as.integer(team_stats[[rank_col]][valid]),
+    rankDisplay = team_stats[[rankDisplay_col]][valid],
+    value = round(team_stats[[stat_col]][valid], 4),
+    stringsAsFactors = FALSE
+  )
+  df <- df[order(df$rank), ]
+
+  lapply(seq_len(nrow(df)), function(i) {
+    list(rank = df$rank[i], rankDisplay = df$rankDisplay[i], value = df$value[i], team = df$team[i])
+  })
+}
+
+rankings <- list(
+  goalsPerGame = build_rankings(team_stats, "goals_per_game", "goals_per_game_rank", "goals_per_game_rankDisplay"),
+  goalsAgainstPerGame = build_rankings(team_stats, "goals_against_per_game", "goals_against_per_game_rank", "goals_against_per_game_rankDisplay"),
+  goalDiffPerGame = build_rankings(team_stats, "goal_diff_per_game", "goal_diff_per_game_rank", "goal_diff_per_game_rankDisplay"),
+  shotsForPerGame = build_rankings(team_stats, "shots_for_per_game", "shots_for_per_game_rank", "shots_for_per_game_rankDisplay"),
+  shotsAgainstPerGame = build_rankings(team_stats, "shots_against_per_game", "shots_against_per_game_rank", "shots_against_per_game_rankDisplay"),
+  powerPlayPct = build_rankings(team_stats, "power_play_pct", "power_play_pct_rank", "power_play_pct_rankDisplay"),
+  penaltyKillPct = build_rankings(team_stats, "penalty_kill_pct", "penalty_kill_pct_rank", "penalty_kill_pct_rankDisplay"),
+  faceoffWinPct = build_rankings(team_stats, "faceoff_win_pct", "faceoff_win_pct_rank", "faceoff_win_pct_rankDisplay"),
+  pointsPct = build_rankings(team_stats, "points_pct", "points_pct_rank", "points_pct_rankDisplay"),
+  hitsPerGame = build_rankings(team_stats, "hits_per_game", "hits_per_game_rank", "hits_per_game_rankDisplay"),
+  blocksPerGame = build_rankings(team_stats, "blocks_per_game", "blocks_per_game_rank", "blocks_per_game_rankDisplay"),
+  takeawaysPerGame = build_rankings(team_stats, "takeaways_per_game", "takeaways_per_game_rank", "takeaways_per_game_rankDisplay"),
+  giveawaysPerGame = build_rankings(team_stats, "giveaways_per_game", "giveaways_per_game_rank", "giveaways_per_game_rankDisplay"),
+  pimPerGame = build_rankings(team_stats, "pim_per_game", "pim_per_game_rank", "pim_per_game_rankDisplay"),
+  ppGoalsPerGame = build_rankings(team_stats, "pp_goals_per_game", "pp_goals_per_game_rank", "pp_goals_per_game_rankDisplay")
+)
+
+# Add xG% rankings if available
+if ("xgf_pct_rank" %in% names(team_stats)) {
+  rankings$xgfPct <- build_rankings(team_stats, "xgf_pct", "xgf_pct_rank", "xgf_pct_rankDisplay")
+}
+
+# Add one-month trend rankings if available
+if (!is.null(month_trend_stats) && nrow(month_trend_stats) > 0) {
+  rankings$trendRecord <- build_rankings(month_trend_stats, "win_pct", "record_rank", "record_rankDisplay")
+  rankings$trendGoalsPerGame <- build_rankings(month_trend_stats, "goals_per_game", "gpg_rank", "gpg_rankDisplay")
+  rankings$trendGoalsAgainstPerGame <- build_rankings(month_trend_stats, "goals_against_per_game", "gapg_rank", "gapg_rankDisplay")
+  rankings$trendGoalDiffPerGame <- build_rankings(month_trend_stats, "goal_diff_per_game", "goal_diff_rank", "goal_diff_rankDisplay")
+}
+
+# Add trend xG% rankings if available
+if (!is.null(nst_last_10_weeks_xg) && nrow(nst_last_10_weeks_xg) > 0 && "xgf_pct_rank" %in% names(nst_last_10_weeks_xg)) {
+  rankings$trendXgfPct <- build_rankings(nst_last_10_weeks_xg, "xgf_pct", "xgf_pct_rank", "xgf_pct_rankDisplay")
+}
+
+# Build playoff chances list if available
+playoff_chances_list <- list()
+if (!is.null(playoff_probabilities) && length(playoff_probabilities) > 0) {
+  po_df <- do.call(rbind, lapply(names(playoff_probabilities), function(team) {
+    prob <- playoff_probabilities[[team]]
+    data.frame(
+      team = team,
+      playoffProb = if (!is.null(prob$playoffProb)) prob$playoffProb else 0,
+      champProb = if (!is.null(prob$champProb)) prob$champProb else 0,
+      stringsAsFactors = FALSE
+    )
+  }))
+  po_df <- po_df[order(-po_df$champProb, -po_df$playoffProb), ]
+  playoff_chances_list <- lapply(seq_len(nrow(po_df)), function(i) {
+    list(team = po_df$team[i], playoffProb = po_df$playoffProb[i], champProb = po_df$champProb[i])
+  })
+}
+
 output_data <- list(
   sport = "NHL",
   visualizationType = "NHL_MATCHUP",
@@ -2485,6 +2571,8 @@ output_data <- list(
     list(label = "regular season", layout = "right", color = "#9C27B0")
   ),
   sortOrder = 0,
+  rankings = rankings,
+  playoffChances = playoff_chances_list,
   dataPoints = matchups_json
 )
 

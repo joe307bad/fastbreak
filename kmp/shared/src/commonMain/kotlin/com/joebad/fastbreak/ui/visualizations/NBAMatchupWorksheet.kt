@@ -43,6 +43,8 @@ import com.joebad.fastbreak.data.model.LineChartDataPoint
 import com.joebad.fastbreak.data.model.LineChartSeries
 import com.joebad.fastbreak.data.model.NBAMatchup
 import com.joebad.fastbreak.data.model.NBAMatchupVisualization
+import com.joebad.fastbreak.data.model.PlayoffChanceEntry
+import com.joebad.fastbreak.data.model.RankingEntry
 import com.joebad.fastbreak.data.model.PlayoffProbability
 import com.joebad.fastbreak.data.model.ScatterPlotDataPoint
 import com.joebad.fastbreak.data.model.ScatterPlotQuadrants
@@ -243,6 +245,9 @@ fun NBAMatchupWorksheet(
     // State for Stats/Charts tab selection: 0 = Stats, 1 = Charts
     var selectedTab by remember { mutableStateOf(0) }
 
+    // State for playoff chances bottom sheet
+    var showPlayoffChances by remember { mutableStateOf(false) }
+
     // On-demand capture: graphics layer and content only exist during capture
     // This avoids stale layer state when app is backgrounded on iOS
     var captureRequest by remember { mutableStateOf<CaptureRequest?>(null) }
@@ -275,6 +280,15 @@ fun NBAMatchupWorksheet(
         } catch (e: Exception) {
             ""
         }
+    }
+
+    val seasonLabel = remember(selectedMatchup.gameDate) {
+        try {
+            val dateTime = Instant.parse(selectedMatchup.gameDate)
+                .toLocalDateTime(TimeZone.of("America/New_York"))
+            val startYear = if (dateTime.monthNumber >= 7) dateTime.year else dateTime.year - 1
+            "NBA / ${startYear}-${(startYear + 1) % 100}"
+        } catch (e: Exception) { "NBA" }
     }
 
     val shareTitle = remember(selectedMatchup) {
@@ -397,15 +411,35 @@ fun NBAMatchupWorksheet(
                                 awayTeam = selectedMatchup.awayTeam.abbreviation,
                                 homeTeam = selectedMatchup.homeTeam.abbreviation,
                                 awayProb = selectedMatchup.awayTeam.playoffProbability,
-                                homeProb = selectedMatchup.homeTeam.playoffProbability
+                                homeProb = selectedMatchup.homeTeam.playoffProbability,
+                                onClick = if (visualization.playoffChances.isNotEmpty()) {
+                                    { showPlayoffChances = true }
+                                } else null
                             )
+
+                            if (showPlayoffChances) {
+                                PlayoffChancesBottomSheet(
+                                    title = "$seasonLabel / Playoff Chances",
+                                    champLabel = "CHAMP",
+                                    entries = visualization.playoffChances,
+                                    onDismiss = { showPlayoffChances = false },
+                                    probColorFn = ::getProbabilityColor,
+                                    highlightedTeams = setOf(
+                                        selectedMatchup.awayTeam.abbreviation,
+                                        selectedMatchup.homeTeam.abbreviation
+                                    ),
+                                    source = "PlayoffStatus.com"
+                                )
+                            }
 
                             Spacer(modifier = Modifier.height(8.dp))
 
                             NBAMatchupContent(
                                 matchup = selectedMatchup,
+                                rankings = visualization.rankings,
                                 viewSelection = viewSelection,
-                                onViewSelectionChange = { viewSelection = it }
+                                onViewSelectionChange = { viewSelection = it },
+                                seasonLabel = seasonLabel
                             )
 
                             // Source attribution at bottom of scrollable content
@@ -711,7 +745,7 @@ fun NBAMatchupWorksheet(
                                     leftValue = awayPlayer.points_per_game.value?.formatStat(1) ?: "-",
                                     leftRank = awayPlayer.points_per_game.rank,
                                     leftRankDisplay = awayPlayer.points_per_game.rankDisplay,
-                                    centerText = "Pts/Game",
+                                    centerText = "Points/Game",
                                     rightValue = homePlayer.points_per_game.value?.formatStat(1) ?: "-",
                                     rightRank = homePlayer.points_per_game.rank,
                                     rightRankDisplay = homePlayer.points_per_game.rankDisplay,
@@ -722,7 +756,7 @@ fun NBAMatchupWorksheet(
                                     leftValue = awayPlayer.rebounds_per_game.value?.formatStat(1) ?: "-",
                                     leftRank = awayPlayer.rebounds_per_game.rank,
                                     leftRankDisplay = awayPlayer.rebounds_per_game.rankDisplay,
-                                    centerText = "Reb/Game",
+                                    centerText = "Rebounds/Game",
                                     rightValue = homePlayer.rebounds_per_game.value?.formatStat(1) ?: "-",
                                     rightRank = homePlayer.rebounds_per_game.rank,
                                     rightRankDisplay = homePlayer.rebounds_per_game.rankDisplay,
@@ -733,7 +767,7 @@ fun NBAMatchupWorksheet(
                                     leftValue = awayPlayer.assists_per_game.value?.formatStat(1) ?: "-",
                                     leftRank = awayPlayer.assists_per_game.rank,
                                     leftRankDisplay = awayPlayer.assists_per_game.rankDisplay,
-                                    centerText = "Ast/Game",
+                                    centerText = "Assists/Game",
                                     rightValue = homePlayer.assists_per_game.value?.formatStat(1) ?: "-",
                                     rightRank = homePlayer.assists_per_game.rank,
                                     rightRankDisplay = homePlayer.assists_per_game.rankDisplay,
@@ -770,7 +804,7 @@ fun NBAMatchupWorksheet(
                                     leftValue = awayPlayer.steals_per_game.value?.formatStat(1) ?: "-",
                                     leftRank = awayPlayer.steals_per_game.rank,
                                     leftRankDisplay = awayPlayer.steals_per_game.rankDisplay,
-                                    centerText = "Stl/Game",
+                                    centerText = "Steals/Game",
                                     rightValue = homePlayer.steals_per_game.value?.formatStat(1) ?: "-",
                                     rightRank = homePlayer.steals_per_game.rank,
                                     rightRankDisplay = homePlayer.steals_per_game.rankDisplay,
@@ -781,7 +815,7 @@ fun NBAMatchupWorksheet(
                                     leftValue = awayPlayer.blocks_per_game.value?.formatStat(1) ?: "-",
                                     leftRank = awayPlayer.blocks_per_game.rank,
                                     leftRankDisplay = awayPlayer.blocks_per_game.rankDisplay,
-                                    centerText = "Blk/Game",
+                                    centerText = "Blocks/Game",
                                     rightValue = homePlayer.blocks_per_game.value?.formatStat(1) ?: "-",
                                     rightRank = homePlayer.blocks_per_game.rank,
                                     rightRankDisplay = homePlayer.blocks_per_game.rankDisplay,
@@ -843,7 +877,7 @@ fun NBAMatchupWorksheet(
                                 leftValue = awayTrend?.netRating?.formatStat(1) ?: "-",
                                 leftRank = awayTrend?.netRatingRank,
                                 leftRankDisplay = awayTrend?.netRatingRankDisplay,
-                                centerText = "Net Rtg",
+                                centerText = "Net Rating",
                                 rightValue = homeTrend?.netRating?.formatStat(1) ?: "-",
                                 rightRank = homeTrend?.netRatingRank,
                                 rightRankDisplay = homeTrend?.netRatingRankDisplay,
@@ -853,7 +887,7 @@ fun NBAMatchupWorksheet(
                                 leftValue = awayTrend?.offRating?.formatStat(1) ?: "-",
                                 leftRank = awayTrend?.offRatingRank,
                                 leftRankDisplay = awayTrend?.offRatingRankDisplay,
-                                centerText = "Off Rtg",
+                                centerText = "Off Rating",
                                 rightValue = homeTrend?.offRating?.formatStat(1) ?: "-",
                                 rightRank = homeTrend?.offRatingRank,
                                 rightRankDisplay = homeTrend?.offRatingRankDisplay,
@@ -863,7 +897,7 @@ fun NBAMatchupWorksheet(
                                 leftValue = awayTrend?.defRating?.formatStat(1) ?: "-",
                                 leftRank = awayTrend?.defRatingRank,
                                 leftRankDisplay = awayTrend?.defRatingRankDisplay,
-                                centerText = "Def Rtg",
+                                centerText = "Def Rating",
                                 rightValue = homeTrend?.defRating?.formatStat(1) ?: "-",
                                 rightRank = homeTrend?.defRatingRank,
                                 rightRankDisplay = homeTrend?.defRatingRankDisplay,
@@ -873,7 +907,7 @@ fun NBAMatchupWorksheet(
                                 leftValue = awayTrend?.ppg?.formatStat(1) ?: "-",
                                 leftRank = awayTrend?.ppgRank,
                                 leftRankDisplay = awayTrend?.ppgRankDisplay,
-                                centerText = "PPG",
+                                centerText = "Points/Game",
                                 rightValue = homeTrend?.ppg?.formatStat(1) ?: "-",
                                 rightRank = homeTrend?.ppgRank,
                                 rightRankDisplay = homeTrend?.ppgRankDisplay,
@@ -883,7 +917,7 @@ fun NBAMatchupWorksheet(
                                 leftValue = awayTrend?.apg?.formatStat(1) ?: "-",
                                 leftRank = awayTrend?.apgRank,
                                 leftRankDisplay = awayTrend?.apgRankDisplay,
-                                centerText = "APG",
+                                centerText = "Assists/Game",
                                 rightValue = homeTrend?.apg?.formatStat(1) ?: "-",
                                 rightRank = homeTrend?.apgRank,
                                 rightRankDisplay = homeTrend?.apgRankDisplay,
@@ -893,7 +927,7 @@ fun NBAMatchupWorksheet(
                                 leftValue = awayTrend?.tpg?.formatStat(1) ?: "-",
                                 leftRank = awayTrend?.tpgRank,
                                 leftRankDisplay = awayTrend?.tpgRankDisplay,
-                                centerText = "TOV",
+                                centerText = "TOV/Game",
                                 rightValue = homeTrend?.tpg?.formatStat(1) ?: "-",
                                 rightRank = homeTrend?.tpgRank,
                                 rightRankDisplay = homeTrend?.tpgRankDisplay,
@@ -903,7 +937,7 @@ fun NBAMatchupWorksheet(
                                 leftValue = awayTrend?.tovDiff?.let { if (it >= 0) "+${it.formatStat(1)}" else it.formatStat(1) } ?: "-",
                                 leftRank = awayTrend?.tovDiffRank,
                                 leftRankDisplay = awayTrend?.tovDiffRankDisplay,
-                                centerText = "TOV Diff",
+                                centerText = "TOV Diff/Game",
                                 rightValue = homeTrend?.tovDiff?.let { if (it >= 0) "+${it.formatStat(1)}" else it.formatStat(1) } ?: "-",
                                 rightRank = homeTrend?.tovDiffRank,
                                 rightRankDisplay = homeTrend?.tovDiffRankDisplay,
@@ -1328,8 +1362,10 @@ private fun CompactStatRow(
 @Composable
 private fun NBAMatchupContent(
     matchup: com.joebad.fastbreak.data.model.NBAMatchup,
+    rankings: Map<String, List<com.joebad.fastbreak.data.model.RankingEntry>>,
     viewSelection: Int,
-    onViewSelectionChange: (Int) -> Unit
+    onViewSelectionChange: (Int) -> Unit,
+    seasonLabel: String = "NBA"
 ) {
     Column {
         // Extra spacing below pinned team header
@@ -1386,7 +1422,9 @@ private fun NBAMatchupContent(
                 awayTeam = matchup.awayTeam.abbreviation,
                 homeTeam = matchup.homeTeam.abbreviation,
                 awayStats = matchup.awayTeam.stats,
-                homeStats = matchup.homeTeam.stats
+                homeStats = matchup.homeTeam.stats,
+                rankings = rankings,
+                seasonLabel = seasonLabel
             )
         }
 
@@ -1421,9 +1459,9 @@ private fun NBAMatchupContent(
 
         // Stats based on view selection
         when (viewSelection) {
-            0 -> TeamStatsView(matchup)
-            1 -> VersusView(matchup, isAwayOffense = true)
-            2 -> VersusView(matchup, isAwayOffense = false)
+            0 -> TeamStatsView(matchup, rankings, seasonLabel)
+            1 -> VersusView(matchup, rankings, seasonLabel = seasonLabel)
+            2 -> VersusView(matchup, rankings, isAwayOffense = false, seasonLabel = seasonLabel)
         }
 
         // Player Stats Section
@@ -1436,7 +1474,14 @@ private fun NBAMatchupContent(
  * Team stats view - comparing team stats side by side
  */
 @Composable
-private fun TeamStatsView(matchup: com.joebad.fastbreak.data.model.NBAMatchup) {
+private fun TeamStatsView(
+    matchup: com.joebad.fastbreak.data.model.NBAMatchup,
+    rankings: Map<String, List<RankingEntry>>,
+    seasonLabel: String = "NBA"
+) {
+    var selectedRankingKey by remember { mutableStateOf<String?>(null) }
+    val highlightedTeams = setOf(matchup.awayTeam.abbreviation, matchup.homeTeam.abbreviation)
+
     SectionHeader("Team Stats")
 
     Column {
@@ -1445,37 +1490,33 @@ private fun TeamStatsView(matchup: com.joebad.fastbreak.data.model.NBAMatchup) {
         Spacer(modifier = Modifier.height(4.dp))
 
         matchup.comparisons?.sideBySide?.offense?.forEach { (key, stat) ->
-            val awayValue = stat.away.value
             val awayRank = stat.away.rank
-            val awayRankDisplay = stat.away.rankDisplay
-            val homeValue = stat.home.value
             val homeRank = stat.home.rank
-            val homeRankDisplay = stat.home.rankDisplay
             val label = stat.label
 
-            // Use rank-based advantage (sport-agnostic: lower rank is always better)
             val advantage = if (awayRank != null && homeRank != null) {
                 when {
-                    awayRank < homeRank -> -1  // away team has better rank (advantage)
-                    awayRank > homeRank -> 1   // home team has better rank (advantage)
+                    awayRank < homeRank -> -1
+                    awayRank > homeRank -> 1
                     else -> 0
                 }
             } else 0
 
             val isPct = label.contains("%")
-            val awayText = if (isPct) awayValue.formatPct(1) else awayValue?.formatStat(2) ?: "-"
-            val homeText = if (isPct) homeValue.formatPct(1) else homeValue?.formatStat(2) ?: "-"
+            val awayText = if (isPct) stat.away.value.formatPct(1) else stat.away.value?.formatStat(2) ?: "-"
+            val homeText = if (isPct) stat.home.value.formatPct(1) else stat.home.value?.formatStat(2) ?: "-"
 
             FiveColumnRowWithRanks(
                 leftValue = awayText,
                 leftRank = awayRank,
-                leftRankDisplay = awayRankDisplay,
+                leftRankDisplay = stat.away.rankDisplay,
                 centerText = label,
                 rightValue = homeText,
                 rightRank = homeRank,
-                rightRankDisplay = homeRankDisplay,
+                rightRankDisplay = stat.home.rankDisplay,
                 advantage = advantage,
-                useNBARanks = true
+                useNBARanks = true,
+                onClick = if (rankings.containsKey(key)) {{ selectedRankingKey = key }} else null
             )
         }
 
@@ -1486,39 +1527,53 @@ private fun TeamStatsView(matchup: com.joebad.fastbreak.data.model.NBAMatchup) {
         Spacer(modifier = Modifier.height(4.dp))
 
         matchup.comparisons?.sideBySide?.defense?.forEach { (key, stat) ->
-            val awayValue = stat.away.value
             val awayRank = stat.away.rank
-            val awayRankDisplay = stat.away.rankDisplay
-            val homeValue = stat.home.value
             val homeRank = stat.home.rank
-            val homeRankDisplay = stat.home.rankDisplay
             val label = stat.label
 
-            // Use rank-based advantage (sport-agnostic: lower rank is always better)
             val advantage = if (awayRank != null && homeRank != null) {
                 when {
-                    awayRank < homeRank -> -1  // away team has better rank (advantage)
-                    awayRank > homeRank -> 1   // home team has better rank (advantage)
+                    awayRank < homeRank -> -1
+                    awayRank > homeRank -> 1
                     else -> 0
                 }
             } else 0
 
             val isPct = label.contains("%")
-            val awayText = if (isPct) awayValue.formatPct(1) else awayValue?.formatStat(2) ?: "-"
-            val homeText = if (isPct) homeValue.formatPct(1) else homeValue?.formatStat(2) ?: "-"
+            val awayText = if (isPct) stat.away.value.formatPct(1) else stat.away.value?.formatStat(2) ?: "-"
+            val homeText = if (isPct) stat.home.value.formatPct(1) else stat.home.value?.formatStat(2) ?: "-"
 
             FiveColumnRowWithRanks(
                 leftValue = awayText,
                 leftRank = awayRank,
-                leftRankDisplay = awayRankDisplay,
+                leftRankDisplay = stat.away.rankDisplay,
                 centerText = label,
                 rightValue = homeText,
                 rightRank = homeRank,
-                rightRankDisplay = homeRankDisplay,
+                rightRankDisplay = stat.home.rankDisplay,
                 advantage = advantage,
-                useNBARanks = true
+                useNBARanks = true,
+                onClick = if (rankings.containsKey(key)) {{ selectedRankingKey = key }} else null
             )
         }
+    }
+
+    // Rankings bottom sheet
+    selectedRankingKey?.let { key ->
+        val entries = rankings[key] ?: emptyList()
+        val label = matchup.comparisons?.sideBySide?.offense?.get(key)?.label
+            ?: matchup.comparisons?.sideBySide?.defense?.get(key)?.label
+            ?: key
+        StatRankingsBottomSheet(
+            statLabel = "$seasonLabel / $label",
+            entries = entries,
+            onDismiss = { selectedRankingKey = null },
+            rankColorFn = ::getNBATeamRankColor,
+            highlightedTeams = highlightedTeams,
+            isPct = label.contains("%"),
+            subtitle = "Season Rankings",
+            source = "hoopR / ESPN"
+        )
     }
 }
 
@@ -1528,8 +1583,12 @@ private fun TeamStatsView(matchup: com.joebad.fastbreak.data.model.NBAMatchup) {
 @Composable
 private fun VersusView(
     matchup: com.joebad.fastbreak.data.model.NBAMatchup,
-    isAwayOffense: Boolean
+    rankings: Map<String, List<RankingEntry>>,
+    isAwayOffense: Boolean = true,
+    seasonLabel: String = "NBA"
 ) {
+    var selectedRankingKey by remember { mutableStateOf<String?>(null) }
+    val highlightedTeams = setOf(matchup.awayTeam.abbreviation, matchup.homeTeam.abbreviation)
     val offenseTeam = if (isAwayOffense) matchup.awayTeam else matchup.homeTeam
     val defenseTeam = if (isAwayOffense) matchup.homeTeam else matchup.awayTeam
 
@@ -1547,32 +1606,45 @@ private fun VersusView(
             currentComparison.forEach { (statKey, stat) ->
                 val advantage = stat.advantage ?: 0
                 val offLabel = stat.offLabel
-                val defLabel = stat.defLabel
 
                 val offValue = stat.offense.value
-                val offRank = stat.offense.rank
-                val offRankDisplay = stat.offense.rankDisplay
-
                 val defValue = stat.defense.value
-                val defRank = stat.defense.rank
-                val defRankDisplay = stat.defense.rankDisplay
 
                 if (offValue != null && defValue != null) {
                     val isPct = offLabel.contains("%")
                     FiveColumnRowWithRanks(
                         leftValue = if (isPct) (offValue * 100).formatStat(1) + "%" else offValue.formatStat(2),
-                        leftRank = offRank,
-                        leftRankDisplay = offRankDisplay,
+                        leftRank = stat.offense.rank,
+                        leftRankDisplay = stat.offense.rankDisplay,
                         centerText = offLabel,
                         rightValue = if (isPct) (defValue * 100).formatStat(1) + "%" else defValue.formatStat(2),
-                        rightRank = defRank,
-                        rightRankDisplay = defRankDisplay,
+                        rightRank = stat.defense.rank,
+                        rightRankDisplay = stat.defense.rankDisplay,
                         advantage = advantage,
-                        useNBARanks = true
+                        useNBARanks = true,
+                        onClick = if (rankings.containsKey(statKey)) {{ selectedRankingKey = statKey }} else null
                     )
                 }
             }
         }
+    }
+
+    selectedRankingKey?.let { key ->
+        val entries = rankings[key] ?: emptyList()
+        val label = matchup.comparisons?.let { c ->
+            val comp = if (isAwayOffense) c.awayOffVsHomeDef else c.homeOffVsAwayDef
+            comp[key]?.offLabel
+        } ?: key
+        StatRankingsBottomSheet(
+            statLabel = "$seasonLabel / $label",
+            entries = entries,
+            onDismiss = { selectedRankingKey = null },
+            rankColorFn = ::getNBATeamRankColor,
+            highlightedTeams = highlightedTeams,
+            isPct = label.contains("%"),
+            subtitle = "Season Rankings",
+            source = "hoopR / ESPN"
+        )
     }
 }
 
@@ -1605,17 +1677,17 @@ private fun PlayerStatsView(matchup: com.joebad.fastbreak.data.model.NBAMatchup)
             accessor = { player -> PlayerStatValue(player.games_played.value, player.games_played.rank, player.games_played.rankDisplay) }
         ),
         PlayerStatConfig(
-            label = "Pts/Game",
+            label = "Points/Game",
             decimals = 1,
             accessor = { player -> PlayerStatValue(player.points_per_game.value, player.points_per_game.rank, player.points_per_game.rankDisplay) }
         ),
         PlayerStatConfig(
-            label = "Reb/Game",
+            label = "Rebounds/Game",
             decimals = 1,
             accessor = { player -> PlayerStatValue(player.rebounds_per_game.value, player.rebounds_per_game.rank, player.rebounds_per_game.rankDisplay) }
         ),
         PlayerStatConfig(
-            label = "Ast/Game",
+            label = "Assists/Game",
             decimals = 1,
             accessor = { player -> PlayerStatValue(player.assists_per_game.value, player.assists_per_game.rank, player.assists_per_game.rankDisplay) }
         ),
@@ -1783,13 +1855,15 @@ private fun PlayoffProbabilitySection(
     awayTeam: String,
     homeTeam: String,
     awayProb: PlayoffProbability?,
-    homeProb: PlayoffProbability?
+    homeProb: PlayoffProbability?,
+    onClick: (() -> Unit)? = null
 ) {
     // Only show if at least one team has probability data
     if (awayProb != null || homeProb != null) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
+                .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
                 .padding(horizontal = 8.dp, vertical = 1.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
@@ -2520,14 +2594,35 @@ private fun OneMonthTrendSection(
     awayTeam: String,
     homeTeam: String,
     awayStats: JsonObject,
-    homeStats: JsonObject
+    homeStats: JsonObject,
+    rankings: Map<String, List<RankingEntry>>,
+    seasonLabel: String = "NBA"
 ) {
     val awayTrend = parseMonthTrend(awayStats)
     val homeTrend = parseMonthTrend(homeStats)
 
-    // Only show section if we have trend data for at least one team
     if (awayTrend == null && homeTrend == null) {
         return
+    }
+
+    var selectedRankingKey by remember { mutableStateOf<String?>(null) }
+    val highlightedTeams = setOf(awayTeam, homeTeam)
+
+    // Map display label to ranking key
+    val trendRankingKeyMap = mapOf(
+        "Record" to "trendRecord",
+        "Net Rating" to "trendNetRating",
+        "Off Rating" to "trendOffensiveRating",
+        "Def Rating" to "trendDefensiveRating",
+        "Points/Game" to "trendPointsPerGame",
+        "Assists/Game" to "trendAssistsPerGame",
+        "TOV/Game" to "trendTurnoversPerGame",
+        "TOV Diff/Game" to "trendTurnoverDiff"
+    )
+
+    fun onClickForKey(label: String): (() -> Unit)? {
+        val key = trendRankingKeyMap[label] ?: return null
+        return if (rankings.containsKey(key)) {{ selectedRankingKey = key }} else null
     }
 
     SectionHeader("One Month Trend")
@@ -2553,7 +2648,9 @@ private fun OneMonthTrendSection(
         rightValue = homeRecord,
         rightRank = homeTrend?.recordRank,
         rightRankDisplay = homeTrend?.recordRankDisplay,
-        advantage = recordAdvantage
+        advantage = recordAdvantage,
+        onClick = onClickForKey("Record"),
+        rankColorFn = { getTrendRecordRankColor(it, 30) }
     )
 
     // Net Rating
@@ -2574,7 +2671,8 @@ private fun OneMonthTrendSection(
         rightValue = homeTrend?.netRating?.formatStat(1) ?: "-",
         rightRank = homeTrend?.netRatingRank,
         rightRankDisplay = homeTrend?.netRatingRankDisplay,
-        advantage = netRatingAdvantage
+        advantage = netRatingAdvantage,
+        onClick = onClickForKey("Net Rating")
     )
 
     // Offensive Rating
@@ -2595,7 +2693,8 @@ private fun OneMonthTrendSection(
         rightValue = homeTrend?.offRating?.formatStat(1) ?: "-",
         rightRank = homeTrend?.offRatingRank,
         rightRankDisplay = homeTrend?.offRatingRankDisplay,
-        advantage = offRatingAdvantage
+        advantage = offRatingAdvantage,
+        onClick = onClickForKey("Off Rating")
     )
 
     // Defensive Rating (lower rank is better)
@@ -2616,7 +2715,8 @@ private fun OneMonthTrendSection(
         rightValue = homeTrend?.defRating?.formatStat(1) ?: "-",
         rightRank = homeTrend?.defRatingRank,
         rightRankDisplay = homeTrend?.defRatingRankDisplay,
-        advantage = defRatingAdvantage
+        advantage = defRatingAdvantage,
+        onClick = onClickForKey("Def Rating")
     )
 
     // Points Per Game
@@ -2633,11 +2733,12 @@ private fun OneMonthTrendSection(
         leftValue = awayTrend?.ppg?.formatStat(1) ?: "-",
         leftRank = awayTrend?.ppgRank,
         leftRankDisplay = awayTrend?.ppgRankDisplay,
-        centerText = "PPG",
+        centerText = "Points/Game",
         rightValue = homeTrend?.ppg?.formatStat(1) ?: "-",
         rightRank = homeTrend?.ppgRank,
         rightRankDisplay = homeTrend?.ppgRankDisplay,
-        advantage = ppgAdvantage
+        advantage = ppgAdvantage,
+        onClick = onClickForKey("Points/Game")
     )
 
     // Assists Per Game
@@ -2654,11 +2755,12 @@ private fun OneMonthTrendSection(
         leftValue = awayTrend?.apg?.formatStat(1) ?: "-",
         leftRank = awayTrend?.apgRank,
         leftRankDisplay = awayTrend?.apgRankDisplay,
-        centerText = "APG",
+        centerText = "Assists/Game",
         rightValue = homeTrend?.apg?.formatStat(1) ?: "-",
         rightRank = homeTrend?.apgRank,
         rightRankDisplay = homeTrend?.apgRankDisplay,
-        advantage = apgAdvantage
+        advantage = apgAdvantage,
+        onClick = onClickForKey("Assists/Game")
     )
 
     // Turnovers Per Game (lower is better)
@@ -2675,11 +2777,12 @@ private fun OneMonthTrendSection(
         leftValue = awayTrend?.tpg?.formatStat(1) ?: "-",
         leftRank = awayTrend?.tpgRank,
         leftRankDisplay = awayTrend?.tpgRankDisplay,
-        centerText = "TOV",
+        centerText = "TOV/Game",
         rightValue = homeTrend?.tpg?.formatStat(1) ?: "-",
         rightRank = homeTrend?.tpgRank,
         rightRankDisplay = homeTrend?.tpgRankDisplay,
-        advantage = tpgAdvantage
+        advantage = tpgAdvantage,
+        onClick = onClickForKey("TOV/Game")
     )
 
     // Turnover Differential (higher is better)
@@ -2696,14 +2799,29 @@ private fun OneMonthTrendSection(
         leftValue = awayTrend?.tovDiff?.let { if (it >= 0) "+${it.formatStat(1)}" else it.formatStat(1) } ?: "-",
         leftRank = awayTrend?.tovDiffRank,
         leftRankDisplay = awayTrend?.tovDiffRankDisplay,
-        centerText = "TOV Diff",
+        centerText = "TOV Diff/Game",
         rightValue = homeTrend?.tovDiff?.let { if (it >= 0) "+${it.formatStat(1)}" else it.formatStat(1) } ?: "-",
         rightRank = homeTrend?.tovDiffRank,
         rightRankDisplay = homeTrend?.tovDiffRankDisplay,
-        advantage = tovDiffAdvantage
+        advantage = tovDiffAdvantage,
+        onClick = onClickForKey("TOV Diff/Game")
     )
 
     Spacer(modifier = Modifier.height(6.dp))
+
+    // Rankings bottom sheet
+    selectedRankingKey?.let { key ->
+        val label = trendRankingKeyMap.entries.find { it.value == key }?.key ?: key
+        StatRankingsBottomSheet(
+            statLabel = "$seasonLabel / $label",
+            entries = rankings[key] ?: emptyList(),
+            onDismiss = { selectedRankingKey = null },
+            rankColorFn = ::getNBATeamRankColor,
+            highlightedTeams = highlightedTeams,
+            subtitle = "Over the last month",
+            source = "hoopR / ESPN"
+        )
+    }
 }
 
 /**

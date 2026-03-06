@@ -670,6 +670,12 @@ team_box <- tryCatch({
 
 cat("Loaded", nrow(team_box), "team box score records\n")
 
+# Filter out All-Star teams (includes "World", "Stripes", "Rising Stars", etc.)
+team_box <- team_box %>%
+  filter(!grepl("All-Star|All Star|Rising Stars|^World$|^Stripes$|^Team ", team_display_name, ignore.case = TRUE))
+
+cat("After filtering All-Star teams:", nrow(team_box), "records\n")
+
 # Calculate team season statistics
 team_stats <- team_box %>%
   group_by(team_id, team_display_name, team_short_display_name) %>%
@@ -1809,7 +1815,7 @@ build_nba_comparisons <- function(home_stats, away_stats, home_team, away_team) 
   )
 
   # Add advanced offensive stats if available
-  if (!is.na(home_stats$offensive_rating) && !is.na(away_stats$offensive_rating)) {
+  if (is_valid_value(home_stats$offensive_rating) && is_valid_value(away_stats$offensive_rating)) {
     off_stats <- c(off_stats, list(
       list(key = "offensiveRating", label = "Offensive Rating", value_home = home_stats$offensive_rating, rank_home = home_stats$offensive_rating_rank, rankDisplay_home = home_stats$offensive_rating_rankDisplay, value_away = away_stats$offensive_rating, rank_away = away_stats$offensive_rating_rank, rankDisplay_away = away_stats$offensive_rating_rankDisplay),
       list(key = "trueShootingPct", label = "True Shooting %", value_home = home_stats$ts_pct, rank_home = home_stats$ts_pct_rank, rankDisplay_home = home_stats$ts_pct_rankDisplay, value_away = away_stats$ts_pct, rank_away = away_stats$ts_pct_rank, rankDisplay_away = away_stats$ts_pct_rankDisplay),
@@ -1846,13 +1852,13 @@ build_nba_comparisons <- function(home_stats, away_stats, home_team, away_team) 
   )
 
   # Add advanced defensive stats if available
-  if (!is.na(home_stats$defensive_rating) && !is.na(away_stats$defensive_rating)) {
+  if (is_valid_value(home_stats$defensive_rating) && is_valid_value(away_stats$defensive_rating)) {
     def_stats <- c(def_stats, list(
       list(key = "defensiveRating", label = "Defensive Rating", value_home = home_stats$defensive_rating, rank_home = home_stats$defensive_rating_rank, rankDisplay_home = home_stats$defensive_rating_rankDisplay, value_away = away_stats$defensive_rating, rank_away = away_stats$defensive_rating_rank, rankDisplay_away = away_stats$defensive_rating_rankDisplay)
     ))
   }
 
-  if (!is.na(home_stats$opp_efg_pct) && !is.na(away_stats$opp_efg_pct)) {
+  if (is_valid_value(home_stats$opp_efg_pct) && is_valid_value(away_stats$opp_efg_pct)) {
     def_stats <- c(def_stats, list(
       list(key = "oppEffectiveFgPct", label = "Opp Effective FG %", value_home = home_stats$opp_efg_pct, rank_home = home_stats$opp_efg_pct_rank, rankDisplay_home = home_stats$opp_efg_pct_rankDisplay, value_away = away_stats$opp_efg_pct, rank_away = away_stats$opp_efg_pct_rank, rankDisplay_away = away_stats$opp_efg_pct_rankDisplay)
     ))
@@ -2080,12 +2086,12 @@ for (game in all_games) {
   # This ensures we get the most active and impactful players
   home_players <- player_stats %>%
     filter(team_id == game$home_team_id) %>%
-    arrange(desc(minutes_per_game), desc(games_played), desc(if_else(!is.na(player_pie), player_pie, 0))) %>%
+    arrange(desc(minutes_per_game), desc(games_played), desc(if ("player_pie" %in% names(.)) if_else(!is.na(player_pie), player_pie, 0) else 0)) %>%
     head(7)
 
   away_players <- player_stats %>%
     filter(team_id == game$away_team_id) %>%
-    arrange(desc(minutes_per_game), desc(games_played), desc(if_else(!is.na(player_pie), player_pie, 0))) %>%
+    arrange(desc(minutes_per_game), desc(games_played), desc(if ("player_pie" %in% names(.)) if_else(!is.na(player_pie), player_pie, 0) else 0)) %>%
     head(7)
 
   # Build team comparison data
@@ -2128,7 +2134,7 @@ for (game in all_games) {
   )
 
   # Add advanced stats if available
-  if (!is.null(advanced_stats) && !is.na(home_stats$offensive_rating)) {
+  if (!is.null(advanced_stats) && is_valid_value(home_stats$offensive_rating)) {
     home_team_data$stats$offensiveRating <- round(home_stats$offensive_rating, 1)
     home_team_data$stats$offensiveRatingRank <- home_stats$offensive_rating_rank
     home_team_data$stats$offensiveRatingRankDisplay <- home_stats$offensive_rating_rankDisplay
@@ -2156,7 +2162,7 @@ for (game in all_games) {
   }
 
   # Add four factors if available
-  if (!is.null(four_factors_stats) && !is.na(home_stats$fta_rate)) {
+  if (!is.null(four_factors_stats) && is_valid_value(home_stats$fta_rate)) {
     home_team_data$stats$ftaRate <- round(home_stats$fta_rate, 1)
     home_team_data$stats$ftaRateRank <- home_stats$fta_rate_rank
     home_team_data$stats$ftaRateRankDisplay <- home_stats$fta_rate_rankDisplay
@@ -2301,7 +2307,7 @@ for (game in all_games) {
   )
 
   # Add advanced stats if available
-  if (!is.null(advanced_stats) && !is.na(away_stats$offensive_rating)) {
+  if (!is.null(advanced_stats) && is_valid_value(away_stats$offensive_rating)) {
     away_team_data$stats$offensiveRating <- round(away_stats$offensive_rating, 1)
     away_team_data$stats$offensiveRatingRank <- away_stats$offensive_rating_rank
     away_team_data$stats$offensiveRatingRankDisplay <- away_stats$offensive_rating_rankDisplay
@@ -2329,7 +2335,7 @@ for (game in all_games) {
   }
 
   # Add four factors if available
-  if (!is.null(four_factors_stats) && !is.na(away_stats$fta_rate)) {
+  if (!is.null(four_factors_stats) && is_valid_value(away_stats$fta_rate)) {
     away_team_data$stats$ftaRate <- round(away_stats$fta_rate, 1)
     away_team_data$stats$ftaRateRank <- away_stats$fta_rate_rank
     away_team_data$stats$ftaRateRankDisplay <- away_stats$fta_rate_rankDisplay
@@ -2711,6 +2717,93 @@ end_timer()
 start_timer("STEP 6: Generate output JSON")
 cat("\n6. Generating output JSON...\n")
 
+# Build rankings dictionary: for each stat, an array of all teams sorted by rank
+build_rankings <- function(team_stats, stat_col, rank_col, rankDisplay_col) {
+  # Filter out teams with NA ranks
+  valid <- !is.na(team_stats[[rank_col]])
+  if (!any(valid)) return(list())
+
+  df <- data.frame(
+    team = team_stats$team_abbreviation[valid],
+    rank = as.integer(team_stats[[rank_col]][valid]),
+    rankDisplay = team_stats[[rankDisplay_col]][valid],
+    value = round(team_stats[[stat_col]][valid], 4),
+    stringsAsFactors = FALSE
+  )
+  df <- df[order(df$rank), ]
+
+  lapply(seq_len(nrow(df)), function(i) {
+    list(rank = df$rank[i], rankDisplay = df$rankDisplay[i], value = df$value[i], team = df$team[i])
+  })
+}
+
+rankings <- list(
+  pointsPerGame = build_rankings(team_stats, "points_per_game", "points_per_game_rank", "points_per_game_rankDisplay"),
+  fieldGoalPct = build_rankings(team_stats, "fg_pct", "fg_pct_rank", "fg_pct_rankDisplay"),
+  threePtPct = build_rankings(team_stats, "three_pt_pct", "three_pt_pct_rank", "three_pt_pct_rankDisplay"),
+  reboundsPerGame = build_rankings(team_stats, "rebounds_per_game", "rebounds_per_game_rank", "rebounds_per_game_rankDisplay"),
+  assistsPerGame = build_rankings(team_stats, "assists_per_game", "assists_per_game_rank", "assists_per_game_rankDisplay"),
+  stealsPerGame = build_rankings(team_stats, "steals_per_game", "steals_per_game_rank", "steals_per_game_rankDisplay"),
+  blocksPerGame = build_rankings(team_stats, "blocks_per_game", "blocks_per_game_rank", "blocks_per_game_rankDisplay"),
+  turnoversPerGame = build_rankings(team_stats, "turnovers_per_game", "turnovers_per_game_rank", "turnovers_per_game_rankDisplay"),
+  oppPointsPerGame = build_rankings(team_stats, "opp_points_per_game", "opp_points_per_game_rank", "opp_points_per_game_rankDisplay"),
+  oppFieldGoalPct = build_rankings(team_stats, "opp_fg_pct", "opp_fg_pct_rank", "opp_fg_pct_rankDisplay"),
+  oppThreePtPct = build_rankings(team_stats, "opp_three_pt_pct", "opp_three_pt_pct_rank", "opp_three_pt_pct_rankDisplay"),
+  oppAssistsPerGame = build_rankings(team_stats, "opp_assists_per_game", "opp_assists_per_game_rank", "opp_assists_per_game_rankDisplay"),
+  oppTurnoversPerGame = build_rankings(team_stats, "opp_turnovers_per_game", "opp_turnovers_per_game_rank", "opp_turnovers_per_game_rankDisplay")
+)
+
+# Add advanced stat rankings if available
+if ("offensive_rating_rank" %in% names(team_stats)) {
+  rankings$offensiveRating <- build_rankings(team_stats, "offensive_rating", "offensive_rating_rank", "offensive_rating_rankDisplay")
+  rankings$defensiveRating <- build_rankings(team_stats, "defensive_rating", "defensive_rating_rank", "defensive_rating_rankDisplay")
+  rankings$netRating <- build_rankings(team_stats, "net_rating", "net_rating_rank", "net_rating_rankDisplay")
+  rankings$pace <- build_rankings(team_stats, "pace", "pace_rank", "pace_rankDisplay")
+  rankings$effectiveFgPct <- build_rankings(team_stats, "efg_pct", "efg_pct_rank", "efg_pct_rankDisplay")
+  rankings$trueShootingPct <- build_rankings(team_stats, "ts_pct", "ts_pct_rank", "ts_pct_rankDisplay")
+  rankings$offensiveRebPct <- build_rankings(team_stats, "oreb_pct", "oreb_pct_rank", "oreb_pct_rankDisplay")
+  rankings$turnoverPct <- build_rankings(team_stats, "tm_tov_pct", "tm_tov_pct_rank", "tm_tov_pct_rankDisplay")
+}
+
+# Add four factors rankings if available
+if ("fta_rate_rank" %in% names(team_stats)) {
+  rankings$ftaRate <- build_rankings(team_stats, "fta_rate", "fta_rate_rank", "fta_rate_rankDisplay")
+  rankings$oppEffectiveFgPct <- build_rankings(team_stats, "opp_efg_pct", "opp_efg_pct_rank", "opp_efg_pct_rankDisplay")
+  rankings$oppFtaRate <- build_rankings(team_stats, "opp_fta_rate", "opp_fta_rate_rank", "opp_fta_rate_rankDisplay")
+  rankings$oppTurnoverPct <- build_rankings(team_stats, "opp_tov_pct", "opp_tov_pct_rank", "opp_tov_pct_rankDisplay")
+  rankings$oppOffensiveRebPct <- build_rankings(team_stats, "opp_oreb_pct", "opp_oreb_pct_rank", "opp_oreb_pct_rankDisplay")
+}
+
+# Add one-month trend rankings if available
+if (!is.null(month_trend_stats) && nrow(month_trend_stats) > 0) {
+  rankings$trendRecord <- build_rankings(month_trend_stats, "win_pct", "record_rank", "record_rankDisplay")
+  rankings$trendNetRating <- build_rankings(month_trend_stats, "avg_net_rating", "net_rating_rank", "net_rating_rankDisplay")
+  rankings$trendOffensiveRating <- build_rankings(month_trend_stats, "avg_off_rating", "off_rating_rank", "off_rating_rankDisplay")
+  rankings$trendDefensiveRating <- build_rankings(month_trend_stats, "avg_def_rating", "def_rating_rank", "def_rating_rankDisplay")
+  rankings$trendPointsPerGame <- build_rankings(month_trend_stats, "points_per_game", "ppg_rank", "ppg_rankDisplay")
+  rankings$trendAssistsPerGame <- build_rankings(month_trend_stats, "assists_per_game", "apg_rank", "apg_rankDisplay")
+  rankings$trendTurnoversPerGame <- build_rankings(month_trend_stats, "turnovers_per_game", "tpg_rank", "tpg_rankDisplay")
+  rankings$trendTurnoverDiff <- build_rankings(month_trend_stats, "turnover_diff", "tov_diff_rank", "tov_diff_rankDisplay")
+}
+
+# Build playoff chances list if available
+playoff_chances_list <- list()
+if (!is.null(playoff_probabilities) && length(playoff_probabilities) > 0) {
+  po_df <- do.call(rbind, lapply(names(playoff_probabilities), function(team) {
+    prob <- playoff_probabilities[[team]]
+    data.frame(
+      team = team,
+      playoffProb = if (!is.null(prob$playoffProb)) prob$playoffProb else 0,
+      champProb = if (!is.null(prob$champProb)) prob$champProb else 0,
+      stringsAsFactors = FALSE
+    )
+  }))
+  po_df <- po_df[order(-po_df$champProb, -po_df$playoffProb), ]
+  playoff_chances_list <- lapply(seq_len(nrow(po_df)), function(i) {
+    list(team = po_df$team[i], playoffProb = po_df$playoffProb[i], champProb = po_df$champProb[i])
+  })
+}
+
 output_data <- list(
   sport = "NBA",
   visualizationType = "NBA_MATCHUP",
@@ -2734,6 +2827,8 @@ output_data <- list(
     bottomLeft = list(label = "Struggling", color = "#F44336", lightModeColor = "#F44336"),
     bottomRight = list(label = "Offensive", color = "#FF9800", lightModeColor = "#FF9800")
   ),
+  rankings = rankings,
+  playoffChances = playoff_chances_list,
   dataPoints = matchups_json
 )
 

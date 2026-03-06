@@ -39,6 +39,8 @@ import com.joebad.fastbreak.data.model.LineChartDataPoint
 import com.joebad.fastbreak.data.model.LineChartSeries
 import com.joebad.fastbreak.data.model.NHLMatchup
 import com.joebad.fastbreak.data.model.NHLMatchupVisualization
+import com.joebad.fastbreak.data.model.PlayoffChanceEntry
+import com.joebad.fastbreak.data.model.RankingEntry
 import com.joebad.fastbreak.data.model.NHLPlayerInfo
 import com.joebad.fastbreak.data.model.PlayoffProbability
 import com.joebad.fastbreak.data.model.QuadrantConfig
@@ -229,6 +231,9 @@ fun NHLMatchupWorksheet(
     // State for Stats/Charts tab selection: 0 = Stats, 1 = Charts
     var selectedTab by remember { mutableStateOf(0) }
 
+    // State for playoff chances bottom sheet
+    var showPlayoffChances by remember { mutableStateOf(false) }
+
     // On-demand capture
     var captureRequest by remember { mutableStateOf<NhlCaptureRequest?>(null) }
     val graphicsLayer = rememberGraphicsLayer()
@@ -260,6 +265,15 @@ fun NHLMatchupWorksheet(
         } catch (e: Exception) {
             ""
         }
+    }
+
+    val seasonLabel = remember(selectedMatchup.gameDate) {
+        try {
+            val dateTime = Instant.parse(selectedMatchup.gameDate)
+                .toLocalDateTime(TimeZone.of("America/New_York"))
+            val startYear = if (dateTime.monthNumber >= 7) dateTime.year else dateTime.year - 1
+            "NHL / ${startYear}-${(startYear + 1) % 100}"
+        } catch (e: Exception) { "NHL" }
     }
 
     val shareTitle = remember(selectedMatchup) {
@@ -384,15 +398,35 @@ fun NHLMatchupWorksheet(
 
                             NHLPlayoffProbabilitySection(
                                 awayProb = selectedMatchup.awayTeam.playoffProbability,
-                                homeProb = selectedMatchup.homeTeam.playoffProbability
+                                homeProb = selectedMatchup.homeTeam.playoffProbability,
+                                onClick = if (visualization.playoffChances.isNotEmpty()) {
+                                    { showPlayoffChances = true }
+                                } else null
                             )
+
+                            if (showPlayoffChances) {
+                                PlayoffChancesBottomSheet(
+                                    title = "$seasonLabel / Playoff Chances",
+                                    champLabel = "CUP",
+                                    entries = visualization.playoffChances,
+                                    onDismiss = { showPlayoffChances = false },
+                                    probColorFn = ::getNHLProbabilityColor,
+                                    highlightedTeams = setOf(
+                                        selectedMatchup.awayTeam.abbreviation,
+                                        selectedMatchup.homeTeam.abbreviation
+                                    ),
+                                    source = "PlayoffStatus.com"
+                                )
+                            }
 
                             Spacer(modifier = Modifier.height(8.dp))
 
                             NHLMatchupContent(
                                 matchup = selectedMatchup,
+                                rankings = visualization.rankings,
                                 viewSelection = viewSelection,
-                                onViewSelectionChange = { viewSelection = it }
+                                onViewSelectionChange = { viewSelection = it },
+                                seasonLabel = seasonLabel
                             )
 
                             // Source attribution at bottom of scrollable content
@@ -773,7 +807,7 @@ private fun buildNHLShareStatBoxes(matchup: NHLMatchup): List<ShareStatBox> {
                         leftValue = awayPlayer.pointsPerGame.value?.formatStat(2) ?: "-",
                         leftRank = awayPlayer.pointsPerGame.rank,
                         leftRankDisplay = awayPlayer.pointsPerGame.rankDisplay,
-                        centerText = "Pts/Game",
+                        centerText = "Points/Game",
                         rightValue = homePlayer.pointsPerGame.value?.formatStat(2) ?: "-",
                         rightRank = homePlayer.pointsPerGame.rank,
                         rightRankDisplay = homePlayer.pointsPerGame.rankDisplay,
@@ -820,7 +854,7 @@ private fun buildNHLShareStatBoxes(matchup: NHLMatchup): List<ShareStatBox> {
                     leftValue = awayTrend?.goalsFor?.formatStat(2) ?: "-",
                     leftRank = awayTrend?.goalsForRank,
                     leftRankDisplay = awayTrend?.goalsForRankDisplay,
-                    centerText = "GF/G",
+                    centerText = "Goals/Game",
                     rightValue = homeTrend?.goalsFor?.formatStat(2) ?: "-",
                     rightRank = homeTrend?.goalsForRank,
                     rightRankDisplay = homeTrend?.goalsForRankDisplay,
@@ -830,7 +864,7 @@ private fun buildNHLShareStatBoxes(matchup: NHLMatchup): List<ShareStatBox> {
                     leftValue = awayTrend?.goalsAgainst?.formatStat(2) ?: "-",
                     leftRank = awayTrend?.goalsAgainstRank,
                     leftRankDisplay = awayTrend?.goalsAgainstRankDisplay,
-                    centerText = "GA/G",
+                    centerText = "Goals Against/Game",
                     rightValue = homeTrend?.goalsAgainst?.formatStat(2) ?: "-",
                     rightRank = homeTrend?.goalsAgainstRank,
                     rightRankDisplay = homeTrend?.goalsAgainstRankDisplay,
@@ -843,7 +877,7 @@ private fun buildNHLShareStatBoxes(matchup: NHLMatchup): List<ShareStatBox> {
                     } ?: "-",
                     leftRank = awayTrend?.goalDiffRank,
                     leftRankDisplay = awayTrend?.goalDiffRankDisplay,
-                    centerText = "Goal Diff/G",
+                    centerText = "Goal Diff/Game",
                     rightValue = homeTrend?.goalDiff?.let {
                         val sign = if (it > 0) "+" else ""
                         "$sign${it.formatStat(2)}"
@@ -1304,8 +1338,10 @@ private fun getNHLConferenceRankColor(rank: Int): Color {
 @Composable
 private fun NHLMatchupContent(
     matchup: NHLMatchup,
+    rankings: Map<String, List<RankingEntry>>,
     viewSelection: Int,
-    onViewSelectionChange: (Int) -> Unit
+    onViewSelectionChange: (Int) -> Unit,
+    seasonLabel: String = "NHL"
 ) {
     Column {
         Spacer(modifier = Modifier.height(3.dp))
@@ -1359,7 +1395,9 @@ private fun NHLMatchupContent(
                 awayTeam = matchup.awayTeam.abbreviation,
                 homeTeam = matchup.homeTeam.abbreviation,
                 awayStats = matchup.awayTeam.stats,
-                homeStats = matchup.homeTeam.stats
+                homeStats = matchup.homeTeam.stats,
+                rankings = rankings,
+                seasonLabel = seasonLabel
             )
         }
 
@@ -1394,9 +1432,9 @@ private fun NHLMatchupContent(
 
         // Stats based on view selection
         when (viewSelection) {
-            0 -> NHLTeamStatsView(matchup)
-            1 -> NHLVersusView(matchup, isAwayOffense = true)
-            2 -> NHLVersusView(matchup, isAwayOffense = false)
+            0 -> NHLTeamStatsView(matchup, rankings, seasonLabel)
+            1 -> NHLVersusView(matchup, rankings, seasonLabel = seasonLabel)
+            2 -> NHLVersusView(matchup, rankings, isAwayOffense = false, seasonLabel = seasonLabel)
         }
 
         // Player Stats Section
@@ -1409,7 +1447,14 @@ private fun NHLMatchupContent(
  * NHL Team stats view
  */
 @Composable
-private fun NHLTeamStatsView(matchup: NHLMatchup) {
+private fun NHLTeamStatsView(
+    matchup: NHLMatchup,
+    rankings: Map<String, List<RankingEntry>>,
+    seasonLabel: String = "NHL"
+) {
+    var selectedRankingKey by remember { mutableStateOf<String?>(null) }
+    val highlightedTeams = setOf(matchup.awayTeam.abbreviation, matchup.homeTeam.abbreviation)
+
     NHLSectionHeader("Team Stats")
 
     Column {
@@ -1417,13 +1462,9 @@ private fun NHLTeamStatsView(matchup: NHLMatchup) {
         NHLSubsectionHeader("Offensive Stats")
         Spacer(modifier = Modifier.height(4.dp))
 
-        matchup.comparisons?.sideBySide?.offense?.forEach { (_, stat) ->
-            val awayValue = stat.away.value
+        matchup.comparisons?.sideBySide?.offense?.forEach { (key, stat) ->
             val awayRank = stat.away.rank
-            val awayRankDisplay = stat.away.rankDisplay
-            val homeValue = stat.home.value
             val homeRank = stat.home.rank
-            val homeRankDisplay = stat.home.rankDisplay
             val label = stat.label
 
             val advantage = if (awayRank != null && homeRank != null) {
@@ -1435,20 +1476,21 @@ private fun NHLTeamStatsView(matchup: NHLMatchup) {
             } else 0
 
             val isPct = label.contains("%")
-            val awayText = if (isPct) awayValue.formatPct(1) else awayValue?.formatStat(2) ?: "-"
-            val homeText = if (isPct) homeValue.formatPct(1) else homeValue?.formatStat(2) ?: "-"
+            val awayText = if (isPct) stat.away.value.formatPct(1) else stat.away.value?.formatStat(2) ?: "-"
+            val homeText = if (isPct) stat.home.value.formatPct(1) else stat.home.value?.formatStat(2) ?: "-"
 
             FiveColumnRowWithRanks(
                 leftValue = awayText,
                 leftRank = awayRank,
-                leftRankDisplay = awayRankDisplay,
+                leftRankDisplay = stat.away.rankDisplay,
                 centerText = label,
                 rightValue = homeText,
                 rightRank = homeRank,
-                rightRankDisplay = homeRankDisplay,
+                rightRankDisplay = stat.home.rankDisplay,
                 advantage = advantage,
                 useNBARanks = false,
-                useNHLRanks = true
+                useNHLRanks = true,
+                onClick = if (rankings.containsKey(key)) {{ selectedRankingKey = key }} else null
             )
         }
 
@@ -1458,13 +1500,9 @@ private fun NHLTeamStatsView(matchup: NHLMatchup) {
         NHLSubsectionHeader("Defensive Stats")
         Spacer(modifier = Modifier.height(4.dp))
 
-        matchup.comparisons?.sideBySide?.defense?.forEach { (_, stat) ->
-            val awayValue = stat.away.value
+        matchup.comparisons?.sideBySide?.defense?.forEach { (key, stat) ->
             val awayRank = stat.away.rank
-            val awayRankDisplay = stat.away.rankDisplay
-            val homeValue = stat.home.value
             val homeRank = stat.home.rank
-            val homeRankDisplay = stat.home.rankDisplay
             val label = stat.label
 
             val advantage = if (awayRank != null && homeRank != null) {
@@ -1476,22 +1514,41 @@ private fun NHLTeamStatsView(matchup: NHLMatchup) {
             } else 0
 
             val isPct = label.contains("%")
-            val awayText = if (isPct) awayValue.formatPct(1) else awayValue?.formatStat(2) ?: "-"
-            val homeText = if (isPct) homeValue.formatPct(1) else homeValue?.formatStat(2) ?: "-"
+            val awayText = if (isPct) stat.away.value.formatPct(1) else stat.away.value?.formatStat(2) ?: "-"
+            val homeText = if (isPct) stat.home.value.formatPct(1) else stat.home.value?.formatStat(2) ?: "-"
 
             FiveColumnRowWithRanks(
                 leftValue = awayText,
                 leftRank = awayRank,
-                leftRankDisplay = awayRankDisplay,
+                leftRankDisplay = stat.away.rankDisplay,
                 centerText = label,
                 rightValue = homeText,
                 rightRank = homeRank,
-                rightRankDisplay = homeRankDisplay,
+                rightRankDisplay = stat.home.rankDisplay,
                 advantage = advantage,
                 useNBARanks = false,
-                useNHLRanks = true
+                useNHLRanks = true,
+                onClick = if (rankings.containsKey(key)) {{ selectedRankingKey = key }} else null
             )
         }
+    }
+
+    // Rankings bottom sheet
+    selectedRankingKey?.let { key ->
+        val entries = rankings[key] ?: emptyList()
+        val label = matchup.comparisons?.sideBySide?.offense?.get(key)?.label
+            ?: matchup.comparisons?.sideBySide?.defense?.get(key)?.label
+            ?: key
+        StatRankingsBottomSheet(
+            statLabel = "$seasonLabel / $label",
+            entries = entries,
+            onDismiss = { selectedRankingKey = null },
+            rankColorFn = ::getNHLTeamRankColor,
+            highlightedTeams = highlightedTeams,
+            isPct = label.contains("%"),
+            subtitle = "Season Rankings",
+            source = "NHL.com / NST"
+        )
     }
 }
 
@@ -1501,8 +1558,12 @@ private fun NHLTeamStatsView(matchup: NHLMatchup) {
 @Composable
 private fun NHLVersusView(
     matchup: NHLMatchup,
-    isAwayOffense: Boolean
+    rankings: Map<String, List<RankingEntry>>,
+    isAwayOffense: Boolean = true,
+    seasonLabel: String = "NHL"
 ) {
+    var selectedRankingKey by remember { mutableStateOf<String?>(null) }
+    val highlightedTeams = setOf(matchup.awayTeam.abbreviation, matchup.homeTeam.abbreviation)
     val offenseTeam = if (isAwayOffense) matchup.awayTeam else matchup.homeTeam
     val defenseTeam = if (isAwayOffense) matchup.homeTeam else matchup.awayTeam
 
@@ -1517,35 +1578,49 @@ private fun NHLVersusView(
         }
 
         Column {
-            currentComparison.forEach { (_, stat) ->
+            currentComparison.forEach { (statKey, stat) ->
                 val advantage = stat.advantage ?: 0
                 val offLabel = stat.offLabel
 
                 val offValue = stat.offense.value
-                val offRank = stat.offense.rank
-                val offRankDisplay = stat.offense.rankDisplay
-
                 val defValue = stat.defense.value
-                val defRank = stat.defense.rank
-                val defRankDisplay = stat.defense.rankDisplay
 
                 if (offValue != null && defValue != null) {
                     val isPct = offLabel.contains("%")
                     FiveColumnRowWithRanks(
                         leftValue = if (isPct) (offValue * 100).formatStat(1) + "%" else offValue.formatStat(2),
-                        leftRank = offRank,
-                        leftRankDisplay = offRankDisplay,
+                        leftRank = stat.offense.rank,
+                        leftRankDisplay = stat.offense.rankDisplay,
                         centerText = offLabel,
                         rightValue = if (isPct) (defValue * 100).formatStat(1) + "%" else defValue.formatStat(2),
-                        rightRank = defRank,
-                        rightRankDisplay = defRankDisplay,
+                        rightRank = stat.defense.rank,
+                        rightRankDisplay = stat.defense.rankDisplay,
                         advantage = advantage,
                         useNBARanks = false,
-                        useNHLRanks = true
+                        useNHLRanks = true,
+                        onClick = if (rankings.containsKey(statKey)) {{ selectedRankingKey = statKey }} else null
                     )
                 }
             }
         }
+    }
+
+    selectedRankingKey?.let { key ->
+        val entries = rankings[key] ?: emptyList()
+        val label = matchup.comparisons?.let { c ->
+            val comp = if (isAwayOffense) c.awayOffVsHomeDef else c.homeOffVsAwayDef
+            comp[key]?.offLabel
+        } ?: key
+        StatRankingsBottomSheet(
+            statLabel = "$seasonLabel / $label",
+            entries = entries,
+            onDismiss = { selectedRankingKey = null },
+            rankColorFn = ::getNHLTeamRankColor,
+            highlightedTeams = highlightedTeams,
+            isPct = label.contains("%"),
+            subtitle = "Season Rankings",
+            source = "NHL.com / NST"
+        )
     }
 }
 
@@ -1623,13 +1698,31 @@ private fun NHLMonthTrendSection(
     awayTeam: String,
     homeTeam: String,
     awayStats: JsonObject,
-    homeStats: JsonObject
+    homeStats: JsonObject,
+    rankings: Map<String, List<RankingEntry>>,
+    seasonLabel: String = "NHL"
 ) {
     val awayTrend = parseNHLMonthTrend(awayStats)
     val homeTrend = parseNHLMonthTrend(homeStats)
 
     if (awayTrend == null && homeTrend == null) {
         return
+    }
+
+    var selectedRankingKey by remember { mutableStateOf<String?>(null) }
+    val highlightedTeams = setOf(awayTeam, homeTeam)
+
+    val trendRankingKeyMap = mapOf(
+        "Record" to "trendRecord",
+        "Goals/Game" to "trendGoalsPerGame",
+        "Goals Against/Game" to "trendGoalsAgainstPerGame",
+        "Goal Diff/Game" to "trendGoalDiffPerGame",
+        "xG% (5v5)" to "trendXgfPct"
+    )
+
+    fun onClickForKey(label: String): (() -> Unit)? {
+        val key = trendRankingKeyMap[label] ?: return null
+        return if (rankings.containsKey(key)) {{ selectedRankingKey = key }} else null
     }
 
     NHLSectionHeader("Recent Trend (Last 10 Weeks)")
@@ -1657,7 +1750,9 @@ private fun NHLMonthTrendSection(
         rightRankDisplay = homeTrend?.recordRankDisplay,
         advantage = recordAdvantage,
         useNBARanks = false,
-        useNHLRanks = true
+        useNHLRanks = true,
+        onClick = onClickForKey("Record"),
+        rankColorFn = { getTrendRecordRankColor(it, 32) }
     )
 
     // Goals For per Game
@@ -1674,13 +1769,14 @@ private fun NHLMonthTrendSection(
         leftValue = awayTrend?.goalsFor?.formatStat(2) ?: "-",
         leftRank = awayTrend?.goalsForRank,
         leftRankDisplay = awayTrend?.goalsForRankDisplay,
-        centerText = "GF/G",
+        centerText = "Goals/Game",
         rightValue = homeTrend?.goalsFor?.formatStat(2) ?: "-",
         rightRank = homeTrend?.goalsForRank,
         rightRankDisplay = homeTrend?.goalsForRankDisplay,
         advantage = gfAdvantage,
         useNBARanks = false,
-        useNHLRanks = true
+        useNHLRanks = true,
+        onClick = onClickForKey("Goals/Game")
     )
 
     // Goals Against per Game (lower is better)
@@ -1697,13 +1793,14 @@ private fun NHLMonthTrendSection(
         leftValue = awayTrend?.goalsAgainst?.formatStat(2) ?: "-",
         leftRank = awayTrend?.goalsAgainstRank,
         leftRankDisplay = awayTrend?.goalsAgainstRankDisplay,
-        centerText = "GA/G",
+        centerText = "Goals Against/Game",
         rightValue = homeTrend?.goalsAgainst?.formatStat(2) ?: "-",
         rightRank = homeTrend?.goalsAgainstRank,
         rightRankDisplay = homeTrend?.goalsAgainstRankDisplay,
         advantage = gaAdvantage,
         useNBARanks = false,
-        useNHLRanks = true
+        useNHLRanks = true,
+        onClick = onClickForKey("Goals Against/Game")
     )
 
     // Goal Differential per Game
@@ -1723,7 +1820,7 @@ private fun NHLMonthTrendSection(
         } ?: "-",
         leftRank = awayTrend?.goalDiffRank,
         leftRankDisplay = awayTrend?.goalDiffRankDisplay,
-        centerText = "Goal Diff/G",
+        centerText = "Goal Diff/Game",
         rightValue = homeTrend?.goalDiff?.let {
             val sign = if (it > 0) "+" else ""
             "$sign${it.formatStat(2)}"
@@ -1732,7 +1829,8 @@ private fun NHLMonthTrendSection(
         rightRankDisplay = homeTrend?.goalDiffRankDisplay,
         advantage = gdAdvantage,
         useNBARanks = false,
-        useNHLRanks = true
+        useNHLRanks = true,
+        onClick = onClickForKey("Goal Diff/Game")
     )
 
     // xG% (5v5)
@@ -1756,7 +1854,23 @@ private fun NHLMonthTrendSection(
             rightRankDisplay = homeTrend?.xgfPctRankDisplay,
             advantage = xgAdvantage,
             useNBARanks = false,
-            useNHLRanks = true
+            useNHLRanks = true,
+            onClick = onClickForKey("xG% (5v5)")
+        )
+    }
+
+    // Rankings bottom sheet
+    selectedRankingKey?.let { key ->
+        val label = trendRankingKeyMap.entries.find { it.value == key }?.key ?: key
+        StatRankingsBottomSheet(
+            statLabel = "$seasonLabel / $label",
+            entries = rankings[key] ?: emptyList(),
+            onDismiss = { selectedRankingKey = null },
+            rankColorFn = ::getNHLTeamRankColor,
+            highlightedTeams = highlightedTeams,
+            isPct = label.contains("%"),
+            subtitle = "Over the last 10 weeks",
+            source = "NHL.com / NST"
         )
     }
 }
@@ -2136,13 +2250,15 @@ private fun formatOrdinal(number: Int): String {
 @Composable
 private fun NHLPlayoffProbabilitySection(
     awayProb: PlayoffProbability?,
-    homeProb: PlayoffProbability?
+    homeProb: PlayoffProbability?,
+    onClick: (() -> Unit)? = null
 ) {
     // Only show if at least one team has probability data
     if (awayProb != null || homeProb != null) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
+                .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
                 .padding(horizontal = 8.dp, vertical = 1.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
@@ -2180,6 +2296,21 @@ private fun formatNHLProbability(prob: Double?): String {
         if (prob >= 99.5) ">99%" else "${prob.toInt()}%"
     } else {
         "-"
+    }
+}
+
+/**
+ * Non-composable probability color for bottom sheet usage
+ */
+private fun getNHLProbabilityColor(prob: Double?): Color {
+    if (prob == null) return Color.Gray
+    return when {
+        prob >= 90 -> Color(0xFF1B5E20)
+        prob >= 75 -> Color(0xFF2E7D32)
+        prob >= 60 -> Color(0xFF388E3C)
+        prob >= 40 -> Color(0xFFFF8C00)
+        prob >= 20 -> Color(0xFFE65100)
+        else -> Color(0xFFC62828)
     }
 }
 

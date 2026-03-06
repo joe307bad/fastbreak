@@ -330,6 +330,21 @@ data class StatValue(
 )
 
 @Serializable
+data class RankingEntry(
+    val rank: Int,
+    val rankDisplay: String,
+    val value: Double,
+    val team: String
+)
+
+@Serializable
+data class PlayoffChanceEntry(
+    val team: String,
+    val playoffProb: Double,
+    val champProb: Double
+)
+
+@Serializable
 data class CurrentTeamStats(
     val offense: Map<String, StatValue>,
     val defense: Map<String, StatValue>
@@ -732,6 +747,8 @@ data class NBAMatchupVisualization(
     override val tags: List<Tag>? = null,
     override val sortOrder: Int? = null,
     val scatterPlotQuadrants: ScatterPlotQuadrants? = null,
+    val rankings: Map<String, List<RankingEntry>> = emptyMap(),
+    val playoffChances: List<PlayoffChanceEntry> = emptyList(),
     val dataPoints: List<NBAMatchup>
 ) : VisualizationType
 
@@ -959,6 +976,8 @@ data class NHLMatchupVisualization(
     @Serializable(with = TagListSerializer::class)
     override val tags: List<Tag>? = null,
     override val sortOrder: Int? = null,
+    val rankings: Map<String, List<RankingEntry>> = emptyMap(),
+    val playoffChances: List<PlayoffChanceEntry> = emptyList(),
     val dataPoints: List<NHLMatchup>
 ) : VisualizationType
 

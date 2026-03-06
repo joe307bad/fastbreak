@@ -5,16 +5,40 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import androidx.compose.material3.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.layer.drawLayer
+import androidx.compose.ui.graphics.rememberGraphicsLayer
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.joebad.fastbreak.data.model.PlayoffChanceEntry
+import com.joebad.fastbreak.data.model.RankingEntry
+import com.joebad.fastbreak.platform.getImageExporter
+import com.joebad.fastbreak.ui.components.FabOption
+import com.joebad.fastbreak.ui.components.MultiOptionFab
 
 // Team colors for advantage indicators
 internal val Team1Color = Color(0xFF2196F3) // Blue (away team)
@@ -74,6 +98,35 @@ val nbaTeamRankColors: Map<Int, Color> = buildMap {
 fun getNBATeamRankColor(rank: Int?): Color {
     if (rank == null || rank <= 0) return Color.Transparent
     return nbaTeamRankColors[rank.coerceIn(1, 50)] ?: Color.Transparent
+}
+
+/**
+ * Get color for trend record rank (top 5 green, rest split orange/red)
+ * Works for any league size.
+ */
+fun getTrendRecordRankColor(rank: Int?, totalTeams: Int = 30): Color {
+    if (rank == null || rank <= 0) return Color.Transparent
+    if (rank <= 5) {
+        // Green gradient for top 5
+        val ratio = (rank - 1) / 4f
+        val red = (0 + ratio * 60).toInt()
+        val green = (150 + ratio * 30).toInt()
+        return Color(red, green, 0)
+    }
+    val remaining = totalTeams - 5
+    val midpoint = 5 + remaining / 2
+    return if (rank <= midpoint) {
+        // Orange gradient
+        val ratio = (rank - 6).toFloat() / (midpoint - 6).coerceAtLeast(1).toFloat()
+        val red = (255 - ratio * 55).toInt()
+        val green = (140 - ratio * 40).toInt()
+        Color(red, green, 0)
+    } else {
+        // Red gradient
+        val ratio = (rank - midpoint - 1).toFloat() / (totalTeams - midpoint - 1).coerceAtLeast(1).toFloat()
+        val red = (200 - ratio * 61).toInt()
+        Color(red, 0, 0)
+    }
 }
 
 /**
@@ -181,10 +234,10 @@ fun getCBBTeamRankColor(rank: Int?): Color {
 val nhlTeamRankColors: Map<Int, Color> = buildMap {
     put(0, Color.Transparent) // For null ranks
 
-    // Darkest red color for rank 32+
+    // Darkest red color for rank 30+
     val darkestRed = Color(139, 0, 0)
 
-    for (rank in 1..32) {
+    for (rank in 1..30) {
         val color = when {
             rank <= 10 -> {
                 // Green gradient (ranks 1-10): Bright green to darker green
@@ -203,10 +256,10 @@ val nhlTeamRankColors: Map<Int, Color> = buildMap {
                 Color(red, green, blue)
             }
             else -> {
-                // Red to dark red gradient (ranks 21-32)
-                val ratio = (rank - 21) / 11f
+                // Red to dark red gradient (ranks 21-30)
+                val ratio = (rank - 21) / 9f
                 val red = (200 - ratio * 61).toInt()
-                val green = (0 + ratio * 0).toInt()
+                val green = 0
                 val blue = 0
                 Color(red, green, blue)
             }
@@ -214,8 +267,8 @@ val nhlTeamRankColors: Map<Int, Color> = buildMap {
         put(rank, color)
     }
 
-    // Add explicit mapping for ranks > 32 to use the darkest red
-    for (rank in 33..50) {
+    // Add explicit mapping for ranks > 30 to use the darkest red
+    for (rank in 31..50) {
         put(rank, darkestRed)
     }
 }
@@ -400,11 +453,14 @@ fun FiveColumnRowWithRanks(
     useNBARanks: Boolean = true, // true for NBA (30 teams), false for NFL (32 teams)
     usePlayerRanks: Boolean = false, // true for player ranks (1-100+ scale), overrides useNBARanks
     useCBBRanks: Boolean = false, // true for CBB (64 teams), overrides useNBARanks
-    useNHLRanks: Boolean = false // true for NHL (32 teams), overrides useNBARanks
+    useNHLRanks: Boolean = false, // true for NHL (32 teams), overrides useNBARanks
+    onClick: (() -> Unit)? = null,
+    rankColorFn: ((Int?) -> Color)? = null // optional override for rank badge colors
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
             .padding(horizontal = 8.dp, vertical = 4.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
@@ -438,7 +494,7 @@ fun FiveColumnRowWithRanks(
             modifier = Modifier
                 .width(32.dp)
                 .background(
-                    when {
+                    rankColorFn?.invoke(leftRank) ?: when {
                         usePlayerRanks -> getNBAPlayerRankColor(leftRank)
                         useCBBRanks -> getCBBTeamRankColor(leftRank)
                         useNHLRanks -> getNHLTeamRankColor(leftRank)
@@ -481,7 +537,7 @@ fun FiveColumnRowWithRanks(
             modifier = Modifier
                 .width(32.dp)
                 .background(
-                    when {
+                    rankColorFn?.invoke(rightRank) ?: when {
                         usePlayerRanks -> getNBAPlayerRankColor(rightRank)
                         useCBBRanks -> getCBBTeamRankColor(rightRank)
                         useNHLRanks -> getNHLTeamRankColor(rightRank)
@@ -836,4 +892,701 @@ fun <T> PlayerComparisonSection(
     }
 
     Spacer(modifier = Modifier.height(4.dp))
+}
+
+private enum class ShareRange { FULL, TOP_HALF, BOTTOM_HALF }
+
+/**
+ * Static share image for stat rankings (rendered off-screen for capture)
+ */
+@Composable
+private fun StatRankingsShareImage(
+    statLabel: String,
+    subtitle: String,
+    source: String,
+    entries: List<RankingEntry>,
+    rankColorFn: (Int?) -> Color,
+    isPct: Boolean
+) {
+    val bg = MaterialTheme.colorScheme.background
+    val onBg = MaterialTheme.colorScheme.onSurface
+    val dimColor = onBg.copy(alpha = 0.5f)
+
+    Column(
+        modifier = Modifier
+            .requiredWidth(340.dp)
+            .background(bg)
+            .padding(16.dp)
+    ) {
+        Text(statLabel, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, color = onBg, maxLines = 1)
+        if (subtitle.isNotBlank()) {
+            Text(subtitle, style = MaterialTheme.typography.bodySmall, fontSize = 12.sp, color = dimColor, maxLines = 1)
+        }
+        Spacer(modifier = Modifier.height(8.dp))
+        // Header
+        Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 2.dp)) {
+            Text("RK", style = MaterialTheme.typography.labelSmall, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = dimColor, modifier = Modifier.width(26.dp), textAlign = TextAlign.Center)
+            Spacer(modifier = Modifier.width(4.dp))
+            Text("TEAM", style = MaterialTheme.typography.labelSmall, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = dimColor, modifier = Modifier.weight(1f))
+            Text("VALUE", style = MaterialTheme.typography.labelSmall, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = dimColor, textAlign = TextAlign.End, modifier = Modifier.width(56.dp))
+        }
+        entries.forEach { entry ->
+            val rankColor = rankColorFn(entry.rank)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .drawBehind {
+                        val y = size.height / 2
+                        val startX = 26.dp.toPx() + 4.dp.toPx() + 40.dp.toPx()
+                        val endX = size.width - 56.dp.toPx()
+                        if (endX > startX) {
+                            drawLine(
+                                color = rankColor.copy(alpha = 0.18f),
+                                start = androidx.compose.ui.geometry.Offset(startX, y),
+                                end = androidx.compose.ui.geometry.Offset(endX, y),
+                                strokeWidth = 1.dp.toPx(),
+                                pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(3.dp.toPx(), 3.dp.toPx()))
+                            )
+                        }
+                    }
+                    .padding(horizontal = 4.dp, vertical = 3.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier.width(26.dp).background(rankColor, RoundedCornerShape(3.dp)).padding(3.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(entry.rankDisplay, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color.White, maxLines = 1)
+                }
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(entry.team, fontSize = 12.sp, fontWeight = FontWeight.Medium, fontFamily = FontFamily.Monospace, color = onBg, modifier = Modifier.weight(1f))
+                Text(if (isPct) formatPctValue(entry.value) else formatStatValue(entry.value), fontSize = 12.sp, textAlign = TextAlign.End, color = onBg, modifier = Modifier.width(56.dp))
+            }
+        }
+        Spacer(modifier = Modifier.height(8.dp))
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text(source, fontSize = 9.sp, color = dimColor, maxLines = 1)
+            Text("fbrk.app", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = dimColor)
+        }
+    }
+}
+
+/**
+ * Static share image for playoff chances (rendered off-screen for capture)
+ */
+@Composable
+private fun PlayoffChancesShareImage(
+    title: String,
+    subtitle: String,
+    source: String,
+    champLabel: String,
+    entries: List<PlayoffChanceEntry>,
+    probColorFn: (Double?) -> Color
+) {
+    val bg = MaterialTheme.colorScheme.background
+    val onBg = MaterialTheme.colorScheme.onSurface
+    val dimColor = onBg.copy(alpha = 0.5f)
+
+    Column(
+        modifier = Modifier
+            .requiredWidth(340.dp)
+            .background(bg)
+            .padding(16.dp)
+    ) {
+        Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, color = onBg, maxLines = 1)
+        if (subtitle.isNotBlank()) {
+            Text(subtitle, style = MaterialTheme.typography.bodySmall, fontSize = 12.sp, color = dimColor, maxLines = 1)
+        }
+        Spacer(modifier = Modifier.height(8.dp))
+        Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text("RK", style = MaterialTheme.typography.labelSmall, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = dimColor, modifier = Modifier.width(22.dp), textAlign = TextAlign.Center)
+            Spacer(modifier = Modifier.width(4.dp))
+            Text("TEAM", style = MaterialTheme.typography.labelSmall, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = dimColor, modifier = Modifier.weight(1f))
+            Text("PLAYOFF", style = MaterialTheme.typography.labelSmall, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = dimColor, textAlign = TextAlign.Center, modifier = Modifier.width(52.dp), maxLines = 1)
+            Text(champLabel.uppercase(), style = MaterialTheme.typography.labelSmall, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = dimColor, textAlign = TextAlign.Center, modifier = Modifier.width(52.dp), maxLines = 1)
+        }
+        entries.forEachIndexed { index, entry ->
+            val playoffColor = probColorFn(entry.playoffProb)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .drawBehind {
+                        val y = size.height / 2
+                        val startX = 22.dp.toPx() + 4.dp.toPx() + 40.dp.toPx()
+                        val endX = size.width - 52.dp.toPx() - 4.dp.toPx() - 52.dp.toPx()
+                        if (endX > startX) {
+                            drawLine(
+                                color = playoffColor.copy(alpha = 0.18f),
+                                start = androidx.compose.ui.geometry.Offset(startX, y),
+                                end = androidx.compose.ui.geometry.Offset(endX, y),
+                                strokeWidth = 1.dp.toPx(),
+                                pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(3.dp.toPx(), 3.dp.toPx()))
+                            )
+                        }
+                    }
+                    .padding(horizontal = 4.dp, vertical = 3.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("${index + 1}", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = dimColor, modifier = Modifier.width(22.dp), textAlign = TextAlign.Center)
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(entry.team, fontSize = 12.sp, fontWeight = FontWeight.Medium, fontFamily = FontFamily.Monospace, color = onBg, modifier = Modifier.weight(1f))
+                Box(modifier = Modifier.width(50.dp).background(playoffColor, RoundedCornerShape(3.dp)).padding(horizontal = 4.dp, vertical = 2.dp), contentAlignment = Alignment.Center) {
+                    Text(formatProb(entry.playoffProb), fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color.White, maxLines = 1)
+                }
+                Spacer(modifier = Modifier.width(4.dp))
+                Box(modifier = Modifier.width(50.dp).background(probColorFn(entry.champProb), RoundedCornerShape(3.dp)).padding(horizontal = 4.dp, vertical = 2.dp), contentAlignment = Alignment.Center) {
+                    Text(formatProb(entry.champProb), fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color.White, maxLines = 1)
+                }
+            }
+        }
+        Spacer(modifier = Modifier.height(8.dp))
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text(source, fontSize = 9.sp, color = dimColor, maxLines = 1)
+            Text("fbrk.app", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = dimColor)
+        }
+    }
+}
+
+/**
+ * Bottom sheet showing full league rankings for a stat
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun StatRankingsBottomSheet(
+    statLabel: String,
+    entries: List<RankingEntry>,
+    onDismiss: () -> Unit,
+    rankColorFn: (Int?) -> Color = ::getNBATeamRankColor,
+    highlightedTeams: Set<String> = emptySet(),
+    isPct: Boolean = false,
+    subtitle: String = "",
+    source: String = ""
+) {
+    var isReversed by remember { mutableStateOf(false) }
+    val displayEntries = if (isReversed) entries.reversed() else entries
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    // Share capture state
+    var shareRange by remember { mutableStateOf<ShareRange?>(null) }
+    val graphicsLayer = rememberGraphicsLayer()
+    val imageExporter = remember { getImageExporter() }
+
+    LaunchedEffect(shareRange) {
+        if (shareRange != null) {
+            kotlinx.coroutines.delay(100)
+            try {
+                val bitmap = graphicsLayer.toImageBitmap()
+                val rangeLabel = when (shareRange) {
+                    ShareRange.TOP_HALF -> "Top Half"
+                    ShareRange.BOTTOM_HALF -> "Bottom Half"
+                    else -> ""
+                }
+                val shareTitle = if (rangeLabel.isNotEmpty()) "$statLabel - $rangeLabel" else statLabel
+                imageExporter.shareImage(bitmap, shareTitle)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            } finally {
+                shareRange = null
+            }
+        }
+    }
+
+    // Off-screen share image
+    shareRange?.let { range ->
+        val mid = displayEntries.size / 2
+        val shareEntries = when (range) {
+            ShareRange.FULL -> displayEntries
+            ShareRange.TOP_HALF -> displayEntries.take(mid)
+            ShareRange.BOTTOM_HALF -> displayEntries.drop(mid)
+        }
+        val rangeSubtitle = subtitle
+        CompositionLocalProvider(LocalDensity provides Density(4f, 1f)) {
+            Box(
+                modifier = Modifier
+                    .wrapContentSize(unbounded = true)
+                    .offset { IntOffset(-10000, 0) }
+                    .drawWithContent {
+                        graphicsLayer.record(
+                            size = androidx.compose.ui.unit.IntSize(size.width.toInt(), size.height.toInt())
+                        ) { this@drawWithContent.drawContent() }
+                        drawLayer(graphicsLayer)
+                    }
+            ) {
+                StatRankingsShareImage(
+                    statLabel = statLabel,
+                    subtitle = rangeSubtitle,
+                    source = source,
+                    entries = shareEntries,
+                    rankColorFn = rankColorFn,
+                    isPct = isPct
+                )
+            }
+        }
+    }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = MaterialTheme.colorScheme.background,
+        dragHandle = { BottomSheetDefaults.DragHandle() }
+    ) {
+        Box(modifier = Modifier.fillMaxWidth()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp)
+            ) {
+                // Title with sort toggle caret
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(bottom = 12.dp)
+                ) {
+                    Text(
+                        text = statLabel,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontFamily = FontFamily.Monospace,
+                        maxLines = 1
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Icon(
+                        imageVector = if (isReversed) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
+                        contentDescription = if (isReversed) "Sort best first" else "Sort worst first",
+                        modifier = Modifier
+                            .size(20.dp)
+                            .clickable { isReversed = !isReversed },
+                        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                    )
+                }
+                if (subtitle.isNotBlank()) {
+                    Text(
+                        text = subtitle,
+                        style = MaterialTheme.typography.bodySmall,
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                        maxLines = 1,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+                }
+
+                // Scrollable content
+                var selectedTeam by remember { mutableStateOf<String?>(null) }
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f, fill = false)
+                        .verticalScroll(rememberScrollState())
+                ) {
+                    // Header row
+                    Row(
+                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "RK",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                            modifier = Modifier.width(32.dp),
+                            textAlign = TextAlign.Center
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "TEAM",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                            modifier = Modifier.width(40.dp)
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text(
+                            text = "VALUE",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                            textAlign = TextAlign.End,
+                            modifier = Modifier.width(60.dp)
+                        )
+                    }
+
+                    displayEntries.forEach { entry ->
+                        val isHighlighted = entry.team in highlightedTeams
+                        val isSelected = entry.team == selectedTeam
+                        val rankColor = rankColorFn(entry.rank)
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .then(
+                                    if (isSelected) Modifier.background(
+                                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f),
+                                        RoundedCornerShape(4.dp)
+                                    ) else if (isHighlighted) Modifier.background(
+                                        MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
+                                        RoundedCornerShape(4.dp)
+                                    ) else Modifier
+                                )
+                                .clickable {
+                                    selectedTeam = if (selectedTeam == entry.team) null else entry.team
+                                }
+                                .drawBehind {
+                                    val y = size.height / 2
+                                    val startX = 32.dp.toPx() + 6.dp.toPx() + 42.dp.toPx()
+                                    val endX = startX + 12.dp.toPx()
+                                    if (endX > startX) {
+                                        drawLine(
+                                            color = rankColor.copy(alpha = if (isSelected) 0.3f else 0.12f),
+                                            start = androidx.compose.ui.geometry.Offset(startX, y),
+                                            end = androidx.compose.ui.geometry.Offset(endX, y),
+                                            strokeWidth = 1.dp.toPx(),
+                                            pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(3.dp.toPx(), 3.dp.toPx()))
+                                        )
+                                    }
+                                }
+                                .padding(horizontal = 4.dp, vertical = 3.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            // Rank badge
+                            Box(
+                                modifier = Modifier
+                                    .width(32.dp)
+                                    .background(rankColor, RoundedCornerShape(4.dp))
+                                    .padding(4.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = entry.rankDisplay,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontSize = 9.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White,
+                                    maxLines = 1
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.width(6.dp))
+
+                            // Team abbreviation
+                            Text(
+                                text = entry.team,
+                                style = MaterialTheme.typography.bodySmall,
+                                fontSize = 11.sp,
+                                fontWeight = if (isHighlighted || isSelected) FontWeight.Bold else FontWeight.Medium,
+                                fontFamily = FontFamily.Monospace,
+                                modifier = Modifier.width(40.dp)
+                            )
+
+                            Spacer(modifier = Modifier.width(12.dp))
+
+                            // Value
+                            Text(
+                                text = if (isPct) formatPctValue(entry.value) else formatStatValue(entry.value),
+                                style = MaterialTheme.typography.bodySmall,
+                                fontSize = 11.sp,
+                                fontWeight = if (isHighlighted || isSelected) FontWeight.Bold else FontWeight.Normal,
+                                textAlign = TextAlign.End,
+                                modifier = Modifier.width(60.dp)
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(72.dp)) // Space for FAB
+                }
+            }
+
+            // Share FAB
+            MultiOptionFab(
+                options = listOf(
+                    FabOption(Icons.Filled.Share, "Full List") { shareRange = ShareRange.FULL },
+                    FabOption(Icons.Filled.Share, "Top Half") { shareRange = ShareRange.TOP_HALF },
+                    FabOption(Icons.Filled.Share, "Bottom Half") { shareRange = ShareRange.BOTTOM_HALF }
+                ),
+                modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp)
+            )
+        }
+    }
+}
+
+private fun formatStatValue(value: Double): String {
+    val rounded = kotlin.math.round(value * 100) / 100
+    val str = rounded.toString()
+    return if (str.contains('.')) {
+        val parts = str.split('.')
+        "${parts[0]}.${parts[1].padEnd(1, '0').take(2)}"
+    } else str
+}
+
+private fun formatPctValue(value: Double): String {
+    // Values already in percentage form (e.g., 48.5) or decimal (e.g., 0.485)
+    val pctVal = if (value <= 1.0) value * 100 else value
+    val rounded = kotlin.math.round(pctVal * 10) / 10
+    val str = rounded.toString()
+    return if (str.contains('.')) {
+        val parts = str.split('.')
+        "${parts[0]}.${parts[1].take(1)}%"
+    } else "$str.0%"
+}
+
+private fun formatProb(prob: Double): String {
+    return if (prob >= 99.5) ">99%" else "${prob.toInt()}%"
+}
+
+/**
+ * Bottom sheet showing full league playoff and championship chances
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun PlayoffChancesBottomSheet(
+    title: String,
+    champLabel: String,
+    entries: List<PlayoffChanceEntry>,
+    onDismiss: () -> Unit,
+    probColorFn: (Double?) -> Color,
+    highlightedTeams: Set<String> = emptySet(),
+    subtitle: String = "",
+    source: String = ""
+) {
+    var isReversed by remember { mutableStateOf(false) }
+    val displayEntries = if (isReversed) entries.reversed() else entries
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    // Share capture state
+    var shareRange by remember { mutableStateOf<ShareRange?>(null) }
+    val graphicsLayer = rememberGraphicsLayer()
+    val imageExporter = remember { getImageExporter() }
+
+    LaunchedEffect(shareRange) {
+        if (shareRange != null) {
+            kotlinx.coroutines.delay(100)
+            try {
+                val bitmap = graphicsLayer.toImageBitmap()
+                val rangeLabel = when (shareRange) {
+                    ShareRange.TOP_HALF -> "Top Half"
+                    ShareRange.BOTTOM_HALF -> "Bottom Half"
+                    else -> ""
+                }
+                val shareTitle = if (rangeLabel.isNotEmpty()) "$title - $rangeLabel" else title
+                imageExporter.shareImage(bitmap, shareTitle)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            } finally {
+                shareRange = null
+            }
+        }
+    }
+
+    // Off-screen share image
+    shareRange?.let { range ->
+        val mid = displayEntries.size / 2
+        val shareEntries = when (range) {
+            ShareRange.FULL -> displayEntries
+            ShareRange.TOP_HALF -> displayEntries.take(mid)
+            ShareRange.BOTTOM_HALF -> displayEntries.drop(mid)
+        }
+        val rangeSubtitle = subtitle
+        CompositionLocalProvider(LocalDensity provides Density(4f, 1f)) {
+            Box(
+                modifier = Modifier
+                    .wrapContentSize(unbounded = true)
+                    .offset { IntOffset(-10000, 0) }
+                    .drawWithContent {
+                        graphicsLayer.record(
+                            size = androidx.compose.ui.unit.IntSize(size.width.toInt(), size.height.toInt())
+                        ) { this@drawWithContent.drawContent() }
+                        drawLayer(graphicsLayer)
+                    }
+            ) {
+                PlayoffChancesShareImage(
+                    title = title,
+                    subtitle = rangeSubtitle,
+                    source = source,
+                    champLabel = champLabel,
+                    entries = shareEntries,
+                    probColorFn = probColorFn
+                )
+            }
+        }
+    }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = MaterialTheme.colorScheme.background,
+        dragHandle = { BottomSheetDefaults.DragHandle() }
+    ) {
+        Box(modifier = Modifier.fillMaxWidth()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp)
+            ) {
+                // Title with sort toggle caret
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(bottom = 12.dp)
+                ) {
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontFamily = FontFamily.Monospace,
+                        maxLines = 1
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Icon(
+                        imageVector = if (isReversed) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
+                        contentDescription = if (isReversed) "Sort best first" else "Sort worst first",
+                        modifier = Modifier
+                            .size(20.dp)
+                            .clickable { isReversed = !isReversed },
+                        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                    )
+                }
+
+                // Scrollable content
+                var selectedTeam by remember { mutableStateOf<String?>(null) }
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f, fill = false)
+                        .verticalScroll(rememberScrollState())
+                ) {
+                    // Header row
+                    Row(
+                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "TEAM",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                            modifier = Modifier.width(40.dp)
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text(
+                            text = "PLAYOFF",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.width(52.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = champLabel.uppercase(),
+                            style = MaterialTheme.typography.labelSmall,
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.width(52.dp)
+                        )
+                    }
+
+                    displayEntries.forEach { entry ->
+                        val isHighlighted = entry.team in highlightedTeams
+                        val isSelected = entry.team == selectedTeam
+                        val playoffColor = probColorFn(entry.playoffProb)
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .then(
+                                    if (isSelected) Modifier.background(
+                                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f),
+                                        RoundedCornerShape(4.dp)
+                                    ) else if (isHighlighted) Modifier.background(
+                                        MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
+                                        RoundedCornerShape(4.dp)
+                                    ) else Modifier
+                                )
+                                .clickable {
+                                    selectedTeam = if (selectedTeam == entry.team) null else entry.team
+                                }
+                                .drawBehind {
+                                    val y = size.height / 2
+                                    val startX = 42.dp.toPx()
+                                    val endX = startX + 12.dp.toPx()
+                                    if (endX > startX) {
+                                        drawLine(
+                                            color = playoffColor.copy(alpha = if (isSelected) 0.3f else 0.12f),
+                                            start = androidx.compose.ui.geometry.Offset(startX, y),
+                                            end = androidx.compose.ui.geometry.Offset(endX, y),
+                                            strokeWidth = 1.dp.toPx(),
+                                            pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(3.dp.toPx(), 3.dp.toPx()))
+                                        )
+                                    }
+                                }
+                                .padding(horizontal = 4.dp, vertical = 3.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            // Team abbreviation
+                            Text(
+                                text = entry.team,
+                                style = MaterialTheme.typography.bodySmall,
+                                fontSize = 11.sp,
+                                fontWeight = if (isHighlighted || isSelected) FontWeight.Bold else FontWeight.Medium,
+                                fontFamily = FontFamily.Monospace,
+                                modifier = Modifier.width(40.dp)
+                            )
+
+                            Spacer(modifier = Modifier.width(12.dp))
+
+                            // Playoff prob badge
+                            Box(
+                                modifier = Modifier
+                                    .width(52.dp)
+                                    .background(playoffColor, RoundedCornerShape(4.dp))
+                                    .padding(horizontal = 4.dp, vertical = 3.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = formatProb(entry.playoffProb),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White,
+                                    maxLines = 1
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.width(4.dp))
+
+                            // Champ prob badge
+                            Box(
+                                modifier = Modifier
+                                    .width(52.dp)
+                                    .background(probColorFn(entry.champProb), RoundedCornerShape(4.dp))
+                                    .padding(horizontal = 4.dp, vertical = 3.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = formatProb(entry.champProb),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White,
+                                    maxLines = 1
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(72.dp)) // Space for FAB
+                }
+            }
+
+            // Share FAB
+            MultiOptionFab(
+                options = listOf(
+                    FabOption(Icons.Filled.Share, "Full List") { shareRange = ShareRange.FULL },
+                    FabOption(Icons.Filled.Share, "Top Half") { shareRange = ShareRange.TOP_HALF },
+                    FabOption(Icons.Filled.Share, "Bottom Half") { shareRange = ShareRange.BOTTOM_HALF }
+                ),
+                modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp)
+            )
+        }
+    }
 }

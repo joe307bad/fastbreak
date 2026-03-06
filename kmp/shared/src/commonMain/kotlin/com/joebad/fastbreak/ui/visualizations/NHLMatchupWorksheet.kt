@@ -411,6 +411,7 @@ fun NHLMatchupWorksheet(
                                     entries = visualization.playoffChances,
                                     onDismiss = { showPlayoffChances = false },
                                     probColorFn = ::getNHLProbabilityColor,
+                                    champProbColorFn = ::getNHLCupProbabilityColor,
                                     highlightedTeams = setOf(
                                         selectedMatchup.awayTeam.abbreviation,
                                         selectedMatchup.homeTeam.abbreviation
@@ -2310,6 +2311,15 @@ private fun getNHLProbabilityColor(prob: Double?): Color {
         prob >= 60 -> Color(0xFF388E3C)
         prob >= 40 -> Color(0xFFFF8C00)
         prob >= 20 -> Color(0xFFE65100)
+        else -> Color(0xFFC62828)
+    }
+}
+
+private fun getNHLCupProbabilityColor(prob: Double?): Color {
+    if (prob == null) return Color.Gray
+    return when {
+        prob >= 6 -> Color(0xFF2E7D32)
+        prob >= 3 -> Color(0xFFFF8C00)
         else -> Color(0xFFC62828)
     }
 }

@@ -906,11 +906,13 @@ private fun StatRankingsShareImage(
     source: String,
     entries: List<RankingEntry>,
     rankColorFn: (Int?) -> Color,
-    isPct: Boolean
+    isPct: Boolean,
+    highlightedTeams: Set<String> = emptySet()
 ) {
     val bg = MaterialTheme.colorScheme.background
     val onBg = MaterialTheme.colorScheme.onSurface
     val dimColor = onBg.copy(alpha = 0.5f)
+    val highlightColor = MaterialTheme.colorScheme.primary
 
     Column(
         modifier = Modifier
@@ -925,26 +927,28 @@ private fun StatRankingsShareImage(
         Spacer(modifier = Modifier.height(8.dp))
         // Header
         Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 2.dp)) {
-            Text("RK", style = MaterialTheme.typography.labelSmall, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = dimColor, modifier = Modifier.width(26.dp), textAlign = TextAlign.Center)
+            Spacer(modifier = Modifier.width(8.dp))
+            Text("RK", style = MaterialTheme.typography.labelSmall, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = dimColor, modifier = Modifier.width(32.dp), textAlign = TextAlign.Center)
             Spacer(modifier = Modifier.width(4.dp))
             Text("TEAM", style = MaterialTheme.typography.labelSmall, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = dimColor, modifier = Modifier.weight(1f))
             Text("VALUE", style = MaterialTheme.typography.labelSmall, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = dimColor, textAlign = TextAlign.End, modifier = Modifier.width(56.dp))
         }
         entries.forEach { entry ->
             val rankColor = rankColorFn(entry.rank)
+            val isHighlighted = entry.team in highlightedTeams
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .drawBehind {
                         val y = size.height / 2
-                        val startX = 26.dp.toPx() + 4.dp.toPx() + 40.dp.toPx()
+                        val startX = 32.dp.toPx() + 4.dp.toPx() + 40.dp.toPx()
                         val endX = size.width - 56.dp.toPx()
                         if (endX > startX) {
                             drawLine(
-                                color = rankColor.copy(alpha = 0.18f),
+                                color = rankColor.copy(alpha = 0.25f),
                                 start = androidx.compose.ui.geometry.Offset(startX, y),
                                 end = androidx.compose.ui.geometry.Offset(endX, y),
-                                strokeWidth = 1.dp.toPx(),
+                                strokeWidth = 2.dp.toPx(),
                                 pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(3.dp.toPx(), 3.dp.toPx()))
                             )
                         }
@@ -952,15 +956,35 @@ private fun StatRankingsShareImage(
                     .padding(horizontal = 4.dp, vertical = 3.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                if (isHighlighted) {
+                    Box(modifier = Modifier.size(5.dp).background(highlightColor, CircleShape))
+                    Spacer(modifier = Modifier.width(3.dp))
+                } else {
+                    Spacer(modifier = Modifier.width(8.dp))
+                }
                 Box(
-                    modifier = Modifier.width(26.dp).background(rankColor, RoundedCornerShape(3.dp)).padding(3.dp),
+                    modifier = Modifier.width(32.dp).background(rankColor, RoundedCornerShape(3.dp)).padding(3.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(entry.rankDisplay, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color.White, maxLines = 1)
                 }
                 Spacer(modifier = Modifier.width(4.dp))
-                Text(entry.team, fontSize = 12.sp, fontWeight = FontWeight.Medium, fontFamily = FontFamily.Monospace, color = onBg, modifier = Modifier.weight(1f))
-                Text(if (isPct) formatPctValue(entry.value) else formatStatValue(entry.value), fontSize = 12.sp, textAlign = TextAlign.End, color = onBg, modifier = Modifier.width(56.dp))
+                Text(
+                    entry.team,
+                    fontSize = 12.sp,
+                    fontWeight = if (isHighlighted) FontWeight.ExtraBold else FontWeight.Medium,
+                    fontFamily = FontFamily.Monospace,
+                    color = if (isHighlighted) highlightColor else onBg,
+                    modifier = Modifier.weight(1f)
+                )
+                Text(
+                    if (isPct) formatPctValue(entry.value) else formatStatValue(entry.value),
+                    fontSize = 12.sp,
+                    fontWeight = if (isHighlighted) FontWeight.Bold else FontWeight.Normal,
+                    textAlign = TextAlign.End,
+                    color = if (isHighlighted) highlightColor else onBg,
+                    modifier = Modifier.width(56.dp)
+                )
             }
         }
         Spacer(modifier = Modifier.height(8.dp))
@@ -981,11 +1005,14 @@ private fun PlayoffChancesShareImage(
     source: String,
     champLabel: String,
     entries: List<PlayoffChanceEntry>,
-    probColorFn: (Double?) -> Color
+    probColorFn: (Double?) -> Color,
+    champProbColorFn: (Double?) -> Color = probColorFn,
+    highlightedTeams: Set<String> = emptySet()
 ) {
     val bg = MaterialTheme.colorScheme.background
     val onBg = MaterialTheme.colorScheme.onSurface
     val dimColor = onBg.copy(alpha = 0.5f)
+    val highlightColor = MaterialTheme.colorScheme.primary
 
     Column(
         modifier = Modifier
@@ -999,6 +1026,7 @@ private fun PlayoffChancesShareImage(
         }
         Spacer(modifier = Modifier.height(8.dp))
         Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+            Spacer(modifier = Modifier.width(8.dp))
             Text("RK", style = MaterialTheme.typography.labelSmall, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = dimColor, modifier = Modifier.width(22.dp), textAlign = TextAlign.Center)
             Spacer(modifier = Modifier.width(4.dp))
             Text("TEAM", style = MaterialTheme.typography.labelSmall, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = dimColor, modifier = Modifier.weight(1f))
@@ -1007,6 +1035,7 @@ private fun PlayoffChancesShareImage(
         }
         entries.forEachIndexed { index, entry ->
             val playoffColor = probColorFn(entry.playoffProb)
+            val isHighlighted = entry.team in highlightedTeams
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -1016,10 +1045,10 @@ private fun PlayoffChancesShareImage(
                         val endX = size.width - 52.dp.toPx() - 4.dp.toPx() - 52.dp.toPx()
                         if (endX > startX) {
                             drawLine(
-                                color = playoffColor.copy(alpha = 0.18f),
+                                color = playoffColor.copy(alpha = 0.25f),
                                 start = androidx.compose.ui.geometry.Offset(startX, y),
                                 end = androidx.compose.ui.geometry.Offset(endX, y),
-                                strokeWidth = 1.dp.toPx(),
+                                strokeWidth = 2.dp.toPx(),
                                 pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(3.dp.toPx(), 3.dp.toPx()))
                             )
                         }
@@ -1027,14 +1056,27 @@ private fun PlayoffChancesShareImage(
                     .padding(horizontal = 4.dp, vertical = 3.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                if (isHighlighted) {
+                    Box(modifier = Modifier.size(5.dp).background(highlightColor, CircleShape))
+                    Spacer(modifier = Modifier.width(3.dp))
+                } else {
+                    Spacer(modifier = Modifier.width(8.dp))
+                }
                 Text("${index + 1}", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = dimColor, modifier = Modifier.width(22.dp), textAlign = TextAlign.Center)
                 Spacer(modifier = Modifier.width(4.dp))
-                Text(entry.team, fontSize = 12.sp, fontWeight = FontWeight.Medium, fontFamily = FontFamily.Monospace, color = onBg, modifier = Modifier.weight(1f))
+                Text(
+                    entry.team,
+                    fontSize = 12.sp,
+                    fontWeight = if (isHighlighted) FontWeight.ExtraBold else FontWeight.Medium,
+                    fontFamily = FontFamily.Monospace,
+                    color = if (isHighlighted) highlightColor else onBg,
+                    modifier = Modifier.weight(1f)
+                )
                 Box(modifier = Modifier.width(50.dp).background(playoffColor, RoundedCornerShape(3.dp)).padding(horizontal = 4.dp, vertical = 2.dp), contentAlignment = Alignment.Center) {
                     Text(formatProb(entry.playoffProb), fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color.White, maxLines = 1)
                 }
                 Spacer(modifier = Modifier.width(4.dp))
-                Box(modifier = Modifier.width(50.dp).background(probColorFn(entry.champProb), RoundedCornerShape(3.dp)).padding(horizontal = 4.dp, vertical = 2.dp), contentAlignment = Alignment.Center) {
+                Box(modifier = Modifier.width(50.dp).background(champProbColorFn(entry.champProb), RoundedCornerShape(3.dp)).padding(horizontal = 4.dp, vertical = 2.dp), contentAlignment = Alignment.Center) {
                     Text(formatProb(entry.champProb), fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color.White, maxLines = 1)
                 }
             }
@@ -1065,6 +1107,10 @@ fun StatRankingsBottomSheet(
     var isReversed by remember { mutableStateOf(false) }
     val displayEntries = if (isReversed) entries.reversed() else entries
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    var selectedTeams by remember { mutableStateOf(emptySet<String>()) }
+    val allHighlightedTeams = remember(highlightedTeams, selectedTeams) {
+        highlightedTeams + selectedTeams
+    }
 
     // Share capture state
     var shareRange by remember { mutableStateOf<ShareRange?>(null) }
@@ -1118,7 +1164,8 @@ fun StatRankingsBottomSheet(
                     source = source,
                     entries = shareEntries,
                     rankColorFn = rankColorFn,
-                    isPct = isPct
+                    isPct = isPct,
+                    highlightedTeams = allHighlightedTeams
                 )
             }
         }
@@ -1169,7 +1216,6 @@ fun StatRankingsBottomSheet(
                 }
 
                 // Scrollable content
-                var selectedTeam by remember { mutableStateOf<String?>(null) }
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -1213,22 +1259,19 @@ fun StatRankingsBottomSheet(
 
                     displayEntries.forEach { entry ->
                         val isHighlighted = entry.team in highlightedTeams
-                        val isSelected = entry.team == selectedTeam
+                        val isSelected = entry.team in selectedTeams
                         val rankColor = rankColorFn(entry.rank)
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .then(
-                                    if (isSelected) Modifier.background(
-                                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f),
-                                        RoundedCornerShape(4.dp)
-                                    ) else if (isHighlighted) Modifier.background(
+                                    if (isSelected || isHighlighted) Modifier.background(
                                         MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
                                         RoundedCornerShape(4.dp)
                                     ) else Modifier
                                 )
                                 .clickable {
-                                    selectedTeam = if (selectedTeam == entry.team) null else entry.team
+                                    selectedTeams = if (entry.team in selectedTeams) selectedTeams - entry.team else selectedTeams + entry.team
                                 }
                                 .drawBehind {
                                     val y = size.height / 2
@@ -1343,6 +1386,7 @@ fun PlayoffChancesBottomSheet(
     entries: List<PlayoffChanceEntry>,
     onDismiss: () -> Unit,
     probColorFn: (Double?) -> Color,
+    champProbColorFn: (Double?) -> Color = probColorFn,
     highlightedTeams: Set<String> = emptySet(),
     subtitle: String = "",
     source: String = ""
@@ -1350,6 +1394,10 @@ fun PlayoffChancesBottomSheet(
     var isReversed by remember { mutableStateOf(false) }
     val displayEntries = if (isReversed) entries.reversed() else entries
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    var selectedTeams by remember { mutableStateOf(emptySet<String>()) }
+    val allHighlightedTeams = remember(highlightedTeams, selectedTeams) {
+        highlightedTeams + selectedTeams
+    }
 
     // Share capture state
     var shareRange by remember { mutableStateOf<ShareRange?>(null) }
@@ -1403,7 +1451,9 @@ fun PlayoffChancesBottomSheet(
                     source = source,
                     champLabel = champLabel,
                     entries = shareEntries,
-                    probColorFn = probColorFn
+                    probColorFn = probColorFn,
+                    champProbColorFn = champProbColorFn,
+                    highlightedTeams = allHighlightedTeams
                 )
             }
         }
@@ -1444,7 +1494,6 @@ fun PlayoffChancesBottomSheet(
                 }
 
                 // Scrollable content
-                var selectedTeam by remember { mutableStateOf<String?>(null) }
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -1488,22 +1537,19 @@ fun PlayoffChancesBottomSheet(
 
                     displayEntries.forEach { entry ->
                         val isHighlighted = entry.team in highlightedTeams
-                        val isSelected = entry.team == selectedTeam
+                        val isSelected = entry.team in selectedTeams
                         val playoffColor = probColorFn(entry.playoffProb)
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .then(
-                                    if (isSelected) Modifier.background(
-                                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f),
-                                        RoundedCornerShape(4.dp)
-                                    ) else if (isHighlighted) Modifier.background(
+                                    if (isSelected || isHighlighted) Modifier.background(
                                         MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
                                         RoundedCornerShape(4.dp)
                                     ) else Modifier
                                 )
                                 .clickable {
-                                    selectedTeam = if (selectedTeam == entry.team) null else entry.team
+                                    selectedTeams = if (entry.team in selectedTeams) selectedTeams - entry.team else selectedTeams + entry.team
                                 }
                                 .drawBehind {
                                     val y = size.height / 2
@@ -1558,7 +1604,7 @@ fun PlayoffChancesBottomSheet(
                             Box(
                                 modifier = Modifier
                                     .width(52.dp)
-                                    .background(probColorFn(entry.champProb), RoundedCornerShape(4.dp))
+                                    .background(champProbColorFn(entry.champProb), RoundedCornerShape(4.dp))
                                     .padding(horizontal = 4.dp, vertical = 3.dp),
                                 contentAlignment = Alignment.Center
                             ) {

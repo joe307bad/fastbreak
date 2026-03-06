@@ -74,36 +74,14 @@ is_valid_value <- function(x) {
 # Dense ranking ensures ranks never exceed the number of unique values
 # Example: values [10, 20, 20, 30] get ranks [1, 2, 2, 3] not [1, 2, 2, 4]
 tied_rank <- function(x) {
-  # Handle all NA case
-  if (all(is.na(x))) {
-    return(list(rank = rep(NA_integer_, length(x)), rankDisplay = rep(NA_character_, length(x))))
-  }
+  numeric_ranks <- rank(x, ties.method = "min", na.last = "keep")
+  rank_counts <- table(numeric_ranks[!is.na(numeric_ranks)])
 
-  # Get unique non-NA values and sort them
-  unique_vals <- sort(unique(x[!is.na(x)]))
-
-  # Create a mapping from value to dense rank
-  value_to_rank <- setNames(seq_along(unique_vals), as.character(unique_vals))
-
-  # Count occurrences of each value to identify ties
-  value_counts <- table(x[!is.na(x)])
-
-  # Assign dense ranks
-  numeric_ranks <- sapply(x, function(v) {
-    if (is.na(v)) {
-      return(NA_integer_)
-    }
-    as.integer(value_to_rank[as.character(v)])
-  })
-
-  # Create display ranks with "T" prefix for ties
-  display_ranks <- sapply(seq_along(x), function(i) {
-    v <- x[i]
-    r <- numeric_ranks[i]
-    if (is.na(v) || is.na(r)) {
+  display_ranks <- sapply(numeric_ranks, function(r) {
+    if (is.na(r)) {
       return(NA_character_)
     }
-    if (value_counts[as.character(v)] > 1) {
+    if (rank_counts[as.character(r)] > 1) {
       paste0("T", r)
     } else {
       as.character(r)

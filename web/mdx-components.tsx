@@ -10,6 +10,7 @@ import { NavigateChartsDemo } from "./src/components/ui/NavigateChartsDemo";
 import { HeadingWithAnchor } from "./src/components/ui/HeadingWithAnchor";
 import { ManualPage } from "./src/components/ui/ManualPage";
 import { SportsTalkGallery } from "./src/components/ui/SportsTalkGallery";
+import { HowIsMyTeamGallery } from "./src/components/ui/HowIsMyTeamGallery";
 import { WorksheetLightbox } from "./src/components/ui/WorksheetLightbox";
 import { SportsTalkExamplesGallery } from "./src/components/ui/SportsTalkExamplesGallery";
 import { GoalProgress } from "./src/components/ui/GoalProgress";
@@ -26,6 +27,7 @@ export function useMDXComponents(components: MDXComponents): MDXComponents {
     NavigateChartsDemo,
     ManualPage,
     SportsTalkGallery,
+    HowIsMyTeamGallery,
     WorksheetLightbox,
     SportsTalkExamplesGallery,
     GoalProgress,

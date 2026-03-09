@@ -14,10 +14,10 @@ If you're a casual fan or a diehard fan or an aspiring fan, how do you follow sp
 
 Do you have an app you check? Do you have multiple apps you check? Do you have notifications? Do you watch TV or follow reporters on Instagram or read newsletters?
 
-I built fastbreak to cater to how I like to digest sports: daily, digestable, data-driven trends. Fastbreak is built to be:
+I built fastbreak to cater to how I like to follow sports: daily, digestible, data-driven trends. Fastbreak is built to be:
 
 1. Informative on how my team was doing in the recent past, how will they do tonight, and how will they do in the future
-2. A source for a wholistic, multi-sport news update
+2. A source for a holistic, multi-sport news update
 3. A world-class mobile app experience
 4. Ad-free
 5. Packed with easily approachable data visualizations
@@ -48,13 +48,13 @@ Finally, I started looking at how they are going to do going forward:
 
 <HowWillMyTeamDo />
 
-And this is the essense of fastbreak: equipping the casual fan with enough information to carry a multi dimensional conversation.
+And this is the essence of fastbreak: equipping the casual fan with enough information to carry a multi-dimensional conversation.
 
-## A source for a wholistic, multi-sport news update
+## A source for a holistic, multi-sport news update
 
-[Fastbreak has a feature called "topics"](/docs/guide#topics). This is is the space-age sports section.
+[Fastbreak has a feature called "topics"](/docs/guide#topics). This is the space-age sports section.
 
-Topics are daily generated summaries of the key events in each major sports league. Each summary comes with statistical anlysis of the mentioned teams, data points that link to a chart in the app, relevant links sourced from Google, and functionality to mark topics as read.
+Topics are daily generated summaries of the key events in each major sports league. Each summary comes with statistical analysis of the mentioned teams, data points that link to a chart in the app, relevant links sourced from Google, and functionality to mark topics as read.
 
 The special part of topics is it acts as your personal assistant to provide interesting league updates [that are grounded in Google search](https://docs.cloud.google.com/vertex-ai/generative-ai/docs/grounding/overview) to ensure accuracy and relevancy.
 
@@ -64,20 +64,20 @@ The primary focus of the fastbreak beta has been to build a fully native iOS and
 
 It also uses the [R programming language](https://www.r-project.org/) and [cron](https://en.wikipedia.org/wiki/Cron) to pull publicly accessible data on a schedule and generate simple JSON files. Clients download the files from AWS's low latency [CloudFront CDN](https://aws.amazon.com/cloudfront/).
 
-Technology aside, fastbreak is designed to work with the user: gestures on charts just work, swiping in certain areas of the app just works, navigation is easy and simple, and data per square inch is very high but easily digestable.
+Technology aside, fastbreak is designed to work with the user: gestures on charts just work, swiping in certain areas of the app just works, navigation is easy and simple, and data per square inch is very high but easily digestible.
 
 ## Ad-free
 
-All the data in fastbreak is publicly accessible or ethically scraped, temporarily stored, and properly attributed. The packages used to build fastbreak are MIT licensed, open-sourced libraries. The source for fastbreak is viewable but not available for monetization.
+All the data in fastbreak is publicly accessible, temporarily stored, and properly attributed. The packages used to build fastbreak are MIT licensed, open-sourced libraries. The source for fastbreak is viewable but not available for monetization.
 
 Following sports and diving deep into stats should be free and accessible to everyone with an internet connection and a phone.
 
 ## Easily approachable data visualizations
 
-I have always been fascinated with telling stories with data. Fastbreak has many simple, visually appealing charts with subtle permutastions and some with multi-dimensional data sets. Each visualization has multiple ways to filter, sort, and share the result.
+I have always been fascinated with telling stories with data. Fastbreak has many simple, visually appealing charts with subtle permutations and some with multi-dimensional data sets. Each visualization has multiple ways to filter, sort, and share the result.
 
 To render a range of data visualizations, fastbreak uses [Koala Plot](https://koalaplot.github.io/).
 
 ## Conclusion
 
-Fastbreak is a passion project that I built for a personal desire: to make it more fun to follow sports casually. I have been using it as my primary source of sports news and stats for weeks. For years I have struggled to follow the NBA, now I wake up and study the matchup worksheets for the basketball games for the day trying to decide which game has the most appeal based on the teams standings, playoff hopes, monthly trends, all in a single visualization; it's a blast.
+Fastbreak is a passion project that I built for a personal desire: to make it more fun to follow sports casually. I have been using it as my primary source of sports news and stats for weeks. For years I have struggled to follow the NBA. Now I wake up and study the matchup worksheets for the basketball games for the day trying to decide which game has the most appeal based on the teams standings, playoff hopes, monthly trends, all in a single visualization; it's a blast.

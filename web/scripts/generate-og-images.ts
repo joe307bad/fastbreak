@@ -56,17 +56,27 @@ function generateOGImageSVG(
     return lines;
   };
 
-  const subtitleLines = subtitle ? wrapText(subtitle, 50) : [];
+  const titleLines = wrapText(title, 28);
+  const subtitleLines = subtitle ? wrapText(subtitle, 55) : [];
   const fontFamily = "'Geist Mono', 'SF Mono', 'Monaco', 'Menlo', 'Consolas', 'Liberation Mono', 'Courier New', monospace";
 
-  return `<svg width="516" height="270" viewBox="0 0 516 270" xmlns="http://www.w3.org/2000/svg">
-  <!-- Background -->
-  <rect width="516" height="270" fill="#fafafa"/>
+  // Calculate title height for positioning subtitle
+  const titleStartY = 120;
+  const titleLineHeight = 85;
+  const titleEndY = titleStartY + (titleLines.length - 1) * titleLineHeight;
+  const subtitleStartY = titleEndY + 80;
 
-  <!-- Title -->
-  <text x="20" y="60" font-family="${fontFamily}" font-size="34" font-weight="bold" fill="#171717" text-anchor="start">
-    <tspan x="20" dy="0">${escapeXml(title)}</tspan>
-  </text>
+  return `<svg width="1200" height="630" viewBox="0 0 1200 630" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <rect width="1200" height="630" fill="#fafafa"/>
+
+  <!-- Title (wrapped) -->
+  ${titleLines
+    .map(
+      (line, i) =>
+        `<text x="48" y="${titleStartY + i * titleLineHeight}" font-family="${fontFamily}" font-size="72" font-weight="bold" fill="#171717" text-anchor="start">${escapeXml(line)}</text>`
+    )
+    .join('\n  ')}
 
   <!-- Subtitle (wrapped) -->
   ${
@@ -74,9 +84,7 @@ function generateOGImageSVG(
       ? subtitleLines
           .map(
             (line, i) =>
-              `<text x="20" y="${110 + i * 22}" font-family="${fontFamily}" font-size="17" fill="#525252" text-anchor="start">
-    <tspan x="20" dy="0">${escapeXml(line)}</tspan>
-  </text>`
+              `<text x="48" y="${subtitleStartY + i * 44}" font-family="${fontFamily}" font-size="34" fill="#525252" text-anchor="start">${escapeXml(line)}</text>`
           )
           .join('\n  ')
       : ''
@@ -85,14 +93,14 @@ function generateOGImageSVG(
   <!-- Date -->
   ${
     formattedDate
-      ? `<text x="20" y="245" font-family="${fontFamily}" font-size="15" fill="#525252" text-anchor="start">${escapeXml(
+      ? `<text x="48" y="580" font-family="${fontFamily}" font-size="28" fill="#525252" text-anchor="start">${escapeXml(
           formattedDate
         )}</text>`
       : ''
   }
 
-  <!-- Logo in bottom right (aligned with date) -->
-  <image x="430" y="180" width="68" height="68" href="data:image/png;base64,${logoBase64}"/>
+  <!-- Logo in bottom right -->
+  <image x="1040" y="470" width="120" height="120" href="data:image/png;base64,${logoBase64}"/>
 </svg>`;
 }
 

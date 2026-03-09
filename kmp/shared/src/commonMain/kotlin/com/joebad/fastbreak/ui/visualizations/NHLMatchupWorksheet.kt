@@ -625,6 +625,7 @@ fun NHLMatchupWorksheet(
                                     }
                                     drawLayer(graphicsLayer)
                                 }
+                                .background(MaterialTheme.colorScheme.background)
                         ) {
                             NHLPostGameShareImage(
                                 matchup = selectedMatchup,

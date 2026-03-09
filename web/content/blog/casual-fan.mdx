@@ -1,0 +1,83 @@
+---
+title: "Sports analytics for the casual fan"
+date: "2026-03-08"
+description: "The essence of fastbreak"
+author: "Joe Badaczewski"
+authorUrl: "https://joebad.com"
+---
+
+Fastbreak is supposed to make sports analytics more accessible to casual fans. As a casual fan, I want following sports to be easy and fun. I want it to be a daily routine I look forward to like my grandpa used to sit down and read the sports section. Now, when I brush my teeth everyday, I read the space-age sports section: fastbreak.
+
+## How do you follow sports?
+
+If you're a casual fan or a diehard fan or an aspiring fan, how do you follow sports?
+
+Do you have an app you check? Do you have multiple apps you check? Do you have notifications? Do you watch TV or follow reporters on Instagram or read newsletters?
+
+I built fastbreak to cater to how I like to digest sports: daily, digestable, data-driven trends. Fastbreak is built to be:
+
+1. Informative on how my team was doing in the recent past, how will they do tonight, and how will they do in the future
+2. A source for a wholistic, multi-sport news update
+3. A world-class mobile app experience
+4. Ad-free
+5. Packed with easily approachable data visualizations
+
+Let's break down how fastbreak achieves each of these design goals.
+
+## What should a casual fan know about their team?
+
+Fastbreak gives casual fans the tools and stats to answer the critical questions: how has my team done in the recent past, how will they do tonight, and how will they do in the future.
+
+Let me show you an example. Recently I went to the Flyers at Penguins game and I wanted to talk to my friends about the Penguins.
+
+First I looked at how they've been doing:
+
+<HowIsMyTeamGallery />
+
+Then, I looked at the game they were playing tonight:
+
+The matchup worksheet for this game shows that the Pens are 6th in the league in power play percentage and top ten in most statistical categories, but they have a losing record since the Olympic break and the Flyers are allowing 4th fewest shots on goal per game.
+
+<FullWidthImage src="/04-casual-fan/03-flyers-v-penguins.png" alt="Flyers as Penguins matchup worksheet" />
+
+We can also look at player charts and comparison charts for the matchup to dive deeper:
+
+<PensVFlyersBreakdown />
+
+Finally, I started looking at how they are going to do going forward:
+
+<HowWillMyTeamDo />
+
+And this is the essense of fastbreak: equipping the casual fan with enough information to carry a multi dimensional conversation.
+
+## A source for a wholistic, multi-sport news update
+
+[Fastbreak has a feature called "topics"](/docs/guide#topics). This is is the space-age sports section.
+
+Topics are daily generated summaries of the key events in each major sports league. Each summary comes with statistical anlysis of the mentioned teams, data points that link to a chart in the app, relevant links sourced from Google, and functionality to mark topics as read.
+
+The special part of topics is it acts as your personal assistant to provide interesting league updates [that are grounded in Google search](https://docs.cloud.google.com/vertex-ai/generative-ai/docs/grounding/overview) to ensure accuracy and relevancy.
+
+## A world-class mobile app experience
+
+The primary focus of the fastbreak beta has been to build a fully native iOS and Android app that is performant, offline-first, and easy to use. Fastbreak uses [Kotlin Multiplatform](https://kotlinlang.org/multiplatform/) to build native iOS and Android apps from the same code.
+
+It also uses the [R programming language](https://www.r-project.org/) and [cron](https://en.wikipedia.org/wiki/Cron) to pull publicly accessible data on a schedule and generate simple JSON files. Clients download the files from AWS's low latency [CloudFront CDN](https://aws.amazon.com/cloudfront/).
+
+Technology aside, fastbreak is designed to work with the user: gestures on charts just work, swiping in certain areas of the app just works, navigation is easy and simple, and data per square inch is very high but easily digestable.
+
+## Ad-free
+
+All the data in fastbreak is publicly accessible or ethically scraped, temporarily stored, and properly attributed. The packages used to build fastbreak are MIT licensed, open-sourced libraries. The source for fastbreak is viewable but not available for monetization.
+
+Following sports and diving deep into stats should be free and accessible to everyone with an internet connection and a phone.
+
+## Easily approachable data visualizations
+
+I have always been fascinated with telling stories with data. Fastbreak has many simple, visually appealing charts with subtle permutastions and some with multi-dimensional data sets. Each visualization has multiple ways to filter, sort, and share the result.
+
+To render a range of data visualizations, fastbreak uses [Koala Plot](https://koalaplot.github.io/).
+
+## Conclusion
+
+Fastbreak is a passion project that I built for a personal desire: to make it more fun to follow sports casually. I have been using it as my primary source of sports news and stats for weeks. For years I have struggled to follow the NBA, now I wake up and study the matchup worksheets for the basketball games for the day trying to decide which game has the most appeal based on the teams standings, playoff hopes, monthly trends, all in a single visualization; it's a blast.

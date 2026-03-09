@@ -10,12 +10,17 @@ import { NavigateChartsDemo } from "./src/components/ui/NavigateChartsDemo";
 import { HeadingWithAnchor } from "./src/components/ui/HeadingWithAnchor";
 import { ManualPage } from "./src/components/ui/ManualPage";
 import { SportsTalkGallery } from "./src/components/ui/SportsTalkGallery";
+import { HowIsMyTeamGallery } from "./src/components/ui/HowIsMyTeamGallery";
+import { PensVFlyersBreakdown } from "./src/components/ui/PensVFlyersBreakdown";
+import { HowWillMyTeamDo } from "./src/components/ui/HowWillMyTeamDo";
 import { WorksheetLightbox } from "./src/components/ui/WorksheetLightbox";
 import { SportsTalkExamplesGallery } from "./src/components/ui/SportsTalkExamplesGallery";
 import { GoalProgress } from "./src/components/ui/GoalProgress";
+import { FullWidthImage } from "./src/components/ui/FullWidthImage";
 
 export function useMDXComponents(components: MDXComponents): MDXComponents {
   return {
+    FullWidthImage,
     PlatformLinks,
     IntroScreenshots,
     PlatformSupport,
@@ -26,6 +31,9 @@ export function useMDXComponents(components: MDXComponents): MDXComponents {
     NavigateChartsDemo,
     ManualPage,
     SportsTalkGallery,
+    HowIsMyTeamGallery,
+    PensVFlyersBreakdown,
+    HowWillMyTeamDo,
     WorksheetLightbox,
     SportsTalkExamplesGallery,
     GoalProgress,

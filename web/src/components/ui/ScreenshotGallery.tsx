@@ -3,8 +3,18 @@
 import { useState } from 'react';
 import Image from 'next/image';
 
+type ImageItem = string | { src: string; caption: string };
+
 interface ScreenshotGalleryProps {
-  images: string[];
+  images: ImageItem[];
+}
+
+function getImageSrc(item: ImageItem): string {
+  return typeof item === 'string' ? item : item.src;
+}
+
+function getImageCaption(item: ImageItem): string | undefined {
+  return typeof item === 'string' ? undefined : item.caption;
 }
 
 export function ScreenshotGallery({ images }: ScreenshotGalleryProps) {
@@ -13,21 +23,28 @@ export function ScreenshotGallery({ images }: ScreenshotGalleryProps) {
   return (
     <>
       <div className="flex gap-4 overflow-x-auto pb-4 my-6 snap-x snap-mandatory">
-        {images.map((image, index) => (
-          <div
-            key={image}
-            className="flex-shrink-0 snap-start cursor-pointer"
-            onClick={() => setLightboxIndex(index)}
-          >
-            <Image
-              src={image}
-              alt={`Screenshot ${index + 1}`}
-              width={300}
-              height={600}
-              className="rounded-lg border border-[var(--border)] hover:opacity-80 transition-opacity"
-            />
-          </div>
-        ))}
+        {images.map((image, index) => {
+          const src = getImageSrc(image);
+          const caption = getImageCaption(image);
+          return (
+            <div
+              key={src}
+              className="flex-shrink-0 snap-start cursor-pointer"
+              onClick={() => setLightboxIndex(index)}
+            >
+              <Image
+                src={src}
+                alt={caption || `Screenshot ${index + 1}`}
+                width={300}
+                height={600}
+                className="rounded-lg border border-[var(--border)] hover:opacity-80 transition-opacity"
+              />
+              {caption && (
+                <p className="text-sm text-[var(--muted)] mt-2 text-center max-w-[300px]">{caption}</p>
+              )}
+            </div>
+          );
+        })}
       </div>
 
       {lightboxIndex !== null && (
@@ -69,14 +86,17 @@ export function ScreenshotGallery({ images }: ScreenshotGalleryProps) {
             </button>
           )}
 
-          <div className="max-w-5xl max-h-[90vh] relative" onClick={(e) => e.stopPropagation()}>
+          <div className="max-w-5xl max-h-[90vh] relative flex flex-col items-center" onClick={(e) => e.stopPropagation()}>
             <Image
-              src={images[lightboxIndex]}
-              alt={`Screenshot ${lightboxIndex + 1}`}
+              src={getImageSrc(images[lightboxIndex])}
+              alt={getImageCaption(images[lightboxIndex]) || `Screenshot ${lightboxIndex + 1}`}
               width={1200}
               height={2400}
-              className="rounded-lg max-h-[90vh] w-auto"
+              className="rounded-lg max-h-[85vh] w-auto"
             />
+            {getImageCaption(images[lightboxIndex]) && (
+              <p className="text-white text-center mt-4 text-lg">{getImageCaption(images[lightboxIndex])}</p>
+            )}
           </div>
         </div>
       )}

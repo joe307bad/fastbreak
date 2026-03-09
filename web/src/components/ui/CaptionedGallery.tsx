@@ -39,51 +39,64 @@ export function CaptionedGallery({ images }: CaptionedGalleryProps) {
 
       {lightboxIndex !== null && (
         <div
-          className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4"
+          className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-2 md:p-4"
           onClick={() => setLightboxIndex(null)}
         >
-          {lightboxIndex > 0 && (
-            <button
-              className="absolute left-4 text-white text-4xl hover:opacity-70 transition-opacity z-10"
-              onClick={(e) => {
-                e.stopPropagation();
-                setLightboxIndex(lightboxIndex - 1);
-              }}
-              aria-label="Previous"
-            >
-              ‹
-            </button>
-          )}
+          <div className="w-full h-full flex items-center justify-center gap-2 md:gap-4">
+            {/* Left arrow */}
+            <div className="flex-shrink-0 w-8 md:w-12 flex items-center justify-center">
+              {lightboxIndex > 0 && (
+                <button
+                  className="text-white text-3xl md:text-4xl hover:opacity-70 transition-opacity"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setLightboxIndex(lightboxIndex - 1);
+                  }}
+                  aria-label="Previous"
+                >
+                  ‹
+                </button>
+              )}
+            </div>
 
-          {lightboxIndex < images.length - 1 && (
-            <button
-              className="absolute right-4 text-white text-4xl hover:opacity-70 transition-opacity z-10"
-              onClick={(e) => {
-                e.stopPropagation();
-                setLightboxIndex(lightboxIndex + 1);
-              }}
-              aria-label="Next"
-            >
-              ›
-            </button>
-          )}
+            {/* Main content */}
+            <div className="flex-1 h-full max-w-5xl flex flex-col items-center justify-center min-w-0 relative" onClick={(e) => e.stopPropagation()}>
+              <button
+                className="absolute top-0 right-0 text-white text-3xl md:text-4xl hover:opacity-70 transition-opacity leading-none z-10"
+                onClick={() => setLightboxIndex(null)}
+                aria-label="Close"
+              >
+                ×
+              </button>
+              <div className="flex flex-col items-start">
+                <Image
+                  src={images[lightboxIndex].src}
+                  alt={images[lightboxIndex].caption}
+                  width={1200}
+                  height={2400}
+                  className="rounded-lg max-h-[65vh] md:max-h-[calc(100vh-12rem)] w-auto object-contain"
+                />
+                <div className="max-h-[20vh] md:max-h-32 mt-2 overflow-y-auto">
+                  <p className="text-white text-sm md:text-base text-left">{images[lightboxIndex].caption}</p>
+                </div>
+              </div>
+            </div>
 
-          <div className="max-w-5xl w-full h-full relative flex flex-col items-center" onClick={(e) => e.stopPropagation()}>
-            <button
-              className="self-end mb-2 text-white text-4xl hover:opacity-70 transition-opacity leading-none"
-              onClick={() => setLightboxIndex(null)}
-              aria-label="Close"
-            >
-              ×
-            </button>
-            <Image
-              src={images[lightboxIndex].src}
-              alt={images[lightboxIndex].caption}
-              width={1200}
-              height={2400}
-              className="rounded-lg max-h-[calc(100vh-8rem)] w-auto"
-            />
-            <div className="mt-2 text-white text-sm px-4">{images[lightboxIndex].caption}</div>
+            {/* Right arrow */}
+            <div className="flex-shrink-0 w-8 md:w-12 flex items-center justify-center">
+              {lightboxIndex < images.length - 1 && (
+                <button
+                  className="text-white text-3xl md:text-4xl hover:opacity-70 transition-opacity"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setLightboxIndex(lightboxIndex + 1);
+                  }}
+                  aria-label="Next"
+                >
+                  ›
+                </button>
+              )}
+            </div>
           </div>
         </div>
       )}

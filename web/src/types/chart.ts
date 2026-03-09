@@ -118,6 +118,11 @@ export interface RegistryEntry {
   interval: string;
   updatedAt: string;
   title: string;
+  type?: string;
 }
 
 export type Registry = Record<string, RegistryEntry>;
+
+export function isChartEntry(entry: RegistryEntry): boolean {
+  return entry.type !== 'topics';
+}

@@ -1,4 +1,4 @@
-import { fetchRegistry, fetchChartData, slugToKey, keyToSlug } from '@/lib/api';
+import { fetchChartRegistry, fetchChartData, slugToKey, keyToSlug } from '@/lib/api';
 import { ChartRenderer } from '@/components/charts';
 
 interface Props {
@@ -6,14 +6,11 @@ interface Props {
 }
 
 export async function generateStaticParams() {
-  const registry = await fetchRegistry();
+  const registry = await fetchChartRegistry();
   return Object.keys(registry).map(key => ({
     slug: keyToSlug(key),
   }));
 }
-
-// Revalidate this page once per day (86400 seconds = 24 hours)
-export const revalidate = 86400;
 
 export async function generateMetadata({ params }: Props) {
   const { slug } = await params;

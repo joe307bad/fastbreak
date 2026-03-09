@@ -7,7 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "generate-og": "tsx scripts/generate-og-images.ts"
+    "generate-og": "tsx scripts/generate-og-images.ts",
+    "download-charts": "tsx scripts/download-charts.ts",
+    "prebuild": "npm run download-charts"
   },
   "dependencies": {
     "@mdx-js/loader": "^3.1.1",

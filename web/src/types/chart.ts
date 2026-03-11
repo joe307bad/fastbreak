@@ -1,4 +1,4 @@
-export type VisualizationType = 'SCATTER_PLOT' | 'LINE_CHART' | 'BAR_CHART' | 'BAR_GRAPH' | 'TABLE' | 'MATCHUP' | 'MATCHUP_V2';
+export type VisualizationType = 'SCATTER_PLOT' | 'LINE_CHART' | 'BAR_CHART' | 'BAR_GRAPH' | 'TABLE' | 'MATCHUP' | 'MATCHUP_V2' | 'NBA_MATCHUP' | 'NHL_MATCHUP';
 
 export interface QuadrantConfig {
   color: string;
@@ -120,7 +120,144 @@ export interface MatchupV2Data extends BaseChartData {
   dataPoints: MatchupDataPoint[];
 }
 
-export type ChartData = ScatterPlotData | LineChartData | BarChartData | TableData | MatchupData | MatchupV2Data;
+// NBA Matchup types
+export interface NBATeamStats {
+  gamesPlayed: number;
+  pointsPerGame: number;
+  pointsPerGameRank: number;
+  fieldGoalPct: number;
+  threePtPct: number;
+  reboundsPerGame: number;
+  assistsPerGame: number;
+  stealsPerGame: number;
+  blocksPerGame: number;
+  turnoversPerGame: number;
+  offensiveRating: number;
+  offensiveRatingRank: number;
+  defensiveRating: number;
+  defensiveRatingRank: number;
+  netRating: number;
+  netRatingRank: number;
+  pace: number;
+  [key: string]: number | string | Record<string, unknown>;
+}
+
+export interface NBATeam {
+  id: string;
+  name: string;
+  abbreviation: string;
+  logo?: string;
+  wins: number;
+  losses: number;
+  conferenceRank: number;
+  conference: string;
+  stats: NBATeamStats;
+}
+
+export interface NBAMatchupDataPoint {
+  gameId: string;
+  gameDate: string;
+  gameName: string;
+  gameStatus: string;
+  gameCompleted: boolean;
+  homeTeam: NBATeam;
+  awayTeam: NBATeam;
+  odds?: {
+    spread?: string;
+    overUnder?: string;
+    homeMoneyline?: string;
+    awayMoneyline?: string;
+  };
+}
+
+export interface NBAMatchupData extends BaseChartData {
+  visualizationType: 'NBA_MATCHUP';
+  dataPoints: NBAMatchupDataPoint[];
+}
+
+// NHL Matchup types
+export interface NHLTeamStats {
+  gamesPlayed: number;
+  goalsPerGame: number;
+  goalsPerGameRank: number;
+  goalsAgainstPerGame: number;
+  goalsAgainstPerGameRank: number;
+  goalDiffPerGame: number;
+  goalDiffPerGameRank: number;
+  shotsForPerGame: number;
+  shotsAgainstPerGame: number;
+  powerPlayPct: number;
+  penaltyKillPct: number;
+  faceoffWinPct: number;
+  pointsPct: number;
+  pointsPctRank: number;
+  xgfPct: number;
+  xgfPctRank: number;
+  [key: string]: number | string | Record<string, unknown>;
+}
+
+export interface NHLTeam {
+  id: string;
+  name: string;
+  abbreviation: string;
+  logo?: string;
+  wins: number;
+  losses: number;
+  otLosses: number;
+  points: number;
+  conferenceRank: number;
+  divisionRank: number;
+  division: string;
+  conference: string;
+  streak?: string;
+  last10?: string;
+  stats: NHLTeamStats;
+}
+
+export interface NHLMatchupDataPoint {
+  gameId: string;
+  gameDate: string;
+  gameName: string;
+  gameState: string;
+  gameCompleted: boolean;
+  homeTeam: NHLTeam;
+  awayTeam: NHLTeam;
+}
+
+export interface NHLMatchupData extends BaseChartData {
+  visualizationType: 'NHL_MATCHUP';
+  dataPoints: NHLMatchupDataPoint[];
+}
+
+// NFL/MATCHUP_V2 types
+export interface MatchupV2Odds {
+  home_spread: string;
+  home_moneyline: string;
+  away_spread: string;
+  away_moneyline: string;
+  over_under: string;
+}
+
+export interface MatchupV2Team {
+  name: string;
+  abbreviation: string;
+  record?: string;
+  conferenceRank?: number;
+  conference?: string;
+  stats?: Record<string, { value: number; rank: number; rankDisplay: string }>;
+}
+
+export interface MatchupV2DataPoint {
+  game_datetime: string;
+  odds?: MatchupV2Odds;
+  homeTeam?: MatchupV2Team;
+  awayTeam?: MatchupV2Team;
+  comparisons?: {
+    sideBySide?: Record<string, Record<string, { label: string; home: { value: number; rank: number }; away: { value: number; rank: number } }>>;
+  };
+}
+
+export type ChartData = ScatterPlotData | LineChartData | BarChartData | TableData | MatchupData | MatchupV2Data | NBAMatchupData | NHLMatchupData;
 
 export interface RegistryEntry {
   interval: string;

@@ -1,9 +1,11 @@
 import { fetchChartRegistry, fetchChartData } from '@/lib/api';
-import { ChartData, MatchupData } from '@/types/chart';
+import { ChartData, MatchupData, MatchupV2Data, NBAMatchupData, NHLMatchupData } from '@/types/chart';
 import { SportTabs } from '@/components/ui/SportTabs';
 import { ChartGrid } from '@/components/ui/ChartGrid';
 import { getOrderedLeagues } from '@/lib/leagues';
 import type { Metadata } from 'next';
+
+type AnyMatchupData = MatchupData | MatchupV2Data | NBAMatchupData | NHLMatchupData;
 
 export const metadata: Metadata = {
   title: 'fastbreak',
@@ -35,9 +37,10 @@ export default async function Home() {
     chart => SUPPORTED_TYPES.includes(chart.data.visualizationType)
   );
 
+  const MATCHUP_TYPES = ['MATCHUP', 'MATCHUP_V2', 'NBA_MATCHUP', 'NHL_MATCHUP'];
   const matchups = sportCharts.filter(
-    chart => chart.data.visualizationType === 'MATCHUP'
-  ) as { key: string; data: MatchupData }[];
+    chart => MATCHUP_TYPES.includes(chart.data.visualizationType)
+  ) as { key: string; data: AnyMatchupData }[];
 
   return (
     <main className="max-w-[2000px] mx-auto px-0 md:px-4">

@@ -7,6 +7,10 @@ import { ChartData, ScatterPlotData } from '@/types/chart';
 
 interface Props {
   data: ChartData;
+  title?: string;
+  subtitle?: string;
+  source?: string;
+  lastUpdated?: string;
 }
 
 // Helper to darken a hex color
@@ -106,12 +110,12 @@ function QuadrantLegend({
   selectedQuadrant: QuadrantKey | null;
   onSelectQuadrant: (quadrant: QuadrantKey | null) => void;
 }) {
-  const quadrants: { key: QuadrantKey; config: typeof data.quadrantTopRight }[] = [
-    { key: 'topRight', config: data.quadrantTopRight },
-    { key: 'topLeft', config: data.quadrantTopLeft },
-    { key: 'bottomLeft', config: data.quadrantBottomLeft },
-    { key: 'bottomRight', config: data.quadrantBottomRight },
-  ].filter(q => q.config);
+  const quadrants = ([
+    { key: 'topRight' as const, config: data.quadrantTopRight },
+    { key: 'topLeft' as const, config: data.quadrantTopLeft },
+    { key: 'bottomLeft' as const, config: data.quadrantBottomLeft },
+    { key: 'bottomRight' as const, config: data.quadrantBottomRight },
+  ] as const).filter(q => q.config);
 
   if (quadrants.length === 0) return null;
 
@@ -152,7 +156,7 @@ function QuadrantLegend({
   );
 }
 
-export function ChartWithTable({ data }: Props) {
+export function ChartWithTable({ data, title, subtitle, source, lastUpdated }: Props) {
   const [highlightedLabels, setHighlightedLabels] = useState<string[] | null>(null);
   const [selectedLabel, setSelectedLabel] = useState<string | null>(null);
   const [selectedQuadrant, setSelectedQuadrant] = useState<QuadrantKey | null>(null);
@@ -224,13 +228,23 @@ export function ChartWithTable({ data }: Props) {
             />
           )}
         </section>
+        {title && (
+          <div className="mt-4">
+            <h1 className="text-lg font-bold">{title}</h1>
+            {subtitle && (
+              <p className="text-sm text-[var(--muted)] mt-1">{subtitle}</p>
+            )}
+            {source && lastUpdated && (
+              <div className="mt-2 text-xs text-[var(--muted)]">
+                {source} · {new Date(lastUpdated).toLocaleDateString()}
+              </div>
+            )}
+          </div>
+        )}
         {data.description && (
           <aside className="mt-4">
             <h2 className="text-sm font-bold mb-2">About</h2>
             <p className="text-xs text-[var(--muted)] leading-relaxed">{data.description}</p>
-            <div className="mt-2 text-xs text-[var(--muted)]">
-              {data.source} · {new Date(data.lastUpdated).toLocaleDateString()}
-            </div>
           </aside>
         )}
       </div>

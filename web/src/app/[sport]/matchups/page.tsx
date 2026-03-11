@@ -1,7 +1,7 @@
 import { fetchChartRegistry, fetchChartData } from '@/lib/api';
 import { ChartData, MatchupData, MatchupV2Data, NBAMatchupData, NHLMatchupData } from '@/types/chart';
 import { SportTabs } from '@/components/ui/SportTabs';
-import { ChartGrid } from '@/components/ui/ChartGrid';
+import { UpcomingMatchups } from '@/components/charts/UpcomingMatchups';
 import { getOrderedLeagues } from '@/lib/leagues';
 import { notFound } from 'next/navigation';
 
@@ -20,11 +20,11 @@ export async function generateStaticParams() {
 export async function generateMetadata({ params }: Props) {
   const { sport } = await params;
   return {
-    title: `${sport.toUpperCase()}`,
+    title: `${sport.toUpperCase()} Matchups`,
   };
 }
 
-export default async function SportPage({ params }: Props) {
+export default async function MatchupsPage({ params }: Props) {
   const { sport } = await params;
 
   if (!VALID_SPORTS.includes(sport.toLowerCase())) {
@@ -46,22 +46,35 @@ export default async function SportPage({ params }: Props) {
     chart => chart.data.sport?.toLowerCase() === sport.toLowerCase()
   );
 
-  // List of supported visualization types on web
-  const SUPPORTED_TYPES = ['SCATTER_PLOT', 'LINE_CHART', 'BAR_CHART', 'BAR_GRAPH', 'TABLE'];
-
-  const charts = sportCharts.filter(
-    chart => SUPPORTED_TYPES.includes(chart.data.visualizationType)
-  );
-
   const MATCHUP_TYPES = ['MATCHUP', 'MATCHUP_V2', 'NBA_MATCHUP', 'NHL_MATCHUP'];
   const matchups = sportCharts.filter(
     chart => MATCHUP_TYPES.includes(chart.data.visualizationType)
   ) as { key: string; data: AnyMatchupData }[];
 
+  const matchupData = matchups[0]?.data;
+
+  if (!matchupData) {
+    return (
+      <main className="max-w-[2000px] mx-auto px-0 md:px-4">
+        <SportTabs orderedSports={orderedSports} />
+        <div className="p-4">
+          <p className="text-[var(--muted)]">No matchups available for {sport.toUpperCase()}</p>
+        </div>
+      </main>
+    );
+  }
+
   return (
     <main className="max-w-[2000px] mx-auto px-0 md:px-4">
       <SportTabs orderedSports={orderedSports} />
-      <ChartGrid charts={charts} matchups={matchups} />
+
+      <div className="px-2 md:px-0">
+        <UpcomingMatchups data={matchupData} />
+
+        <div className="mt-4 py-4 border-t border-[var(--border)] text-xs text-[var(--muted)]">
+          {matchupData.source} · {new Date(matchupData.lastUpdated).toLocaleDateString()}
+        </div>
+      </div>
     </main>
   );
 }

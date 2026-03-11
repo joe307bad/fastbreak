@@ -1,6 +1,8 @@
 'use client';
 
-import { ResponsiveLine, CustomLayerProps } from '@nivo/line';
+import { ResponsiveLine, LineCustomSvgLayerProps, LineSeries } from '@nivo/line';
+
+type CustomLayerProps = LineCustomSvgLayerProps<LineSeries>;
 import { LineChartData } from '@/types/chart';
 
 interface Props {
@@ -225,7 +227,7 @@ export function LineChart({ data, highlightedLabels, selectedLabel, onSelect }: 
               <span className="font-bold">{point.seriesId}</span>
             </div>
             <div className="text-[var(--muted)] mt-1">
-              Week {point.data.x}: {point.data.yFormatted}
+              Week {String(point.data.x)}: {point.data.yFormatted}
             </div>
           </div>
         )}

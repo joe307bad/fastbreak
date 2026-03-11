@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 
 interface ChartNavProps {
   charts: { key: string; title: string }[];
@@ -9,16 +9,7 @@ interface ChartNavProps {
 }
 
 export function ChartNav({ charts, activeChart, onChartClick }: ChartNavProps) {
-  const [isDark, setIsDark] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
-
-  useEffect(() => {
-    const checkDark = () => setIsDark(document.documentElement.classList.contains('dark'));
-    checkDark();
-    const observer = new MutationObserver(checkDark);
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
-    return () => observer.disconnect();
-  }, []);
 
   if (charts.length === 0) return null;
 
@@ -58,17 +49,10 @@ export function ChartNav({ charts, activeChart, onChartClick }: ChartNavProps) {
                   <button
                     key={chart.key}
                     onClick={() => handleChartClick(chart.key)}
-                    style={
-                      !isActive
-                        ? { backgroundColor: isDark ? 'rgba(163, 163, 163, 0.2)' : '#ffffff' }
-                        : undefined
-                    }
                     className={`px-3 py-1 text-xs font-medium rounded-full whitespace-nowrap transition-colors border ${
                       isActive
                         ? 'bg-[var(--foreground)] text-[var(--background)] border-[var(--foreground)]'
-                        : isDark
-                          ? 'text-[var(--muted)] border-transparent hover:text-[var(--foreground)]'
-                          : 'text-black border-gray-200 hover:bg-gray-100'
+                        : 'bg-white dark:bg-white/20 text-black dark:text-[var(--muted)] border-gray-200 dark:border-transparent hover:bg-gray-100 dark:hover:bg-white/30 dark:hover:text-[var(--foreground)]'
                     }`}
                   >
                     {chart.title}
@@ -89,17 +73,10 @@ export function ChartNav({ charts, activeChart, onChartClick }: ChartNavProps) {
               <button
                 key={chart.key}
                 onClick={() => onChartClick(chart.key)}
-                style={
-                  !isActive
-                    ? { backgroundColor: isDark ? 'rgba(163, 163, 163, 0.2)' : '#ffffff' }
-                    : undefined
-                }
                 className={`px-3 py-1 text-xs font-medium rounded-full whitespace-nowrap transition-colors border ${
                   isActive
                     ? 'bg-[var(--foreground)] text-[var(--background)] border-[var(--foreground)]'
-                    : isDark
-                      ? 'text-[var(--muted)] border-transparent hover:text-[var(--foreground)]'
-                      : 'text-black border-gray-200 hover:bg-gray-100'
+                    : 'bg-white dark:bg-white/20 text-black dark:text-[var(--muted)] border-gray-200 dark:border-transparent hover:bg-gray-100 dark:hover:bg-white/30 dark:hover:text-[var(--foreground)]'
                 }`}
               >
                 {chart.title}

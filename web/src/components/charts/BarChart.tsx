@@ -1,5 +1,6 @@
 'use client';
 
+import React from 'react';
 import { ResponsiveBar, BarLayer } from '@nivo/bar';
 import { BarChartData, ReferenceLine } from '@/types/chart';
 
@@ -110,7 +111,7 @@ function createReferenceLinesLayer(
 ): BarLayer<{ label: string; value: number }> {
   return (props) => {
     const { innerWidth, yScale } = props;
-    const lines: JSX.Element[] = [];
+    const lines: React.ReactElement[] = [];
 
     if (topRef) {
       const y = yScale(topRef.value);

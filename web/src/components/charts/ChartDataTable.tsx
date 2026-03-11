@@ -102,7 +102,7 @@ function extractFilterOptions(data: ChartData): { conferences: string[]; divisio
 function buildTableData(data: ChartData): { rows: Row[]; columnKeys: string[] } {
   switch (data.visualizationType) {
     case 'SCATTER_PLOT': {
-      const hasConfRank = data.dataPoints.some(d => (d as Record<string, unknown>).conferenceRank != null);
+      const hasConfRank = data.dataPoints.some(d => (d as unknown as Record<string, unknown>).conferenceRank != null);
       const hasConf = data.dataPoints.some(d => d.conference);
       const columnKeys = [
         'label',
@@ -114,7 +114,7 @@ function buildTableData(data: ChartData): { rows: Row[]; columnKeys: string[] } 
         ...(hasConf ? ['conf'] : []),
       ];
       const rows = data.dataPoints.map(d => {
-        const dAny = d as Record<string, unknown>;
+        const dAny = d as unknown as Record<string, unknown>;
         const confRank = dAny.conferenceRank as number | undefined;
         return {
           label: d.label,
@@ -142,7 +142,7 @@ function buildTableData(data: ChartData): { rows: Row[]; columnKeys: string[] } 
     }
     case 'BAR_CHART':
     case 'BAR_GRAPH': {
-      const hasConfRank = data.dataPoints.some(d => (d as Record<string, unknown>).conferenceRank != null);
+      const hasConfRank = data.dataPoints.some(d => (d as unknown as Record<string, unknown>).conferenceRank != null);
       const hasConf = data.dataPoints.some(d => d.conference);
       const columnKeys = [
         'label',
@@ -151,7 +151,7 @@ function buildTableData(data: ChartData): { rows: Row[]; columnKeys: string[] } 
         ...(hasConf ? ['conf'] : []),
       ];
       const rows = data.dataPoints.map(d => {
-        const dAny = d as Record<string, unknown>;
+        const dAny = d as unknown as Record<string, unknown>;
         const confRank = dAny.conferenceRank as number | undefined;
         return {
           label: d.label,

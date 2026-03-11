@@ -3,6 +3,8 @@ export { LineChart } from './LineChart';
 export { BarChart } from './BarChart';
 export { Table } from './Table';
 export { Matchup } from './Matchup';
+export { UpcomingMatchups } from './UpcomingMatchups';
+export { TopMatchupsWidget } from './TopMatchupsWidget';
 export { ChartRenderer } from './ChartRenderer';
 export { ChartWithTable } from './ChartWithTable';
 export { ChartDataTable } from './ChartDataTable';

@@ -56,7 +56,7 @@ export default async function SportPage({ params }: Props) {
   ) as { key: string; data: MatchupData }[];
 
   return (
-    <main className="max-w-7xl mx-auto px-0 md:px-4">
+    <main className="max-w-[2000px] mx-auto px-0 md:px-4">
       <SportTabs orderedSports={orderedSports} />
       <ChartGrid charts={charts} matchups={matchups} />
     </main>

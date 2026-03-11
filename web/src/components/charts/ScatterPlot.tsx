@@ -6,6 +6,9 @@ import { useState, useEffect } from 'react';
 
 interface Props {
   data: ScatterPlotData;
+  highlightedLabels?: string[] | null;
+  selectedLabel?: string | null;
+  onSelect?: (label: string | null) => void;
 }
 
 interface NodeData {
@@ -43,7 +46,10 @@ function createNodesLayer(
   xMid: number,
   yMid: number,
   quadrants: Quadrants,
-  isMobile: boolean
+  isMobile: boolean,
+  highlightedLabels?: string[] | null,
+  selectedLabel?: string | null,
+  onSelect?: (label: string | null) => void
 ) {
   return function NodesLayer({ nodes }: ScatterPlotLayerProps<NodeData>) {
     return (
@@ -51,25 +57,59 @@ function createNodesLayer(
         {nodes.map(node => {
           const color = getQuadrantColor(node.data.x, node.data.y, xMid, yMid, quadrants);
           const isOutlier = node.data.isOutlier || false;
+          const isHighlighted = !highlightedLabels || highlightedLabels.includes(node.data.label || '');
+          const isSelected = selectedLabel === node.data.label;
 
           // Outliers get larger radius and thicker stroke
           const radius = isOutlier ? 8 : 6;
           const strokeWidth = isOutlier ? 2.5 : 1.5;
           // On mobile, non-outliers are transparent; on desktop, all points are fully visible
-          const fillOpacity = isMobile ? (isOutlier ? 1 : 0.15) : 1;
+          // If highlighted filter is active, dim non-highlighted points
+          let fillOpacity = isMobile ? (isOutlier ? 1 : 0.15) : 1;
+          if (highlightedLabels && !isHighlighted) {
+            fillOpacity = 0.1;
+          }
 
           return (
-            <circle
-              key={node.id}
-              cx={node.x}
-              cy={node.y}
-              r={radius}
-              fill={color}
-              fillOpacity={fillOpacity}
-              stroke="var(--background)"
-              strokeWidth={strokeWidth}
-              strokeOpacity={fillOpacity}
-            />
+            <g key={node.id}>
+              {/* Selection ring - marching ants */}
+              {isSelected && (
+                <>
+                  <circle
+                    cx={node.x}
+                    cy={node.y}
+                    r={radius + 4}
+                    fill="none"
+                    stroke="#000"
+                    strokeWidth={3}
+                    strokeDasharray="6,6"
+                  />
+                  <circle
+                    cx={node.x}
+                    cy={node.y}
+                    r={radius + 4}
+                    fill="none"
+                    stroke={color}
+                    strokeWidth={3}
+                    strokeDasharray="6,6"
+                    strokeDashoffset={6}
+                    style={{ animation: 'marching-ants 1s linear infinite' }}
+                  />
+                </>
+              )}
+              <circle
+                cx={node.x}
+                cy={node.y}
+                r={radius}
+                fill={color}
+                fillOpacity={fillOpacity}
+                stroke="var(--background)"
+                strokeWidth={strokeWidth}
+                strokeOpacity={fillOpacity}
+                style={{ cursor: 'pointer' }}
+                onClick={() => onSelect?.(node.data.label || null)}
+              />
+            </g>
           );
         })}
       </g>
@@ -77,14 +117,17 @@ function createNodesLayer(
   };
 }
 
-function createLabelsLayer(subject?: string, isMobile?: boolean) {
+function createLabelsLayer(subject?: string, isMobile?: boolean, highlightedLabels?: string[] | null) {
   return function LabelsLayer({ nodes }: ScatterPlotLayerProps<NodeData>) {
     return (
       <g>
         {nodes.map(node => {
           const d = node.data;
+          const isHighlighted = !highlightedLabels || highlightedLabels.includes(d.label || '');
           // On mobile, only show labels for outliers; on desktop, show all labels
+          // If filter is active and point is not highlighted, hide label
           if (isMobile && !d.isOutlier) return null;
+          if (highlightedLabels && !isHighlighted) return null;
 
           const displayLabel = subject === 'PLAYER' ? (d.label || d.teamCode || '') : (d.teamCode || d.label || '');
           const labelWidth = displayLabel.length * 6 + 6;
@@ -210,7 +253,7 @@ function createQuadrantLayer(
   };
 }
 
-export function ScatterPlot({ data }: Props) {
+export function ScatterPlot({ data, highlightedLabels, selectedLabel, onSelect }: Props) {
   const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
@@ -304,8 +347,8 @@ export function ScatterPlot({ data }: Props) {
   };
 
   const QuadrantLayer = createQuadrantLayer(xMid, yMid, quadrants);
-  const NodesLayer = createNodesLayer(xMid, yMid, quadrants, isMobile);
-  const LabelsLayer = createLabelsLayer(data.subject, isMobile);
+  const NodesLayer = createNodesLayer(xMid, yMid, quadrants, isMobile, highlightedLabels, selectedLabel, onSelect);
+  const LabelsLayer = createLabelsLayer(data.subject, isMobile, highlightedLabels);
 
   return (
     <div className="w-full h-full">
@@ -360,8 +403,8 @@ export function ScatterPlot({ data }: Props) {
         }}
         colors={{ scheme: 'category10' }}
         nodeSize={12}
-        useMesh={true}
-        layers={[QuadrantLayer, 'grid', 'axes', NodesLayer, LabelsLayer, 'markers', 'mesh', 'legends', 'annotations']}
+        useMesh={false}
+        layers={[QuadrantLayer, 'grid', 'axes', NodesLayer, LabelsLayer, 'markers', 'legends', 'annotations']}
         tooltip={({ node }) => {
           const d = node.data as NodeData;
           return (

@@ -1,18 +1,141 @@
 'use client';
 
-import { ResponsiveLine } from '@nivo/line';
+import { ResponsiveLine, CustomLayerProps } from '@nivo/line';
 import { LineChartData } from '@/types/chart';
 
 interface Props {
   data: LineChartData;
+  highlightedLabels?: string[] | null;
+  selectedLabel?: string | null;
+  onSelect?: (label: string | null) => void;
 }
 
-export function LineChart({ data }: Props) {
-  const chartData = data.series.map(series => ({
-    id: series.label,
-    color: series.color,
-    data: series.dataPoints.map(p => ({ x: p.x, y: p.y })),
-  }));
+function hexToRgba(hex: string, alpha: number): string {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+// Custom layer to render marching ants on selected line
+function createSelectedLineLayer(selectedLabel: string | null) {
+  return function SelectedLineLayer({ series, lineGenerator }: CustomLayerProps) {
+    if (!selectedLabel) return null;
+
+    const selectedSeries = series.find(s => s.id === selectedLabel);
+    if (!selectedSeries) return null;
+
+    const path = lineGenerator(selectedSeries.data.map(d => ({
+      x: d.position.x,
+      y: d.position.y,
+    })));
+
+    if (!path) return null;
+
+    return (
+      <g>
+        {/* Background stroke - black */}
+        <path
+          d={path}
+          fill="none"
+          stroke="#000"
+          strokeWidth={4}
+          strokeDasharray="6,6"
+          strokeLinecap="round"
+        />
+        {/* Foreground stroke - colored, animated */}
+        <path
+          d={path}
+          fill="none"
+          stroke={selectedSeries.color}
+          strokeWidth={4}
+          strokeDasharray="6,6"
+          strokeDashoffset={6}
+          strokeLinecap="round"
+          style={{ animation: 'marching-ants 1s linear infinite' }}
+        />
+      </g>
+    );
+  };
+}
+
+// Custom legend layer with click handling
+function createClickableLegendLayer(
+  seriesData: Array<{ id: string; color: string }>,
+  selectedLabel: string | null,
+  onSelect?: (label: string | null) => void
+) {
+  return function ClickableLegendLayer({ innerWidth, innerHeight }: CustomLayerProps) {
+    const legendX = innerWidth + 15;
+    const itemHeight = 18;
+    const startY = 0;
+
+    return (
+      <g>
+        {seriesData.map((series, index) => {
+          const isSelected = selectedLabel === series.id;
+          const y = startY + index * itemHeight;
+
+          return (
+            <g
+              key={series.id}
+              transform={`translate(${legendX}, ${y})`}
+              style={{ cursor: 'pointer' }}
+              onClick={() => onSelect?.(series.id)}
+            >
+              {/* Selection highlight background */}
+              {isSelected && (
+                <rect
+                  x={-4}
+                  y={-2}
+                  width={74}
+                  height={itemHeight}
+                  fill="var(--border)"
+                  rx={2}
+                />
+              )}
+              {/* Color circle */}
+              <circle
+                cx={5}
+                cy={itemHeight / 2 - 2}
+                r={5}
+                fill={series.color}
+              />
+              {/* Label */}
+              <text
+                x={15}
+                y={itemHeight / 2 + 1}
+                style={{
+                  fontSize: 11,
+                  fontFamily: 'var(--font-geist-mono), monospace',
+                  fill: 'var(--foreground)',
+                  fontWeight: isSelected ? 700 : 400,
+                }}
+              >
+                {series.id}
+              </text>
+            </g>
+          );
+        })}
+      </g>
+    );
+  };
+}
+
+export function LineChart({ data, highlightedLabels, selectedLabel, onSelect }: Props) {
+  const chartData = data.series.map(series => {
+    const isHighlighted = !highlightedLabels || highlightedLabels.includes(series.label);
+    const color = isHighlighted ? series.color : hexToRgba(series.color, 0.15);
+    return {
+      id: series.label,
+      color,
+      data: series.dataPoints.map(p => ({ x: p.x, y: p.y })),
+    };
+  });
+
+  const seriesColors = data.series.map(s => ({ id: s.label, color: s.color }));
+  const SelectedLineLayer = createSelectedLineLayer(selectedLabel || null);
+  const ClickableLegendLayer = createClickableLegendLayer(seriesColors, selectedLabel || null, onSelect);
 
   return (
     <div className="w-full h-full">
@@ -78,17 +201,18 @@ export function LineChart({ data }: Props) {
         pointBorderWidth={2}
         pointBorderColor={{ from: 'serieColor' }}
         useMesh={true}
-        legends={[
-          {
-            anchor: 'right',
-            direction: 'column',
-            translateX: 80,
-            itemWidth: 70,
-            itemHeight: 18,
-            symbolSize: 10,
-            symbolShape: 'circle',
-            itemTextColor: 'var(--foreground)',
-          },
+        layers={[
+          'grid',
+          'markers',
+          'axes',
+          'areas',
+          'crosshair',
+          'lines',
+          SelectedLineLayer,
+          'points',
+          'slices',
+          'mesh',
+          ClickableLegendLayer,
         ]}
         enableSlices={false}
         tooltip={({ point }) => (

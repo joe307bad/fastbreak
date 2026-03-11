@@ -4,3 +4,5 @@ export { BarChart } from './BarChart';
 export { Table } from './Table';
 export { Matchup } from './Matchup';
 export { ChartRenderer } from './ChartRenderer';
+export { ChartWithTable } from './ChartWithTable';
+export { ChartDataTable } from './ChartDataTable';

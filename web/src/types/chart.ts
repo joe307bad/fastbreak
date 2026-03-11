@@ -78,10 +78,18 @@ export interface LineChartData extends BaseChartData {
   series: LineSeries[];
 }
 
+export interface ReferenceLine {
+  value: number;
+  label: string;
+  color: string;
+}
+
 export interface BarChartData extends BaseChartData {
   visualizationType: 'BAR_CHART' | 'BAR_GRAPH';
   xAxisLabel?: string;
   yAxisLabel?: string;
+  topReferenceLine?: ReferenceLine;
+  bottomReferenceLine?: ReferenceLine;
   dataPoints: Array<{ label: string; value: number; color?: string; division?: string; conference?: string }>;
 }
 

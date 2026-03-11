@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
+import Link from 'next/link';
 import { ChartRenderer } from '@/components/charts';
 import { Matchup } from '@/components/charts/Matchup';
 import { ChartData, MatchupData } from '@/types/chart';
@@ -16,6 +17,10 @@ function slugify(text: string): string {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-|-$/g, '');
+}
+
+function keyToSlug(key: string): string {
+  return key.replace('dev/', '').replace('.json', '');
 }
 
 export function ChartGrid({ charts, matchups }: ChartGridProps) {
@@ -103,30 +108,29 @@ export function ChartGrid({ charts, matchups }: ChartGridProps) {
                 </div>
                 <div className="flex items-center justify-between mt-1">
                   <h3 className="text-sm font-bold">{data.title}</h3>
-                  {data.description && (
-                    <div className="group relative">
-                      <svg
-                        className="w-4 h-4 text-[var(--muted)] hover:text-[var(--foreground)] transition-colors cursor-help"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                        />
-                      </svg>
-                      <div className="invisible group-hover:visible absolute right-0 top-6 z-10 w-64 p-3 bg-[var(--card)] border border-[var(--border)] rounded shadow-lg text-xs text-[var(--foreground)] font-normal">
-                        {data.description}
-                      </div>
-                    </div>
-                  )}
+                  <Link
+                    href={`/${data.sport.toLowerCase()}/chart/${keyToSlug(key)}`}
+                    className="text-[var(--muted)] hover:text-[var(--foreground)] transition-colors"
+                    aria-label="Expand chart"
+                  >
+                    <svg
+                      className="w-4 h-4"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5v-4m0 4h-4m4 0l-5-5"
+                      />
+                    </svg>
+                  </Link>
                 </div>
               </header>
 
-              <div className="h-[300px] md:h-[350px]">
+              <div className="h-[300px] md:h-[450px]">
                 <ChartRenderer data={data} />
               </div>
 

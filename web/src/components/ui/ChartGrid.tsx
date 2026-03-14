@@ -162,7 +162,7 @@ export function ChartGrid({ charts, matchups }: ChartGridProps) {
         {nflMatchupData && !topMatchupData && (
           <article
             id="chart-matchups"
-            className={`border bg-[var(--card)] rounded-none md:rounded p-2 md:p-4 transition-all duration-300 scroll-mt-24 md:scroll-mt-4 lg:col-span-2 ${
+            className={`border bg-[var(--card)] rounded-none md:rounded p-2 md:p-4 transition-all duration-300 scroll-mt-24 md:scroll-mt-4 ${
               activeChart === nflMatchupData.key
                 ? 'border-[var(--foreground)] ring-2 ring-[var(--foreground)]/20'
                 : 'border-[var(--border)]'

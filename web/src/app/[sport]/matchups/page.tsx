@@ -1,7 +1,7 @@
 import { fetchChartRegistry, fetchChartData } from '@/lib/api';
 import { ChartData, MatchupData, MatchupV2Data, NBAMatchupData, NHLMatchupData } from '@/types/chart';
 import { SportTabs } from '@/components/ui/SportTabs';
-import { UpcomingMatchups } from '@/components/charts/UpcomingMatchups';
+import { MatchupsWithNav } from '@/components/charts/MatchupsWithNav';
 import { getOrderedLeagues } from '@/lib/leagues';
 import { notFound } from 'next/navigation';
 
@@ -69,7 +69,7 @@ export default async function MatchupsPage({ params }: Props) {
       <SportTabs orderedSports={orderedSports} />
 
       <div className="px-2 md:px-0">
-        <UpcomingMatchups data={matchupData} />
+        <MatchupsWithNav data={matchupData} />
 
         <div className="mt-4 py-4 border-t border-[var(--border)] text-xs text-[var(--muted)]">
           {matchupData.source} · {new Date(matchupData.lastUpdated).toLocaleDateString()}

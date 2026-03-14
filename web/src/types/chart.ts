@@ -139,7 +139,9 @@ export interface NBATeamStats {
   netRating: number;
   netRatingRank: number;
   pace: number;
-  [key: string]: number | string | Record<string, unknown>;
+  cumNetRatingByWeek?: Record<string, number>;
+  efficiencyByWeek?: Record<string, { offRating: number; defRating: number }>;
+  [key: string]: number | string | Record<string, unknown> | undefined;
 }
 
 export interface NBATeam {
@@ -152,6 +154,104 @@ export interface NBATeam {
   conferenceRank: number;
   conference: string;
   stats: NBATeamStats;
+}
+
+export interface StatComparison {
+  label: string;
+  home: { value: number; rank: number };
+  away: { value: number; rank: number };
+}
+
+export interface OffDefStatEntry {
+  statKey: string;
+  offLabel: string;
+  defLabel: string;
+  offense: { team: string; value: number; rank: number; rankDisplay?: string };
+  defense: { team: string; value: number; rank: number; rankDisplay?: string };
+  advantage: number;
+}
+
+export interface OffDefComparison {
+  [key: string]: OffDefStatEntry | undefined;
+}
+
+export interface NBAComparisons {
+  sideBySide?: {
+    offense?: Record<string, StatComparison>;
+    defense?: Record<string, StatComparison>;
+    misc?: Record<string, StatComparison>;
+  };
+  homeOffVsAwayDef?: OffDefComparison;
+  awayOffVsHomeDef?: OffDefComparison;
+}
+
+export interface TeamBoxScore {
+  pts: number;
+  fgm: number;
+  fga: number;
+  fgPct?: number;
+  fg3m?: number;
+  fg3a?: number;
+  fg3Pct?: number;
+  ftm?: number;
+  fta?: number;
+  ftPct?: number;
+  reb?: number;
+  ast?: number;
+  stl?: number;
+  blk?: number;
+  tov?: number;
+  [key: string]: number | undefined;
+}
+
+export interface VsSeasonAvgStat {
+  gameValue: number;
+  seasonAvg: number;
+  difference: number;
+  percentDiff?: number;
+  aboveAverage?: boolean;
+  label?: string;
+}
+
+export interface VsSeasonAvg {
+  points?: VsSeasonAvgStat;
+  fieldGoalPct?: VsSeasonAvgStat;
+  threePtPct?: VsSeasonAvgStat;
+  rebounds?: VsSeasonAvgStat;
+  assists?: VsSeasonAvgStat;
+  [key: string]: VsSeasonAvgStat | undefined;
+}
+
+export interface NBAMatchupResults {
+  finalScore: {
+    home: number;
+    away: number;
+  };
+  winner: string;
+  margin: number;
+  homeWon: boolean;
+  teamBoxScore?: {
+    home: TeamBoxScore;
+    away: TeamBoxScore;
+  };
+  vsSeasonAvg?: {
+    home: VsSeasonAvg;
+    away: VsSeasonAvg;
+  };
+}
+
+export interface LeagueEfficiencyStats {
+  avgOffRating: number;
+  avgDefRating: number;
+  minOffRating: number;
+  maxOffRating: number;
+  minDefRating: number;
+  maxDefRating: number;
+}
+
+export interface LeagueCumNetRatingStats {
+  minCumNetRating: number;
+  maxCumNetRating: number;
 }
 
 export interface NBAMatchupDataPoint {
@@ -168,6 +268,11 @@ export interface NBAMatchupDataPoint {
     homeMoneyline?: string;
     awayMoneyline?: string;
   };
+  comparisons?: NBAComparisons;
+  results?: NBAMatchupResults;
+  tenthNetRatingByWeek?: Record<string, number>;
+  leagueEfficiencyStats?: LeagueEfficiencyStats;
+  leagueCumNetRatingStats?: LeagueCumNetRatingStats;
 }
 
 export interface NBAMatchupData extends BaseChartData {

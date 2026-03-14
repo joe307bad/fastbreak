@@ -1,19 +1,18 @@
-import { fetchRegistry, fetchChartData, slugToKey, keyToSlug } from '@/lib/api';
+import { fetchChartRegistry, fetchChartData, slugToKey, keyToSlug } from '@/lib/api';
 import { ChartRenderer } from '@/components/charts';
+import { SportTabs } from '@/components/ui/SportTabs';
+import { getOrderedLeagues } from '@/lib/leagues';
 
 interface Props {
   params: Promise<{ slug: string }>;
 }
 
 export async function generateStaticParams() {
-  const registry = await fetchRegistry();
+  const registry = await fetchChartRegistry();
   return Object.keys(registry).map(key => ({
     slug: keyToSlug(key),
   }));
 }
-
-// Revalidate this page once per day (86400 seconds = 24 hours)
-export const revalidate = 86400;
 
 export async function generateMetadata({ params }: Props) {
   const { slug } = await params;
@@ -29,37 +28,34 @@ export default async function ChartPage({ params }: Props) {
   const { slug } = await params;
   const key = slugToKey(slug);
   const data = await fetchChartData(key);
+  const orderedSports = getOrderedLeagues();
 
   return (
-    <main className="max-w-5xl mx-auto px-0 md:px-4">
-      <header className="mb-4 md:mb-6 px-2 md:px-0">
-        <div className="flex items-center gap-2 text-xs text-[var(--muted)] uppercase tracking-wider">
-          <span>{data.sport}</span>
-          <span>·</span>
-          <span>{data.visualizationType?.replace('_', ' ')}</span>
-        </div>
-        <h1 className="text-xl font-bold mt-1">{data.title}</h1>
-        {data.subtitle && (
-          <p className="text-sm text-[var(--muted)] mt-1">{data.subtitle}</p>
-        )}
-      </header>
+    <main className="max-w-[2000px] mx-auto px-0 md:px-4">
+      <SportTabs orderedSports={orderedSports} />
 
-      <div className="border border-[var(--border)] bg-[var(--card)] rounded-none md:rounded p-2 md:p-4">
-        <div className="h-[400px] md:h-[500px]">
-          <ChartRenderer data={data} />
+      <div className="px-2 md:px-0">
+        <div className="border border-[var(--border)] bg-[var(--card)] rounded-none md:rounded p-2 md:p-4">
+          <div className="h-[400px] md:h-[500px]">
+            <ChartRenderer data={data} />
+          </div>
+        </div>
+
+        <div className="mt-4">
+          <h1 className="text-lg font-bold">{data.title}</h1>
+          {data.subtitle && (
+            <p className="text-sm text-[var(--muted)] mt-1">{data.subtitle}</p>
+          )}
+          {data.description && (
+            <p className="text-sm text-[var(--muted)] mt-2 max-w-2xl">
+              {data.description}
+            </p>
+          )}
+          <div className="mt-2 text-xs text-[var(--muted)]">
+            {data.source} · {new Date(data.lastUpdated).toLocaleDateString()}
+          </div>
         </div>
       </div>
-
-      {data.description && (
-        <p className="text-sm text-[var(--muted)] mt-4 max-w-2xl px-2 md:px-0">
-          {data.description}
-        </p>
-      )}
-
-      <footer className="mt-6 pt-4 border-t border-[var(--border)] text-xs text-[var(--muted)] flex gap-4 px-2 md:px-0">
-        <span>Source: {data.source}</span>
-        <span>Updated: {new Date(data.lastUpdated).toLocaleString()}</span>
-      </footer>
     </main>
   );
 }

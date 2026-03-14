@@ -17,6 +17,9 @@
 /.next/
 /out/
 
+# downloaded chart data
+/data/
+
 # production
 /build
 

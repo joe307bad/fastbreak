@@ -3,16 +3,18 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
-const SPORTS = ['nfl', 'nba', 'nhl'] as const;
+interface SportTabsProps {
+  orderedSports: string[];
+}
 
-export function SportTabs() {
+export function SportTabs({ orderedSports }: SportTabsProps) {
   const pathname = usePathname();
-  const currentSport = pathname.split('/')[1]?.toLowerCase() || 'nfl';
+  const currentSport = pathname.split('/')[1]?.toLowerCase() || orderedSports[0];
 
   return (
     <nav className="mb-2 md:mb-4">
       <div className="flex gap-0">
-        {SPORTS.map(sport => {
+        {orderedSports.map(sport => {
           const isActive = currentSport === sport;
           return (
             <Link

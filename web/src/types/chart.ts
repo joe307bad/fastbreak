@@ -3,6 +3,14 @@ export type VisualizationType = 'SCATTER_PLOT' | 'LINE_CHART' | 'BAR_CHART' | 'B
 export interface QuadrantConfig {
   color: string;
   label: string;
+  lightModeColor?: string;
+}
+
+export interface ScatterPlotQuadrants {
+  topRight?: QuadrantConfig;
+  topLeft?: QuadrantConfig;
+  bottomLeft?: QuadrantConfig;
+  bottomRight?: QuadrantConfig;
 }
 
 export interface ScatterDataPoint {
@@ -277,6 +285,7 @@ export interface NBAMatchupDataPoint {
 
 export interface NBAMatchupData extends BaseChartData {
   visualizationType: 'NBA_MATCHUP';
+  scatterPlotQuadrants?: ScatterPlotQuadrants;
   dataPoints: NBAMatchupDataPoint[];
 }
 

@@ -9,8 +9,12 @@ library(readr)
 # ============================================================================
 # Constants
 # ============================================================================
-TOURNAMENT_START <- as.Date("2026-03-17")
-TOURNAMENT_END <- as.Date("2026-04-06")
+SELECTION_SUNDAY <- as.Date("2026-03-15")  # When bracket is announced
+TOURNAMENT_START <- as.Date("2026-03-19")  # First tournament games (Round of 64)
+TOURNAMENT_END <- as.Date("2026-04-07")    # Championship game
+
+# S3 key for persisting bracket history across daily runs
+HISTORY_S3_KEY <- "dev/cbb__bracket_history.json"
 
 REGION_COLORS <- list(
   East = "#1565C0",
@@ -44,6 +48,127 @@ tied_rank <- function(x) {
   })
 
   return(list(rank = numeric_ranks, rankDisplay = display_ranks))
+}
+
+# ============================================================================
+# History Persistence Functions
+# ============================================================================
+
+#' Load bracket history from S3
+#' Returns NULL if no history exists or in development mode
+load_bracket_history <- function() {
+  s3_bucket <- Sys.getenv("AWS_S3_BUCKET")
+
+  if (!nzchar(s3_bucket)) {
+    # Development mode - try to load from local temp file
+    local_history <- "/tmp/cbb_bracket_history.json"
+    if (file.exists(local_history)) {
+      cat("Loading history from local file:", local_history, "\n")
+      tryCatch({
+        return(fromJSON(local_history, simplifyVector = FALSE))
+      }, error = function(e) {
+        cat("Warning: Could not parse local history:", e$message, "\n")
+        return(NULL)
+      })
+    }
+    return(NULL)
+  }
+
+  # Production mode - download from S3
+  s3_path <- paste0("s3://", s3_bucket, "/", HISTORY_S3_KEY)
+  tmp_file <- tempfile(fileext = ".json")
+
+  cmd <- paste("aws s3 cp", shQuote(s3_path), shQuote(tmp_file), "2>/dev/null")
+  result <- system(cmd, ignore.stdout = TRUE, ignore.stderr = TRUE)
+
+  if (result == 0 && file.exists(tmp_file)) {
+    cat("Loaded bracket history from S3\n")
+    tryCatch({
+      history <- fromJSON(tmp_file, simplifyVector = FALSE)
+      unlink(tmp_file)
+      return(history)
+    }, error = function(e) {
+      cat("Warning: Could not parse S3 history:", e$message, "\n")
+      unlink(tmp_file)
+      return(NULL)
+    })
+  }
+
+  cat("No existing bracket history found\n")
+  return(NULL)
+}
+
+#' Save bracket history to S3
+#' @param history List containing completed games indexed by gameId
+save_bracket_history <- function(history) {
+  s3_bucket <- Sys.getenv("AWS_S3_BUCKET")
+
+  tmp_file <- tempfile(fileext = ".json")
+  write_json(history, tmp_file, pretty = TRUE, auto_unbox = TRUE, null = "null", na = "null")
+
+  if (!nzchar(s3_bucket)) {
+    # Development mode - save locally
+    local_history <- "/tmp/cbb_bracket_history.json"
+    file.copy(tmp_file, local_history, overwrite = TRUE)
+    cat("Saved history to local file:", local_history, "\n")
+    unlink(tmp_file)
+    return(TRUE)
+  }
+
+  # Production mode - upload to S3
+  s3_path <- paste0("s3://", s3_bucket, "/", HISTORY_S3_KEY)
+  cmd <- paste("aws s3 cp", shQuote(tmp_file), shQuote(s3_path), "--content-type application/json")
+  result <- system(cmd)
+  unlink(tmp_file)
+
+  if (result == 0) {
+    cat("Saved bracket history to S3:", s3_path, "\n")
+    return(TRUE)
+  } else {
+    cat("Warning: Failed to save bracket history to S3\n")
+    return(FALSE)
+  }
+}
+
+#' Parse region and round from ESPN notes headline
+#' @param headline String like "Men's Basketball Championship - East Region - 1st Round"
+#' @return List with region and round fields
+parse_bracket_info <- function(headline) {
+  if (is.null(headline) || headline == "") {
+    return(list(region = "Unknown", round = "Unknown", roundNumber = 0))
+  }
+
+  # Extract region
+  region <- "Finals"  # Default for Final Four / Championship
+  if (grepl("East Region", headline, ignore.case = TRUE)) region <- "East"
+  else if (grepl("South Region", headline, ignore.case = TRUE)) region <- "South"
+  else if (grepl("Midwest Region", headline, ignore.case = TRUE)) region <- "Midwest"
+  else if (grepl("West Region", headline, ignore.case = TRUE)) region <- "West"
+
+  # Extract round
+  round <- "Unknown"
+  round_number <- 0
+  if (grepl("1st Round", headline, ignore.case = TRUE)) {
+    round <- "Round of 64"
+    round_number <- 1
+  } else if (grepl("2nd Round", headline, ignore.case = TRUE)) {
+    round <- "Round of 32"
+    round_number <- 2
+  } else if (grepl("Sweet 16", headline, ignore.case = TRUE)) {
+    round <- "Sweet 16"
+    round_number <- 3
+  } else if (grepl("Elite 8|Elite Eight", headline, ignore.case = TRUE)) {
+    round <- "Elite 8"
+    round_number <- 4
+  } else if (grepl("Final Four", headline, ignore.case = TRUE)) {
+    round <- "Final Four"
+    round_number <- 5
+  } else if (grepl("National Championship|Championship", headline, ignore.case = TRUE)) {
+    round <- "Championship"
+    round_number <- 6
+  }
+
+  return(list(region = region, round = round, roundNumber = round_number))
 }
 
 cat("=== NCAA Bracket Stats Generation ===\n")
@@ -315,16 +440,20 @@ cat("Calculated ranks for all stats\n")
 cat("\n3. Determining tournament status...\n")
 
 today <- Sys.Date()
-is_pre_tournament <- today < TOURNAMENT_START
+is_pre_selection <- today < SELECTION_SUNDAY  # Before bracket is announced
+is_bracket_announced <- today >= SELECTION_SUNDAY  # Bracket is out, use ESPN data
 is_tournament_active <- today >= TOURNAMENT_START && today <= TOURNAMENT_END
 is_tournament_complete <- today > TOURNAMENT_END
 
-if (is_pre_tournament) {
+if (is_pre_selection) {
   tournament_status <- "PROJECTED"
-  cat("Tournament has not started. Building projected bracket from top 64 teams.\n")
+  cat("Selection Sunday has not happened. Building projected bracket from top 64 teams.\n")
 } else if (is_tournament_active) {
   tournament_status <- "IN_PROGRESS"
-  cat("Tournament is active. Fetching live bracket data.\n")
+  cat("Tournament is active. Fetching live bracket data from ESPN.\n")
+} else if (is_bracket_announced && !is_tournament_complete) {
+  tournament_status <- "IN_PROGRESS"  # Bracket announced but games not started yet
+  cat("Bracket announced. Fetching actual tournament bracket from ESPN.\n")
 } else {
   tournament_status <- "COMPLETED"
   cat("Tournament is complete.\n")
@@ -419,36 +548,36 @@ build_comparisons <- function(team1_data, team2_data) {
   t1s <- team1_data$teamStats
   t2s <- team2_data$teamStats
 
-  # Side by side comparisons
+  # Side by side comparisons (using home/away to match Kotlin SideBySideStatComparison)
   off_comparison <- list(
-    pointsPerGame = list(statKey = "pointsPerGame", label = "PPG", team1 = t1s$pointsPerGame, team2 = t2s$pointsPerGame),
-    fieldGoalPct = list(statKey = "fieldGoalPct", label = "FG%", team1 = t1s$fieldGoalPct, team2 = t2s$fieldGoalPct),
-    threePointPct = list(statKey = "threePointPct", label = "3P%", team1 = t1s$threePointPct, team2 = t2s$threePointPct),
-    effectiveFGPct = list(statKey = "effectiveFGPct", label = "eFG%", team1 = t1s$effectiveFGPct, team2 = t2s$effectiveFGPct),
-    trueShooting = list(statKey = "trueShooting", label = "TS%", team1 = t1s$trueShooting, team2 = t2s$trueShooting),
-    assistsPerGame = list(statKey = "assistsPerGame", label = "APG", team1 = t1s$assistsPerGame, team2 = t2s$assistsPerGame),
-    turnoversPerGame = list(statKey = "turnoversPerGame", label = "TO/G", team1 = t1s$turnoversPerGame, team2 = t2s$turnoversPerGame),
-    offReboundsPerGame = list(statKey = "offReboundsPerGame", label = "ORPG", team1 = t1s$offReboundsPerGame, team2 = t2s$offReboundsPerGame),
-    pace = list(statKey = "pace", label = "Pace", team1 = t1s$pace, team2 = t2s$pace)
+    pointsPerGame = list(label = "PPG", home = t1s$pointsPerGame, away = t2s$pointsPerGame),
+    fieldGoalPct = list(label = "FG%", home = t1s$fieldGoalPct, away = t2s$fieldGoalPct),
+    threePointPct = list(label = "3P%", home = t1s$threePointPct, away = t2s$threePointPct),
+    effectiveFGPct = list(label = "eFG%", home = t1s$effectiveFGPct, away = t2s$effectiveFGPct),
+    trueShooting = list(label = "TS%", home = t1s$trueShooting, away = t2s$trueShooting),
+    assistsPerGame = list(label = "APG", home = t1s$assistsPerGame, away = t2s$assistsPerGame),
+    turnoversPerGame = list(label = "TO/G", home = t1s$turnoversPerGame, away = t2s$turnoversPerGame),
+    offReboundsPerGame = list(label = "ORPG", home = t1s$offReboundsPerGame, away = t2s$offReboundsPerGame),
+    pace = list(label = "Pace", home = t1s$pace, away = t2s$pace)
   )
 
   def_comparison <- list(
-    oppPointsPerGame = list(statKey = "oppPointsPerGame", label = "Opp PPG", team1 = t1s$oppPointsPerGame, team2 = t2s$oppPointsPerGame),
-    oppFieldGoalPct = list(statKey = "oppFieldGoalPct", label = "Opp FG%", team1 = t1s$oppFieldGoalPct, team2 = t2s$oppFieldGoalPct),
-    oppThreePointPct = list(statKey = "oppThreePointPct", label = "Opp 3P%", team1 = t1s$oppThreePointPct, team2 = t2s$oppThreePointPct),
-    oppEffectiveFGPct = list(statKey = "oppEffectiveFGPct", label = "Opp eFG%", team1 = t1s$oppEffectiveFGPct, team2 = t2s$oppEffectiveFGPct),
-    oppTrueShooting = list(statKey = "oppTrueShooting", label = "Opp TS%", team1 = t1s$oppTrueShooting, team2 = t2s$oppTrueShooting),
-    stealsPerGame = list(statKey = "stealsPerGame", label = "SPG", team1 = t1s$stealsPerGame, team2 = t2s$stealsPerGame),
-    blocksPerGame = list(statKey = "blocksPerGame", label = "BPG", team1 = t1s$blocksPerGame, team2 = t2s$blocksPerGame),
-    forcedTurnoverPct = list(statKey = "forcedTurnoverPct", label = "Forced TO%", team1 = t1s$forcedTurnoverPct, team2 = t2s$forcedTurnoverPct)
+    oppPointsPerGame = list(label = "Opp PPG", home = t1s$oppPointsPerGame, away = t2s$oppPointsPerGame),
+    oppFieldGoalPct = list(label = "Opp FG%", home = t1s$oppFieldGoalPct, away = t2s$oppFieldGoalPct),
+    oppThreePointPct = list(label = "Opp 3P%", home = t1s$oppThreePointPct, away = t2s$oppThreePointPct),
+    oppEffectiveFGPct = list(label = "Opp eFG%", home = t1s$oppEffectiveFGPct, away = t2s$oppEffectiveFGPct),
+    oppTrueShooting = list(label = "Opp TS%", home = t1s$oppTrueShooting, away = t2s$oppTrueShooting),
+    stealsPerGame = list(label = "SPG", home = t1s$stealsPerGame, away = t2s$stealsPerGame),
+    blocksPerGame = list(label = "BPG", home = t1s$blocksPerGame, away = t2s$blocksPerGame),
+    forcedTurnoverPct = list(label = "Forced TO%", home = t1s$forcedTurnoverPct, away = t2s$forcedTurnoverPct)
   )
 
   overall_comparison <- list(
-    srs = list(statKey = "srs", label = "SRS", team1 = t1s$srs, team2 = t2s$srs),
-    netRating = list(statKey = "netRating", label = "Net Rating", team1 = t1s$netRating, team2 = t2s$netRating),
-    strengthOfSchedule = list(statKey = "strengthOfSchedule", label = "SOS", team1 = t1s$strengthOfSchedule, team2 = t2s$strengthOfSchedule),
-    marginOfVictory = list(statKey = "marginOfVictory", label = "MOV", team1 = t1s$marginOfVictory, team2 = t2s$marginOfVictory),
-    reboundsPerGame = list(statKey = "reboundsPerGame", label = "RPG", team1 = t1s$reboundsPerGame, team2 = t2s$reboundsPerGame)
+    srs = list(label = "SRS", home = t1s$srs, away = t2s$srs),
+    netRating = list(label = "Net Rating", home = t1s$netRating, away = t2s$netRating),
+    strengthOfSchedule = list(label = "SOS", home = t1s$strengthOfSchedule, away = t2s$strengthOfSchedule),
+    marginOfVictory = list(label = "MOV", home = t1s$marginOfVictory, away = t2s$marginOfVictory),
+    reboundsPerGame = list(label = "RPG", home = t1s$reboundsPerGame, away = t2s$reboundsPerGame)
   )
 
   # Team1 offense vs Team2 defense
@@ -557,16 +686,293 @@ build_comparisons <- function(team1_data, team2_data) {
 
   return(list(
     sideBySide = list(offense = off_comparison, defense = def_comparison, overall = overall_comparison),
-    team1OffVsTeam2Def = team1_off_vs_team2_def,
-    team2OffVsTeam1Def = team2_off_vs_team1_def
+    homeOffVsAwayDef = team1_off_vs_team2_def,
+    awayOffVsHomeDef = team2_off_vs_team1_def
   ))
 }
 
 # ============================================================================
-# STEP 4: Build projected bracket (pre-tournament) or fetch live data
+# Tournament Game Processing Functions
 # ============================================================================
 
-if (is_pre_tournament) {
+#' Process a single tournament game from ESPN event data
+#' @param event ESPN event object
+#' @param team_stats_lookup Named list of team statistics
+#' @return Processed game object or NULL
+process_tournament_game <- function(event, team_stats_lookup) {
+  if (length(event$competitions) == 0) return(NULL)
+
+  competition <- event$competitions[[1]]
+  teams <- competition$competitors
+  if (length(teams) != 2) return(NULL)
+
+  # Parse region and round from notes
+  notes <- competition$notes
+  headline <- if (length(notes) > 0 && !is.null(notes[[1]]$headline)) notes[[1]]$headline else ""
+  bracket_info <- parse_bracket_info(headline)
+
+  # Determine game status
+  game_status <- "SCHEDULED"
+  if (!is.null(competition$status$type$name)) {
+    status_name <- competition$status$type$name
+    if (status_name == "STATUS_FINAL") {
+      game_status <- "FINAL"
+    } else if (status_name == "STATUS_IN_PROGRESS") {
+      game_status <- "IN_PROGRESS"
+    }
+  }
+
+  team1 <- teams[[1]]
+  team2 <- teams[[2]]
+
+  # Get team info
+  team1_name <- team1$team$displayName
+  team2_name <- team2$team$displayName
+  team1_abbrev <- if (!is.null(team1$team$abbreviation)) team1$team$abbreviation else substr(team1_name, 1, 4)
+  team2_abbrev <- if (!is.null(team2$team$abbreviation)) team2$team$abbreviation else substr(team2_name, 1, 4)
+  team1_logo <- if (!is.null(team1$team$logo)) team1$team$logo else NULL
+  team2_logo <- if (!is.null(team2$team$logo)) team2$team$logo else NULL
+  team1_seed <- if (!is.null(team1$curatedRank$current)) as.integer(team1$curatedRank$current) else 0
+  team2_seed <- if (!is.null(team2$curatedRank$current)) as.integer(team2$curatedRank$current) else 0
+
+  team1_key <- tolower(team1_name)
+  team2_key <- tolower(team2_name)
+
+  team1_data <- build_team_stats(team1_key, team1_name, team1_abbrev, team1_logo, team1_seed)
+  team2_data <- build_team_stats(team2_key, team2_name, team2_abbrev, team2_logo, team2_seed)
+
+  # Add scores for completed/in-progress games
+  if (game_status %in% c("FINAL", "IN_PROGRESS")) {
+    team1_data$score <- as.integer(team1$score)
+    team2_data$score <- as.integer(team2$score)
+    if (game_status == "FINAL") {
+      team1_data$isWinner <- isTRUE(team1$winner)
+      team2_data$isWinner <- isTRUE(team2$winner)
+    }
+  }
+
+  comparisons <- build_comparisons(team1_data, team2_data)
+
+  # Build box score for completed games
+  box_score <- NULL
+  if (game_status == "FINAL") {
+    box_score <- fetch_game_box_score(event$id)
+  }
+
+  # Build game object
+  game_date <- event$date
+  if (grepl("T\\d{2}:\\d{2}Z$", game_date)) game_date <- sub("Z$", ":00Z", game_date)
+
+  game <- list(
+    gameId = event$id,
+    gameNumber = as.integer(gsub("[^0-9]", "", event$id)) %% 100,
+    gameDate = game_date,
+    gameStatus = game_status,
+    region = bracket_info$region,
+    round = bracket_info$round,
+    roundNumber = bracket_info$roundNumber,
+    team1 = team1_data,
+    team2 = team2_data,
+    winner = if (game_status == "FINAL") {
+      if (isTRUE(team1_data$isWinner)) team1_data$name else team2_data$name
+    } else NULL,
+    winnerSeed = if (game_status == "FINAL") {
+      if (isTRUE(team1_data$isWinner)) team1_data$seed else team2_data$seed
+    } else NULL,
+    location = NULL,
+    odds = NULL,
+    boxScore = box_score,
+    comparisons = comparisons
+  )
+
+  # Add location if available
+  if (!is.null(competition$venue)) {
+    venue <- competition$venue
+    game$location <- list(
+      stadium = if (!is.null(venue$fullName)) venue$fullName else NULL,
+      city = if (!is.null(venue$address) && !is.null(venue$address$city)) venue$address$city else NULL,
+      state = if (!is.null(venue$address) && !is.null(venue$address$state)) venue$address$state else NULL
+    )
+  }
+
+  return(game)
+}
+
+#' Fetch box score for a completed game
+#' @param game_id ESPN game ID
+#' @return Box score object or NULL
+fetch_game_box_score <- function(game_id) {
+  summary_url <- paste0(
+    "https://site.api.espn.com/apis/site/v2/sports/basketball/mens-college-basketball/summary?event=",
+    game_id
+  )
+
+  Sys.sleep(0.5)  # Rate limiting
+
+  summary_resp <- tryCatch({
+    GET(summary_url)
+  }, error = function(e) NULL)
+
+  if (is.null(summary_resp) || status_code(summary_resp) != 200) {
+    return(NULL)
+  }
+
+  summary_data <- content(summary_resp, as = "parsed")
+
+  if (is.null(summary_data$boxscore) || is.null(summary_data$boxscore$teams)) {
+    return(NULL)
+  }
+
+  bs_teams <- summary_data$boxscore$teams
+  if (length(bs_teams) < 2) return(NULL)
+
+  parse_team_box <- function(team_bs) {
+    stats <- team_bs$statistics
+    get_stat <- function(name) {
+      for (s in stats) {
+        if (s$name == name) return(as.numeric(s$displayValue))
+      }
+      return(0)
+    }
+    list(
+      points = get_stat("points"),
+      fgm = get_stat("fieldGoalsMade"),
+      fga = get_stat("fieldGoalsAttempted"),
+      fgPct = get_stat("fieldGoalPct"),
+      fg3m = get_stat("threePointFieldGoalsMade"),
+      fg3a = get_stat("threePointFieldGoalsAttempted"),
+      fg3Pct = get_stat("threePointFieldGoalPct"),
+      ftm = get_stat("freeThrowsMade"),
+      fta = get_stat("freeThrowsAttempted"),
+      ftPct = get_stat("freeThrowPct"),
+      rebounds = get_stat("totalRebounds"),
+      assists = get_stat("assists"),
+      steals = get_stat("steals"),
+      blocks = get_stat("blocks"),
+      turnovers = get_stat("turnovers")
+    )
+  }
+
+  list(
+    team1 = parse_team_box(bs_teams[[1]]),
+    team2 = parse_team_box(bs_teams[[2]])
+  )
+}
+
+#' Organize all games into bracket structure by region and round
+#' @param all_games Named list of games indexed by gameId
+#' @return List of regions with rounds containing games
+organize_bracket_data <- function(all_games) {
+  # Initialize regions structure
+  regions_data <- list()
+  for (region_name in c("East", "South", "Midwest", "West")) {
+    regions_data[[region_name]] <- list(
+      name = region_name,
+      colorHex = REGION_COLORS[[region_name]],
+      rounds = list(
+        list(roundNumber = 1, roundName = "Round of 64", games = list()),
+        list(roundNumber = 2, roundName = "Round of 32", games = list()),
+        list(roundNumber = 3, roundName = "Sweet 16", games = list()),
+        list(roundNumber = 4, roundName = "Elite 8", games = list())
+      )
+    )
+  }
+
+  # Distribute games to regions and rounds
+  for (game_id in names(all_games)) {
+    game <- all_games[[game_id]]
+
+    region <- game$region
+    round_num <- game$roundNumber
+
+    # Skip Final Four and Championship (handled separately)
+    if (region == "Finals" || round_num > 4) next
+
+    # Skip unknown region/round
+    if (is.null(region) || region == "Unknown" || round_num == 0) next
+
+    # Add to appropriate region/round
+    if (!is.null(regions_data[[region]])) {
+      current_games <- regions_data[[region]]$rounds[[round_num]]$games
+      regions_data[[region]]$rounds[[round_num]]$games[[length(current_games) + 1]] <- game
+    }
+  }
+
+  return(regions_data)
+}
+
+#' Build Final Four section from completed Elite 8 games
+#' @param all_games All tournament games
+#' @return Final Four data structure
+build_final_four <- function(all_games) {
+  final_four_games <- list()
+  championship_game <- NULL
+
+  for (game_id in names(all_games)) {
+    game <- all_games[[game_id]]
+
+    if (!is.null(game$round) && game$round == "Final Four") {
+      final_four_games[[length(final_four_games) + 1]] <- game
+    } else if (!is.null(game$round) && game$round == "Championship") {
+      championship_game <- game
+    }
+  }
+
+  # Determine semifinal matchups
+  semifinal1 <- if (length(final_four_games) >= 1) final_four_games[[1]] else NULL
+  semifinal2 <- if (length(final_four_games) >= 2) final_four_games[[2]] else NULL
+
+  # Project Final Four if Elite 8 is complete but Final Four games not yet scheduled
+  if (is.null(semifinal1) || is.null(semifinal2)) {
+    elite_8_winners <- list()
+
+    for (game_id in names(all_games)) {
+      game <- all_games[[game_id]]
+      if (!is.null(game$round) && game$round == "Elite 8" && game$gameStatus == "FINAL") {
+        winner_data <- if (isTRUE(game$team1$isWinner)) game$team1 else game$team2
+        elite_8_winners[[game$region]] <- winner_data
+      }
+    }
+
+    # Traditional Final Four pairings: East vs West, South vs Midwest
+    if (length(elite_8_winners) >= 2) {
+      if (!is.null(elite_8_winners$East) && !is.null(elite_8_winners$West) && is.null(semifinal1)) {
+        semifinal1 <- list(
+          gameId = "projected_ff_1",
+          gameStatus = "PROJECTED",
+          round = "Final Four",
+          roundNumber = 5,
+          team1 = elite_8_winners$East,
+          team2 = elite_8_winners$West,
+          comparisons = build_comparisons(elite_8_winners$East, elite_8_winners$West)
+        )
+      }
+      if (!is.null(elite_8_winners$South) && !is.null(elite_8_winners$Midwest) && is.null(semifinal2)) {
+        semifinal2 <- list(
+          gameId = "projected_ff_2",
+          gameStatus = "PROJECTED",
+          round = "Final Four",
+          roundNumber = 5,
+          team1 = elite_8_winners$South,
+          team2 = elite_8_winners$Midwest,
+          comparisons = build_comparisons(elite_8_winners$South, elite_8_winners$Midwest)
+        )
+      }
+    }
+  }
+
+  list(
+    semifinal1 = semifinal1,
+    semifinal2 = semifinal2,
+    championship = championship_game
+  )
+}
+
+# ============================================================================
+# STEP 4: Build projected bracket (pre-selection) or fetch actual bracket from ESPN
+# ============================================================================
+
+if (is_pre_selection) {
   cat("\n4. Building projected bracket from top 64 teams by SRS...\n")
 
   # Get top 64 teams by SRS (Simple Rating System)
@@ -737,190 +1143,97 @@ if (is_pre_tournament) {
   subtitle <- "Top 64 teams by SRS"
 
 } else {
-  # Tournament is active or complete - fetch from ESPN
-  cat("\n4. Fetching tournament bracket from ESPN...\n")
+  # Tournament is active or complete - fetch from ESPN with history persistence
+  cat("\n4. Fetching tournament bracket from ESPN with history persistence...\n")
 
-  scoreboard_url <- "https://site.api.espn.com/apis/site/v2/sports/basketball/mens-college-basketball/scoreboard?groups=100"
-  cat("Fetching from:", scoreboard_url, "\n")
+  # Load existing history
+  bracket_history <- load_bracket_history()
+  if (is.null(bracket_history)) {
+    bracket_history <- list(
+      games = list(),           # Keyed by gameId
+      lastUpdated = NULL,
+      tournamentYear = 2026
+    )
+  }
 
-  scoreboard_resp <- tryCatch({
-    GET(scoreboard_url)
-  }, error = function(e) {
-    cat("Error fetching scoreboard:", e$message, "\n")
-    NULL
-  })
+  cat("History contains", length(bracket_history$games), "completed games\n")
 
-  if (!is.null(scoreboard_resp) && status_code(scoreboard_resp) == 200) {
-    scoreboard_data <- content(scoreboard_resp, as = "parsed")
+  all_games <- list()  # Will contain all games indexed by gameId
 
-    # Initialize regions
-    regions_data <- list()
-    for (region_name in names(REGION_COLORS)) {
-      regions_data[[region_name]] <- list(
-        name = region_name,
-        colorHex = REGION_COLORS[[region_name]],
-        rounds = list(
-          list(roundNumber = 1, roundName = "Round of 64", games = list()),
-          list(roundNumber = 2, roundName = "Round of 32", games = list()),
-          list(roundNumber = 3, roundName = "Sweet 16", games = list()),
-          list(roundNumber = 4, roundName = "Elite 8", games = list())
-        )
-      )
-    }
+  # Determine date range to fetch
+  # After Selection Sunday, always fetch at least the first round dates to get bracket structure
+  fetch_start <- TOURNAMENT_START
+  # If today is before tournament start, still fetch the first few days to get scheduled games
+  fetch_end <- if (today < TOURNAMENT_START) {
+    TOURNAMENT_START + 3  # Fetch March 19-22 to get Round of 64 and 32
+  } else {
+    min(today, TOURNAMENT_END)
+  }
 
-    # Process each event
-    if (!is.null(scoreboard_data$events)) {
-      for (event in scoreboard_data$events) {
-        if (length(event$competitions) == 0) next
-        competition <- event$competitions[[1]]
+  # Fetch games for each day from tournament start to fetch_end
+  current_date <- fetch_start
+  while (current_date <= fetch_end) {
+    date_str <- format(current_date, "%Y%m%d")
+    cat("Fetching games for", format(current_date, "%Y-%m-%d"), "...\n")
 
-        teams <- competition$competitors
-        if (length(teams) != 2) next
+    scoreboard_url <- paste0(
+      "https://site.api.espn.com/apis/site/v2/sports/basketball/mens-college-basketball/scoreboard",
+      "?groups=100&dates=", date_str
+    )
 
-        # Determine game status
-        game_status <- "SCHEDULED"
-        if (!is.null(competition$status$type$name)) {
-          status_name <- competition$status$type$name
-          if (status_name == "STATUS_FINAL") {
-            game_status <- "FINAL"
-          } else if (status_name == "STATUS_IN_PROGRESS") {
-            game_status <- "IN_PROGRESS"
+    Sys.sleep(0.3)  # Rate limiting
+
+    scoreboard_resp <- tryCatch({
+      GET(scoreboard_url)
+    }, error = function(e) {
+      cat("Error fetching date", date_str, ":", e$message, "\n")
+      NULL
+    })
+
+    if (!is.null(scoreboard_resp) && status_code(scoreboard_resp) == 200) {
+      scoreboard_data <- content(scoreboard_resp, as = "parsed")
+
+      if (!is.null(scoreboard_data$events)) {
+        for (event in scoreboard_data$events) {
+          game_id <- event$id
+
+          # Check if already in history and game is complete - use cached data
+          if (!is.null(bracket_history$games[[game_id]]) &&
+              bracket_history$games[[game_id]]$gameStatus == "FINAL") {
+            cat("  Using cached data for game", game_id, "\n")
+            all_games[[game_id]] <- bracket_history$games[[game_id]]
+            next
           }
-        }
 
-        team1 <- teams[[1]]
-        team2 <- teams[[2]]
+          # Process this game fresh
+          game_data <- process_tournament_game(event, team_stats_lookup)
+          if (!is.null(game_data)) {
+            all_games[[game_id]] <- game_data
 
-        # Get team info
-        team1_name <- team1$team$displayName
-        team2_name <- team2$team$displayName
-        team1_abbrev <- if (!is.null(team1$team$abbreviation)) team1$team$abbreviation else substr(team1_name, 1, 4)
-        team2_abbrev <- if (!is.null(team2$team$abbreviation)) team2$team$abbreviation else substr(team2_name, 1, 4)
-        team1_logo <- if (!is.null(team1$team$logo)) team1$team$logo else NULL
-        team2_logo <- if (!is.null(team2$team$logo)) team2$team$logo else NULL
-        team1_seed <- if (!is.null(team1$curatedRank$current)) team1$curatedRank$current else 0
-        team2_seed <- if (!is.null(team2$curatedRank$current)) team2$curatedRank$current else 0
-
-        team1_key <- tolower(team1_name)
-        team2_key <- tolower(team2_name)
-
-        team1_data <- build_team_stats(team1_key, team1_name, team1_abbrev, team1_logo, team1_seed)
-        team2_data <- build_team_stats(team2_key, team2_name, team2_abbrev, team2_logo, team2_seed)
-
-        # Add scores for completed/in-progress games
-        if (game_status %in% c("FINAL", "IN_PROGRESS")) {
-          team1_data$score <- as.integer(team1$score)
-          team2_data$score <- as.integer(team2$score)
-          if (game_status == "FINAL") {
-            team1_data$isWinner <- team1$winner
-            team2_data$isWinner <- team2$winner
-          }
-        }
-
-        comparisons <- build_comparisons(team1_data, team2_data)
-
-        # Build box score for completed games
-        box_score <- NULL
-        if (game_status == "FINAL") {
-          # Fetch detailed game summary for box score
-          summary_url <- paste0("https://site.api.espn.com/apis/site/v2/sports/basketball/mens-college-basketball/summary?event=", event$id)
-          Sys.sleep(0.5)  # Rate limiting
-          summary_resp <- tryCatch({
-            GET(summary_url)
-          }, error = function(e) NULL)
-
-          if (!is.null(summary_resp) && status_code(summary_resp) == 200) {
-            summary_data <- content(summary_resp, as = "parsed")
-            if (!is.null(summary_data$boxscore) && !is.null(summary_data$boxscore$teams)) {
-              bs_teams <- summary_data$boxscore$teams
-              if (length(bs_teams) >= 2) {
-                parse_team_box <- function(team_bs) {
-                  stats <- team_bs$statistics
-                  get_stat <- function(name) {
-                    for (s in stats) {
-                      if (s$name == name) return(as.numeric(s$displayValue))
-                    }
-                    return(0)
-                  }
-                  list(
-                    points = get_stat("points"),
-                    fgm = get_stat("fieldGoalsMade"),
-                    fga = get_stat("fieldGoalsAttempted"),
-                    fgPct = get_stat("fieldGoalPct"),
-                    fg3m = get_stat("threePointFieldGoalsMade"),
-                    fg3a = get_stat("threePointFieldGoalsAttempted"),
-                    fg3Pct = get_stat("threePointFieldGoalPct"),
-                    ftm = get_stat("freeThrowsMade"),
-                    fta = get_stat("freeThrowsAttempted"),
-                    ftPct = get_stat("freeThrowPct"),
-                    rebounds = get_stat("totalRebounds"),
-                    assists = get_stat("assists"),
-                    steals = get_stat("steals"),
-                    blocks = get_stat("blocks"),
-                    turnovers = get_stat("turnovers")
-                  )
-                }
-                box_score <- list(
-                  team1 = parse_team_box(bs_teams[[1]]),
-                  team2 = parse_team_box(bs_teams[[2]])
-                )
-              }
+            # Update history if game is complete
+            if (game_data$gameStatus == "FINAL") {
+              cat("  Saving completed game", game_id, "to history\n")
+              bracket_history$games[[game_id]] <- game_data
             }
           }
         }
-
-        # Build game object
-        game_date <- event$date
-        if (grepl("T\\d{2}:\\d{2}Z$", game_date)) game_date <- sub("Z$", ":00Z", game_date)
-
-        game <- list(
-          gameId = event$id,
-          gameNumber = as.integer(gsub("[^0-9]", "", event$id)) %% 100,
-          gameDate = game_date,
-          gameStatus = game_status,
-          team1 = team1_data,
-          team2 = team2_data,
-          location = NULL,
-          odds = NULL,
-          boxScore = box_score,
-          comparisons = comparisons
-        )
-
-        # Add location if available
-        if (!is.null(competition$venue)) {
-          venue <- competition$venue
-          game$location <- list(
-            stadium = if (!is.null(venue$fullName)) venue$fullName else NULL,
-            city = if (!is.null(venue$address) && !is.null(venue$address$city)) venue$address$city else NULL,
-            state = if (!is.null(venue$address) && !is.null(venue$address$state)) venue$address$state else NULL
-          )
-        }
-
-        # TODO: Determine region and round from event metadata
-        # For now, add to East region Round of 64 as placeholder
-        regions_data[["East"]]$rounds[[1]]$games[[length(regions_data[["East"]]$rounds[[1]]$games) + 1]] <- game
       }
     }
 
-    cat("Processed", length(scoreboard_data$events), "tournament games\n")
-  } else {
-    cat("Failed to fetch tournament data. Using empty bracket.\n")
-    regions_data <- list()
-    for (region_name in names(REGION_COLORS)) {
-      regions_data[[region_name]] <- list(
-        name = region_name,
-        colorHex = REGION_COLORS[[region_name]],
-        rounds = list()
-      )
-    }
+    current_date <- current_date + 1
   }
 
-  # Final Four placeholder
-  final_four <- list(
-    semifinal1 = NULL,
-    semifinal2 = NULL,
-    championship = NULL
-  )
+  cat("Total games processed:", length(all_games), "\n")
+
+  # Save updated history
+  bracket_history$lastUpdated <- format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC")
+  save_bracket_history(bracket_history)
+
+  # Organize games into regions and rounds
+  regions_data <- organize_bracket_data(all_games)
+
+  # Build Final Four section
+  final_four <- build_final_four(all_games)
 
   title <- "2026 NCAA Tournament Bracket"
   if (is_tournament_complete) {

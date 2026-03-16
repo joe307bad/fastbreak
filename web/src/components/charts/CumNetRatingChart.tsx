@@ -234,7 +234,7 @@ export function CumNetRatingChart({ homeTeamStats, awayTeamStats, homeAbbrev, aw
                 <span className="font-bold">{point.seriesId}</span>
               </div>
               <div className="text-[var(--muted)]">
-                Week {String(point.data.x)}: {point.data.y >= 0 ? '+' : ''}{point.data.yFormatted}
+                Week {String(point.data.x)}: {Number(point.data.y ?? 0) >= 0 ? '+' : ''}{point.data.yFormatted}
               </div>
             </div>
           )}

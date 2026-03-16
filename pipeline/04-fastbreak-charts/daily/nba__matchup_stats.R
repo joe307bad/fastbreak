@@ -781,47 +781,49 @@ four_factors_stats <- tryCatch({
   NULL
 })
 
-if (!is.null(advanced_stats)) {
-  # Join advanced stats with team stats (join on team_display_name since IDs don't match)
-  team_stats <- team_stats %>%
-    left_join(
-      advanced_stats %>%
-        select(TEAM_NAME, OFF_RATING, DEF_RATING, NET_RATING, PACE, PIE, AST_PCT, AST_RATIO,
-               OREB_PCT, DREB_PCT, REB_PCT, TM_TOV_PCT, EFG_PCT, TS_PCT) %>%
-        rename(
-          team_display_name = TEAM_NAME,
-          offensive_rating = OFF_RATING,
-          defensive_rating = DEF_RATING,
-          net_rating = NET_RATING,
-          pace = PACE,
-          pie = PIE,
-          ast_pct = AST_PCT,
-          ast_ratio = AST_RATIO,
-          oreb_pct = OREB_PCT,
-          dreb_pct = DREB_PCT,
-          reb_pct = REB_PCT,
-          tm_tov_pct = TM_TOV_PCT,
-          efg_pct = EFG_PCT,
-          ts_pct = TS_PCT
-        ) %>%
-        mutate(
-          offensive_rating = as.numeric(offensive_rating),
-          defensive_rating = as.numeric(defensive_rating),
-          net_rating = as.numeric(net_rating),
-          pace = as.numeric(pace),
-          pie = as.numeric(pie),
-          ast_pct = as.numeric(ast_pct),
-          ast_ratio = as.numeric(ast_ratio),
-          oreb_pct = as.numeric(oreb_pct),
-          dreb_pct = as.numeric(dreb_pct),
-          reb_pct = as.numeric(reb_pct),
-          tm_tov_pct = as.numeric(tm_tov_pct),
-          efg_pct = as.numeric(efg_pct),
-          ts_pct = as.numeric(ts_pct)
-        ),
-      by = "team_display_name"
-    )
+if (is.null(advanced_stats)) {
+  stop("FATAL: Could not load advanced stats from NBA API. This data is required for matchup worksheets.")
 }
+
+# Join advanced stats with team stats (join on team_display_name since IDs don't match)
+team_stats <- team_stats %>%
+  left_join(
+    advanced_stats %>%
+      select(TEAM_NAME, OFF_RATING, DEF_RATING, NET_RATING, PACE, PIE, AST_PCT, AST_RATIO,
+             OREB_PCT, DREB_PCT, REB_PCT, TM_TOV_PCT, EFG_PCT, TS_PCT) %>%
+      rename(
+        team_display_name = TEAM_NAME,
+        offensive_rating = OFF_RATING,
+        defensive_rating = DEF_RATING,
+        net_rating = NET_RATING,
+        pace = PACE,
+        pie = PIE,
+        ast_pct = AST_PCT,
+        ast_ratio = AST_RATIO,
+        oreb_pct = OREB_PCT,
+        dreb_pct = DREB_PCT,
+        reb_pct = REB_PCT,
+        tm_tov_pct = TM_TOV_PCT,
+        efg_pct = EFG_PCT,
+        ts_pct = TS_PCT
+      ) %>%
+      mutate(
+        offensive_rating = as.numeric(offensive_rating),
+        defensive_rating = as.numeric(defensive_rating),
+        net_rating = as.numeric(net_rating),
+        pace = as.numeric(pace),
+        pie = as.numeric(pie),
+        ast_pct = as.numeric(ast_pct),
+        ast_ratio = as.numeric(ast_ratio),
+        oreb_pct = as.numeric(oreb_pct),
+        dreb_pct = as.numeric(dreb_pct),
+        reb_pct = as.numeric(reb_pct),
+        tm_tov_pct = as.numeric(tm_tov_pct),
+        efg_pct = as.numeric(efg_pct),
+        ts_pct = as.numeric(ts_pct)
+      ),
+    by = "team_display_name"
+  )
 
 if (!is.null(four_factors_stats)) {
   # Join four factors stats (join on team_display_name since IDs don't match)
@@ -899,36 +901,35 @@ team_stats <- team_stats %>%
     opp_turnovers_per_game_rankDisplay = opp_turnovers_pg_ranks$rankDisplay
   )
 
-if (!is.null(advanced_stats)) {
-  off_rating_ranks <- tied_rank(-team_stats$offensive_rating)
-  def_rating_ranks <- tied_rank(team_stats$defensive_rating)  # Lower is better
-  net_rating_ranks <- tied_rank(-team_stats$net_rating)
-  pace_ranks <- tied_rank(-team_stats$pace)
-  efg_pct_ranks <- tied_rank(-team_stats$efg_pct)
-  ts_pct_ranks <- tied_rank(-team_stats$ts_pct)
-  oreb_pct_ranks <- tied_rank(-team_stats$oreb_pct)
-  tov_pct_ranks <- tied_rank(team_stats$tm_tov_pct)  # Lower is better
+# Calculate advanced stat ranks (advanced_stats is required, script fails above if null)
+off_rating_ranks <- tied_rank(-team_stats$offensive_rating)
+def_rating_ranks <- tied_rank(team_stats$defensive_rating)  # Lower is better
+net_rating_ranks <- tied_rank(-team_stats$net_rating)
+pace_ranks <- tied_rank(-team_stats$pace)
+efg_pct_ranks <- tied_rank(-team_stats$efg_pct)
+ts_pct_ranks <- tied_rank(-team_stats$ts_pct)
+oreb_pct_ranks <- tied_rank(-team_stats$oreb_pct)
+tov_pct_ranks <- tied_rank(team_stats$tm_tov_pct)  # Lower is better
 
-  team_stats <- team_stats %>%
-    mutate(
-      offensive_rating_rank = off_rating_ranks$rank,
-      offensive_rating_rankDisplay = off_rating_ranks$rankDisplay,
-      defensive_rating_rank = def_rating_ranks$rank,
-      defensive_rating_rankDisplay = def_rating_ranks$rankDisplay,
-      net_rating_rank = net_rating_ranks$rank,
-      net_rating_rankDisplay = net_rating_ranks$rankDisplay,
-      pace_rank = pace_ranks$rank,
-      pace_rankDisplay = pace_ranks$rankDisplay,
-      efg_pct_rank = efg_pct_ranks$rank,
-      efg_pct_rankDisplay = efg_pct_ranks$rankDisplay,
-      ts_pct_rank = ts_pct_ranks$rank,
-      ts_pct_rankDisplay = ts_pct_ranks$rankDisplay,
-      oreb_pct_rank = oreb_pct_ranks$rank,
-      oreb_pct_rankDisplay = oreb_pct_ranks$rankDisplay,
-      tm_tov_pct_rank = tov_pct_ranks$rank,
-      tm_tov_pct_rankDisplay = tov_pct_ranks$rankDisplay
-    )
-}
+team_stats <- team_stats %>%
+  mutate(
+    offensive_rating_rank = off_rating_ranks$rank,
+    offensive_rating_rankDisplay = off_rating_ranks$rankDisplay,
+    defensive_rating_rank = def_rating_ranks$rank,
+    defensive_rating_rankDisplay = def_rating_ranks$rankDisplay,
+    net_rating_rank = net_rating_ranks$rank,
+    net_rating_rankDisplay = net_rating_ranks$rankDisplay,
+    pace_rank = pace_ranks$rank,
+    pace_rankDisplay = pace_ranks$rankDisplay,
+    efg_pct_rank = efg_pct_ranks$rank,
+    efg_pct_rankDisplay = efg_pct_ranks$rankDisplay,
+    ts_pct_rank = ts_pct_ranks$rank,
+    ts_pct_rankDisplay = ts_pct_ranks$rankDisplay,
+    oreb_pct_rank = oreb_pct_ranks$rank,
+    oreb_pct_rankDisplay = oreb_pct_ranks$rankDisplay,
+    tm_tov_pct_rank = tov_pct_ranks$rank,
+    tm_tov_pct_rankDisplay = tov_pct_ranks$rankDisplay
+  )
 
 if (!is.null(four_factors_stats)) {
   fta_rate_ranks <- tied_rank(-team_stats$fta_rate)
@@ -976,26 +977,59 @@ end_timer()
 start_timer("STEP 1b: Calculate cumulative net rating")
 cat("\n1b. Calculating cumulative net rating and weekly efficiency...\n")
 
-# Calculate per-game net rating and group by week
-# Net Rating = Offensive Rating - Defensive Rating (per 100 possessions)
-# Possessions ≈ FGA - ORB + TOV + (0.44 * FTA)
 # NBA season starts in October, so we use the season start year as reference
 season_start_date <- as.Date(paste0(NBA_SEASON - 1, "-10-01"))
 
-# First, calculate per-game ratings using simple possession estimate
-game_ratings <- team_box %>%
+# Fetch official per-game advanced stats from NBA API
+# This gives us accurate NET_RATING, OFF_RATING, DEF_RATING per game
+cat("Fetching official per-game advanced stats from NBA API...\n")
+
+# Helper function with retry logic for NBA API calls
+fetch_with_retry <- function(fetch_fn, max_retries = 3, delay_secs = 2) {
+  for (attempt in 1:max_retries) {
+    result <- tryCatch({
+      fetch_fn()
+    }, error = function(e) {
+      cat("Attempt", attempt, "failed:", e$message, "\n")
+      NULL
+    })
+    if (!is.null(result)) return(result)
+    if (attempt < max_retries) {
+      cat("Retrying in", delay_secs, "seconds...\n")
+      Sys.sleep(delay_secs)
+    }
+  }
+  NULL
+}
+
+team_game_logs_advanced <- fetch_with_retry(function() {
+  hoopR::nba_teamgamelogs(
+    season = NBA_SEASON_STRING,
+    season_type = "Regular Season",
+    measure_type = "Advanced"
+  )$TeamGameLogs
+})
+
+if (is.null(team_game_logs_advanced) || nrow(team_game_logs_advanced) == 0) {
+  stop("FATAL: Could not load per-game advanced stats from NBA API. This data is required for matchup worksheets.")
+}
+
+cat("Loaded", nrow(team_game_logs_advanced), "game logs with official ratings\n")
+
+# Use official per-game ratings
+game_ratings <- team_game_logs_advanced %>%
   mutate(
-    game_date_parsed = as.Date(game_date),
+    game_date_parsed = as.Date(GAME_DATE),
     week_num = as.integer(floor(difftime(game_date_parsed, season_start_date, units = "weeks")) + 1),
-    # Simple possession estimate: FGA - ORB + TOV + 0.44*FTA
-    possessions = field_goals_attempted - offensive_rebounds + turnovers + (0.44 * free_throws_attempted),
-    # Calculate offensive and defensive ratings (per 100 possessions)
-    off_rating = (team_score / possessions) * 100,
-    def_rating = (opponent_team_score / possessions) * 100,
-    # Net rating for this game
-    game_net_rating = off_rating - def_rating
+    team_abbreviation = TEAM_ABBREVIATION,
+    # Use official ratings from NBA API
+    off_rating = as.numeric(OFF_RATING),
+    def_rating = as.numeric(DEF_RATING),
+    game_net_rating = as.numeric(NET_RATING)
   ) %>%
-  filter(week_num > 0, possessions > 0)
+  filter(week_num > 0, !is.na(game_net_rating))
+
+cat("Using official NBA per-game ratings for", length(unique(game_ratings$team_abbreviation)), "teams\n")
 
 # Calculate cumulative average net rating by week
 cum_net_rating_by_team <- game_ratings %>%

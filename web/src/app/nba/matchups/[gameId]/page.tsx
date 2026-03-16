@@ -58,6 +58,18 @@ function formatGameTime(gameTime: string): { date: string; time: string } {
   };
 }
 
+function getMascot(teamName: string): string {
+  const words = teamName.split(' ');
+  return words[words.length - 1];
+}
+
+function getConferenceRankBadgeClasses(rank: number): string {
+  const base = 'inline-flex items-center justify-center px-1.5 h-4 rounded text-[10px] font-medium';
+  if (rank <= 6) return `${base} bg-green-500/20 text-green-500`;  // Playoff spot
+  if (rank <= 10) return `${base} bg-yellow-500/20 text-yellow-500`;  // Play-in
+  return `${base} bg-red-500/20 text-red-500`;  // Lottery
+}
+
 function MatchupHeader({ game }: { game: NBAMatchupDataPoint }) {
   const { date, time } = formatGameTime(game.gameDate);
   const isCompleted = game.gameCompleted;
@@ -80,36 +92,46 @@ function MatchupHeader({ game }: { game: NBAMatchupDataPoint }) {
         {/* Away Team Info */}
         <div className="text-right">
           <div className="font-bold">{game.awayTeam.abbreviation}</div>
-          <div className="text-xs text-[var(--muted)]">{game.awayTeam.name}</div>
+          <div className="text-xs text-[var(--muted)]">{getMascot(game.awayTeam.name)}</div>
         </div>
 
-        {/* Away Record/Rank */}
+        {/* Away Record/Rank/Net */}
         <div className="text-right text-xs text-[var(--muted)]">
           <div>{game.awayTeam.wins}-{game.awayTeam.losses}</div>
-          <div>#{game.awayTeam.conferenceRank} {game.awayTeam.conference}</div>
-        </div>
-
-        {/* Center - Net Ratings */}
-        <div className="text-center">
-          <div className={`font-mono text-xs ${game.awayTeam.stats.netRating >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+          <div className="flex items-center justify-end gap-1">
+            <span className={getConferenceRankBadgeClasses(game.awayTeam.conferenceRank)}>
+              {game.awayTeam.conferenceRank}
+            </span>
+            <span>{game.awayTeam.conference}</span>
+          </div>
+          <div className={`font-mono ${game.awayTeam.stats.netRating >= 0 ? 'text-green-500' : 'text-red-500'}`}>
             {game.awayTeam.stats.netRating >= 0 ? '+' : ''}{game.awayTeam.stats.netRating.toFixed(1)}
           </div>
-          <div className="text-[10px] text-[var(--muted)]">Net Rtg</div>
-          <div className={`font-mono text-xs ${game.homeTeam.stats.netRating >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-            {game.homeTeam.stats.netRating >= 0 ? '+' : ''}{game.homeTeam.stats.netRating.toFixed(1)}
-          </div>
         </div>
 
-        {/* Home Record/Rank */}
+        {/* Center - @ */}
+        <div className="text-center text-[var(--muted)] flex items-center justify-center">
+          @
+        </div>
+
+        {/* Home Record/Rank/Net */}
         <div className="text-left text-xs text-[var(--muted)]">
           <div>{game.homeTeam.wins}-{game.homeTeam.losses}</div>
-          <div>#{game.homeTeam.conferenceRank} {game.homeTeam.conference}</div>
+          <div className="flex items-center justify-start gap-1">
+            <span className={getConferenceRankBadgeClasses(game.homeTeam.conferenceRank)}>
+              {game.homeTeam.conferenceRank}
+            </span>
+            <span>{game.homeTeam.conference}</span>
+          </div>
+          <div className={`font-mono ${game.homeTeam.stats.netRating >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+            {game.homeTeam.stats.netRating >= 0 ? '+' : ''}{game.homeTeam.stats.netRating.toFixed(1)}
+          </div>
         </div>
 
         {/* Home Team Info */}
         <div className="text-left">
           <div className="font-bold">{game.homeTeam.abbreviation}</div>
-          <div className="text-xs text-[var(--muted)]">{game.homeTeam.name}</div>
+          <div className="text-xs text-[var(--muted)]">{getMascot(game.homeTeam.name)}</div>
         </div>
       </div>
     </div>
@@ -354,8 +376,8 @@ export default async function NBAMatchupPage({ params }: Props) {
 
         {/* 50/50 split layout */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-2">
-          {/* Charts - viewport height on desktop */}
-          <div className="flex flex-col gap-2 h-[400px] lg:h-[calc(100vh-120px)] order-2 lg:order-1">
+          {/* Charts - square-ish dimensions */}
+          <div className="flex flex-col gap-2 h-[700px] lg:h-[calc(100vh-80px)] order-2 lg:order-1">
             <div className="flex-1">
               <CumNetRatingChart
                 homeTeamStats={game.homeTeam.stats}
@@ -373,6 +395,7 @@ export default async function NBAMatchupPage({ params }: Props) {
                 homeAbbrev={game.homeTeam.abbreviation}
                 awayAbbrev={game.awayTeam.abbreviation}
                 leagueStats={game.leagueEfficiencyStats}
+                quadrants={matchupData.scatterPlotQuadrants}
               />
             </div>
           </div>

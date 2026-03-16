@@ -5,7 +5,9 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -16,6 +18,10 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.joebad.fastbreak.data.model.BracketGameInfo
+import com.joebad.fastbreak.data.model.BracketRegionInfo
+import com.joebad.fastbreak.data.model.NCAABracketVisualization
 import io.github.koalaplot.core.gestures.GestureConfig
 import io.github.koalaplot.core.line.LinePlot
 import io.github.koalaplot.core.style.LineStyle
@@ -25,6 +31,7 @@ import io.github.koalaplot.core.xygraph.FloatLinearAxisModel
 import io.github.koalaplot.core.xygraph.XYGraph
 import io.github.koalaplot.core.xygraph.XYGraphScope
 import io.github.koalaplot.core.xygraph.rememberAxisStyle
+import kotlin.math.round
 
 // Data classes
 data class BracketTeam(
@@ -48,6 +55,7 @@ data class BracketRegion(
 
 data class MatchupSheetData(
     val game: BracketGame,
+    val gameInfo: BracketGameInfo? = null,  // Actual game data with comparisons
     val regionName: String,
     val roundName: String,
     val regionColor: Color
@@ -90,10 +98,23 @@ private val QUADRANT_BOUNDS = listOf(
 @OptIn(ExperimentalKoalaPlotApi::class)
 @Composable
 fun NCAABracket(
+    visualization: NCAABracketVisualization? = null,
     modifier: Modifier = Modifier,
     onNavigationToggleHandlerChanged: ((BracketNavigationToggleHandler?) -> Unit)? = null
 ) {
-    val regions = remember { generateBracketRegions() }
+    // Use visualization data if available, otherwise use mock data
+    val regions = remember(visualization) {
+        visualization?.let { viz ->
+            viz.regions.mapNotNull { regionInfo ->
+                convertRegionInfoToBracketRegion(regionInfo)
+            }
+        } ?: generateBracketRegions()
+    }
+
+    // Create a lookup map from visualization for game comparisons
+    val gameInfoLookup = remember(visualization) {
+        buildGameInfoLookup(visualization)
+    }
     var currentQuadrant by remember { mutableIntStateOf(0) }
     var isNavigationExpanded by remember { mutableStateOf(true) }
     var selectedMatchup by remember { mutableStateOf<MatchupSheetData?>(null) }
@@ -204,7 +225,8 @@ fun NCAABracket(
                         textColor = textColor,
                         backgroundColor = backgroundColor,
                         onMatchupClick = { game, roundName ->
-                            selectedMatchup = MatchupSheetData(game, region.name, roundName, region.color)
+                            val gameInfo = gameInfoLookup[game.gameNumber]
+                            selectedMatchup = MatchupSheetData(game, gameInfo, region.name, roundName, region.color)
                         }
                     )
                 }
@@ -216,8 +238,10 @@ fun NCAABracket(
                     textColor = textColor,
                     backgroundColor = backgroundColor,
                     isLandscape = isLandscape,
+                    visualization = visualization,
                     onMatchupClick = { game, regionName, roundName, color ->
-                        selectedMatchup = MatchupSheetData(game, regionName, roundName, color)
+                        val gameInfo = gameInfoLookup[game.gameNumber]
+                        selectedMatchup = MatchupSheetData(game, gameInfo, regionName, roundName, color)
                     }
                 )
             }
@@ -267,6 +291,14 @@ private fun MiniMapNavigation(
     isFinalFourSelected: Boolean,
     modifier: Modifier = Modifier
 ) {
+    // Need at least 4 regions for the bracket layout
+    if (regions.size < 4) return
+
+    val eastRegion = regions.getOrNull(0) ?: return
+    val southRegion = regions.getOrNull(1) ?: return
+    val midwestRegion = regions.getOrNull(2) ?: return
+    val westRegion = regions.getOrNull(3) ?: return
+
     Row(
         modifier = modifier.width(180.dp),
         horizontalArrangement = Arrangement.spacedBy(2.dp),
@@ -278,12 +310,12 @@ private fun MiniMapNavigation(
             verticalArrangement = Arrangement.spacedBy(2.dp)
         ) {
             MiniRegionBox(
-                region = regions[0],
+                region = eastRegion,
                 isSelected = currentIndex == 0,
                 onClick = { onRegionClick(0) }
             )
             MiniRegionBox(
-                region = regions[2],
+                region = midwestRegion,
                 isSelected = currentIndex == 2,
                 onClick = { onRegionClick(2) }
             )
@@ -324,12 +356,12 @@ private fun MiniMapNavigation(
             verticalArrangement = Arrangement.spacedBy(2.dp)
         ) {
             MiniRegionBox(
-                region = regions[1],
+                region = southRegion,
                 isSelected = currentIndex == 1,
                 onClick = { onRegionClick(1) }
             )
             MiniRegionBox(
-                region = regions[3],
+                region = westRegion,
                 isSelected = currentIndex == 3,
                 onClick = { onRegionClick(3) }
             )
@@ -397,27 +429,30 @@ private fun XYGraphScope<Float, Float>.DrawRegionContent(
     onMatchupClick: (BracketGame, String) -> Unit
 ) {
     // Y positions for each round (centered vertically within region)
-    val round1Positions = listOf(1f, 3f, 5f, 7f, 9f, 11f, 13f, 15f)
-    val round2Positions = listOf(2f, 6f, 10f, 14f)
-    val round3Positions = listOf(4f, 12f)
+    // Order: top to bottom so #1 seed (index 0) appears at the top
+    val round1Positions = listOf(15f, 13f, 11f, 9f, 7f, 5f, 3f, 1f)
+    val round2Positions = listOf(14f, 10f, 6f, 2f)
+    val round3Positions = listOf(12f, 4f)
     val round4Positions = listOf(8f)
 
     val allPositions = listOf(round1Positions, round2Positions, round3Positions, round4Positions)
 
     // Draw connecting lines between rounds
     for (roundIndex in 0 until 3) {
-        val currentPositions = allPositions[roundIndex]
-        val nextPositions = allPositions[roundIndex + 1]
+        val currentPositions = allPositions.getOrNull(roundIndex) ?: continue
+        val nextPositions = allPositions.getOrNull(roundIndex + 1) ?: continue
 
         // For reversed regions, rounds go 3,2,1,0 instead of 0,1,2,3
         // Use ROUND_X_POSITIONS for proper spacing (0, 1.5, 3, 4.5)
-        val currentX = xOffset + if (isReversed) ROUND_X_POSITIONS[3 - roundIndex] else ROUND_X_POSITIONS[roundIndex]
-        val nextX = xOffset + if (isReversed) ROUND_X_POSITIONS[2 - roundIndex] else ROUND_X_POSITIONS[roundIndex + 1]
+        val currentXIndex = if (isReversed) 3 - roundIndex else roundIndex
+        val nextXIndex = if (isReversed) 2 - roundIndex else roundIndex + 1
+        val currentX = xOffset + (ROUND_X_POSITIONS.getOrNull(currentXIndex) ?: continue)
+        val nextX = xOffset + (ROUND_X_POSITIONS.getOrNull(nextXIndex) ?: continue)
 
         for (i in nextPositions.indices) {
-            val topY = yOffset + currentPositions[i * 2]
-            val bottomY = yOffset + currentPositions[i * 2 + 1]
-            val midY = yOffset + nextPositions[i]
+            val topY = yOffset + (currentPositions.getOrNull(i * 2) ?: continue)
+            val bottomY = yOffset + (currentPositions.getOrNull(i * 2 + 1) ?: continue)
+            val midY = yOffset + (nextPositions.getOrNull(i) ?: continue)
 
             // Horizontal line from top game
             LinePlot(
@@ -474,12 +509,13 @@ private fun XYGraphScope<Float, Float>.DrawRegionContent(
 
     // Draw matchup boxes for each round (skip Elite 8 / round 4 - it's drawn separately in F4 section)
     region.rounds.dropLast(1).forEachIndexed { roundIndex, games ->
-        val positions = allPositions[roundIndex]
-        val x = xOffset + if (isReversed) ROUND_X_POSITIONS[3 - roundIndex] else ROUND_X_POSITIONS[roundIndex]
-        val roundName = roundNames[roundIndex]
+        val positions = allPositions.getOrNull(roundIndex) ?: return@forEachIndexed
+        val xPosIndex = if (isReversed) 3 - roundIndex else roundIndex
+        val x = xOffset + (ROUND_X_POSITIONS.getOrNull(xPosIndex) ?: return@forEachIndexed)
+        val roundName = roundNames.getOrNull(roundIndex) ?: "Round ${roundIndex + 1}"
 
         games.forEachIndexed { gameIndex, game ->
-            val y = yOffset + positions[gameIndex]
+            val y = yOffset + (positions.getOrNull(gameIndex) ?: return@forEachIndexed)
             DrawMatchupBox(
                 game = game,
                 x = x,
@@ -507,8 +543,12 @@ private fun XYGraphScope<Float, Float>.DrawFinalFourConnectors(
     textColor: Color,
     backgroundColor: Color,
     isLandscape: Boolean,
+    visualization: NCAABracketVisualization? = null,
     onMatchupClick: (BracketGame, String, String, Color) -> Unit
 ) {
+    // Need at least 4 regions to draw Final Four connectors
+    if (regions.size < 4) return
+
     // Elite 8 positions (now separated - left regions at x=7, right regions at x=5)
     // - East: x=7 (0 + ROUND_X_POSITIONS[3]), y=25 (17 + 8)
     // - South: x=5 (4 + ROUND_X_POSITIONS[0]), y=25
@@ -553,17 +593,17 @@ private fun XYGraphScope<Float, Float>.DrawFinalFourConnectors(
     val championshipX = centerX  // Always at center (6.0)
     val championshipY = 16.5f
 
-    // Create Final Four semifinal games from Elite 8 winners
-    val eastElite8 = regions[0].rounds.last().first()
-    val southElite8 = regions[1].rounds.last().first()
-    val midwestElite8 = regions[2].rounds.last().first()
-    val westElite8 = regions[3].rounds.last().first()
+    // Create Final Four semifinal games from Elite 8 winners (with defensive null checks)
+    val eastElite8 = regions.getOrNull(0)?.rounds?.lastOrNull()?.firstOrNull()
+    val southElite8 = regions.getOrNull(1)?.rounds?.lastOrNull()?.firstOrNull()
+    val midwestElite8 = regions.getOrNull(2)?.rounds?.lastOrNull()?.firstOrNull()
+    val westElite8 = regions.getOrNull(3)?.rounds?.lastOrNull()?.firstOrNull()
 
-    // Get winners from Elite 8 games
-    val eastWinner = if (eastElite8.team1?.isWinner == true) eastElite8.team1 else eastElite8.team2
-    val southWinner = if (southElite8.team1?.isWinner == true) southElite8.team1 else southElite8.team2
-    val midwestWinner = if (midwestElite8.team1?.isWinner == true) midwestElite8.team1 else midwestElite8.team2
-    val westWinner = if (westElite8.team1?.isWinner == true) westElite8.team1 else westElite8.team2
+    // Get winners from Elite 8 games (with null safety)
+    val eastWinner = eastElite8?.let { game -> if (game.team1?.isWinner == true) game.team1 else game.team2 }
+    val southWinner = southElite8?.let { game -> if (game.team1?.isWinner == true) game.team1 else game.team2 }
+    val midwestWinner = midwestElite8?.let { game -> if (game.team1?.isWinner == true) game.team1 else game.team2 }
+    val westWinner = westElite8?.let { game -> if (game.team1?.isWinner == true) game.team1 else game.team2 }
 
     // Final Four semifinal games
     val topSemifinal = BracketGame(
@@ -641,18 +681,8 @@ private fun XYGraphScope<Float, Float>.DrawFinalFourConnectors(
                 strokeWidth = 2.dp
             )
         )
-
-        // Horizontal line connecting Final Four (Semi1 - Champ - Semi2)
-        LinePlot(
-            data = listOf(
-                DefaultPoint(semifinal1X, finalFourY),
-                DefaultPoint(semifinal2X, finalFourY)
-            ),
-            lineStyle = LineStyle(
-                brush = SolidColor(lineColor),
-                strokeWidth = 2.dp
-            )
-        )
+        // Note: No horizontal line at Final Four - the vertical connectors and matchup boxes
+        // are sufficient to show the bracket structure
     } else {
         // Portrait: Elite 8 pairs stacked vertically at center
         // Vertical line connecting East to South (top pair)
@@ -728,8 +758,8 @@ private fun XYGraphScope<Float, Float>.DrawFinalFourConnectors(
 
     // Draw Elite 8 matchup boxes AFTER lines (so they appear on top)
     elite8Positions.forEach { (regionIndex, x, y) ->
-        val region = regions[regionIndex]
-        val elite8Game = region.rounds.last().first() // Elite 8 is the last round (round 4)
+        val region = regions.getOrNull(regionIndex) ?: return@forEach
+        val elite8Game = region.rounds.lastOrNull()?.firstOrNull() ?: return@forEach
 
         LinePlot(
             data = listOf(DefaultPoint(x, y)),
@@ -949,23 +979,66 @@ private fun MatchupTeamRow(
 
 @Composable
 private fun EmptyMatchupRow() {
-    Box(
+    Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 4.dp, vertical = 4.dp)
-            .height(16.dp),
-        contentAlignment = Alignment.CenterStart
+            .padding(horizontal = 4.dp, vertical = 3.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(
-            text = "TBD",
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
-        )
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.weight(1f)
+        ) {
+            Text(
+                text = "?",
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                maxLines = 1,
+                modifier = Modifier.width(18.dp)
+            )
+
+            Text(
+                text = "TBD",
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                maxLines = 1
+            )
+        }
     }
 }
 
 /**
- * Bottom sheet showing matchup details
+ * Helper to format doubles with specified decimal places
+ */
+private fun Double.formatStat(decimals: Int = 1): String {
+    val multiplier = when (decimals) {
+        0 -> 1.0
+        1 -> 10.0
+        2 -> 100.0
+        3 -> 1000.0
+        else -> 10.0
+    }
+    val rounded = round(this * multiplier) / multiplier
+    return when (decimals) {
+        0 -> rounded.toInt().toString()
+        else -> {
+            val str = rounded.toString()
+            if (str.contains('.')) {
+                val parts = str.split('.')
+                val decimalPart = parts[1].padEnd(decimals, '0').take(decimals)
+                "${parts[0]}.$decimalPart"
+            } else {
+                "$str.${"0".repeat(decimals)}"
+            }
+        }
+    }
+}
+
+/**
+ * Bottom sheet showing CBB-style matchup comparison
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -974,6 +1047,26 @@ private fun MatchupBottomSheet(
     onDismiss: () -> Unit
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    var viewSelection by remember { mutableIntStateOf(0) }
+
+    val gameInfo = matchupData.gameInfo
+    val comparisons = gameInfo?.comparisons
+
+    // Get full team info from gameInfo if available, otherwise use basic game data
+    val team1Info = gameInfo?.team1
+    val team2Info = gameInfo?.team2
+
+    // Team names for display - use full info if available
+    val team1Name = team1Info?.name ?: matchupData.game.team1?.name ?: "TBD"
+    val team2Name = team2Info?.name ?: matchupData.game.team2?.name ?: "TBD"
+
+    // Seeds for display
+    val team1Seed = team1Info?.seed ?: matchupData.game.team1?.seed
+    val team2Seed = team2Info?.seed ?: matchupData.game.team2?.seed
+
+    // Team display names with seeds
+    val team1Display = if (team1Seed != null && team1Name != "TBD") "($team1Seed) $team1Name" else team1Name
+    val team2Display = if (team2Seed != null && team2Name != "TBD") "($team2Seed) $team2Name" else team2Name
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -983,63 +1076,490 @@ private fun MatchupBottomSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp)
-                .padding(bottom = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+                .padding(start = 16.dp, end = 16.dp, bottom = 16.dp)
         ) {
-            // Header
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+            // Main content area with pinned header
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f, fill = false)
             ) {
-                Column {
-                    Text(
-                        text = matchupData.roundName,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = matchupData.regionColor
-                    )
-                    Text(
-                        text = matchupData.regionName,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(top = 20.dp)
+                ) {
+                    // Record section (like CBB)
+                    if (team1Info != null || team2Info != null) {
+                        BracketRecordSection(
+                            team1 = team1Info,
+                            team2 = team2Info
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // Round and region info
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 8.dp),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(8.dp)
+                                .background(matchupData.regionColor, RoundedCornerShape(4.dp))
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "${matchupData.roundName} • ${matchupData.regionName}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+
+                    // Check if we have TBD teams
+                    val team1 = matchupData.game.team1
+                    val team2 = matchupData.game.team2
+                    val hasTbdTeam = team1 == null || team2 == null
+
+                    // Show content based on whether we have comparison data
+                    if (comparisons != null && !hasTbdTeam) {
+                        Spacer(modifier = Modifier.height(4.dp))
+
+                        // View Navigation tabs (same as CBB)
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            TeamStatsNavBadge(
+                                text = "Team",
+                                isSelected = viewSelection == 0,
+                                onClick = { viewSelection = 0 }
+                            )
+                            TeamStatsNavBadge(
+                                text = "$team1Name Off vs $team2Name Def",
+                                isSelected = viewSelection == 1,
+                                onClick = { viewSelection = 1 }
+                            )
+                            TeamStatsNavBadge(
+                                text = "$team2Name Off vs $team1Name Def",
+                                isSelected = viewSelection == 2,
+                                onClick = { viewSelection = 2 }
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        when (viewSelection) {
+                            0 -> BracketTeamStatsView(comparisons)
+                            1 -> BracketOffenseVsDefenseView(
+                                comparisons = comparisons.awayOffVsHomeDef,
+                                offTeam = team1Name,
+                                defTeam = team2Name
+                            )
+                            2 -> BracketOffenseVsDefenseView(
+                                comparisons = comparisons.homeOffVsAwayDef,
+                                offTeam = team2Name,
+                                defTeam = team1Name
+                            )
+                        }
+                    } else if (hasTbdTeam) {
+                        // TBD matchup - show placeholder with team cards
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        if (team1 != null) {
+                            MatchupSheetTeamRow(
+                                team = team1,
+                                regionColor = matchupData.regionColor
+                            )
+                        } else {
+                            TbdMatchupRow()
+                        }
+
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 8.dp),
+                            horizontalArrangement = Arrangement.Center
+                        ) {
+                            Text(
+                                text = "vs",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+
+                        if (team2 != null) {
+                            MatchupSheetTeamRow(
+                                team = team2,
+                                regionColor = matchupData.regionColor
+                            )
+                        } else {
+                            TbdMatchupRow()
+                        }
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        Text(
+                            text = "Matchup will be determined by earlier round results",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                            modifier = Modifier.fillMaxWidth(),
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                        )
+                    } else {
+                        // Both teams known but no comparison data - show team info in CBB style
+                        Spacer(modifier = Modifier.height(4.dp))
+
+                        // Still show navigation tabs structure for consistency
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            TeamStatsNavBadge(
+                                text = "Team",
+                                isSelected = true,
+                                onClick = { }
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        // Show team info cards similar to CBB
+                        MatchupSheetTeamRow(
+                            team = team1!!,
+                            regionColor = matchupData.regionColor
+                        )
+
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 8.dp),
+                            horizontalArrangement = Arrangement.Center
+                        ) {
+                            Text(
+                                text = "vs",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+
+                        MatchupSheetTeamRow(
+                            team = team2!!,
+                            regionColor = matchupData.regionColor
+                        )
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        Text(
+                            text = "Detailed comparison stats will be available when game data is loaded",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                            modifier = Modifier.fillMaxWidth(),
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                        )
+                    }
                 }
+
+                // Pinned header at top (overlays content)
+                PinnedMatchupHeader(
+                    awayTeam = team1Display,
+                    homeTeam = team2Display,
+                    awayScore = matchupData.game.team1?.score,
+                    homeScore = matchupData.game.team2?.score,
+                    modifier = Modifier.align(Alignment.TopCenter)
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Team stats view for bracket matchup - side by side comparison using FiveColumnRowWithRanks
+ */
+@Composable
+private fun BracketTeamStatsView(comparisons: com.joebad.fastbreak.data.model.MatchupComparisons) {
+    Column {
+        // Offensive Stats
+        val offenseStats = comparisons.sideBySide?.offense
+        if (!offenseStats.isNullOrEmpty()) {
+            SectionHeader("Offensive Stats")
+            Spacer(modifier = Modifier.height(4.dp))
+
+            offenseStats.forEach { (key, stat) ->
+                val awayValue = stat.away.value
+                val awayRank = stat.away.rank
+                val awayRankDisplay = stat.away.rankDisplay
+                val homeValue = stat.home.value
+                val homeRank = stat.home.rank
+                val homeRankDisplay = stat.home.rankDisplay
+                val label = stat.label
+
+                // Use rank-based advantage (lower rank is better)
+                val advantage = if (awayRank != null && homeRank != null) {
+                    when {
+                        awayRank < homeRank -> -1
+                        awayRank > homeRank -> 1
+                        else -> 0
+                    }
+                } else 0
+
+                val awayText = awayValue?.formatStat(2) ?: "-"
+                val homeText = homeValue?.formatStat(2) ?: "-"
+
+                FiveColumnRowWithRanks(
+                    leftValue = awayText,
+                    leftRank = awayRank,
+                    leftRankDisplay = awayRankDisplay,
+                    centerText = label,
+                    rightValue = homeText,
+                    rightRank = homeRank,
+                    rightRankDisplay = homeRankDisplay,
+                    advantage = advantage,
+                    useCBBRanks = true
+                )
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+        }
+
+        // Defensive Stats
+        val defenseStats = comparisons.sideBySide?.defense
+        if (!defenseStats.isNullOrEmpty()) {
+            SectionHeader("Defensive Stats")
+            Spacer(modifier = Modifier.height(4.dp))
+
+            defenseStats.forEach { (key, stat) ->
+                val awayValue = stat.away.value
+                val awayRank = stat.away.rank
+                val awayRankDisplay = stat.away.rankDisplay
+                val homeValue = stat.home.value
+                val homeRank = stat.home.rank
+                val homeRankDisplay = stat.home.rankDisplay
+                val label = stat.label
+
+                val advantage = if (awayRank != null && homeRank != null) {
+                    when {
+                        awayRank < homeRank -> -1
+                        awayRank > homeRank -> 1
+                        else -> 0
+                    }
+                } else 0
+
+                val awayText = awayValue?.formatStat(2) ?: "-"
+                val homeText = homeValue?.formatStat(2) ?: "-"
+
+                FiveColumnRowWithRanks(
+                    leftValue = awayText,
+                    leftRank = awayRank,
+                    leftRankDisplay = awayRankDisplay,
+                    centerText = label,
+                    rightValue = homeText,
+                    rightRank = homeRank,
+                    rightRankDisplay = homeRankDisplay,
+                    advantage = advantage,
+                    useCBBRanks = true
+                )
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+        }
+
+        // Overall Stats
+        val overallStats = comparisons.sideBySide?.overall
+        if (!overallStats.isNullOrEmpty()) {
+            SectionHeader("Overall Ratings")
+            Spacer(modifier = Modifier.height(4.dp))
+
+            overallStats.forEach { (key, stat) ->
+                val awayValue = stat.away.value
+                val awayRank = stat.away.rank
+                val awayRankDisplay = stat.away.rankDisplay
+                val homeValue = stat.home.value
+                val homeRank = stat.home.rank
+                val homeRankDisplay = stat.home.rankDisplay
+                val label = stat.label
+
+                val advantage = if (awayRank != null && homeRank != null) {
+                    when {
+                        awayRank < homeRank -> -1
+                        awayRank > homeRank -> 1
+                        else -> 0
+                    }
+                } else 0
+
+                val awayText = awayValue?.formatStat(2) ?: "-"
+                val homeText = homeValue?.formatStat(2) ?: "-"
+
+                FiveColumnRowWithRanks(
+                    leftValue = awayText,
+                    leftRank = awayRank,
+                    leftRankDisplay = awayRankDisplay,
+                    centerText = label,
+                    rightValue = homeText,
+                    rightRank = homeRank,
+                    rightRankDisplay = homeRankDisplay,
+                    advantage = advantage,
+                    useCBBRanks = true
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Offense vs Defense view for bracket matchup
+ */
+@Composable
+private fun BracketOffenseVsDefenseView(
+    comparisons: Map<String, com.joebad.fastbreak.data.model.MatchupStatComparison>,
+    offTeam: String,
+    defTeam: String
+) {
+    if (comparisons.isEmpty()) {
+        Text(
+            text = "No offense vs defense comparison available",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+            modifier = Modifier.fillMaxWidth(),
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+        )
+        return
+    }
+
+    SectionHeader("$offTeam Offense vs $defTeam Defense")
+    Spacer(modifier = Modifier.height(4.dp))
+
+    comparisons.forEach { (key, stat) ->
+        val offValue = stat.offense.value
+        val offRank = stat.offense.rank
+        val offRankDisplay = stat.offense.rankDisplay
+        val defValue = stat.defense.value
+        val defRank = stat.defense.rank
+        val defRankDisplay = stat.defense.rankDisplay
+
+        if (offValue != null && defValue != null) {
+            FiveColumnRowWithRanks(
+                leftValue = offValue.formatStat(2),
+                leftRank = offRank,
+                leftRankDisplay = offRankDisplay,
+                centerText = stat.offLabel,
+                rightValue = defValue.formatStat(2),
+                rightRank = defRank,
+                rightRankDisplay = defRankDisplay,
+                advantage = stat.advantage ?: 0,
+                useCBBRanks = true
+            )
+        }
+    }
+}
+
+/**
+ * Record section showing seed, record, and rankings for bracket matchup (similar to CBB)
+ */
+@Composable
+private fun BracketRecordSection(
+    team1: com.joebad.fastbreak.data.model.BracketTeamInfo?,
+    team2: com.joebad.fastbreak.data.model.BracketTeamInfo?
+) {
+    val textStyle = MaterialTheme.typography.bodySmall.copy(lineHeight = 14.sp)
+    val textColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+
+    // Build ranking info for team1 (AP / SRS)
+    val team1RankingParts = mutableListOf<String>()
+    team1?.apRank?.let { team1RankingParts.add("#$it AP") }
+    team1?.srsRank?.let { team1RankingParts.add("#$it SRS") }
+    val team1RankingInfo = team1RankingParts.joinToString(" / ")
+
+    // Build ranking info for team2 (AP / SRS)
+    val team2RankingParts = mutableListOf<String>()
+    team2?.apRank?.let { team2RankingParts.add("#$it AP") }
+    team2?.srsRank?.let { team2RankingParts.add("#$it SRS") }
+    val team2RankingInfo = team2RankingParts.joinToString(" / ")
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 8.dp, vertical = 4.dp),
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        // Team 1 info (left-aligned)
+        Column(
+            modifier = Modifier.weight(1f),
+            horizontalAlignment = Alignment.Start
+        ) {
+            // Record
+            if (team1?.wins != null && team1.losses != null) {
                 Text(
-                    text = "Game #${matchupData.game.gameNumber}",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    text = "${team1.wins}-${team1.losses}",
+                    style = textStyle,
+                    fontSize = 11.sp,
+                    color = textColor
                 )
             }
-
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-
-            // Team 1
-            matchupData.game.team1?.let { team ->
-                MatchupSheetTeamRow(
-                    team = team,
-                    regionColor = matchupData.regionColor
-                )
-            }
-
-            // VS divider
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.Center
-            ) {
+            // AP / SRS rankings
+            if (team1RankingInfo.isNotEmpty()) {
                 Text(
-                    text = "vs",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    text = team1RankingInfo,
+                    style = textStyle,
+                    fontSize = 11.sp,
+                    color = textColor
                 )
             }
+            // Conference
+            team1?.conference?.let {
+                Text(
+                    text = it,
+                    style = textStyle,
+                    fontSize = 11.sp,
+                    color = textColor
+                )
+            }
+        }
 
-            // Team 2
-            matchupData.game.team2?.let { team ->
-                MatchupSheetTeamRow(
-                    team = team,
-                    regionColor = matchupData.regionColor
+        // Team 2 info (right-aligned)
+        Column(
+            modifier = Modifier.weight(1f),
+            horizontalAlignment = Alignment.End
+        ) {
+            // Record
+            if (team2?.wins != null && team2.losses != null) {
+                Text(
+                    text = "${team2.wins}-${team2.losses}",
+                    style = textStyle,
+                    fontSize = 11.sp,
+                    color = textColor,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.End
+                )
+            }
+            // AP / SRS rankings
+            if (team2RankingInfo.isNotEmpty()) {
+                Text(
+                    text = team2RankingInfo,
+                    style = textStyle,
+                    fontSize = 11.sp,
+                    color = textColor,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.End
+                )
+            }
+            // Conference
+            team2?.conference?.let {
+                Text(
+                    text = it,
+                    style = textStyle,
+                    fontSize = 11.sp,
+                    color = textColor,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.End
                 )
             }
         }
@@ -1116,6 +1636,52 @@ private fun MatchupSheetTeamRow(
                 color = regionColor
             )
         }
+    }
+}
+
+/**
+ * TBD row shown when a team is not yet determined
+ */
+@Composable
+private fun TbdMatchupRow() {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(8.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+            .border(
+                width = 1.dp,
+                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
+                shape = RoundedCornerShape(8.dp)
+            )
+            .padding(12.dp),
+        horizontalArrangement = Arrangement.Start,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // Placeholder seed badge
+        Box(
+            modifier = Modifier
+                .size(28.dp)
+                .clip(RoundedCornerShape(4.dp))
+                .background(MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = "?",
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+            )
+        }
+
+        Spacer(modifier = Modifier.width(12.dp))
+
+        Text(
+            text = "To Be Determined",
+            style = MaterialTheme.typography.bodyLarge,
+            fontWeight = FontWeight.Medium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+        )
     }
 }
 
@@ -1245,3 +1811,208 @@ private val westTeams = listOf(
     7 to "Dayton", 10 to "Nevada",
     2 to "Arizona", 15 to "Long Beach"
 )
+
+// Region color mapping
+private val regionColors = mapOf(
+    "East" to Color(0xFF1565C0),
+    "South" to Color(0xFF2E7D32),
+    "Midwest" to Color(0xFFF57F17),
+    "West" to Color(0xFFC62828)
+)
+
+/**
+ * Parses a hex color string to a Compose Color
+ */
+private fun parseHexColor(hexColor: String): Color? {
+    return try {
+        val hex = hexColor.removePrefix("#")
+        when (hex.length) {
+            6 -> {
+                val r = hex.substring(0, 2).toInt(16)
+                val g = hex.substring(2, 4).toInt(16)
+                val b = hex.substring(4, 6).toInt(16)
+                Color(r, g, b)
+            }
+            8 -> {
+                val a = hex.substring(0, 2).toInt(16)
+                val r = hex.substring(2, 4).toInt(16)
+                val g = hex.substring(4, 6).toInt(16)
+                val b = hex.substring(6, 8).toInt(16)
+                Color(r, g, b, a)
+            }
+            else -> null
+        }
+    } catch (e: Exception) {
+        null
+    }
+}
+
+/**
+ * Helper to check if a team represents TBD (not yet determined)
+ */
+private fun isTbdTeam(team: com.joebad.fastbreak.data.model.BracketTeamInfo?): Boolean {
+    if (team == null) return true
+    if (team.name.equals("TBD", ignoreCase = true)) return true
+    if (team.name.isBlank()) return true
+    if (team.seed <= 0) return true
+    return false
+}
+
+/**
+ * Converts a BracketRegionInfo from the visualization to the local BracketRegion type
+ * Ensures all 4 rounds exist (Round of 64, Round of 32, Sweet 16, Elite 8) with TBD placeholders
+ */
+private fun convertRegionInfoToBracketRegion(regionInfo: BracketRegionInfo): BracketRegion? {
+    val color = parseHexColor(regionInfo.colorHex) ?: regionColors[regionInfo.name] ?: Color.Gray
+
+    // Expected games per round: Round 1 = 8, Round 2 = 4, Sweet 16 = 2, Elite 8 = 1
+    val expectedGamesPerRound = listOf(8, 4, 2, 1)
+
+    // Build all 4 rounds, creating TBD placeholders for missing rounds/games
+    val rounds = (0 until 4).map { roundIndex ->
+        val roundInfo = regionInfo.rounds.getOrNull(roundIndex)
+        val expectedGames = expectedGamesPerRound[roundIndex]
+
+        if (roundInfo == null || roundInfo.games.isEmpty()) {
+            // No data for this round - create TBD placeholder games
+            (0 until expectedGames).map { gameIndex ->
+                BracketGame(
+                    team1 = null,
+                    team2 = null,
+                    gameNumber = roundIndex * 100 + gameIndex + 1  // Unique game numbers
+                )
+            }
+        } else {
+            // Process existing games from data
+            val games = roundInfo.games.mapIndexed { index, gameInfo ->
+                // For Round 2+, check if the game has been decided
+                // Games show TBD if:
+                // 1. It's Round 2 or later (roundIndex > 0)
+                // 2. AND the game status is NOT "FINAL" or "IN_PROGRESS"
+                val gameStatus = gameInfo.gameStatus?.uppercase() ?: ""
+                val isGameDecided = gameStatus == "FINAL" || gameStatus == "IN_PROGRESS"
+                val shouldShowTbd = roundIndex > 0 && !isGameDecided
+
+                // For round 1, teams should exist. For later rounds, show TBD if game not decided
+                val team1 = if (shouldShowTbd || isTbdTeam(gameInfo.team1)) {
+                    if (roundIndex > 0) {
+                        null  // Show as TBD for undecided later rounds
+                    } else {
+                        // Round 1 - only null if actually TBD
+                        if (isTbdTeam(gameInfo.team1)) null else {
+                            gameInfo.team1?.let { t ->
+                                BracketTeam(
+                                    seed = t.seed,
+                                    name = t.name,
+                                    score = t.score,
+                                    isWinner = gameInfo.winner == t.name || (t.score != null && gameInfo.team2?.score != null && t.score > gameInfo.team2.score)
+                                )
+                            }
+                        }
+                    }
+                } else {
+                    gameInfo.team1?.let { t ->
+                        BracketTeam(
+                            seed = t.seed,
+                            name = t.name,
+                            score = t.score,
+                            isWinner = gameInfo.winner == t.name || (t.score != null && gameInfo.team2?.score != null && t.score > gameInfo.team2.score)
+                        )
+                    }
+                }
+
+                val team2 = if (shouldShowTbd || isTbdTeam(gameInfo.team2)) {
+                    if (roundIndex > 0) {
+                        null  // Show as TBD for undecided later rounds
+                    } else {
+                        // Round 1 - only null if actually TBD
+                        if (isTbdTeam(gameInfo.team2)) null else {
+                            gameInfo.team2?.let { t ->
+                                BracketTeam(
+                                    seed = t.seed,
+                                    name = t.name,
+                                    score = t.score,
+                                    isWinner = gameInfo.winner == t.name || (t.score != null && gameInfo.team1?.score != null && t.score > gameInfo.team1.score)
+                                )
+                            }
+                        }
+                    }
+                } else {
+                    gameInfo.team2?.let { t ->
+                        BracketTeam(
+                            seed = t.seed,
+                            name = t.name,
+                            score = t.score,
+                            isWinner = gameInfo.winner == t.name || (t.score != null && gameInfo.team1?.score != null && t.score > gameInfo.team1.score)
+                        )
+                    }
+                }
+
+                BracketGame(
+                    team1 = team1,
+                    team2 = team2,
+                    gameNumber = gameInfo.gameNumber ?: (index + 1)
+                )
+            }
+
+            // Pad with TBD games if we have fewer games than expected
+            val paddedGames = if (games.size < expectedGames) {
+                games + (games.size until expectedGames).map { gameIndex ->
+                    BracketGame(
+                        team1 = null,
+                        team2 = null,
+                        gameNumber = roundIndex * 100 + gameIndex + 1
+                    )
+                }
+            } else {
+                games
+            }
+
+            // For Round 1 only, sort games so #1 seed matchup appears first
+            if (roundIndex == 0) {
+                paddedGames.sortedBy { game ->
+                    val seed1 = game.team1?.seed ?: 99
+                    val seed2 = game.team2?.seed ?: 99
+                    minOf(seed1, seed2)
+                }
+            } else {
+                paddedGames
+            }
+        }
+    }
+
+    return BracketRegion(
+        name = regionInfo.name,
+        color = color,
+        rounds = rounds
+    )
+}
+
+/**
+ * Builds a lookup map from game number to BracketGameInfo for accessing comparison data
+ */
+private fun buildGameInfoLookup(visualization: NCAABracketVisualization?): Map<Int, BracketGameInfo> {
+    if (visualization == null) return emptyMap()
+
+    val lookup = mutableMapOf<Int, BracketGameInfo>()
+
+    // Add games from all regions
+    visualization.regions.forEach { region ->
+        region.rounds.forEach { round ->
+            round.games.forEach { game ->
+                game.gameNumber?.let { num ->
+                    lookup[num] = game
+                }
+            }
+        }
+    }
+
+    // Add Final Four games
+    visualization.finalFour?.let { ff ->
+        ff.semifinal1?.gameNumber?.let { lookup[it] = ff.semifinal1 }
+        ff.semifinal2?.gameNumber?.let { lookup[it] = ff.semifinal2 }
+        ff.championship?.gameNumber?.let { lookup[it] = ff.championship }
+    }
+
+    return lookup
+}

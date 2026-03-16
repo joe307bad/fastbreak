@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { ResponsiveScatterPlot, ScatterPlotLayerProps } from '@nivo/scatterplot';
-import { NBATeamStats, LeagueEfficiencyStats } from '@/types/chart';
+import { NBATeamStats, LeagueEfficiencyStats, ScatterPlotQuadrants } from '@/types/chart';
 
 interface Props {
   homeTeamStats: NBATeamStats;
@@ -10,6 +10,7 @@ interface Props {
   homeAbbrev: string;
   awayAbbrev: string;
   leagueStats?: LeagueEfficiencyStats;
+  quadrants?: ScatterPlotQuadrants;
 }
 
 interface WeeklyEfficiency {
@@ -25,6 +26,23 @@ interface NodeData {
 }
 
 type WeekFilter = 'all' | 'last5' | 'prior5';
+type QuadrantKey = 'topRight' | 'topLeft' | 'bottomLeft' | 'bottomRight';
+
+function getQuadrantForPoint(
+  offRating: number,
+  defRating: number,
+  avgOff: number,
+  avgDef: number
+): QuadrantKey {
+  // Y-axis is reversed (lower def rating is better, shown at top)
+  const isHighOff = offRating >= avgOff;
+  const isLowDef = defRating <= avgDef;
+
+  if (isHighOff && isLowDef) return 'topRight';      // Elite
+  if (!isHighOff && isLowDef) return 'topLeft';      // Defensive
+  if (!isHighOff && !isLowDef) return 'bottomLeft';  // Struggling
+  return 'bottomRight';                               // Offensive
+}
 
 function WeekFilterNav({ filter, onFilterChange }: { filter: WeekFilter; onFilterChange: (f: WeekFilter) => void }) {
   const options: { value: WeekFilter; label: string }[] = [
@@ -48,6 +66,52 @@ function WeekFilterNav({ filter, onFilterChange }: { filter: WeekFilter; onFilte
           {opt.label}
         </button>
       ))}
+    </div>
+  );
+}
+
+function QuadrantLegend({
+  quadrants,
+  selectedQuadrant,
+  onSelectQuadrant,
+}: {
+  quadrants?: ScatterPlotQuadrants;
+  selectedQuadrant: QuadrantKey | null;
+  onSelectQuadrant: (q: QuadrantKey | null) => void;
+}) {
+  if (!quadrants) return null;
+
+  const items: { key: QuadrantKey; config: { color: string; label: string } | undefined }[] = [
+    { key: 'topRight', config: quadrants.topRight },
+    { key: 'topLeft', config: quadrants.topLeft },
+    { key: 'bottomRight', config: quadrants.bottomRight },
+    { key: 'bottomLeft', config: quadrants.bottomLeft },
+  ];
+
+  return (
+    <div className="flex gap-1 justify-center mb-1 flex-wrap">
+      {items.map(({ key, config }) => {
+        if (!config) return null;
+        const isSelected = selectedQuadrant === key;
+        return (
+          <button
+            key={key}
+            onClick={() => onSelectQuadrant(isSelected ? null : key)}
+            className={`px-2 py-0.5 text-[10px] rounded-full border-2 transition-colors flex items-center gap-1 font-semibold`}
+            style={{
+              borderColor: isSelected ? config.color : 'var(--border)',
+              backgroundColor: isSelected ? `${config.color}20` : 'transparent',
+              color: config.color,
+            }}
+          >
+            <span
+              className="w-2 h-2 rounded-full"
+              style={{ backgroundColor: config.color }}
+            />
+            {config.label}
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -115,14 +179,18 @@ function createNodesLayer(
   seriesColors: Array<{ id: string; color: string }>,
   selectedId: string | null,
   weekFilter: WeekFilter,
-  maxWeek: number
+  maxWeek: number,
+  selectedQuadrant: QuadrantKey | null,
+  avgOff: number,
+  avgDef: number
 ) {
   return function NodesLayer({ nodes }: ScatterPlotLayerProps<NodeData>) {
     return (
       <g>
         {nodes.map(node => {
           const seriesColor = seriesColors.find(s => s.id === node.serieId)?.color || '#888';
-          const weekNum = (node.data as NodeData).week;
+          const nodeData = node.data as NodeData;
+          const weekNum = nodeData.week;
 
           // Check if week matches the filter
           const isWeekSelected = weekFilter === 'all' ||
@@ -132,8 +200,12 @@ function createNodesLayer(
           // Check if series matches the legend filter
           const isSeriesSelected = !selectedId || selectedId === node.serieId;
 
-          // Point is highlighted if both filters pass (or their respective filter is "all"/null)
-          const isHighlighted = isWeekSelected && isSeriesSelected;
+          // Check if quadrant matches the filter
+          const pointQuadrant = getQuadrantForPoint(nodeData.x, nodeData.y, avgOff, avgDef);
+          const isQuadrantSelected = !selectedQuadrant || selectedQuadrant === pointQuadrant;
+
+          // Point is highlighted if all filters pass (or their respective filter is "all"/null)
+          const isHighlighted = isWeekSelected && isSeriesSelected && isQuadrantSelected;
           const fillOpacity = isHighlighted ? 1 : 0.15;
 
           return (
@@ -171,6 +243,100 @@ function createNodesLayer(
   };
 }
 
+function createQuadrantLayer(
+  avgOff: number,
+  avgDef: number,
+  quadrants?: ScatterPlotQuadrants
+) {
+  return function QuadrantLayer({ xScale, yScale, innerWidth, innerHeight }: ScatterPlotLayerProps<NodeData>) {
+    if (!quadrants) return null;
+
+    const xMidPx = xScale(avgOff);
+    const yMidPx = yScale(avgDef);
+
+    // Note: Y-axis is reversed (lower def rating is better, shown at top)
+    // So topRight visually is high offense (right) + low defense (top) = Elite
+    // bottomLeft visually is low offense (left) + high defense (bottom) = Struggling
+    const regions = [
+      {
+        x: xMidPx,
+        y: 0,
+        width: innerWidth - xMidPx,
+        height: yMidPx,
+        quadrant: quadrants.topRight,
+        labelX: innerWidth - 4,
+        labelY: 10,
+        anchor: 'end' as const,
+      },
+      {
+        x: 0,
+        y: 0,
+        width: xMidPx,
+        height: yMidPx,
+        quadrant: quadrants.topLeft,
+        labelX: 4,
+        labelY: 10,
+        anchor: 'start' as const,
+      },
+      {
+        x: 0,
+        y: yMidPx,
+        width: xMidPx,
+        height: innerHeight - yMidPx,
+        quadrant: quadrants.bottomLeft,
+        labelX: 4,
+        labelY: innerHeight - 4,
+        anchor: 'start' as const,
+      },
+      {
+        x: xMidPx,
+        y: yMidPx,
+        width: innerWidth - xMidPx,
+        height: innerHeight - yMidPx,
+        quadrant: quadrants.bottomRight,
+        labelX: innerWidth - 4,
+        labelY: innerHeight - 4,
+        anchor: 'end' as const,
+      },
+    ];
+
+    return (
+      <g>
+        {regions.map((region, i) => {
+          if (!region.quadrant) return null;
+          return (
+            <g key={i}>
+              <rect
+                x={region.x}
+                y={region.y}
+                width={region.width}
+                height={region.height}
+                fill={region.quadrant.color}
+                fillOpacity={0.08}
+              />
+              <text
+                x={region.labelX}
+                y={region.labelY}
+                textAnchor={region.anchor}
+                style={{
+                  fontSize: 9,
+                  fontFamily: 'var(--font-geist-mono), monospace',
+                  fill: region.quadrant.color,
+                  fontWeight: 600,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em',
+                }}
+              >
+                {region.quadrant.label}
+              </text>
+            </g>
+          );
+        })}
+      </g>
+    );
+  };
+}
+
 function parseEfficiencyData(stats: NBATeamStats): WeeklyEfficiency[] {
   const efficiencyByWeek = stats.efficiencyByWeek;
   if (!efficiencyByWeek) return [];
@@ -187,9 +353,10 @@ function parseEfficiencyData(stats: NBATeamStats): WeeklyEfficiency[] {
     .sort((a, b) => a.week - b.week);
 }
 
-export function WeeklyEfficiencyChart({ homeTeamStats, awayTeamStats, homeAbbrev, awayAbbrev, leagueStats }: Props) {
+export function WeeklyEfficiencyChart({ homeTeamStats, awayTeamStats, homeAbbrev, awayAbbrev, leagueStats, quadrants }: Props) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [weekFilter, setWeekFilter] = useState<WeekFilter>('all');
+  const [selectedQuadrant, setSelectedQuadrant] = useState<QuadrantKey | null>(null);
   const homeData = parseEfficiencyData(homeTeamStats);
   const awayData = parseEfficiencyData(awayTeamStats);
 
@@ -238,12 +405,18 @@ export function WeeklyEfficiencyChart({ homeTeamStats, awayTeamStats, homeAbbrev
   const avgDef = leagueStats?.avgDefRating ?? (allPoints.reduce((sum, p) => sum + p.defRating, 0) / allPoints.length);
 
   const ClickableLegendLayer = createClickableLegendLayer(seriesColors, selectedId, setSelectedId);
-  const NodesLayer = createNodesLayer(seriesColors, selectedId, weekFilter, maxWeek);
+  const NodesLayer = createNodesLayer(seriesColors, selectedId, weekFilter, maxWeek, selectedQuadrant, avgOff, avgDef);
+  const QuadrantLayer = createQuadrantLayer(avgOff, avgDef, quadrants);
 
   return (
     <div className="border border-[var(--border)] rounded bg-[var(--card)] p-2 h-full flex flex-col">
       <div className="text-center text-xs font-bold mb-1">Weekly Off/Def Rating</div>
       <WeekFilterNav filter={weekFilter} onFilterChange={setWeekFilter} />
+      <QuadrantLegend
+        quadrants={quadrants}
+        selectedQuadrant={selectedQuadrant}
+        onSelectQuadrant={setSelectedQuadrant}
+      />
       <div className="flex-1 min-h-0">
         <ResponsiveScatterPlot
           data={chartData}
@@ -313,7 +486,7 @@ export function WeeklyEfficiencyChart({ homeTeamStats, awayTeamStats, homeAbbrev
           colors={['#ef4444', '#3b82f6']}
           nodeSize={5}
           useMesh={true}
-          layers={['grid', 'axes', NodesLayer, 'markers', 'mesh', 'annotations', ClickableLegendLayer]}
+          layers={[QuadrantLayer, 'grid', 'axes', NodesLayer, 'markers', 'mesh', 'annotations', ClickableLegendLayer]}
           markers={[
             {
               axis: 'x',

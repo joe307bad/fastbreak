@@ -1162,13 +1162,10 @@ if (is_pre_selection) {
 
   # Determine date range to fetch
   # After Selection Sunday, always fetch at least the first round dates to get bracket structure
+  # Also fetch future dates to get scheduled games (Sweet 16, Elite 8, etc.) that have matchups set
   fetch_start <- TOURNAMENT_START
-  # If today is before tournament start, still fetch the first few days to get scheduled games
-  fetch_end <- if (today < TOURNAMENT_START) {
-    TOURNAMENT_START + 3  # Fetch March 19-22 to get Round of 64 and 32
-  } else {
-    min(today, TOURNAMENT_END)
-  }
+  # Always fetch the full tournament date range to capture scheduled future games
+  fetch_end <- TOURNAMENT_END
 
   # Fetch games for each day from tournament start to fetch_end
   current_date <- fetch_start

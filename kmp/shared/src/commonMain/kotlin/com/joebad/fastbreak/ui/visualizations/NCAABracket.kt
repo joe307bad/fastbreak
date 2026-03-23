@@ -207,21 +207,46 @@ fun NCAABracket(
                 // Default quadrant extent is 8, so use 9.5 to give margin for panning
                 val isZoomedIn = currentXExtent <= 9.5f
 
-                // Draw all four regions
-                // Show full details when zoomed in, dots when zoomed out
+                // FIRST PASS: Draw all connector lines (behind nodes)
+                // Draw region connectors
                 regions.forEachIndexed { index, region ->
                     val isReversed = index == 1 || index == 3  // South and West are reversed
                     val xOffset = if (index == 1 || index == 3) 4f else 0f
                     val yOffset = if (index == 0 || index == 1) 17f else 0f
 
-                    DrawRegionContent(
+                    DrawRegionConnectors(
+                        isReversed = isReversed,
+                        xOffset = xOffset,
+                        yOffset = yOffset,
+                        lineColor = lineColor
+                    )
+                }
+
+                // Draw Final Four connectors
+                DrawFinalFourConnectors(
+                    regions = regions,
+                    lineColor = lineColor,
+                    textColor = textColor,
+                    backgroundColor = backgroundColor,
+                    isLandscape = isLandscape,
+                    visualization = visualization,
+                    drawConnectorsOnly = true,
+                    onMatchupClick = { _, _, _, _ -> }
+                )
+
+                // SECOND PASS: Draw all matchup boxes (on top of connectors)
+                // Draw region matchup boxes
+                regions.forEachIndexed { index, region ->
+                    val isReversed = index == 1 || index == 3  // South and West are reversed
+                    val xOffset = if (index == 1 || index == 3) 4f else 0f
+                    val yOffset = if (index == 0 || index == 1) 17f else 0f
+
+                    DrawRegionMatchupBoxes(
                         region = region,
-                        regionName = region.name,
                         isReversed = isReversed,
                         xOffset = xOffset,
                         yOffset = yOffset,
                         showDetails = isZoomedIn,
-                        lineColor = lineColor,
                         textColor = textColor,
                         backgroundColor = backgroundColor,
                         onMatchupClick = { game, roundName ->
@@ -231,7 +256,7 @@ fun NCAABracket(
                     )
                 }
 
-                // Draw Final Four connector lines, Elite 8, semifinals, and championship
+                // Draw Final Four matchup boxes
                 DrawFinalFourConnectors(
                     regions = regions,
                     lineColor = lineColor,
@@ -239,6 +264,7 @@ fun NCAABracket(
                     backgroundColor = backgroundColor,
                     isLandscape = isLandscape,
                     visualization = visualization,
+                    drawConnectorsOnly = false,
                     onMatchupClick = { game, regionName, roundName, color ->
                         val gameInfo = gameInfoLookup[game.gameNumber]
                         selectedMatchup = MatchupSheetData(game, gameInfo, regionName, roundName, color)
@@ -437,8 +463,9 @@ private fun XYGraphScope<Float, Float>.DrawRegionContent(
 
     val allPositions = listOf(round1Positions, round2Positions, round3Positions, round4Positions)
 
-    // Draw connecting lines between rounds
-    for (roundIndex in 0 until 3) {
+    // Draw connecting lines between rounds (only Round of 64 → Round of 32 → Sweet 16)
+    // Elite 8 connectors are not drawn here since Elite 8 is rendered in the Final Four section
+    for (roundIndex in 0 until 2) {
         val currentPositions = allPositions.getOrNull(roundIndex) ?: continue
         val nextPositions = allPositions.getOrNull(roundIndex + 1) ?: continue
 
@@ -511,7 +538,121 @@ private fun XYGraphScope<Float, Float>.DrawRegionContent(
     region.rounds.dropLast(1).forEachIndexed { roundIndex, games ->
         val positions = allPositions.getOrNull(roundIndex) ?: return@forEachIndexed
         val xPosIndex = if (isReversed) 3 - roundIndex else roundIndex
-        val x = xOffset + (ROUND_X_POSITIONS.getOrNull(xPosIndex) ?: return@forEachIndexed)
+        var x = xOffset + (ROUND_X_POSITIONS.getOrNull(xPosIndex) ?: return@forEachIndexed)
+
+        // Shift Sweet 16 nodes away from center for better spacing
+        if (roundIndex == 2) {
+            x += if (isReversed) 0.7f else -0.7f
+        }
+        val roundName = roundNames.getOrNull(roundIndex) ?: "Round ${roundIndex + 1}"
+
+        games.forEachIndexed { gameIndex, game ->
+            val y = yOffset + (positions.getOrNull(gameIndex) ?: return@forEachIndexed)
+            DrawMatchupBox(
+                game = game,
+                x = x,
+                y = y,
+                regionColor = region.color,
+                textColor = textColor,
+                backgroundColor = backgroundColor,
+                showDetails = showDetails,
+                onClick = { onMatchupClick(game, roundName) }
+            )
+        }
+    }
+}
+
+/**
+ * Draws only the connector lines for a region (Round of 64 → Round of 32 → Sweet 16)
+ */
+@OptIn(ExperimentalKoalaPlotApi::class)
+@Composable
+private fun XYGraphScope<Float, Float>.DrawRegionConnectors(
+    isReversed: Boolean,
+    xOffset: Float,
+    yOffset: Float,
+    lineColor: Color
+) {
+    val round1Positions = listOf(15f, 13f, 11f, 9f, 7f, 5f, 3f, 1f)
+    val round2Positions = listOf(14f, 10f, 6f, 2f)
+    val round3Positions = listOf(12f, 4f)
+    val allPositions = listOf(round1Positions, round2Positions, round3Positions)
+
+    for (roundIndex in 0 until 2) {
+        val currentPositions = allPositions.getOrNull(roundIndex) ?: continue
+        val nextPositions = allPositions.getOrNull(roundIndex + 1) ?: continue
+
+        val currentXIndex = if (isReversed) 3 - roundIndex else roundIndex
+        val nextXIndex = if (isReversed) 2 - roundIndex else roundIndex + 1
+        val currentX = xOffset + (ROUND_X_POSITIONS.getOrNull(currentXIndex) ?: continue)
+        val nextX = xOffset + (ROUND_X_POSITIONS.getOrNull(nextXIndex) ?: continue)
+
+        for (i in nextPositions.indices) {
+            val topY = yOffset + (currentPositions.getOrNull(i * 2) ?: continue)
+            val bottomY = yOffset + (currentPositions.getOrNull(i * 2 + 1) ?: continue)
+            val midY = yOffset + (nextPositions.getOrNull(i) ?: continue)
+
+            LinePlot(
+                data = listOf(
+                    DefaultPoint(currentX + if (isReversed) -0.4f else 0.4f, topY),
+                    DefaultPoint((currentX + nextX) / 2, topY)
+                ),
+                lineStyle = LineStyle(brush = SolidColor(lineColor), strokeWidth = 1.5.dp)
+            )
+            LinePlot(
+                data = listOf(
+                    DefaultPoint(currentX + if (isReversed) -0.4f else 0.4f, bottomY),
+                    DefaultPoint((currentX + nextX) / 2, bottomY)
+                ),
+                lineStyle = LineStyle(brush = SolidColor(lineColor), strokeWidth = 1.5.dp)
+            )
+            LinePlot(
+                data = listOf(
+                    DefaultPoint((currentX + nextX) / 2, topY),
+                    DefaultPoint((currentX + nextX) / 2, bottomY)
+                ),
+                lineStyle = LineStyle(brush = SolidColor(lineColor), strokeWidth = 1.5.dp)
+            )
+            LinePlot(
+                data = listOf(
+                    DefaultPoint((currentX + nextX) / 2, midY),
+                    DefaultPoint(nextX + if (isReversed) 0.4f else -0.4f, midY)
+                ),
+                lineStyle = LineStyle(brush = SolidColor(lineColor), strokeWidth = 1.5.dp)
+            )
+        }
+    }
+}
+
+/**
+ * Draws only the matchup boxes for a region (Round of 64, Round of 32, Sweet 16)
+ */
+@OptIn(ExperimentalKoalaPlotApi::class)
+@Composable
+private fun XYGraphScope<Float, Float>.DrawRegionMatchupBoxes(
+    region: BracketRegion,
+    isReversed: Boolean,
+    xOffset: Float,
+    yOffset: Float,
+    showDetails: Boolean,
+    textColor: Color,
+    backgroundColor: Color,
+    onMatchupClick: (BracketGame, String) -> Unit
+) {
+    val round1Positions = listOf(15f, 13f, 11f, 9f, 7f, 5f, 3f, 1f)
+    val round2Positions = listOf(14f, 10f, 6f, 2f)
+    val round3Positions = listOf(12f, 4f)
+    val allPositions = listOf(round1Positions, round2Positions, round3Positions)
+    val roundNames = listOf("Round of 64", "Round of 32", "Sweet 16")
+
+    region.rounds.dropLast(1).forEachIndexed { roundIndex, games ->
+        val positions = allPositions.getOrNull(roundIndex) ?: return@forEachIndexed
+        val xPosIndex = if (isReversed) 3 - roundIndex else roundIndex
+        var x = xOffset + (ROUND_X_POSITIONS.getOrNull(xPosIndex) ?: return@forEachIndexed)
+
+        if (roundIndex == 2) {
+            x += if (isReversed) 0.7f else -0.7f
+        }
         val roundName = roundNames.getOrNull(roundIndex) ?: "Round ${roundIndex + 1}"
 
         games.forEachIndexed { gameIndex, game ->
@@ -534,6 +675,7 @@ private fun XYGraphScope<Float, Float>.DrawRegionContent(
  * Draws Final Four connector lines, Elite 8, semifinals, and championship matchups
  * These matchups are always visible with full details regardless of zoom level
  * In landscape mode, the Final Four games are arranged horizontally side by side
+ * @param drawConnectorsOnly When true, only draws connector lines. When false, only draws matchup boxes.
  */
 @OptIn(ExperimentalKoalaPlotApi::class)
 @Composable
@@ -544,6 +686,7 @@ private fun XYGraphScope<Float, Float>.DrawFinalFourConnectors(
     backgroundColor: Color,
     isLandscape: Boolean,
     visualization: NCAABracketVisualization? = null,
+    drawConnectorsOnly: Boolean = false,
     onMatchupClick: (BracketGame, String, String, Color) -> Unit
 ) {
     // Need at least 4 regions to draw Final Four connectors
@@ -560,26 +703,21 @@ private fun XYGraphScope<Float, Float>.DrawFinalFourConnectors(
     val bottomY = 8f // y position for Midwest/West Elite 8 (portrait)
 
     // Elite 8 matchup positions (region index to position)
-    // Portrait: stacked vertically in pairs at center
-    // Landscape: spread horizontally, positioned in the center of Sweet 16 area (same Y as portrait)
-    val elite8Positions = if (isLandscape) {
-        // Landscape: Elite 8 spread horizontally at Sweet 16 center positions
-        // Top row at Y=25 (center of top Sweet 16), bottom row at Y=8 (center of bottom Sweet 16)
-        listOf(
-            Triple(0, 4.5f, topY),      // East - left, in top Sweet 16 center
-            Triple(1, 7.5f, topY),      // South - right, in top Sweet 16 center
-            Triple(2, 4.5f, bottomY),   // Midwest - left, in bottom Sweet 16 center
-            Triple(3, 7.5f, bottomY)    // West - right, in bottom Sweet 16 center
-        )
-    } else {
-        // Portrait: stacked vertically at center in pairs
-        listOf(
-            Triple(0, centerX, topY + 2f),      // East (top pair, upper)
-            Triple(1, centerX, topY - 2f),      // South (top pair, lower)
-            Triple(2, centerX, bottomY + 2f),   // Midwest (bottom pair, upper)
-            Triple(3, centerX, bottomY - 2f)    // West (bottom pair, lower)
-        )
-    }
+    // Positioned horizontally - left regions on left, right regions on right
+    // This allows Sweet 16 to connect straight to Elite 8 without crossing
+    val elite8LeftX = 4.2f   // For East and Midwest (left side regions)
+    val elite8RightX = 7.8f  // For South and West (right side regions)
+
+    // Y positions for Elite 8
+    val elite8TopY = 25f     // East/South
+    val elite8BottomY = 8f   // Midwest/West
+
+    val elite8Positions = listOf(
+        Triple(0, elite8LeftX, elite8TopY),       // East - left side, top row
+        Triple(1, elite8RightX, elite8TopY),      // South - right side, top row
+        Triple(2, elite8LeftX, elite8BottomY),    // Midwest - left side, bottom row
+        Triple(3, elite8RightX, elite8BottomY)    // West - right side, bottom row
+    )
 
     // Final Four positions - different layout for portrait vs landscape
     // Portrait: stacked vertically with championship in center
@@ -627,143 +765,157 @@ private fun XYGraphScope<Float, Float>.DrawFinalFourConnectors(
         gameNumber = 1
     )
 
-    // Draw connector lines FIRST (so matchup boxes appear on top)
-    if (isLandscape) {
-        // Landscape: Elite 8 in center of Sweet 16 areas, Final Four in center
-        // Top row (Y=25): East(4.5) - South(7.5) in Sweet 16 center
-        // Middle (Y=16.5): Semi1(4.5) - Champ(6) - Semi2(7.5)
-        // Bottom row (Y=8): Midwest(4.5) - West(7.5) in Sweet 16 center
+    // Line style for connector lines
+    val connectorLineStyle = LineStyle(brush = SolidColor(lineColor), strokeWidth = 1.5.dp)
 
-        // Horizontal line connecting top Elite 8 pair (East - South)
-        LinePlot(
-            data = listOf(
-                DefaultPoint(4.0f, topY),
-                DefaultPoint(8.0f, topY)
-            ),
-            lineStyle = LineStyle(
-                brush = SolidColor(lineColor),
-                strokeWidth = 2.dp
-            )
-        )
+    // Sweet 16 positions for each region (matching the shifted positions in DrawRegionContent)
+    // Left regions (East/Midwest): x = 5 - 0.7 = 4.3
+    // Right regions (South/West): x = 4 + 3 + 0.7 = 7.7
+    val sweet16LeftX = 4.3f
+    val sweet16RightX = 7.7f
 
-        // Horizontal line connecting bottom Elite 8 pair (Midwest - West)
-        LinePlot(
-            data = listOf(
-                DefaultPoint(4.0f, bottomY),
-                DefaultPoint(8.0f, bottomY)
-            ),
-            lineStyle = LineStyle(
-                brush = SolidColor(lineColor),
-                strokeWidth = 2.dp
-            )
-        )
+    // Sweet 16 Y positions: round3Positions = [12, 4] + yOffset
+    // East/South: yOffset = 17, so y = 29, 21
+    // Midwest/West: yOffset = 0, so y = 12, 4
+    val sweet16TopPositions = listOf(
+        Triple(0, sweet16LeftX, 29f),   // East top
+        Triple(0, sweet16LeftX, 21f),   // East bottom
+        Triple(1, sweet16RightX, 29f),  // South top
+        Triple(1, sweet16RightX, 21f),  // South bottom
+        Triple(2, sweet16LeftX, 12f),   // Midwest top
+        Triple(2, sweet16LeftX, 4f),    // Midwest bottom
+        Triple(3, sweet16RightX, 12f),  // West top
+        Triple(3, sweet16RightX, 4f)    // West bottom
+    )
 
-        // Vertical connector from top Elite 8 row down to Final Four
-        LinePlot(
-            data = listOf(
-                DefaultPoint(centerX, topY),
-                DefaultPoint(centerX, finalFourY)
-            ),
-            lineStyle = LineStyle(
-                brush = SolidColor(lineColor),
-                strokeWidth = 2.dp
-            )
-        )
+    // Draw connector lines only when drawConnectorsOnly is true
+    if (drawConnectorsOnly) {
+    // Draw Sweet 16 → Elite 8 connector lines
+    // With horizontal Elite 8 layout, connectors go straight from Sweet 16 to Elite 8
+    elite8Positions.forEach { (regionIndex, elite8X, elite8Y) ->
+        val isLeftRegion = regionIndex == 0 || regionIndex == 2
+        val sweet16X = if (isLeftRegion) sweet16LeftX else sweet16RightX
 
-        // Vertical connector from bottom Elite 8 row up to Final Four
-        LinePlot(
-            data = listOf(
-                DefaultPoint(centerX, bottomY),
-                DefaultPoint(centerX, finalFourY)
-            ),
-            lineStyle = LineStyle(
-                brush = SolidColor(lineColor),
-                strokeWidth = 2.dp
-            )
-        )
-        // Note: No horizontal line at Final Four - the vertical connectors and matchup boxes
-        // are sufficient to show the bracket structure
-    } else {
-        // Portrait: Elite 8 pairs stacked vertically at center
-        // Vertical line connecting East to South (top pair)
-        LinePlot(
-            data = listOf(
-                DefaultPoint(centerX, topY + 2f),
-                DefaultPoint(centerX, topY - 2f)
-            ),
-            lineStyle = LineStyle(
-                brush = SolidColor(lineColor),
-                strokeWidth = 2.dp
-            )
-        )
+        // Get the two Sweet 16 Y positions for this region
+        val sweet16Games = sweet16TopPositions.filter { it.first == regionIndex }
+        if (sweet16Games.size >= 2) {
+            val sweet16TopY = sweet16Games[0].third
+            val sweet16BottomY = sweet16Games[1].third
 
-        // Vertical line connecting Midwest to West (bottom pair)
-        LinePlot(
-            data = listOf(
-                DefaultPoint(centerX, bottomY + 2f),
-                DefaultPoint(centerX, bottomY - 2f)
-            ),
-            lineStyle = LineStyle(
-                brush = SolidColor(lineColor),
-                strokeWidth = 2.dp
+            // Horizontal from top Sweet 16 to vertical connector
+            LinePlot(
+                data = listOf(
+                    DefaultPoint(sweet16X + if (isLeftRegion) 0.5f else -0.5f, sweet16TopY),
+                    DefaultPoint(elite8X, sweet16TopY)
+                ),
+                lineStyle = connectorLineStyle
             )
-        )
 
-        // Connector from top Elite 8 pair to top semifinal
-        LinePlot(
-            data = listOf(
-                DefaultPoint(centerX, topY - 2f),
-                DefaultPoint(centerX, semifinal1Y)
-            ),
-            lineStyle = LineStyle(
-                brush = SolidColor(lineColor),
-                strokeWidth = 2.dp
+            // Horizontal from bottom Sweet 16 to vertical connector
+            LinePlot(
+                data = listOf(
+                    DefaultPoint(sweet16X + if (isLeftRegion) 0.5f else -0.5f, sweet16BottomY),
+                    DefaultPoint(elite8X, sweet16BottomY)
+                ),
+                lineStyle = connectorLineStyle
             )
-        )
 
-        // Connector from bottom Elite 8 pair to bottom semifinal
-        LinePlot(
-            data = listOf(
-                DefaultPoint(centerX, bottomY + 2f),
-                DefaultPoint(centerX, semifinal2Y)
-            ),
-            lineStyle = LineStyle(
-                brush = SolidColor(lineColor),
-                strokeWidth = 2.dp
+            // Vertical connector between the two Sweet 16 lines
+            LinePlot(
+                data = listOf(
+                    DefaultPoint(elite8X, sweet16TopY),
+                    DefaultPoint(elite8X, sweet16BottomY)
+                ),
+                lineStyle = connectorLineStyle
             )
-        )
 
-        // Championship connector (vertical line between the two Final Four semifinals)
-        LinePlot(
-            data = listOf(
-                DefaultPoint(centerX, semifinal2Y),
-                DefaultPoint(centerX, championshipY)
-            ),
-            lineStyle = LineStyle(
-                brush = SolidColor(lineColor),
-                strokeWidth = 2.dp
+            // Vertical to Elite 8 (from midpoint of Sweet 16 to Elite 8)
+            LinePlot(
+                data = listOf(
+                    DefaultPoint(elite8X, elite8Y + if (sweet16TopY > elite8Y) 0.5f else -0.5f),
+                    DefaultPoint(elite8X, elite8Y)
+                ),
+                lineStyle = connectorLineStyle
             )
-        )
-        LinePlot(
-            data = listOf(
-                DefaultPoint(centerX, championshipY),
-                DefaultPoint(centerX, semifinal1Y)
-            ),
-            lineStyle = LineStyle(
-                brush = SolidColor(lineColor),
-                strokeWidth = 2.dp
-            )
-        )
+        }
     }
 
-    // Draw Elite 8 matchup boxes AFTER lines (so they appear on top)
+    // Elite 8 → Final Four horizontal connectors
+    // Top row: East (left) and South (right) connect horizontally, then down to semifinal 1
+    LinePlot(
+        data = listOf(
+            DefaultPoint(elite8LeftX + 0.5f, elite8TopY),
+            DefaultPoint(elite8RightX - 0.5f, elite8TopY)
+        ),
+        lineStyle = connectorLineStyle
+    )
+    // Vertical from top Elite 8 connector to Semifinal 1
+    LinePlot(
+        data = listOf(
+            DefaultPoint(centerX, elite8TopY),
+            DefaultPoint(centerX, semifinal1Y + 0.5f)
+        ),
+        lineStyle = connectorLineStyle
+    )
+
+    // Bottom row: Midwest (left) and West (right) connect horizontally, then up to semifinal 2
+    LinePlot(
+        data = listOf(
+            DefaultPoint(elite8LeftX + 0.5f, elite8BottomY),
+            DefaultPoint(elite8RightX - 0.5f, elite8BottomY)
+        ),
+        lineStyle = connectorLineStyle
+    )
+    // Vertical from bottom Elite 8 connector to Semifinal 2
+    LinePlot(
+        data = listOf(
+            DefaultPoint(centerX, elite8BottomY),
+            DefaultPoint(centerX, semifinal2Y - 0.5f)
+        ),
+        lineStyle = connectorLineStyle
+    )
+
+    // Final Four → Championship connector lines
+    val champMidY = championshipY
+    // Semifinal 1 to championship
+    LinePlot(
+        data = listOf(
+            DefaultPoint(semifinal1X, semifinal1Y - 0.5f),
+            DefaultPoint(semifinal1X, champMidY)
+        ),
+        lineStyle = connectorLineStyle
+    )
+    // Semifinal 2 to championship
+    LinePlot(
+        data = listOf(
+            DefaultPoint(semifinal2X, semifinal2Y + 0.5f),
+            DefaultPoint(semifinal2X, champMidY)
+        ),
+        lineStyle = connectorLineStyle
+    )
+    // Horizontal connector to championship
+    LinePlot(
+        data = listOf(
+            DefaultPoint(semifinal1X, champMidY),
+            DefaultPoint(semifinal2X, champMidY)
+        ),
+        lineStyle = connectorLineStyle
+    )
+    } // end if (drawConnectorsOnly)
+
+    // Draw matchup boxes only when drawConnectorsOnly is false
+    if (!drawConnectorsOnly) {
+    // Use transparent line style to ensure no lines are drawn between symbol points
+    val noLineStyle = LineStyle(brush = SolidColor(Color.Transparent), strokeWidth = 0.dp)
+
+    // Draw Elite 8 matchup boxes
     elite8Positions.forEach { (regionIndex, x, y) ->
         val region = regions.getOrNull(regionIndex) ?: return@forEach
         val elite8Game = region.rounds.lastOrNull()?.firstOrNull() ?: return@forEach
 
         LinePlot(
             data = listOf(DefaultPoint(x, y)),
-            lineStyle = null,
+            lineStyle = noLineStyle,
             symbol = {
                 MatchupBoxSymbol(
                     game = elite8Game,
@@ -782,7 +934,7 @@ private fun XYGraphScope<Float, Float>.DrawFinalFourConnectors(
     // Semifinal 1 (East vs South) - left in landscape, top in portrait
     LinePlot(
         data = listOf(DefaultPoint(semifinal1X, semifinal1Y)),
-        lineStyle = null,
+        lineStyle = noLineStyle,
         symbol = {
             MatchupBoxSymbol(
                 game = topSemifinal,
@@ -797,7 +949,7 @@ private fun XYGraphScope<Float, Float>.DrawFinalFourConnectors(
     // Semifinal 2 (Midwest vs West) - right in landscape, bottom in portrait
     LinePlot(
         data = listOf(DefaultPoint(semifinal2X, semifinal2Y)),
-        lineStyle = null,
+        lineStyle = noLineStyle,
         symbol = {
             MatchupBoxSymbol(
                 game = bottomSemifinal,
@@ -812,7 +964,7 @@ private fun XYGraphScope<Float, Float>.DrawFinalFourConnectors(
     // Championship game (center between semifinals)
     LinePlot(
         data = listOf(DefaultPoint(championshipX, championshipY)),
-        lineStyle = null,
+        lineStyle = noLineStyle,
         symbol = {
             MatchupBoxSymbol(
                 game = championshipGame,
@@ -823,6 +975,7 @@ private fun XYGraphScope<Float, Float>.DrawFinalFourConnectors(
             )
         }
     )
+    } // end if (!drawConnectorsOnly)
 }
 
 /**
@@ -841,9 +994,12 @@ private fun XYGraphScope<Float, Float>.DrawMatchupBox(
     showDetails: Boolean,
     onClick: () -> Unit
 ) {
+    // Use transparent line style to prevent any line rendering
+    val noLineStyle = LineStyle(brush = SolidColor(Color.Transparent), strokeWidth = 0.dp)
+
     LinePlot(
         data = listOf(DefaultPoint(x, y)),
-        lineStyle = null,
+        lineStyle = noLineStyle,
         symbol = {
             if (showDetails) {
                 MatchupBoxSymbol(
@@ -1885,65 +2041,36 @@ private fun convertRegionInfoToBracketRegion(regionInfo: BracketRegionInfo): Bra
         } else {
             // Process existing games from data
             val games = roundInfo.games.mapIndexed { index, gameInfo ->
-                // For Round 2+, check if the game has been decided
-                // Games show TBD if:
-                // 1. It's Round 2 or later (roundIndex > 0)
-                // 2. AND the game status is NOT "FINAL" or "IN_PROGRESS"
+                // Check game status to determine if we should show winner highlighting
                 val gameStatus = gameInfo.gameStatus?.uppercase() ?: ""
                 val isGameDecided = gameStatus == "FINAL" || gameStatus == "IN_PROGRESS"
-                val shouldShowTbd = roundIndex > 0 && !isGameDecided
 
-                // For round 1, teams should exist. For later rounds, show TBD if game not decided
-                val team1 = if (shouldShowTbd || isTbdTeam(gameInfo.team1)) {
-                    if (roundIndex > 0) {
-                        null  // Show as TBD for undecided later rounds
-                    } else {
-                        // Round 1 - only null if actually TBD
-                        if (isTbdTeam(gameInfo.team1)) null else {
-                            gameInfo.team1?.let { t ->
-                                BracketTeam(
-                                    seed = t.seed,
-                                    name = t.name,
-                                    score = t.score,
-                                    isWinner = gameInfo.winner == t.name || (t.score != null && gameInfo.team2?.score != null && t.score > gameInfo.team2.score)
-                                )
-                            }
-                        }
-                    }
+                // Show team if data exists, otherwise TBD
+                // For scheduled games, show teams but without winner highlighting
+                val team1 = if (isTbdTeam(gameInfo.team1)) {
+                    null
                 } else {
                     gameInfo.team1?.let { t ->
                         BracketTeam(
                             seed = t.seed,
                             name = t.name,
                             score = t.score,
-                            isWinner = gameInfo.winner == t.name || (t.score != null && gameInfo.team2?.score != null && t.score > gameInfo.team2.score)
+                            // Only show winner for decided games
+                            isWinner = isGameDecided && (gameInfo.winner == t.name || (t.score != null && gameInfo.team2?.score != null && t.score > gameInfo.team2.score))
                         )
                     }
                 }
 
-                val team2 = if (shouldShowTbd || isTbdTeam(gameInfo.team2)) {
-                    if (roundIndex > 0) {
-                        null  // Show as TBD for undecided later rounds
-                    } else {
-                        // Round 1 - only null if actually TBD
-                        if (isTbdTeam(gameInfo.team2)) null else {
-                            gameInfo.team2?.let { t ->
-                                BracketTeam(
-                                    seed = t.seed,
-                                    name = t.name,
-                                    score = t.score,
-                                    isWinner = gameInfo.winner == t.name || (t.score != null && gameInfo.team1?.score != null && t.score > gameInfo.team1.score)
-                                )
-                            }
-                        }
-                    }
+                val team2 = if (isTbdTeam(gameInfo.team2)) {
+                    null
                 } else {
                     gameInfo.team2?.let { t ->
                         BracketTeam(
                             seed = t.seed,
                             name = t.name,
                             score = t.score,
-                            isWinner = gameInfo.winner == t.name || (t.score != null && gameInfo.team1?.score != null && t.score > gameInfo.team1.score)
+                            // Only show winner for decided games
+                            isWinner = isGameDecided && (gameInfo.winner == t.name || (t.score != null && gameInfo.team1?.score != null && t.score > gameInfo.team1.score))
                         )
                     }
                 }

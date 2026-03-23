@@ -592,6 +592,9 @@ private fun XYGraphScope<Float, Float>.DrawRegionConnectors(
             val bottomY = yOffset + (currentPositions.getOrNull(i * 2 + 1) ?: continue)
             val midY = yOffset + (nextPositions.getOrNull(i) ?: continue)
 
+            // For Sweet 16 (roundIndex == 1), use larger offset to stop before shifted dots
+            val nextRoundOffset = if (roundIndex == 1) 1.0f else 0.4f
+
             LinePlot(
                 data = listOf(
                     DefaultPoint(currentX + if (isReversed) -0.4f else 0.4f, topY),
@@ -616,7 +619,7 @@ private fun XYGraphScope<Float, Float>.DrawRegionConnectors(
             LinePlot(
                 data = listOf(
                     DefaultPoint((currentX + nextX) / 2, midY),
-                    DefaultPoint(nextX + if (isReversed) 0.4f else -0.4f, midY)
+                    DefaultPoint(nextX + if (isReversed) nextRoundOffset else -nextRoundOffset, midY)
                 ),
                 lineStyle = LineStyle(brush = SolidColor(lineColor), strokeWidth = 1.5.dp)
             )
@@ -791,49 +794,33 @@ private fun XYGraphScope<Float, Float>.DrawFinalFourConnectors(
     // Draw connector lines only when drawConnectorsOnly is true
     if (drawConnectorsOnly) {
     // Draw Sweet 16 → Elite 8 connector lines
-    // With horizontal Elite 8 layout, connectors go straight from Sweet 16 to Elite 8
     elite8Positions.forEach { (regionIndex, elite8X, elite8Y) ->
         val isLeftRegion = regionIndex == 0 || regionIndex == 2
-        val sweet16X = if (isLeftRegion) sweet16LeftX else sweet16RightX
-
         // Get the two Sweet 16 Y positions for this region
         val sweet16Games = sweet16TopPositions.filter { it.first == regionIndex }
         if (sweet16Games.size >= 2) {
             val sweet16TopY = sweet16Games[0].third
             val sweet16BottomY = sweet16Games[1].third
 
-            // Horizontal from top Sweet 16 to vertical connector
+            // Offset to stop lines before reaching dots
+            val dotOffset = 0.7f
+            // Align connector x with Sweet 16 dots
+            val connectorX = if (isLeftRegion) sweet16LeftX else sweet16RightX
+
+            // Vertical connector from top Sweet 16 Y down to Elite 8 (stop short of both dots)
             LinePlot(
                 data = listOf(
-                    DefaultPoint(sweet16X + if (isLeftRegion) 0.5f else -0.5f, sweet16TopY),
-                    DefaultPoint(elite8X, sweet16TopY)
+                    DefaultPoint(connectorX, sweet16TopY - dotOffset),
+                    DefaultPoint(connectorX, elite8Y + dotOffset)
                 ),
                 lineStyle = connectorLineStyle
             )
 
-            // Horizontal from bottom Sweet 16 to vertical connector
+            // Vertical connector from bottom Sweet 16 Y up to Elite 8 (stop short of both dots)
             LinePlot(
                 data = listOf(
-                    DefaultPoint(sweet16X + if (isLeftRegion) 0.5f else -0.5f, sweet16BottomY),
-                    DefaultPoint(elite8X, sweet16BottomY)
-                ),
-                lineStyle = connectorLineStyle
-            )
-
-            // Vertical connector between the two Sweet 16 lines
-            LinePlot(
-                data = listOf(
-                    DefaultPoint(elite8X, sweet16TopY),
-                    DefaultPoint(elite8X, sweet16BottomY)
-                ),
-                lineStyle = connectorLineStyle
-            )
-
-            // Vertical to Elite 8 (from midpoint of Sweet 16 to Elite 8)
-            LinePlot(
-                data = listOf(
-                    DefaultPoint(elite8X, elite8Y + if (sweet16TopY > elite8Y) 0.5f else -0.5f),
-                    DefaultPoint(elite8X, elite8Y)
+                    DefaultPoint(connectorX, sweet16BottomY + dotOffset),
+                    DefaultPoint(connectorX, elite8Y - dotOffset)
                 ),
                 lineStyle = connectorLineStyle
             )

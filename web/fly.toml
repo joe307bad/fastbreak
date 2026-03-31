@@ -10,7 +10,7 @@ primary_region = 'iad'
   dockerfile = 'Dockerfile.web'
 
 [http_service]
-  internal_port = 80
+  internal_port = 3000
   force_https = true
   auto_stop_machines = 'stop'
   auto_start_machines = true

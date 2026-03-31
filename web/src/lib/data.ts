@@ -19,7 +19,12 @@ export function getChartRegistry(): Registry {
   const chartRegistry: Registry = {};
   for (const [key, entry] of Object.entries(registry)) {
     if (isChartEntry(entry)) {
-      chartRegistry[key] = entry;
+      // Only include charts that have local data files
+      const chartId = key.replace('dev/', '').replace('.json', '');
+      const chartPath = path.join(CHARTS_DIR, `${chartId}.json`);
+      if (fs.existsSync(chartPath)) {
+        chartRegistry[key] = entry;
+      }
     }
   }
   return chartRegistry;

@@ -4,6 +4,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.*
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -44,7 +45,8 @@ data class BracketTeam(
 data class BracketGame(
     val team1: BracketTeam?,
     val team2: BracketTeam?,
-    val gameNumber: Int
+    val gameNumber: Int,
+    val sourceGameInfo: BracketGameInfo? = null
 )
 
 data class BracketRegion(
@@ -111,10 +113,6 @@ fun NCAABracket(
         } ?: generateBracketRegions()
     }
 
-    // Create a lookup map from visualization for game comparisons
-    val gameInfoLookup = remember(visualization) {
-        buildGameInfoLookup(visualization)
-    }
     var currentQuadrant by remember { mutableIntStateOf(0) }
     var isNavigationExpanded by remember { mutableStateOf(true) }
     var selectedMatchup by remember { mutableStateOf<MatchupSheetData?>(null) }
@@ -250,8 +248,7 @@ fun NCAABracket(
                         textColor = textColor,
                         backgroundColor = backgroundColor,
                         onMatchupClick = { game, roundName ->
-                            val gameInfo = gameInfoLookup[game.gameNumber]
-                            selectedMatchup = MatchupSheetData(game, gameInfo, region.name, roundName, region.color)
+                            selectedMatchup = MatchupSheetData(game, game.sourceGameInfo, region.name, roundName, region.color)
                         }
                     )
                 }
@@ -266,8 +263,7 @@ fun NCAABracket(
                     visualization = visualization,
                     drawConnectorsOnly = false,
                     onMatchupClick = { game, regionName, roundName, color ->
-                        val gameInfo = gameInfoLookup[game.gameNumber]
-                        selectedMatchup = MatchupSheetData(game, gameInfo, regionName, roundName, color)
+                        selectedMatchup = MatchupSheetData(game, game.sourceGameInfo, regionName, roundName, color)
                     }
                 )
             }
@@ -734,39 +730,78 @@ private fun XYGraphScope<Float, Float>.DrawFinalFourConnectors(
     val championshipX = centerX  // Always at center (6.0)
     val championshipY = 16.5f
 
-    // Create Final Four semifinal games from Elite 8 winners (with defensive null checks)
-    val eastElite8 = regions.getOrNull(0)?.rounds?.lastOrNull()?.firstOrNull()
-    val southElite8 = regions.getOrNull(1)?.rounds?.lastOrNull()?.firstOrNull()
-    val midwestElite8 = regions.getOrNull(2)?.rounds?.lastOrNull()?.firstOrNull()
-    val westElite8 = regions.getOrNull(3)?.rounds?.lastOrNull()?.firstOrNull()
+    // Use actual Final Four data from visualization if available, otherwise create from Elite 8 winners
+    val finalFour = visualization?.finalFour
 
-    // Get winners from Elite 8 games (with null safety)
-    val eastWinner = eastElite8?.let { game -> if (game.team1?.isWinner == true) game.team1 else game.team2 }
-    val southWinner = southElite8?.let { game -> if (game.team1?.isWinner == true) game.team1 else game.team2 }
-    val midwestWinner = midwestElite8?.let { game -> if (game.team1?.isWinner == true) game.team1 else game.team2 }
-    val westWinner = westElite8?.let { game -> if (game.team1?.isWinner == true) game.team1 else game.team2 }
+    // Helper to convert BracketGameInfo to BracketGame
+    fun convertGameInfo(gameInfo: BracketGameInfo?): BracketGame? {
+        if (gameInfo == null) return null
+        val gameStatus = gameInfo.gameStatus?.uppercase() ?: ""
+        val isGameDecided = gameStatus == "FINAL" || gameStatus == "IN_PROGRESS"
 
-    // Final Four semifinal games
-    val topSemifinal = BracketGame(
-        team1 = eastWinner?.copy(score = 72, isWinner = true),
-        team2 = southWinner?.copy(score = 68, isWinner = false),
-        gameNumber = 1
-    )
-    val bottomSemifinal = BracketGame(
-        team1 = midwestWinner?.copy(score = 75, isWinner = true),
-        team2 = westWinner?.copy(score = 70, isWinner = false),
-        gameNumber = 2
-    )
+        val team1 = if (isTbdTeam(gameInfo.team1)) null else gameInfo.team1?.let { t ->
+            BracketTeam(
+                seed = t.seed,
+                name = t.name,
+                score = t.score,
+                isWinner = isGameDecided && (gameInfo.winner == t.name ||
+                    (t.score != null && gameInfo.team2?.score != null && t.score > gameInfo.team2.score))
+            )
+        }
+        val team2 = if (isTbdTeam(gameInfo.team2)) null else gameInfo.team2?.let { t ->
+            BracketTeam(
+                seed = t.seed,
+                name = t.name,
+                score = t.score,
+                isWinner = isGameDecided && (gameInfo.winner == t.name ||
+                    (t.score != null && gameInfo.team1?.score != null && t.score > gameInfo.team1.score))
+            )
+        }
+        return BracketGame(team1 = team1, team2 = team2, gameNumber = gameInfo.gameNumber ?: 0, sourceGameInfo = gameInfo)
+    }
 
-    // Championship game from semifinal winners
-    val topSemifinalWinner = if (topSemifinal.team1?.isWinner == true) topSemifinal.team1 else topSemifinal.team2
-    val bottomSemifinalWinner = if (bottomSemifinal.team1?.isWinner == true) bottomSemifinal.team1 else bottomSemifinal.team2
+    // Try to use visualization Final Four data, fall back to mock data from Elite 8 winners
+    val topSemifinal: BracketGame
+    val bottomSemifinal: BracketGame
+    val championshipGame: BracketGame
 
-    val championshipGame = BracketGame(
-        team1 = topSemifinalWinner?.copy(score = 68, isWinner = true),
-        team2 = bottomSemifinalWinner?.copy(score = 64, isWinner = false),
-        gameNumber = 1
-    )
+    if (finalFour?.semifinal1 != null || finalFour?.semifinal2 != null || finalFour?.championship != null) {
+        // Use actual visualization data
+        topSemifinal = convertGameInfo(finalFour?.semifinal1) ?: BracketGame(null, null, 0)
+        bottomSemifinal = convertGameInfo(finalFour?.semifinal2) ?: BracketGame(null, null, 0)
+        championshipGame = convertGameInfo(finalFour?.championship) ?: BracketGame(null, null, 0)
+    } else {
+        // Fall back to deriving from Elite 8 winners (mock data for preview)
+        val eastElite8 = regions.getOrNull(0)?.rounds?.lastOrNull()?.firstOrNull()
+        val southElite8 = regions.getOrNull(1)?.rounds?.lastOrNull()?.firstOrNull()
+        val midwestElite8 = regions.getOrNull(2)?.rounds?.lastOrNull()?.firstOrNull()
+        val westElite8 = regions.getOrNull(3)?.rounds?.lastOrNull()?.firstOrNull()
+
+        val eastWinner = eastElite8?.let { game -> if (game.team1?.isWinner == true) game.team1 else game.team2 }
+        val southWinner = southElite8?.let { game -> if (game.team1?.isWinner == true) game.team1 else game.team2 }
+        val midwestWinner = midwestElite8?.let { game -> if (game.team1?.isWinner == true) game.team1 else game.team2 }
+        val westWinner = westElite8?.let { game -> if (game.team1?.isWinner == true) game.team1 else game.team2 }
+
+        topSemifinal = BracketGame(
+            team1 = eastWinner?.copy(score = null, isWinner = false),
+            team2 = southWinner?.copy(score = null, isWinner = false),
+            gameNumber = 0
+        )
+        bottomSemifinal = BracketGame(
+            team1 = midwestWinner?.copy(score = null, isWinner = false),
+            team2 = westWinner?.copy(score = null, isWinner = false),
+            gameNumber = 0
+        )
+
+        val topSemifinalWinner = if (topSemifinal.team1?.isWinner == true) topSemifinal.team1 else topSemifinal.team2
+        val bottomSemifinalWinner = if (bottomSemifinal.team1?.isWinner == true) bottomSemifinal.team1 else bottomSemifinal.team2
+
+        championshipGame = BracketGame(
+            team1 = topSemifinalWinner?.copy(score = null, isWinner = false),
+            team2 = bottomSemifinalWinner?.copy(score = null, isWinner = false),
+            gameNumber = 0
+        )
+    }
 
     // Line style for connector lines
     val connectorLineStyle = LineStyle(brush = SolidColor(lineColor), strokeWidth = 1.5.dp)
@@ -1029,6 +1064,13 @@ private fun MatchupBoxSymbol(
     backgroundColor: Color,
     onClick: () -> Unit = {}
 ) {
+    val isDarkTheme = isSystemInDarkTheme()
+    val borderColor = if (isDarkTheme) {
+        Color.White
+    } else {
+        MaterialTheme.colorScheme.outline.copy(alpha = 0.4f)
+    }
+
     Card(
         modifier = Modifier
             .width(100.dp)
@@ -1036,7 +1078,7 @@ private fun MatchupBoxSymbol(
         colors = CardDefaults.cardColors(
             containerColor = backgroundColor
         ),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.4f))
+        border = BorderStroke(1.dp, borderColor)
     ) {
         Column {
             game.team1?.let { team ->
@@ -1231,7 +1273,7 @@ private fun MatchupBottomSheet(
                     modifier = Modifier
                         .fillMaxSize()
                         .verticalScroll(rememberScrollState())
-                        .padding(top = 20.dp)
+                        .padding(top = 36.dp)
                 ) {
                     // Record section (like CBB)
                     if (team1Info != null || team2Info != null) {
@@ -1300,15 +1342,18 @@ private fun MatchupBottomSheet(
 
                         Spacer(modifier = Modifier.height(8.dp))
 
+                        // Note: In R comparisons, home=team1, away=team2
+                        // homeOffVsAwayDef = team1's offense vs team2's defense
+                        // awayOffVsHomeDef = team2's offense vs team1's defense
                         when (viewSelection) {
                             0 -> BracketTeamStatsView(comparisons)
                             1 -> BracketOffenseVsDefenseView(
-                                comparisons = comparisons.awayOffVsHomeDef,
+                                comparisons = comparisons.homeOffVsAwayDef,
                                 offTeam = team1Name,
                                 defTeam = team2Name
                             )
                             2 -> BracketOffenseVsDefenseView(
-                                comparisons = comparisons.homeOffVsAwayDef,
+                                comparisons = comparisons.awayOffVsHomeDef,
                                 offTeam = team2Name,
                                 defTeam = team1Name
                             )
@@ -1429,6 +1474,9 @@ private fun MatchupBottomSheet(
 
 /**
  * Team stats view for bracket matchup - side by side comparison using FiveColumnRowWithRanks
+ * Note: In comparisons, "home" = team1 and "away" = team2
+ * Header displays team1 on LEFT, team2 on RIGHT
+ * So we use home values for LEFT column and away values for RIGHT column
  */
 @Composable
 private fun BracketTeamStatsView(comparisons: com.joebad.fastbreak.data.model.MatchupComparisons) {
@@ -1440,34 +1488,36 @@ private fun BracketTeamStatsView(comparisons: com.joebad.fastbreak.data.model.Ma
             Spacer(modifier = Modifier.height(4.dp))
 
             offenseStats.forEach { (key, stat) ->
-                val awayValue = stat.away.value
-                val awayRank = stat.away.rank
-                val awayRankDisplay = stat.away.rankDisplay
-                val homeValue = stat.home.value
-                val homeRank = stat.home.rank
-                val homeRankDisplay = stat.home.rankDisplay
+                // home = team1 (left), away = team2 (right)
+                val leftValue = stat.home.value
+                val leftRank = stat.home.rank
+                val leftRankDisplay = stat.home.rankDisplay
+                val rightValue = stat.away.value
+                val rightRank = stat.away.rank
+                val rightRankDisplay = stat.away.rankDisplay
                 val label = stat.label
 
                 // Use rank-based advantage (lower rank is better)
-                val advantage = if (awayRank != null && homeRank != null) {
+                // Positive = right (team2) has advantage, Negative = left (team1) has advantage
+                val advantage = if (leftRank != null && rightRank != null) {
                     when {
-                        awayRank < homeRank -> -1
-                        awayRank > homeRank -> 1
+                        leftRank < rightRank -> -1  // team1 (left) has better rank
+                        leftRank > rightRank -> 1   // team2 (right) has better rank
                         else -> 0
                     }
                 } else 0
 
-                val awayText = awayValue?.formatStat(2) ?: "-"
-                val homeText = homeValue?.formatStat(2) ?: "-"
+                val leftText = leftValue?.formatStat(2) ?: "-"
+                val rightText = rightValue?.formatStat(2) ?: "-"
 
                 FiveColumnRowWithRanks(
-                    leftValue = awayText,
-                    leftRank = awayRank,
-                    leftRankDisplay = awayRankDisplay,
+                    leftValue = leftText,
+                    leftRank = leftRank,
+                    leftRankDisplay = leftRankDisplay,
                     centerText = label,
-                    rightValue = homeText,
-                    rightRank = homeRank,
-                    rightRankDisplay = homeRankDisplay,
+                    rightValue = rightText,
+                    rightRank = rightRank,
+                    rightRankDisplay = rightRankDisplay,
                     advantage = advantage,
                     useCBBRanks = true
                 )
@@ -1483,33 +1533,34 @@ private fun BracketTeamStatsView(comparisons: com.joebad.fastbreak.data.model.Ma
             Spacer(modifier = Modifier.height(4.dp))
 
             defenseStats.forEach { (key, stat) ->
-                val awayValue = stat.away.value
-                val awayRank = stat.away.rank
-                val awayRankDisplay = stat.away.rankDisplay
-                val homeValue = stat.home.value
-                val homeRank = stat.home.rank
-                val homeRankDisplay = stat.home.rankDisplay
+                // home = team1 (left), away = team2 (right)
+                val leftValue = stat.home.value
+                val leftRank = stat.home.rank
+                val leftRankDisplay = stat.home.rankDisplay
+                val rightValue = stat.away.value
+                val rightRank = stat.away.rank
+                val rightRankDisplay = stat.away.rankDisplay
                 val label = stat.label
 
-                val advantage = if (awayRank != null && homeRank != null) {
+                val advantage = if (leftRank != null && rightRank != null) {
                     when {
-                        awayRank < homeRank -> -1
-                        awayRank > homeRank -> 1
+                        leftRank < rightRank -> -1
+                        leftRank > rightRank -> 1
                         else -> 0
                     }
                 } else 0
 
-                val awayText = awayValue?.formatStat(2) ?: "-"
-                val homeText = homeValue?.formatStat(2) ?: "-"
+                val leftText = leftValue?.formatStat(2) ?: "-"
+                val rightText = rightValue?.formatStat(2) ?: "-"
 
                 FiveColumnRowWithRanks(
-                    leftValue = awayText,
-                    leftRank = awayRank,
-                    leftRankDisplay = awayRankDisplay,
+                    leftValue = leftText,
+                    leftRank = leftRank,
+                    leftRankDisplay = leftRankDisplay,
                     centerText = label,
-                    rightValue = homeText,
-                    rightRank = homeRank,
-                    rightRankDisplay = homeRankDisplay,
+                    rightValue = rightText,
+                    rightRank = rightRank,
+                    rightRankDisplay = rightRankDisplay,
                     advantage = advantage,
                     useCBBRanks = true
                 )
@@ -1525,33 +1576,34 @@ private fun BracketTeamStatsView(comparisons: com.joebad.fastbreak.data.model.Ma
             Spacer(modifier = Modifier.height(4.dp))
 
             overallStats.forEach { (key, stat) ->
-                val awayValue = stat.away.value
-                val awayRank = stat.away.rank
-                val awayRankDisplay = stat.away.rankDisplay
-                val homeValue = stat.home.value
-                val homeRank = stat.home.rank
-                val homeRankDisplay = stat.home.rankDisplay
+                // home = team1 (left), away = team2 (right)
+                val leftValue = stat.home.value
+                val leftRank = stat.home.rank
+                val leftRankDisplay = stat.home.rankDisplay
+                val rightValue = stat.away.value
+                val rightRank = stat.away.rank
+                val rightRankDisplay = stat.away.rankDisplay
                 val label = stat.label
 
-                val advantage = if (awayRank != null && homeRank != null) {
+                val advantage = if (leftRank != null && rightRank != null) {
                     when {
-                        awayRank < homeRank -> -1
-                        awayRank > homeRank -> 1
+                        leftRank < rightRank -> -1
+                        leftRank > rightRank -> 1
                         else -> 0
                     }
                 } else 0
 
-                val awayText = awayValue?.formatStat(2) ?: "-"
-                val homeText = homeValue?.formatStat(2) ?: "-"
+                val leftText = leftValue?.formatStat(2) ?: "-"
+                val rightText = rightValue?.formatStat(2) ?: "-"
 
                 FiveColumnRowWithRanks(
-                    leftValue = awayText,
-                    leftRank = awayRank,
-                    leftRankDisplay = awayRankDisplay,
+                    leftValue = leftText,
+                    leftRank = leftRank,
+                    leftRankDisplay = leftRankDisplay,
                     centerText = label,
-                    rightValue = homeText,
-                    rightRank = homeRank,
-                    rightRankDisplay = homeRankDisplay,
+                    rightValue = rightText,
+                    rightRank = rightRank,
+                    rightRankDisplay = rightRankDisplay,
                     advantage = advantage,
                     useCBBRanks = true
                 )
@@ -1608,7 +1660,11 @@ private fun BracketOffenseVsDefenseView(
 }
 
 /**
- * Record section showing seed, record, and rankings for bracket matchup (similar to CBB)
+ * Record section showing seed, record, and rankings for bracket matchup
+ * Matches CBBRecordSection styling with colored AP rank indicator
+ * Line 1: [colored indicator] record
+ * Line 2: #N AP / #N SRS
+ * Line 3: Conference
  */
 @Composable
 private fun BracketRecordSection(
@@ -1641,14 +1697,25 @@ private fun BracketRecordSection(
             modifier = Modifier.weight(1f),
             horizontalAlignment = Alignment.Start
         ) {
-            // Record
-            if (team1?.wins != null && team1.losses != null) {
-                Text(
-                    text = "${team1.wins}-${team1.losses}",
-                    style = textStyle,
-                    fontSize = 11.sp,
-                    color = textColor
+            // Record with AP rank color indicator
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .size(6.dp)
+                        .background(
+                            color = getAPRankColor(team1?.apRank),
+                            shape = androidx.compose.foundation.shape.CircleShape
+                        )
                 )
+                Spacer(modifier = Modifier.width(4.dp))
+                if (team1?.wins != null && team1.losses != null) {
+                    Text(
+                        text = "${team1.wins}-${team1.losses}",
+                        style = textStyle,
+                        fontSize = 11.sp,
+                        color = textColor
+                    )
+                }
             }
             // AP / SRS rankings
             if (team1RankingInfo.isNotEmpty()) {
@@ -1675,14 +1742,24 @@ private fun BracketRecordSection(
             modifier = Modifier.weight(1f),
             horizontalAlignment = Alignment.End
         ) {
-            // Record
-            if (team2?.wins != null && team2.losses != null) {
-                Text(
-                    text = "${team2.wins}-${team2.losses}",
-                    style = textStyle,
-                    fontSize = 11.sp,
-                    color = textColor,
-                    textAlign = androidx.compose.ui.text.style.TextAlign.End
+            // Record with AP rank color indicator
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (team2?.wins != null && team2.losses != null) {
+                    Text(
+                        text = "${team2.wins}-${team2.losses}",
+                        style = textStyle,
+                        fontSize = 11.sp,
+                        color = textColor
+                    )
+                }
+                Spacer(modifier = Modifier.width(4.dp))
+                Box(
+                    modifier = Modifier
+                        .size(6.dp)
+                        .background(
+                            color = getAPRankColor(team2?.apRank),
+                            shape = androidx.compose.foundation.shape.CircleShape
+                        )
                 )
             }
             // AP / SRS rankings
@@ -2065,7 +2142,8 @@ private fun convertRegionInfoToBracketRegion(regionInfo: BracketRegionInfo): Bra
                 BracketGame(
                     team1 = team1,
                     team2 = team2,
-                    gameNumber = gameInfo.gameNumber ?: (index + 1)
+                    gameNumber = gameInfo.gameNumber ?: (index + 1),
+                    sourceGameInfo = gameInfo
                 )
             }
 
@@ -2102,31 +2180,3 @@ private fun convertRegionInfoToBracketRegion(regionInfo: BracketRegionInfo): Bra
     )
 }
 
-/**
- * Builds a lookup map from game number to BracketGameInfo for accessing comparison data
- */
-private fun buildGameInfoLookup(visualization: NCAABracketVisualization?): Map<Int, BracketGameInfo> {
-    if (visualization == null) return emptyMap()
-
-    val lookup = mutableMapOf<Int, BracketGameInfo>()
-
-    // Add games from all regions
-    visualization.regions.forEach { region ->
-        region.rounds.forEach { round ->
-            round.games.forEach { game ->
-                game.gameNumber?.let { num ->
-                    lookup[num] = game
-                }
-            }
-        }
-    }
-
-    // Add Final Four games
-    visualization.finalFour?.let { ff ->
-        ff.semifinal1?.gameNumber?.let { lookup[it] = ff.semifinal1 }
-        ff.semifinal2?.gameNumber?.let { lookup[it] = ff.semifinal2 }
-        ff.championship?.gameNumber?.let { lookup[it] = ff.championship }
-    }
-
-    return lookup
-}

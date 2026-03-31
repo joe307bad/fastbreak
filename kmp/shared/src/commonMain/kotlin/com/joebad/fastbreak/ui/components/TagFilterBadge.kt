@@ -5,7 +5,6 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -142,8 +141,8 @@ fun TagBadge(
 }
 
 /**
- * Two horizontally scrollable rows of tag filter badges.
- * Left tags wrap content, right tags are scrollable.
+ * Horizontally scrollable row of tag filter badges.
+ * Left-layout tags appear first, followed by right-layout tags.
  */
 @Composable
 fun TagFilterBar(
@@ -154,43 +153,21 @@ fun TagFilterBar(
 ) {
     if (availableTags.isEmpty()) return
 
-    // Group tags by layout
+    // Group tags by layout - left tags first, then right tags
     val leftTags = availableTags.filter { it.layout == "left" }
     val rightTags = availableTags.filter { it.layout == "right" }
+    val orderedTags = leftTags + rightTags
 
-    Row(
+    LazyRow(
         modifier = modifier,
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
+        horizontalArrangement = Arrangement.spacedBy(6.dp)
     ) {
-        // Left-aligned tags - wrap content (not scrollable)
-        if (leftTags.isNotEmpty()) {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                leftTags.forEach { tag ->
-                    TagFilterBadge(
-                        tag = tag,
-                        isSelected = selectedTags.contains(tag.label),
-                        onClick = { onTagToggle(tag.label) }
-                    )
-                }
-            }
-        }
-
-        // Right-aligned tags - scrollable, takes remaining space
-        if (rightTags.isNotEmpty()) {
-            LazyRow(
-                modifier = Modifier.weight(1f),
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                items(rightTags) { tag ->
-                    TagFilterBadge(
-                        tag = tag,
-                        isSelected = selectedTags.contains(tag.label),
-                        onClick = { onTagToggle(tag.label) }
-                    )
-                }
-            }
+        items(orderedTags) { tag ->
+            TagFilterBadge(
+                tag = tag,
+                isSelected = selectedTags.contains(tag.label),
+                onClick = { onTagToggle(tag.label) }
+            )
         }
     }
 }

@@ -9,17 +9,20 @@ import { Matchup } from './Matchup';
 
 interface Props {
   data: ChartData;
+  highlightedLabels?: string[] | null;
+  selectedLabel?: string | null;
+  onSelect?: (label: string | null) => void;
 }
 
-export function ChartRenderer({ data }: Props) {
+export function ChartRenderer({ data, highlightedLabels, selectedLabel, onSelect }: Props) {
   switch (data.visualizationType) {
     case 'SCATTER_PLOT':
-      return <ScatterPlot data={data} />;
+      return <ScatterPlot data={data} highlightedLabels={highlightedLabels} selectedLabel={selectedLabel} onSelect={onSelect} />;
     case 'LINE_CHART':
-      return <LineChart data={data} />;
+      return <LineChart data={data} highlightedLabels={highlightedLabels} selectedLabel={selectedLabel} onSelect={onSelect} />;
     case 'BAR_CHART':
     case 'BAR_GRAPH':
-      return <BarChart data={data} />;
+      return <BarChart data={data} highlightedLabels={highlightedLabels} selectedLabel={selectedLabel} onSelect={onSelect} />;
     case 'TABLE':
       return <Table data={data} />;
     case 'MATCHUP':

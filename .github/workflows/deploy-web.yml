@@ -2,6 +2,8 @@ name: Deploy Web to Fly.io
 
 on:
   workflow_dispatch:
+  schedule:
+    - cron: '0 8 * * *'  # Daily at 8:00 AM UTC
   push:
     branches:
       - main

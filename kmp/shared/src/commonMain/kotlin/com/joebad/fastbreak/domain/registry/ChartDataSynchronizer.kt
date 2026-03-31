@@ -11,6 +11,7 @@ import com.joebad.fastbreak.data.model.LineChartVisualization
 import com.joebad.fastbreak.data.model.MatchupVisualization
 import com.joebad.fastbreak.data.model.MatchupV2Visualization
 import com.joebad.fastbreak.data.model.NBAMatchupVisualization
+import com.joebad.fastbreak.data.model.NCAABracketVisualization
 import com.joebad.fastbreak.data.model.NHLMatchupVisualization
 import com.joebad.fastbreak.data.model.RegistryEntry
 import com.joebad.fastbreak.data.model.ScatterPlotVisualization
@@ -314,6 +315,7 @@ class ChartDataSynchronizer(
                 VizType.NBA_MATCHUP -> json.decodeFromString<NBAMatchupVisualization>(rawJson)
                 VizType.NHL_MATCHUP -> json.decodeFromString<NHLMatchupVisualization>(rawJson)
                 VizType.CBB_MATCHUP -> json.decodeFromString<CBBMatchupVisualization>(rawJson)
+                VizType.NCAA_BRACKET -> json.decodeFromString<NCAABracketVisualization>(rawJson)
                 VizType.HELLO_WORLD -> json.decodeFromString<HelloWorldVisualization>(rawJson)
             }
 

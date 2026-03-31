@@ -995,3 +995,76 @@ data class HelloWorldVisualization(
     override val tags: List<Tag>? = null,
     override val sortOrder: Int? = null
 ) : VisualizationType
+
+// NCAA Tournament Bracket data structures
+@Serializable
+data class BracketTeamInfo(
+    val seed: Int,
+    val name: String,
+    val abbreviation: String? = null,
+    val logo: String? = null,
+    val score: Int? = null,
+    val isWinner: Boolean = false,
+    val conference: String? = null,
+    val apRank: Int? = null,
+    val srsRank: Int? = null,
+    val wins: Int? = null,
+    val losses: Int? = null,
+    val teamStats: JsonObject? = null  // Flexible stats object
+)
+
+@Serializable
+data class BracketGameInfo(
+    val gameId: String,
+    val gameNumber: Int? = null,
+    val gameDate: String? = null,
+    val gameStatus: String? = null,  // "PROJECTED", "SCHEDULED", "IN_PROGRESS", "FINAL", "TBD"
+    val region: String? = null,
+    val round: String? = null,
+    val roundNumber: Int? = null,
+    val team1: BracketTeamInfo? = null,
+    val team2: BracketTeamInfo? = null,
+    val winner: String? = null,
+    val winnerSeed: Int? = null,
+    val location: MatchupLocation? = null,
+    val comparisons: MatchupComparisons? = null
+)
+
+@Serializable
+data class BracketRoundInfo(
+    val roundNumber: Int,
+    val roundName: String,
+    val games: List<BracketGameInfo>
+)
+
+@Serializable
+data class BracketRegionInfo(
+    val name: String,
+    val colorHex: String,
+    val rounds: List<BracketRoundInfo>
+)
+
+@Serializable
+data class BracketFinalFour(
+    val semifinal1: BracketGameInfo? = null,
+    val semifinal2: BracketGameInfo? = null,
+    val championship: BracketGameInfo? = null
+)
+
+@Serializable
+data class NCAABracketVisualization(
+    override val sport: String,
+    override val visualizationType: String,
+    override val title: String,
+    override val subtitle: String,
+    override val description: String,
+    override val lastUpdated: Instant,
+    override val source: String? = null,
+    @Serializable(with = TagListSerializer::class)
+    override val tags: List<Tag>? = null,
+    override val sortOrder: Int? = null,
+    val season: Int? = null,
+    val tournamentStatus: String? = null,  // "PROJECTED", "IN_PROGRESS", "COMPLETED"
+    val regions: List<BracketRegionInfo> = emptyList(),
+    val finalFour: BracketFinalFour? = null
+) : VisualizationType

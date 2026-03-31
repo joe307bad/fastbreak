@@ -52,6 +52,7 @@ fun DataVizScreen(
         state = DataVizState.Loading
 
         // Handle HELLO_WORLD viz type as a hardcoded screen (no data loading needed)
+        // Note: NCAA_BRACKET now loads data from the registry, so it doesn't need special handling here
         if (component.vizType == VizType.HELLO_WORLD) {
             state = DataVizState.Success(
                 HelloWorldVisualization(
@@ -356,12 +357,13 @@ private fun SuccessContent(
 
     Column(modifier = Modifier.fillMaxSize()) {
         // Show filter bar if there are any filterable properties or pinned teams
-        // BUT hide it for MatchupV2Visualization, NBAMatchupVisualization, NHLMatchupVisualization, CBBMatchupVisualization, and HelloWorldVisualization (bracket)
+        // BUT hide it for MatchupV2Visualization, NBAMatchupVisualization, NHLMatchupVisualization, CBBMatchupVisualization, NCAABracketVisualization, and HelloWorldVisualization
         if ((filterOptions.isNotEmpty() || sportPinnedTeams.isNotEmpty())
             && visualization !is MatchupV2Visualization
             && visualization !is NBAMatchupVisualization
             && visualization !is NHLMatchupVisualization
             && visualization !is CBBMatchupVisualization
+            && visualization !is NCAABracketVisualization
             && visualization !is HelloWorldVisualization) {
             val scrollState = rememberScrollState()
             Row(
@@ -527,9 +529,17 @@ private fun RenderVisualization(
             highlightedTeamCodes = highlightedTeamCodes,
             onScheduleToggleHandlerChanged = onScheduleToggleHandlerChanged
         )
-    } else if (visualization is HelloWorldVisualization) {
-        // NCAA Tournament bracket
+    } else if (visualization is NCAABracketVisualization) {
+        // NCAA Tournament bracket with actual data
         NCAABracket(
+            visualization = visualization,
+            modifier = Modifier.fillMaxSize(),
+            onNavigationToggleHandlerChanged = onBracketNavigationToggleHandlerChanged
+        )
+    } else if (visualization is HelloWorldVisualization) {
+        // Placeholder bracket (for development)
+        NCAABracket(
+            visualization = null,
             modifier = Modifier.fillMaxSize(),
             onNavigationToggleHandlerChanged = onBracketNavigationToggleHandlerChanged
         )
@@ -622,6 +632,9 @@ private fun RenderVisualization(
                             }
                             is CBBMatchupVisualization -> {
                                 // Handled by CBBMatchupWorksheet above
+                            }
+                            is NCAABracketVisualization -> {
+                                // Handled by NCAABracket above
                             }
                             is HelloWorldVisualization -> {
                                 // Handled above

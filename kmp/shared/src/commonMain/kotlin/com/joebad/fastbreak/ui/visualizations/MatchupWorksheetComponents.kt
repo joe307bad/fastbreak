@@ -1,7 +1,10 @@
 package com.joebad.fastbreak.ui.visualizations
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -30,6 +33,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -662,6 +666,8 @@ fun PinnedMatchupHeader(
     val hasScore = awayScore != null && homeScore != null
     val homeWon = hasScore && homeScore!! > awayScore!!
     val margin = if (hasScore) kotlin.math.abs(homeScore!! - awayScore!!) else 0
+    val isDarkTheme = isSystemInDarkTheme()
+    val badgeBorderColor = if (isDarkTheme) Color.White else Color.Black
 
     androidx.compose.material3.Surface(
         modifier = modifier.fillMaxWidth(),
@@ -670,73 +676,119 @@ fun PinnedMatchupHeader(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(start = 8.dp, end = 8.dp, top = 6.dp, bottom = 6.dp),
+                .padding(start = 8.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Away team + score
+            // Away team + score (left)
             Row(
                 modifier = Modifier.weight(1f),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.Start
             ) {
+                val awayWon = hasScore && !homeWon
                 Text(
                     text = awayTeam,
+                    modifier = Modifier.weight(1f, fill = false),
                     style = MaterialTheme.typography.bodySmall.copy(lineHeight = 11.sp),
                     fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = if (hasScore && !homeWon) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1
+                    fontWeight = if (awayWon) FontWeight.Bold else FontWeight.Normal,
+                    color = if (awayWon) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
                 if (hasScore) {
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        text = awayScore.toString(),
-                        style = MaterialTheme.typography.bodySmall.copy(lineHeight = 11.sp),
-                        fontSize = 11.sp,
-                        fontWeight = if (!homeWon) FontWeight.Bold else FontWeight.Normal,
-                        color = if (!homeWon) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
-                        maxLines = 1
-                    )
+                    // Away score badge
+                    Box(
+                        modifier = Modifier
+                            .border(1.dp, badgeBorderColor, RoundedCornerShape(4.dp))
+                            .padding(horizontal = 4.dp, vertical = 2.dp)
+                    ) {
+                        Text(
+                            text = awayScore.toString(),
+                            style = MaterialTheme.typography.bodySmall.copy(lineHeight = 11.sp),
+                            fontSize = 11.sp,
+                            fontWeight = if (awayWon) FontWeight.Bold else FontWeight.Normal,
+                            color = if (awayWon) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                            maxLines = 1
+                        )
+                    }
+                    // Margin if away won (outside badge)
+                    if (awayWon) {
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "+$margin",
+                            style = MaterialTheme.typography.bodySmall.copy(lineHeight = 11.sp),
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary,
+                            maxLines = 1
+                        )
+                    }
                 }
             }
 
-            // Center: @ or winner +margin
-            val winner = if (homeWon) homeTeam else awayTeam
-            Text(
-                text = if (hasScore) "$winner +$margin" else "@",
-                style = MaterialTheme.typography.bodySmall.copy(lineHeight = 11.sp),
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Bold,
-                color = if (hasScore) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-                textAlign = TextAlign.Center,
-                maxLines = 1
-            )
+            // Center spacer or @
+            if (!hasScore) {
+                Text(
+                    text = "@",
+                    modifier = Modifier.padding(horizontal = 8.dp),
+                    style = MaterialTheme.typography.bodySmall.copy(lineHeight = 11.sp),
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                )
+            } else {
+                Spacer(modifier = Modifier.width(16.dp))
+            }
 
-            // Home team + score
+            // Home team + score (right)
             Row(
                 modifier = Modifier.weight(1f),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.End
             ) {
                 if (hasScore) {
-                    Text(
-                        text = homeScore.toString(),
-                        style = MaterialTheme.typography.bodySmall.copy(lineHeight = 11.sp),
-                        fontSize = 11.sp,
-                        fontWeight = if (homeWon) FontWeight.Bold else FontWeight.Normal,
-                        color = if (homeWon) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
-                        maxLines = 1
-                    )
+                    // Margin if home won (outside badge)
+                    if (homeWon) {
+                        Text(
+                            text = "+$margin",
+                            style = MaterialTheme.typography.bodySmall.copy(lineHeight = 11.sp),
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary,
+                            maxLines = 1
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                    }
+                    // Home score badge
+                    Box(
+                        modifier = Modifier
+                            .border(1.dp, badgeBorderColor, RoundedCornerShape(4.dp))
+                            .padding(horizontal = 4.dp, vertical = 2.dp)
+                    ) {
+                        Text(
+                            text = homeScore.toString(),
+                            style = MaterialTheme.typography.bodySmall.copy(lineHeight = 11.sp),
+                            fontSize = 11.sp,
+                            fontWeight = if (homeWon) FontWeight.Bold else FontWeight.Normal,
+                            color = if (homeWon) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                            maxLines = 1
+                        )
+                    }
                     Spacer(modifier = Modifier.width(6.dp))
                 }
                 Text(
                     text = homeTeam,
+                    modifier = Modifier.weight(1f, fill = false),
                     style = MaterialTheme.typography.bodySmall.copy(lineHeight = 11.sp),
                     fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = if (hasScore && homeWon) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1
+                    fontWeight = if (homeWon) FontWeight.Bold else FontWeight.Normal,
+                    color = if (homeWon) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    textAlign = TextAlign.End
                 )
             }
         }

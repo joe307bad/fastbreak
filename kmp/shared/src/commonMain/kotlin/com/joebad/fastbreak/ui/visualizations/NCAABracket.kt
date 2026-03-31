@@ -32,6 +32,9 @@ import io.github.koalaplot.core.xygraph.FloatLinearAxisModel
 import io.github.koalaplot.core.xygraph.XYGraph
 import io.github.koalaplot.core.xygraph.XYGraphScope
 import io.github.koalaplot.core.xygraph.rememberAxisStyle
+import kotlinx.datetime.Instant
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
 import kotlin.math.round
 
 // Data classes
@@ -1065,20 +1068,16 @@ private fun MatchupBoxSymbol(
     onClick: () -> Unit = {}
 ) {
     val isDarkTheme = isSystemInDarkTheme()
-    val borderColor = if (isDarkTheme) {
-        Color.White
-    } else {
-        MaterialTheme.colorScheme.outline.copy(alpha = 0.4f)
-    }
 
     Card(
         modifier = Modifier
             .width(100.dp)
             .clickable(onClick = onClick),
+        shape = RoundedCornerShape(4.dp),
         colors = CardDefaults.cardColors(
             containerColor = backgroundColor
         ),
-        border = BorderStroke(1.dp, borderColor)
+        border = if (isDarkTheme) null else BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.4f))
     ) {
         Column {
             game.team1?.let { team ->
@@ -1285,11 +1284,11 @@ private fun MatchupBottomSheet(
 
                     Spacer(modifier = Modifier.height(8.dp))
 
-                    // Round and region info
+                    // Round, region, and game date info
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(bottom = 8.dp),
+                            .padding(bottom = 4.dp),
                         horizontalArrangement = Arrangement.Center,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -1304,6 +1303,22 @@ private fun MatchupBottomSheet(
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
+                    }
+
+                    // Game date and time
+                    gameInfo?.gameDate?.let { dateStr ->
+                        val formattedDate = formatBracketGameDate(dateStr)
+                        if (formattedDate != null) {
+                            Text(
+                                text = formattedDate,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(bottom = 8.dp),
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                            )
+                        }
                     }
 
                     // Check if we have TBD teams
@@ -2178,5 +2193,25 @@ private fun convertRegionInfoToBracketRegion(regionInfo: BracketRegionInfo): Bra
         color = color,
         rounds = rounds
     )
+}
+
+/**
+ * Format a bracket game date string (ISO 8601) into a readable date and time.
+ * Returns null if the date can't be parsed.
+ */
+private fun formatBracketGameDate(gameDate: String): String? {
+    return try {
+        val instant = Instant.parse(gameDate)
+        val eastern = TimeZone.of("America/New_York")
+        val dt = instant.toLocalDateTime(eastern)
+        val month = dt.month.name.take(3).lowercase().replaceFirstChar { it.uppercase() }
+        val day = dt.dayOfMonth
+        val hour = if (dt.hour % 12 == 0) 12 else dt.hour % 12
+        val minute = dt.minute.toString().padStart(2, '0')
+        val amPm = if (dt.hour < 12) "AM" else "PM"
+        "$month $day · $hour:$minute $amPm ET"
+    } catch (_: Exception) {
+        null
+    }
 }
 

@@ -376,7 +376,7 @@ fun NHLMatchupWorksheet(
                             modifier = Modifier
                                 .fillMaxSize()
                                 .verticalScroll(rememberScrollState())
-                                .padding(top = 20.dp)
+                                .padding(top = 36.dp) // Space for pinned header
                         ) {
                             // Record section
                             NHLRecordSection(

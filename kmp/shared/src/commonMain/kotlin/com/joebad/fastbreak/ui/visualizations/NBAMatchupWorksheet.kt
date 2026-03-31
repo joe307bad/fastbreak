@@ -391,7 +391,7 @@ fun NBAMatchupWorksheet(
                             modifier = Modifier
                                 .fillMaxSize()
                                 .verticalScroll(rememberScrollState())
-                                .padding(top = 20.dp) // Space for pinned header (one row now)
+                                .padding(top = 36.dp) // Space for pinned header
                         ) {
                             // Record and conference rank section (scrollable)
                             RecordAndConferenceSection(

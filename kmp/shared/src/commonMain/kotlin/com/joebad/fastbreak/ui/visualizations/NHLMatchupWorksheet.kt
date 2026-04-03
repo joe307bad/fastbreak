@@ -259,9 +259,33 @@ fun NHLMatchupWorksheet(
             val dateTime = instant.toLocalDateTime(TimeZone.of("America/New_York"))
             val hour = if (dateTime.hour == 0) 12 else if (dateTime.hour > 12) dateTime.hour - 12 else dateTime.hour
             val amPm = if (dateTime.hour < 12) "am" else "pm"
-            val dayOfWeek = dateTime.dayOfWeek.name.lowercase().replaceFirstChar { it.uppercase() }
-            val month = dateTime.month.name.lowercase().replaceFirstChar { it.uppercase() }
-            "$dayOfWeek, $month ${dateTime.dayOfMonth}, @ ${hour}:${dateTime.minute.toString().padStart(2, '0')}$amPm ET"
+            val dayOfWeek = when (dateTime.dayOfWeek.name) {
+                "MONDAY" -> "Mon"
+                "TUESDAY" -> "Tue"
+                "WEDNESDAY" -> "Wed"
+                "THURSDAY" -> "Thu"
+                "FRIDAY" -> "Fri"
+                "SATURDAY" -> "Sat"
+                "SUNDAY" -> "Sun"
+                else -> dateTime.dayOfWeek.name.take(3)
+            }
+            val month = when (dateTime.monthNumber) {
+                1 -> "Jan"; 2 -> "Feb"; 3 -> "Mar"; 4 -> "Apr"
+                5 -> "May"; 6 -> "Jun"; 7 -> "Jul"; 8 -> "Aug"
+                9 -> "Sep"; 10 -> "Oct"; 11 -> "Nov"; 12 -> "Dec"
+                else -> ""
+            }
+            val day = dateTime.dayOfMonth
+            val ordinal = when {
+                day in 11..13 -> "${day}th"
+                day % 10 == 1 -> "${day}st"
+                day % 10 == 2 -> "${day}nd"
+                day % 10 == 3 -> "${day}rd"
+                else -> "${day}th"
+            }
+            val minutes = dateTime.minute
+            val timeStr = if (minutes == 0) "$hour$amPm" else "$hour:${minutes.toString().padStart(2, '0')}$amPm"
+            "$dayOfWeek. $month $ordinal @ $timeStr ET"
         } catch (e: Exception) {
             ""
         }
@@ -527,8 +551,8 @@ fun NHLMatchupWorksheet(
         // On-demand capture
         captureRequest?.let { request ->
             val (captureWidth, captureHeight) = when (request.target) {
-                NhlCaptureTarget.PRE_GAME -> 3400.dp to 1900.dp
-                NhlCaptureTarget.POST_GAME -> 400.dp to 340.dp
+                NhlCaptureTarget.PRE_GAME -> 3400.dp to 1950.dp
+                NhlCaptureTarget.POST_GAME -> 400.dp to 360.dp
             }
 
             LaunchedEffect(request) {
@@ -629,6 +653,7 @@ fun NHLMatchupWorksheet(
                         ) {
                             NHLPostGameShareImage(
                                 matchup = selectedMatchup,
+                                formattedDate = formattedDate,
                                 modifier = Modifier.fillMaxSize()
                             )
                         }
@@ -916,6 +941,7 @@ private fun buildNHLShareStatBoxes(matchup: NHLMatchup): List<ShareStatBox> {
 @Composable
 private fun NHLPostGameShareImage(
     matchup: NHLMatchup,
+    formattedDate: String = "",
     modifier: Modifier = Modifier
 ) {
     val results = matchup.results ?: return
@@ -1008,6 +1034,15 @@ private fun NHLPostGameShareImage(
                     modifier = Modifier.align(Alignment.CenterHorizontally)
                 )
             }
+        }
+
+        if (formattedDate.isNotBlank()) {
+            Text(
+                text = formattedDate,
+                style = MaterialTheme.typography.bodyMedium,
+                color = secondaryTextColor,
+                modifier = Modifier.align(Alignment.CenterHorizontally)
+            )
         }
 
         Spacer(modifier = Modifier.height(6.dp))

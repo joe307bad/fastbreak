@@ -584,12 +584,21 @@ fun GenericMatchupShareImage(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
-                    text = "${gameInfo.eventLabel} • ${gameInfo.formattedDate}",
+                    text = gameInfo.eventLabel,
                     fontSize = 42.sp,
                     color = textColor.copy(alpha = 0.8f),
                     maxLines = 1,
                     softWrap = false
                 )
+                if (gameInfo.formattedDate.isNotBlank()) {
+                    Text(
+                        text = gameInfo.formattedDate,
+                        fontSize = 38.sp,
+                        color = textColor.copy(alpha = 0.7f),
+                        maxLines = 1,
+                        softWrap = false
+                    )
+                }
                 odds?.overUnder?.let { ou ->
                     Text(
                         text = "O/U: $ou",

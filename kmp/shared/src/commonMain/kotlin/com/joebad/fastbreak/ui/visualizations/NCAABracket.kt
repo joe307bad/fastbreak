@@ -14,6 +14,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.font.FontWeight
@@ -198,7 +200,7 @@ fun NCAABracket(
                 horizontalMinorGridLineStyle = null,
                 verticalMajorGridLineStyle = null,
                 verticalMinorGridLineStyle = null,
-                modifier = Modifier.fillMaxSize()
+                modifier = Modifier.fillMaxSize().semantics { contentDescription = "chart" }
             ) {
                 // Calculate zoom level from current view extent
                 // When zoomed in (extent ~8), show details. When zoomed out (extent ~13), show dots.
@@ -1072,6 +1074,7 @@ private fun MatchupBoxSymbol(
     Card(
         modifier = Modifier
             .width(100.dp)
+            .semantics { contentDescription = "matchup-node" }
             .clickable(onClick = onClick),
         shape = RoundedCornerShape(4.dp),
         colors = CardDefaults.cardColors(

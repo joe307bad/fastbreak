@@ -1121,4 +1121,243 @@ class DemoUITests {
 
         println("✓ Demo complete!")
     }
+
+    /**
+     * Demo test: NCAA Tournament Bracket interaction
+     * Shows: Opening bracket > Panning around regions > Selecting a matchup node >
+     *        Scrolling matchup bottom sheet up/down > Dismissing the bottom sheet
+     */
+    @Test
+    fun testDemo_BracketInteraction() {
+        println("🎬 RECORDING_READY - Starting bracket interaction demo...")
+
+        println("⏱ Waiting for app to load...")
+        Thread.sleep(1500)
+
+        val screenWidth = device.displayWidth
+        val screenHeight = device.displayHeight
+
+        // Switch to CBB tab first
+        println("🔍 Looking for 'CBB' tab...")
+        val cbbTab = device.wait(
+            Until.findObject(By.text("CBB")),
+            5000
+        )
+
+        if (cbbTab != null) {
+            println("✓ Found 'CBB' tab, tapping...")
+            cbbTab.click()
+            Thread.sleep(1500)
+        } else {
+            println("⚠ CBB tab not found")
+        }
+
+        // Find and tap on the NCAA Tournament Bracket chart item
+        println("🔍 Looking for bracket chart item...")
+        var bracketItem = device.wait(
+            Until.findObject(By.textContains("Bracket")),
+            3000
+        )
+
+        if (bracketItem == null) {
+            println("  → Trying 'NCAA'...")
+            bracketItem = device.wait(
+                Until.findObject(By.textContains("NCAA")),
+                2000
+            )
+        }
+
+        if (bracketItem == null) {
+            println("  → Trying 'Tournament'...")
+            bracketItem = device.wait(
+                Until.findObject(By.textContains("Tournament")),
+                2000
+            )
+        }
+
+        if (bracketItem != null) {
+            println("✓ Found '${bracketItem.text}', tapping...")
+            bracketItem.click()
+            Thread.sleep(2000)
+        } else {
+            println("⚠ Bracket chart item not found")
+            return
+        }
+
+        println("✓ Bracket should be visible")
+        Thread.sleep(1500)
+
+        // Pan around the bracket - swipe left to explore
+        println("🗺 Panning bracket left...")
+        device.swipe(
+            screenWidth * 3 / 4,
+            screenHeight / 2,
+            screenWidth / 4,
+            screenHeight / 2,
+            20
+        )
+        Thread.sleep(1000)
+
+        // Pan right
+        println("🗺 Panning bracket right...")
+        device.swipe(
+            screenWidth / 4,
+            screenHeight / 2,
+            screenWidth * 3 / 4,
+            screenHeight / 2,
+            20
+        )
+        Thread.sleep(1000)
+
+        // Pan up
+        println("🗺 Panning bracket up...")
+        device.swipe(
+            screenWidth / 2,
+            screenHeight * 2 / 3,
+            screenWidth / 2,
+            screenHeight / 3,
+            20
+        )
+        Thread.sleep(1000)
+
+        // Pan down
+        println("🗺 Panning bracket down...")
+        device.swipe(
+            screenWidth / 2,
+            screenHeight / 3,
+            screenWidth / 2,
+            screenHeight * 2 / 3,
+            20
+        )
+        Thread.sleep(1000)
+
+        // Use the mini-map navigation to jump to a region
+        // The mini-map is an overlay with region boxes - try tapping region names
+        println("🔍 Looking for region navigation (e.g., 'East')...")
+        val eastRegion = device.wait(
+            Until.findObject(By.text("East")),
+            2000
+        )
+
+        if (eastRegion != null) {
+            println("✓ Found 'East' region, tapping...")
+            eastRegion.click()
+            Thread.sleep(1000)
+        }
+
+        val southRegion = device.wait(
+            Until.findObject(By.text("South")),
+            2000
+        )
+
+        if (southRegion != null) {
+            println("✓ Found 'South' region, tapping...")
+            southRegion.click()
+            Thread.sleep(1000)
+        }
+
+        val westRegion = device.wait(
+            Until.findObject(By.text("West")),
+            2000
+        )
+
+        if (westRegion != null) {
+            println("✓ Found 'West' region, tapping...")
+            westRegion.click()
+            Thread.sleep(1000)
+        }
+
+        // Tap on a matchup node in the bracket using its content description
+        println("🔍 Looking for matchup nodes...")
+        val matchupNodes = device.findObjects(By.desc("matchup-node"))
+
+        if (matchupNodes.isNotEmpty()) {
+            println("✓ Found ${matchupNodes.size} matchup nodes, tapping first one...")
+            matchupNodes[0].click()
+            Thread.sleep(1500)
+        } else {
+            println("⚠ No matchup nodes found by description, tapping center of screen...")
+            device.click(screenWidth / 2, screenHeight / 2)
+            Thread.sleep(1500)
+        }
+
+        // Scroll down inside the matchup bottom sheet
+        println("📜 Scrolling down in matchup bottom sheet...")
+        device.swipe(
+            screenWidth / 2,
+            screenHeight * 3 / 4,
+            screenWidth / 2,
+            screenHeight / 3,
+            20
+        )
+        Thread.sleep(1000)
+
+        // Scroll further down
+        println("📜 Scrolling further down...")
+        device.swipe(
+            screenWidth / 2,
+            screenHeight * 3 / 4,
+            screenWidth / 2,
+            screenHeight / 3,
+            20
+        )
+        Thread.sleep(1000)
+
+        // Scroll back up in the bottom sheet
+        println("📜 Scrolling back up in bottom sheet...")
+        device.swipe(
+            screenWidth / 2,
+            screenHeight / 3,
+            screenWidth / 2,
+            screenHeight * 3 / 4,
+            20
+        )
+        Thread.sleep(1000)
+
+        // Scroll up more to show the top of the sheet
+        println("📜 Scrolling up more...")
+        device.swipe(
+            screenWidth / 2,
+            screenHeight / 3,
+            screenWidth / 2,
+            screenHeight * 3 / 4,
+            20
+        )
+        Thread.sleep(1000)
+
+        // Dismiss the bottom sheet by swiping down from the top of the sheet
+        println("👇 Dismissing matchup bottom sheet with swipe down...")
+        device.swipe(
+            screenWidth / 2,
+            screenHeight / 4,
+            screenWidth / 2,
+            screenHeight - 100,
+            15
+        )
+        Thread.sleep(1500)
+
+        println("✓ Bottom sheet should be dismissed")
+        Thread.sleep(1000)
+
+        // Pinch to zoom out to show the whole bracket (same pattern as PinchToZoom demo)
+        println("🔍 Zooming out to show full bracket...")
+        val chartObject = device.findObject(UiSelector().descriptionContains("chart"))
+
+        if (chartObject.exists()) {
+            println("✓ Found chart element, pinching to zoom out...")
+            chartObject.pinchIn(50, 50)
+            Thread.sleep(1500)
+            chartObject.pinchIn(50, 50)
+            Thread.sleep(1500)
+            chartObject.pinchIn(50, 50)
+            Thread.sleep(2000)
+        } else {
+            println("⚠ Could not find chart element for pinch gesture")
+        }
+
+        println("✓ Full bracket should be visible")
+        Thread.sleep(2000)
+
+        println("✓ Demo complete!")
+    }
 }

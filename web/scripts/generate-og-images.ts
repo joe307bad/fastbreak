@@ -21,7 +21,7 @@ function generateOGImageSVG(
   date: string
 ): string {
   const formattedDate = date
-    ? new Date(date).toLocaleDateString('en-US', {
+    ? new Date(date + 'T00:00:00').toLocaleDateString('en-US', {
         year: 'numeric',
         month: 'long',
         day: 'numeric',

@@ -41,7 +41,6 @@ fun HomeScreen(
     onRefresh: () -> Unit,
     onMenuClick: () -> Unit = {},
     onNavigateToTopics: () -> Unit = {},
-    onInitialLoad: () -> Unit,
     onRequestPermission: () -> Unit,
     onCheckPermission: () -> Unit,
     onClearSyncProgress: () -> Unit,
@@ -51,17 +50,10 @@ fun HomeScreen(
     val selectedTags by component.selectedTags.subscribeAsState()
 
     // Clear any stale completed sync progress when screen first appears
-    // Only load registry if it hasn't been loaded yet
     LaunchedEffect(Unit) {
         // If there's a completed sync from a previous session, clear it immediately
         if (registryState.syncProgress?.isComplete == true && !registryState.isSyncing) {
             onClearSyncProgress()
-        }
-
-        // Only trigger initial load if registry hasn't been loaded yet
-        // This prevents re-loading when navigating back to home screen
-        if (registryState.registry == null && !registryState.isLoading && !registryState.isSyncing) {
-            onInitialLoad()
         }
     }
 

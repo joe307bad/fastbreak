@@ -154,5 +154,30 @@
       ],
       "whyUseful": "Topics gives you a daily sports briefing without ads, clickbait, or fluff. Every insight is grounded in actual statistics from the app's charts and verified against Google Search results for factual accuracy. Instead of manually searching through dozens of charts, Topics surfaces the most interesting and relevant insights each day. The linked data points let you quickly dive deeper into any statistic that catches your attention, while the read tracking ensures you never miss important updates."
     }
+  },
+  {
+    "id": "bracket",
+    "title": "Bracket",
+    "sortOrder": 9,
+    "demoGif": "/02-manual-screenshots/09-bracket-interaction.gif",
+    "demoAlt": "Bracket walthrough showing panning, zooming, and clicking into matchups",
+    "platforms": {
+      "ios": true,
+      "android": true,
+      "web": false
+    },
+    "dateReleased": "2026-04-06",
+    "version": "1.6.0",
+    "sections": {
+      "howToUse": "As each major sport enters the post season, a bracket visualization will be available in the given sport's screen. The demo shows the 2026 March Madness bracket. Drag across the screen to freely explore the bracket. Pinch to zoom in on a specific section or zoom out to see the entire bracket. Tap any matchup node to instantly view a detailed comparison of the two teams. Use the navigation panel at the top to quickly jump between regions and the Final Four. Rotate your phone to switch to landscape mode for a wider view while retaining all functionality.",
+      "whatItDoes": [
+        { "type": "text", "value": "Provides a fully interactive NCAA tournament bracket optimized for mobile devices. The bracket renders every matchup node at every zoom level, so you always have a clear picture of the tournament structure regardless of how far you've zoomed in or out. Tapping a matchup node immediately displays a compact comparison with a high data-to-pixel ratio — no extra loading or API calls required. The navigation panel lets you jump between regions and the Final Four without manually scrolling. Landscape mode is fully supported with a smooth transition from portrait." }
+      ],
+      "whyUseful": [
+        { "type": "text", "value": "Major sports apps struggle with bracket visualizations on small screens (weird animations, no zoom, no landscape mode, and matchup comparisons that require extra loading). Fastbreak's bracket checks every box: smooth pan and zoom, instant matchup comparisons with no loading, intuitive region navigation, and full landscape support. Read our " },
+        { "type": "link", "value": "bracket comparison blog post", "url": "/blog/bracket-comparison" },
+        { "type": "text", "value": " to see how Fastbreak stacks up against Google, CBS Sports, NCAA, Yahoo, and more." }
+      ]
+    }
   }
 ]

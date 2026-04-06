@@ -1,7 +1,7 @@
 ---
 title: "Building a mobile-first bracket visualization"
-date: "2026-04-02"
-description: "Comparing the mobile bracket experience across Google, CBS Sports, NCAA, Yahoo, and Fastbreak."
+date: "2026-04-06"
+description: "Comparing the mobile bracket experience across Google, ESPN, CBS Sports, NCAA, Yahoo, and Fastbreak."
 author: "Joe Badaczewski"
 authorUrl: "https://joebad.com"
 ---
@@ -17,7 +17,7 @@ I built a bracket visualization for Fastbreak that checks all the boxes for what
 4. Use a navigation panel to quickly switch between regions and the Final Four matchups.
 5. Rotating your phone smoothly transitions into a landscape view that retains all of the portrait functionality.
 
-Below I recorded some basic usage of each bracket visualization from five of the major sports apps (TODO add espn). All of the videos are from my personal iPhone SE 3rd gen.
+Below I recorded some basic usage of each bracket visualization from six of the major sports apps. All of the videos are from my personal iPhone SE 3rd gen.
 
 <BracketComparison name="🥇 Fastbreak" url="https://res.cloudinary.com/joebad-com/video/upload/v1775186151/mr8nz4cbtrzub4vhfow8.mp4">
 <Pros>
@@ -34,7 +34,7 @@ Below I recorded some basic usage of each bracket visualization from five of the
 </Cons>
 </BracketComparison>
 
-<BracketComparison name="🥈 CBS Sports app" url="https://res.cloudinary.com/joebad-com/video/upload/v1775186153/gptnmsucjzfqquskgcb3.mp4">
+<BracketComparison name="🥈 CBS Sports" url="https://res.cloudinary.com/joebad-com/video/upload/v1775186153/gptnmsucjzfqquskgcb3.mp4">
 <Pros>
 - Good data to pixel ratio for the region view
 - Navigation feels predictable between regions
@@ -61,7 +61,7 @@ Below I recorded some basic usage of each bracket visualization from five of the
 </Cons>
 </BracketComparison>
 
-<BracketComparison name="Yahoo app" url="https://res.cloudinary.com/joebad-com/video/upload/v1775186156/kigzcum0dtboxbtgjp0u.mp4">
+<BracketComparison name="Yahoo" url="https://res.cloudinary.com/joebad-com/video/upload/v1775186156/kigzcum0dtboxbtgjp0u.mp4">
 <Pros>
 - Good use of color and space
 - Selecting a matchup node gives a link to an interesting article
@@ -76,7 +76,7 @@ Below I recorded some basic usage of each bracket visualization from five of the
 </Cons>
 </BracketComparison>
 
-<BracketComparison name="Real Bracket" url="https://res.cloudinary.com/joebad-com/video/upload/v1775186152/hqq4wjmbdbopswe1txy0.mp4">
+<BracketComparison name="Real" url="https://res.cloudinary.com/joebad-com/video/upload/v1775186152/hqq4wjmbdbopswe1txy0.mp4">
 <Pros>
 - Dedicated screen (no bottom nav) so the navigation feels predictable
 </Pros>
@@ -87,7 +87,7 @@ Below I recorded some basic usage of each bracket visualization from five of the
 </Cons>
 </BracketComparison>
 
-<BracketComparison name="NCAA official app" url="https://res.cloudinary.com/joebad-com/video/upload/v1775186151/ukh7u7qrld62hncavbes.mp4">
+<BracketComparison name="NCAA official" url="https://res.cloudinary.com/joebad-com/video/upload/v1775186151/ukh7u7qrld62hncavbes.mp4">
 <Pros>
 - Freely explore the bracket without weird animations
 - Nice fixed columns showing the round title
@@ -96,6 +96,22 @@ Below I recorded some basic usage of each bracket visualization from five of the
 - The matchup screen after selecting a node in the bracket has a very low data to pixel ratio
 - Navigation panel is not interactive so you can't jump to regions easily
 - No way of viewing the Final Four on one screen
+</Cons>
+</BracketComparison>
+
+<BracketComparison name="ESPN" url="https://res.cloudinary.com/joebad-com/video/upload/v1775494187/espn-bracket_pxxe6z.mp4">
+<Pros>
+- Good use of space
+- Navigation is pretty easy
+- Fixed column headers
+</Pros>
+<Cons>
+- Panning does not follow the fingers drag point and instead triggers navigation on drag/press up
+- No way to see entire bracket 
+- No zooming
+- No landscape support
+- Clicking into a matchup requires targeting a tiny link
+- The matchup comparison shows very little info on the immediate matchup screen
 </Cons>
 </BracketComparison>
 

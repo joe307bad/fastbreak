@@ -188,7 +188,8 @@ class RegistryContainer(
                 syncProgress = null,
                 diagnostics = state.diagnostics.copy(
                     lastError = null,
-                    isSyncing = true
+                    isSyncing = true,
+                    failedCharts = emptyList()
                 )
             )
         }
@@ -224,6 +225,14 @@ class RegistryContainer(
                             topicsViewed = chartDataSynchronizer.hasTopicsBeenViewed(),
                             diagnostics = state.diagnostics.copy(isSyncing = false)
                         )
+                    }
+
+                    // Show toast if any charts failed to sync
+                    if (state.diagnostics.failedCharts.isNotEmpty()) {
+                        val count = state.diagnostics.failedCharts.size
+                        postSideEffect(RegistrySideEffect.ShowError(
+                            "Failed to sync $count chart${if (count > 1) "s" else ""}"
+                        ))
                     }
                 } catch (e: Exception) {
                     println("❌ Chart synchronization failed: ${e.message}")
@@ -279,6 +288,14 @@ class RegistryContainer(
                                 topicsViewed = chartDataSynchronizer.hasTopicsBeenViewed(),
                                 diagnostics = state.diagnostics.copy(isSyncing = false)
                             )
+                        }
+
+                        // Show toast if any charts failed to sync
+                        if (state.diagnostics.failedCharts.isNotEmpty()) {
+                            val count = state.diagnostics.failedCharts.size
+                            postSideEffect(RegistrySideEffect.ShowError(
+                                "Failed to sync $count chart${if (count > 1) "s" else ""}"
+                            ))
                         }
                     } catch (e: Exception) {
                         println("❌ Chart synchronization failed: ${e.message}")
@@ -344,7 +361,8 @@ class RegistryContainer(
                 ),
                 diagnostics = state.diagnostics.copy(
                     lastError = null,
-                    isSyncing = true
+                    isSyncing = true,
+                    failedCharts = emptyList()
                 )
             )
         }
@@ -402,6 +420,14 @@ class RegistryContainer(
                             topicsViewed = chartDataSynchronizer.hasTopicsBeenViewed(),
                             diagnostics = state.diagnostics.copy(isSyncing = false)
                         )
+                    }
+
+                    // Show toast if any charts failed to sync
+                    if (state.diagnostics.failedCharts.isNotEmpty()) {
+                        val count = state.diagnostics.failedCharts.size
+                        postSideEffect(RegistrySideEffect.ShowError(
+                            "Failed to sync $count chart${if (count > 1) "s" else ""}"
+                        ))
                     }
 
                     // Download team rosters in background
@@ -483,6 +509,14 @@ class RegistryContainer(
                             )
                         }
 
+                        // Show toast if any charts failed to sync
+                        if (state.diagnostics.failedCharts.isNotEmpty()) {
+                            val count = state.diagnostics.failedCharts.size
+                            postSideEffect(RegistrySideEffect.ShowError(
+                                "Failed to sync $count chart${if (count > 1) "s" else ""}"
+                            ))
+                        }
+
                         pinnedTeamsContainer?.downloadTeamRosters()
                     } catch (e: Exception) {
                         println("❌ Chart synchronization failed: ${e.message}")
@@ -548,6 +582,9 @@ class RegistryContainer(
                 // Build registry from cached chart data
                 val registry = buildRegistryFromCache()
 
+                // Capture failed charts before clearing syncProgress
+                val completedFailedCharts = progress.failedCharts
+
                 // Update state with registry - keep isSyncing true for caller
                 intent {
                     reduce {
@@ -563,7 +600,8 @@ class RegistryContainer(
                                 } else null,
                                 failedSyncs = if (progress.hasFailures) {
                                     container.stateFlow.value.diagnostics.failedSyncs + progress.failedCharts.size
-                                } else container.stateFlow.value.diagnostics.failedSyncs
+                                } else container.stateFlow.value.diagnostics.failedSyncs,
+                                failedCharts = completedFailedCharts
                             )
                         )
                     }
@@ -634,7 +672,7 @@ class RegistryContainer(
             lastError = currentState.diagnostics.lastError,
             isStale = registryManager.isRegistryStale(),
             isSyncing = currentState.isSyncing,
-            failedCharts = currentState.syncProgress?.failedCharts ?: emptyList()
+            failedCharts = currentState.syncProgress?.failedCharts ?: currentState.diagnostics.failedCharts
         )
     }
 

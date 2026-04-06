@@ -1,0 +1,120 @@
+---
+title: "Building a mobile-first bracket visualization"
+date: "2026-04-06"
+description: "Comparing the mobile bracket experience across Google, ESPN, CBS Sports, NCAA, Yahoo, and Fastbreak."
+author: "Joe Badaczewski"
+authorUrl: "https://joebad.com"
+---
+
+Every year, March Madness enthralls America. When I was in high school, there were teachers who took off weeks to watch all the games. There was always a classroom that was bending the rules of use for the mounted TVs by playing a random Round of 64 game. In the American workplace lunchroom, there is always a game on from mid March to early April.
+
+The constant interest in college basketball should push the major companies who benefit from the ad revenue to optimize the bracket visualizations on their mobile apps. But they don't. In my opinion, all of the major mobile applications provide subpar bracket visualizations.
+
+I built a bracket visualization for Fastbreak that checks all the boxes for what makes a great, mobile-first user experience:
+1. Freely explore the bracket by dragging across the screen. No weird animations.
+2. Easily clickable matchup nodes that dive straight into a meaningful comparison.
+3. Zoom in and out to inspect the entire bracket or a certain section while maintaining a representation of every matchup node at every zoom level.
+4. Use a navigation panel to quickly switch between regions and the Final Four matchups.
+5. Rotating your phone smoothly transitions into a landscape view that retains all of the portrait functionality.
+
+Below I recorded some basic usage of each bracket visualization from six of the major sports apps. All of the videos are from my personal iPhone SE 3rd gen.
+
+<BracketComparison name="🥇 Fastbreak" url="https://res.cloudinary.com/joebad-com/video/upload/v1775186151/mr8nz4cbtrzub4vhfow8.mp4">
+<Pros>
+- Smooth pan/zoom. No weird animations.
+- View entire bracket on very small devices without compromising usability
+- Intuitive navigation between regions/Final Four
+- Compact matchup comparison with extremely high data to pixel ratio
+- Selecting a matchup node shows the matchup comparison immediately (no loading)
+</Pros>
+<Cons>
+- No logos and overly bland/simple
+- Text may be too small for some users
+- No sharing functionality
+</Cons>
+</BracketComparison>
+
+<BracketComparison name="🥈 CBS Sports" url="https://res.cloudinary.com/joebad-com/video/upload/v1775186153/gptnmsucjzfqquskgcb3.mp4">
+<Pros>
+- Good data to pixel ratio for the region view
+- Navigation feels predictable between regions
+- Link to relevant article when selecting node
+- Decent overall bracket view that has a way to drill into sections and matchups
+</Pros>
+<Cons>
+- Not enough matchup stats when clicking a node
+- No zooming
+- No landscape mode
+</Cons>
+</BracketComparison>
+
+<BracketComparison name="🥉 Google Search results" url="https://res.cloudinary.com/joebad-com/video/upload/v1775186152/x8tnmzibfmht3yq3fqkf.mp4">
+<Pros>
+- Good use of logos
+- Pan all the way to the final four
+</Pros>
+<Cons>
+- Weird animations when panning through bracket
+- A lot of unused space around the navigation
+- Browser based so there is a lot of space taken up by the address bar
+- Size of matchup nodes changes as you pan creating a confusing middle state
+</Cons>
+</BracketComparison>
+
+<BracketComparison name="Yahoo" url="https://res.cloudinary.com/joebad-com/video/upload/v1775186156/kigzcum0dtboxbtgjp0u.mp4">
+<Pros>
+- Good use of color and space
+- Selecting a matchup node gives a link to an interesting article
+</Pros>
+<Cons>
+- Weird animations while panning
+- Swiping can accidentally navigate you away from the bracket
+- No way of viewing the entire bracket or seeing a clear path for a team to the Final Four
+- No landscape support
+- Too much unused space around navigation
+- Matchup comparison after selecting node doesn't show enough stats right away
+</Cons>
+</BracketComparison>
+
+<BracketComparison name="Real" url="https://res.cloudinary.com/joebad-com/video/upload/v1775186152/hqq4wjmbdbopswe1txy0.mp4">
+<Pros>
+- Dedicated screen (no bottom nav) so the navigation feels predictable
+</Pros>
+<Cons>
+- Not technically a bracket
+- No comparison screen when clicking a matchup
+- I had to navigate pretty deep into the app to find the "bracket" section
+</Cons>
+</BracketComparison>
+
+<BracketComparison name="NCAA official" url="https://res.cloudinary.com/joebad-com/video/upload/v1775186151/ukh7u7qrld62hncavbes.mp4">
+<Pros>
+- Freely explore the bracket without weird animations
+- Nice fixed columns showing the round title
+</Pros>
+<Cons>
+- The matchup screen after selecting a node in the bracket has a very low data to pixel ratio
+- Navigation panel is not interactive so you can't jump to regions easily
+- No way of viewing the Final Four on one screen
+</Cons>
+</BracketComparison>
+
+<BracketComparison name="ESPN" url="https://res.cloudinary.com/joebad-com/video/upload/v1775494187/espn-bracket_pxxe6z.mp4">
+<Pros>
+- Good use of space
+- Navigation is pretty easy
+- Fixed column headers
+</Pros>
+<Cons>
+- Panning does not follow the fingers drag point and instead triggers navigation on drag/press up
+- No way to see entire bracket 
+- No zooming
+- No landscape support
+- Clicking into a matchup requires targeting a tiny link
+- The matchup comparison shows very little info on the immediate matchup screen
+</Cons>
+</BracketComparison>
+
+## Takeaways
+
+Building a bracket visualization that works on small devices is hard. But in this case, the juice is worth the squeeze. We should hold major companies who build tools for major sporting events to an extremely high bar. We have been building mobile applications for decades; there is no reason all of these major applications should not have landscape mode. Matchup comparisons should not need an extra API call; loading a full bracket with all matchup data available should happen nearly instantly. Fastbreak prioritizes speed and usability on small screens, making it the best bracket experience on the planet.

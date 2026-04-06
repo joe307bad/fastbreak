@@ -75,7 +75,6 @@ fun App(rootComponent: RootComponent) {
                         onRefresh = { rootComponent.refreshRegistry() },
                         onMenuClick = { scope.launch { drawerState.open() } },
                         onNavigateToTopics = { rootComponent.navigateToTopics() },
-                        onInitialLoad = { rootComponent.loadRegistry() },
                         onRequestPermission = { rootComponent.requestNetworkPermission() },
                         onCheckPermission = { rootComponent.checkNetworkPermission() },
                         onClearSyncProgress = { rootComponent.clearSyncProgress() },

@@ -676,12 +676,12 @@ data class NBASeasonAvgComparison(
 
 @Serializable
 data class LeagueEfficiencyStats(
-    val avgOffRating: Double,
-    val avgDefRating: Double,
-    val minOffRating: Double,
-    val maxOffRating: Double,
-    val minDefRating: Double,
-    val maxDefRating: Double
+    val avgOffRating: Double? = null,
+    val avgDefRating: Double? = null,
+    val minOffRating: Double? = null,
+    val maxOffRating: Double? = null,
+    val minDefRating: Double? = null,
+    val maxDefRating: Double? = null
 )
 
 @Serializable
@@ -702,8 +702,8 @@ data class LeagueCumXgStats(
 
 @Serializable
 data class LeagueCumNetRatingStats(
-    val minCumNetRating: Double,
-    val maxCumNetRating: Double
+    val minCumNetRating: Double? = null,
+    val maxCumNetRating: Double? = null
 )
 
 @Serializable

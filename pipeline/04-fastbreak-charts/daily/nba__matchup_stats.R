@@ -759,71 +759,87 @@ team_stats <- team_stats %>%
 
 cat("Calculated stats for", nrow(team_stats), "teams\n")
 
-# Get advanced team stats
-advanced_stats <- tryCatch({
-  hoopR::nba_leaguedashteamstats(
-    season = NBA_SEASON_STRING,
-    measure_type = "Advanced"
-  )$LeagueDashTeamStats
-}, error = function(e) {
-  cat("Warning: Could not load advanced stats:", e$message, "\n")
+# Helper to call NBA API with retries
+# hoopR has its own 60s curl timeout, so errors are catchable
+call_nba_api <- function(fn, ..., max_retries = 2) {
+  for (attempt in seq_len(max_retries)) {
+    result <- tryCatch({
+      fn(...)
+    }, error = function(e) {
+      cat("  Attempt", attempt, "/", max_retries, "failed:", e$message, "\n")
+      if (attempt < max_retries) Sys.sleep(2)
+      NULL
+    })
+    if (!is.null(result)) return(result)
+  }
+  cat("  All attempts failed. Continuing without this data.\n")
   NULL
-})
+}
+
+# Get advanced team stats
+cat("Fetching advanced team stats from NBA API...\n")
+advanced_result <- call_nba_api(
+  hoopR::nba_leaguedashteamstats,
+  season = NBA_SEASON_STRING,
+  measure_type = "Advanced"
+)
+advanced_stats <- if (!is.null(advanced_result)) advanced_result$LeagueDashTeamStats else NULL
 
 # Get Four Factors stats
-four_factors_stats <- tryCatch({
-  hoopR::nba_leaguedashteamstats(
-    season = NBA_SEASON_STRING,
-    measure_type = "Four Factors"
-  )$LeagueDashTeamStats
-}, error = function(e) {
-  cat("Warning: Could not load four factors stats:", e$message, "\n")
-  NULL
-})
+cat("Fetching four factors stats from NBA API...\n")
+Sys.sleep(1)  # Brief pause to avoid NBA API rate limiting
+four_factors_result <- call_nba_api(
+  hoopR::nba_leaguedashteamstats,
+  season = NBA_SEASON_STRING,
+  measure_type = "Four Factors"
+)
+four_factors_stats <- if (!is.null(four_factors_result)) four_factors_result$LeagueDashTeamStats else NULL
 
 if (is.null(advanced_stats)) {
-  stop("FATAL: Could not load advanced stats from NBA API. This data is required for matchup worksheets.")
+  cat("WARNING: Could not load advanced stats from NBA API. Advanced stats will be unavailable.\n")
 }
 
 # Join advanced stats with team stats (join on team_display_name since IDs don't match)
-team_stats <- team_stats %>%
-  left_join(
-    advanced_stats %>%
-      select(TEAM_NAME, OFF_RATING, DEF_RATING, NET_RATING, PACE, PIE, AST_PCT, AST_RATIO,
-             OREB_PCT, DREB_PCT, REB_PCT, TM_TOV_PCT, EFG_PCT, TS_PCT) %>%
-      rename(
-        team_display_name = TEAM_NAME,
-        offensive_rating = OFF_RATING,
-        defensive_rating = DEF_RATING,
-        net_rating = NET_RATING,
-        pace = PACE,
-        pie = PIE,
-        ast_pct = AST_PCT,
-        ast_ratio = AST_RATIO,
-        oreb_pct = OREB_PCT,
-        dreb_pct = DREB_PCT,
-        reb_pct = REB_PCT,
-        tm_tov_pct = TM_TOV_PCT,
-        efg_pct = EFG_PCT,
-        ts_pct = TS_PCT
-      ) %>%
-      mutate(
-        offensive_rating = as.numeric(offensive_rating),
-        defensive_rating = as.numeric(defensive_rating),
-        net_rating = as.numeric(net_rating),
-        pace = as.numeric(pace),
-        pie = as.numeric(pie),
-        ast_pct = as.numeric(ast_pct),
-        ast_ratio = as.numeric(ast_ratio),
-        oreb_pct = as.numeric(oreb_pct),
-        dreb_pct = as.numeric(dreb_pct),
-        reb_pct = as.numeric(reb_pct),
-        tm_tov_pct = as.numeric(tm_tov_pct),
-        efg_pct = as.numeric(efg_pct),
-        ts_pct = as.numeric(ts_pct)
-      ),
-    by = "team_display_name"
-  )
+if (!is.null(advanced_stats)) {
+  team_stats <- team_stats %>%
+    left_join(
+      advanced_stats %>%
+        select(TEAM_NAME, OFF_RATING, DEF_RATING, NET_RATING, PACE, PIE, AST_PCT, AST_RATIO,
+               OREB_PCT, DREB_PCT, REB_PCT, TM_TOV_PCT, EFG_PCT, TS_PCT) %>%
+        rename(
+          team_display_name = TEAM_NAME,
+          offensive_rating = OFF_RATING,
+          defensive_rating = DEF_RATING,
+          net_rating = NET_RATING,
+          pace = PACE,
+          pie = PIE,
+          ast_pct = AST_PCT,
+          ast_ratio = AST_RATIO,
+          oreb_pct = OREB_PCT,
+          dreb_pct = DREB_PCT,
+          reb_pct = REB_PCT,
+          tm_tov_pct = TM_TOV_PCT,
+          efg_pct = EFG_PCT,
+          ts_pct = TS_PCT
+        ) %>%
+        mutate(
+          offensive_rating = as.numeric(offensive_rating),
+          defensive_rating = as.numeric(defensive_rating),
+          net_rating = as.numeric(net_rating),
+          pace = as.numeric(pace),
+          pie = as.numeric(pie),
+          ast_pct = as.numeric(ast_pct),
+          ast_ratio = as.numeric(ast_ratio),
+          oreb_pct = as.numeric(oreb_pct),
+          dreb_pct = as.numeric(dreb_pct),
+          reb_pct = as.numeric(reb_pct),
+          tm_tov_pct = as.numeric(tm_tov_pct),
+          efg_pct = as.numeric(efg_pct),
+          ts_pct = as.numeric(ts_pct)
+        ),
+      by = "team_display_name"
+    )
+}
 
 if (!is.null(four_factors_stats)) {
   # Join four factors stats (join on team_display_name since IDs don't match)
@@ -901,35 +917,37 @@ team_stats <- team_stats %>%
     opp_turnovers_per_game_rankDisplay = opp_turnovers_pg_ranks$rankDisplay
   )
 
-# Calculate advanced stat ranks (advanced_stats is required, script fails above if null)
-off_rating_ranks <- tied_rank(-team_stats$offensive_rating)
-def_rating_ranks <- tied_rank(team_stats$defensive_rating)  # Lower is better
-net_rating_ranks <- tied_rank(-team_stats$net_rating)
-pace_ranks <- tied_rank(-team_stats$pace)
-efg_pct_ranks <- tied_rank(-team_stats$efg_pct)
-ts_pct_ranks <- tied_rank(-team_stats$ts_pct)
-oreb_pct_ranks <- tied_rank(-team_stats$oreb_pct)
-tov_pct_ranks <- tied_rank(team_stats$tm_tov_pct)  # Lower is better
+# Calculate advanced stat ranks (only if advanced stats were loaded)
+if (!is.null(advanced_stats)) {
+  off_rating_ranks <- tied_rank(-team_stats$offensive_rating)
+  def_rating_ranks <- tied_rank(team_stats$defensive_rating)  # Lower is better
+  net_rating_ranks <- tied_rank(-team_stats$net_rating)
+  pace_ranks <- tied_rank(-team_stats$pace)
+  efg_pct_ranks <- tied_rank(-team_stats$efg_pct)
+  ts_pct_ranks <- tied_rank(-team_stats$ts_pct)
+  oreb_pct_ranks <- tied_rank(-team_stats$oreb_pct)
+  tov_pct_ranks <- tied_rank(team_stats$tm_tov_pct)  # Lower is better
 
-team_stats <- team_stats %>%
-  mutate(
-    offensive_rating_rank = off_rating_ranks$rank,
-    offensive_rating_rankDisplay = off_rating_ranks$rankDisplay,
-    defensive_rating_rank = def_rating_ranks$rank,
-    defensive_rating_rankDisplay = def_rating_ranks$rankDisplay,
-    net_rating_rank = net_rating_ranks$rank,
-    net_rating_rankDisplay = net_rating_ranks$rankDisplay,
-    pace_rank = pace_ranks$rank,
-    pace_rankDisplay = pace_ranks$rankDisplay,
-    efg_pct_rank = efg_pct_ranks$rank,
-    efg_pct_rankDisplay = efg_pct_ranks$rankDisplay,
-    ts_pct_rank = ts_pct_ranks$rank,
-    ts_pct_rankDisplay = ts_pct_ranks$rankDisplay,
-    oreb_pct_rank = oreb_pct_ranks$rank,
-    oreb_pct_rankDisplay = oreb_pct_ranks$rankDisplay,
-    tm_tov_pct_rank = tov_pct_ranks$rank,
-    tm_tov_pct_rankDisplay = tov_pct_ranks$rankDisplay
-  )
+  team_stats <- team_stats %>%
+    mutate(
+      offensive_rating_rank = off_rating_ranks$rank,
+      offensive_rating_rankDisplay = off_rating_ranks$rankDisplay,
+      defensive_rating_rank = def_rating_ranks$rank,
+      defensive_rating_rankDisplay = def_rating_ranks$rankDisplay,
+      net_rating_rank = net_rating_ranks$rank,
+      net_rating_rankDisplay = net_rating_ranks$rankDisplay,
+      pace_rank = pace_ranks$rank,
+      pace_rankDisplay = pace_ranks$rankDisplay,
+      efg_pct_rank = efg_pct_ranks$rank,
+      efg_pct_rankDisplay = efg_pct_ranks$rankDisplay,
+      ts_pct_rank = ts_pct_ranks$rank,
+      ts_pct_rankDisplay = ts_pct_ranks$rankDisplay,
+      oreb_pct_rank = oreb_pct_ranks$rank,
+      oreb_pct_rankDisplay = oreb_pct_ranks$rankDisplay,
+      tm_tov_pct_rank = tov_pct_ranks$rank,
+      tm_tov_pct_rankDisplay = tov_pct_ranks$rankDisplay
+    )
+}
 
 if (!is.null(four_factors_stats)) {
   fta_rate_ranks <- tied_rank(-team_stats$fta_rate)
@@ -985,20 +1003,21 @@ season_start_date <- as.Date(paste0(NBA_SEASON - 1, "-10-01"))
 cat("Fetching official per-game advanced stats from NBA API...\n")
 
 # Helper function with retry logic for NBA API calls
-fetch_with_retry <- function(fetch_fn, max_retries = 3, delay_secs = 2) {
+fetch_with_retry <- function(fetch_fn, max_retries = 2, delay_secs = 2) {
   for (attempt in 1:max_retries) {
     result <- tryCatch({
       fetch_fn()
     }, error = function(e) {
-      cat("Attempt", attempt, "failed:", e$message, "\n")
+      cat("  Attempt", attempt, "/", max_retries, "failed:", e$message, "\n")
       NULL
     })
     if (!is.null(result)) return(result)
     if (attempt < max_retries) {
-      cat("Retrying in", delay_secs, "seconds...\n")
+      cat("  Retrying in", delay_secs, "seconds...\n")
       Sys.sleep(delay_secs)
     }
   }
+  cat("  All attempts failed. Continuing without this data.\n")
   NULL
 }
 
@@ -1011,9 +1030,11 @@ team_game_logs_advanced <- fetch_with_retry(function() {
 })
 
 if (is.null(team_game_logs_advanced) || nrow(team_game_logs_advanced) == 0) {
-  stop("FATAL: Could not load per-game advanced stats from NBA API. This data is required for matchup worksheets.")
+  cat("WARNING: Could not load per-game advanced stats from NBA API. Cumulative net rating and trend data will be unavailable.\n")
+  team_game_logs_advanced <- NULL
 }
 
+if (!is.null(team_game_logs_advanced)) {
 cat("Loaded", nrow(team_game_logs_advanced), "game logs with official ratings\n")
 
 # Use official per-game ratings
@@ -1100,6 +1121,14 @@ league_efficiency_stats <- weekly_efficiency %>%
 
 cat("League avg off rating:", round(league_efficiency_stats$avg_off_rating, 1),
     "def rating:", round(league_efficiency_stats$avg_def_rating, 1), "\n")
+} else {
+  # Initialize empty defaults when game logs are unavailable
+  cum_net_rating_by_team <- data.frame(team_abbreviation = character(), week_num = integer(), cum_net_rating = numeric())
+  tenth_net_rating_by_week <- data.frame(week_num = integer(), tenth_net_rating = numeric())
+  league_cum_net_rating_stats <- list(minCumNetRating = NA, maxCumNetRating = NA)
+  weekly_efficiency <- data.frame(team_abbreviation = character(), week_num = integer(), off_rating = numeric(), def_rating = numeric())
+  league_efficiency_stats <- data.frame(avg_off_rating = NA, avg_def_rating = NA, min_off_rating = NA, max_off_rating = NA, min_def_rating = NA, max_def_rating = NA)
+} # end if (!is.null(team_game_logs_advanced))
 
 end_timer()
 
@@ -1108,6 +1137,11 @@ end_timer()
 # ============================================================================
 start_timer("STEP 1c: Calculate 1-month trend rankings")
 cat("\n1c. Calculating 1-month trend rankings (last 4 weeks)...\n")
+
+if (is.null(team_game_logs_advanced)) {
+  cat("Skipping: game logs not available.\n")
+  month_trend_stats <- NULL
+} else {
 
 # Get current week number
 current_week <- max(game_ratings$week_num, na.rm = TRUE)
@@ -1213,6 +1247,7 @@ month_trend_stats$record_rank <- record_month_ranks$rank
 month_trend_stats$record_rankDisplay <- record_month_ranks$rankDisplay
 
 cat("Calculated month trend rankings for", nrow(month_trend_stats), "teams\n")
+} # end if game logs available
 
 end_timer()
 
@@ -1285,28 +1320,28 @@ player_stats <- player_stats %>%
 
 # Get advanced player stats
 cat("Loading advanced player stats...\n")
-player_advanced_stats <- tryCatch({
-  hoopR::nba_leaguedashplayerstats(
-    season = NBA_SEASON_STRING,
-    measure_type = "Advanced",
-    per_mode = "PerGame"
-  )$LeagueDashPlayerStats
-}, error = function(e) {
-  cat("Warning: Could not load advanced player stats:", e$message, "\n")
-  NULL
-})
+player_advanced_stats <- call_nba_api(
+  hoopR::nba_leaguedashplayerstats,
+  season = NBA_SEASON_STRING,
+  measure_type = "Advanced",
+  per_mode = "PerGame"
+)
+if (!is.null(player_advanced_stats)) {
+  player_advanced_stats <- player_advanced_stats$LeagueDashPlayerStats
+}
 
 # Get player usage stats
-player_usage_stats <- tryCatch({
-  hoopR::nba_leaguedashplayerstats(
-    season = NBA_SEASON_STRING,
-    measure_type = "Usage",
-    per_mode = "PerGame"
-  )$LeagueDashPlayerStats
-}, error = function(e) {
-  cat("Warning: Could not load player usage stats:", e$message, "\n")
-  NULL
-})
+cat("Loading player usage stats...\n")
+Sys.sleep(1)  # Brief pause to avoid NBA API rate limiting
+player_usage_stats <- call_nba_api(
+  hoopR::nba_leaguedashplayerstats,
+  season = NBA_SEASON_STRING,
+  measure_type = "Usage",
+  per_mode = "PerGame"
+)
+if (!is.null(player_usage_stats)) {
+  player_usage_stats <- player_usage_stats$LeagueDashPlayerStats
+}
 
 # Join advanced stats with player stats
 # Try to join on player ID first (after converting to character), fall back to name matching
@@ -2008,9 +2043,9 @@ build_nba_comparisons <- function(home_stats, away_stats, home_team, away_team) 
     off_rank <- home_stats[[matchup$off_rank]]
     def_rank <- away_stats[[matchup$def_rank]]
 
-    if (!is.na(off_val) && !is.na(def_val)) {
+    if (is_valid_value(off_val) && is_valid_value(def_val)) {
       advantage <- 0
-      if (!is.na(off_rank) && !is.na(def_rank)) {
+      if (is_valid_value(off_rank) && is_valid_value(def_rank)) {
         if (off_rank < def_rank) {
           advantage <- -1  # Offense advantage
         } else if (off_rank > def_rank) {
@@ -2053,9 +2088,9 @@ build_nba_comparisons <- function(home_stats, away_stats, home_team, away_team) 
     off_rank <- away_stats[[matchup$off_rank]]
     def_rank <- home_stats[[matchup$def_rank]]
 
-    if (!is.na(off_val) && !is.na(def_val)) {
+    if (is_valid_value(off_val) && is_valid_value(def_val)) {
       advantage <- 0
-      if (!is.na(off_rank) && !is.na(def_rank)) {
+      if (is_valid_value(off_rank) && is_valid_value(def_rank)) {
         if (off_rank < def_rank) {
           advantage <- -1  # Offense advantage
         } else if (off_rank > def_rank) {
@@ -2216,7 +2251,7 @@ for (game in all_games) {
       paste0("week-", home_cum_net_rating$week_num)
     )
   } else {
-    list()
+    setNames(list(), character(0))
   }
 
   # Add weekly efficiency (off/def rating) for last 10 weeks - for scatter plot
@@ -2235,12 +2270,15 @@ for (game in all_games) {
       paste0("week-", home_weekly_eff$week_num)
     )
   } else {
-    list()
+    setNames(list(), character(0))
   }
 
   # Add 1-month trend rankings for home team
-  home_month_trend <- month_trend_stats %>%
-    filter(team_abbreviation == game$home_team_abbrev)
+  home_month_trend <- if (!is.null(month_trend_stats)) {
+    month_trend_stats %>% filter(team_abbreviation == game$home_team_abbrev)
+  } else {
+    data.frame()
+  }
 
   home_team_data$stats$monthTrend <- if (nrow(home_month_trend) > 0) {
     list(
@@ -2288,7 +2326,7 @@ for (game in all_games) {
       )
     )
   } else {
-    list()
+    setNames(list(), character(0))
   }
 
   # Add playoff probability for home team
@@ -2389,7 +2427,7 @@ for (game in all_games) {
       paste0("week-", away_cum_net_rating$week_num)
     )
   } else {
-    list()
+    setNames(list(), character(0))
   }
 
   # Add weekly efficiency (off/def rating) for last 10 weeks - for scatter plot
@@ -2408,12 +2446,15 @@ for (game in all_games) {
       paste0("week-", away_weekly_eff$week_num)
     )
   } else {
-    list()
+    setNames(list(), character(0))
   }
 
   # Add 1-month trend rankings for away team
-  away_month_trend <- month_trend_stats %>%
-    filter(team_abbreviation == game$away_team_abbrev)
+  away_month_trend <- if (!is.null(month_trend_stats)) {
+    month_trend_stats %>% filter(team_abbreviation == game$away_team_abbrev)
+  } else {
+    data.frame()
+  }
 
   away_team_data$stats$monthTrend <- if (nrow(away_month_trend) > 0) {
     list(
@@ -2461,7 +2502,7 @@ for (game in all_games) {
       )
     )
   } else {
-    list()
+    setNames(list(), character(0))
   }
 
   # Add playoff probability for away team
@@ -2713,7 +2754,7 @@ for (game in all_games) {
       paste0("week-", tenth_net_rating_by_week$week_num)
     )
   } else {
-    list()
+    setNames(list(), character(0))
   }
 
   # Add league-wide cumulative net rating bounds for consistent line chart scaling

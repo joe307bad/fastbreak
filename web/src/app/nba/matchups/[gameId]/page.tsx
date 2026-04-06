@@ -104,8 +104,8 @@ function MatchupHeader({ game }: { game: NBAMatchupDataPoint }) {
             </span>
             <span>{game.awayTeam.conference}</span>
           </div>
-          <div className={`font-mono ${game.awayTeam.stats.netRating >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-            {game.awayTeam.stats.netRating >= 0 ? '+' : ''}{game.awayTeam.stats.netRating.toFixed(1)}
+          <div className={`font-mono ${(game.awayTeam.stats.netRating ?? 0) >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+            {game.awayTeam.stats.netRating != null ? `${game.awayTeam.stats.netRating >= 0 ? '+' : ''}${game.awayTeam.stats.netRating.toFixed(1)}` : '-'}
           </div>
         </div>
 
@@ -123,8 +123,8 @@ function MatchupHeader({ game }: { game: NBAMatchupDataPoint }) {
             </span>
             <span>{game.homeTeam.conference}</span>
           </div>
-          <div className={`font-mono ${game.homeTeam.stats.netRating >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-            {game.homeTeam.stats.netRating >= 0 ? '+' : ''}{game.homeTeam.stats.netRating.toFixed(1)}
+          <div className={`font-mono ${(game.homeTeam.stats.netRating ?? 0) >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+            {game.homeTeam.stats.netRating != null ? `${game.homeTeam.stats.netRating >= 0 ? '+' : ''}${game.homeTeam.stats.netRating.toFixed(1)}` : '-'}
           </div>
         </div>
 

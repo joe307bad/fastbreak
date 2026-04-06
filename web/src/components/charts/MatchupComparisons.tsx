@@ -34,7 +34,8 @@ function getRankBadgeClasses(rank: number): string {
   return `${base} bg-[var(--muted)]/20 text-[var(--muted)]`;
 }
 
-function formatValue(value: number, label: string): string {
+function formatValue(value: number | null | undefined, label: string): string {
+  if (value == null) return '-';
   if (label.toLowerCase().includes('%') || label.toLowerCase().includes('pct')) {
     return `${(value * 100).toFixed(1)}%`;
   }

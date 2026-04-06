@@ -53,8 +53,8 @@ function NBAMatchupCard({ matchup }: { matchup: NBAMatchupDataPoint }) {
           </div>
           <div className="flex items-center gap-3 text-xs">
             <span className="text-[var(--muted)]">#{matchup.awayTeam.conferenceRank}</span>
-            <span className={`font-mono w-10 text-right ${matchup.awayTeam.stats.netRating >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-              {matchup.awayTeam.stats.netRating >= 0 ? '+' : ''}{matchup.awayTeam.stats.netRating.toFixed(1)}
+            <span className={`font-mono w-10 text-right ${(matchup.awayTeam.stats.netRating ?? 0) >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+              {matchup.awayTeam.stats.netRating != null ? `${matchup.awayTeam.stats.netRating >= 0 ? '+' : ''}${matchup.awayTeam.stats.netRating.toFixed(1)}` : '-'}
             </span>
           </div>
         </div>
@@ -72,8 +72,8 @@ function NBAMatchupCard({ matchup }: { matchup: NBAMatchupDataPoint }) {
           </div>
           <div className="flex items-center gap-3 text-xs">
             <span className="text-[var(--muted)]">#{matchup.homeTeam.conferenceRank}</span>
-            <span className={`font-mono w-10 text-right ${matchup.homeTeam.stats.netRating >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-              {matchup.homeTeam.stats.netRating >= 0 ? '+' : ''}{matchup.homeTeam.stats.netRating.toFixed(1)}
+            <span className={`font-mono w-10 text-right ${(matchup.homeTeam.stats.netRating ?? 0) >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+              {matchup.homeTeam.stats.netRating != null ? `${matchup.homeTeam.stats.netRating >= 0 ? '+' : ''}${matchup.homeTeam.stats.netRating.toFixed(1)}` : '-'}
             </span>
           </div>
         </div>
@@ -83,15 +83,15 @@ function NBAMatchupCard({ matchup }: { matchup: NBAMatchupDataPoint }) {
       <div className="flex justify-between items-center mt-3 pt-2 border-t border-[var(--border)] text-xs text-[var(--muted)]">
         <div>
           <span>Off Rtg: </span>
-          <span className="font-mono">{matchup.awayTeam.stats.offensiveRating.toFixed(1)}</span>
+          <span className="font-mono">{matchup.awayTeam.stats.offensiveRating?.toFixed(1) ?? '-'}</span>
           <span> vs </span>
-          <span className="font-mono">{matchup.homeTeam.stats.offensiveRating.toFixed(1)}</span>
+          <span className="font-mono">{matchup.homeTeam.stats.offensiveRating?.toFixed(1) ?? '-'}</span>
         </div>
         <div>
           <span>Def Rtg: </span>
-          <span className="font-mono">{matchup.awayTeam.stats.defensiveRating.toFixed(1)}</span>
+          <span className="font-mono">{matchup.awayTeam.stats.defensiveRating?.toFixed(1) ?? '-'}</span>
           <span> vs </span>
-          <span className="font-mono">{matchup.homeTeam.stats.defensiveRating.toFixed(1)}</span>
+          <span className="font-mono">{matchup.homeTeam.stats.defensiveRating?.toFixed(1) ?? '-'}</span>
         </div>
       </div>
     </div>

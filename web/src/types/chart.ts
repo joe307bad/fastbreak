@@ -249,17 +249,17 @@ export interface NBAMatchupResults {
 }
 
 export interface LeagueEfficiencyStats {
-  avgOffRating: number;
-  avgDefRating: number;
-  minOffRating: number;
-  maxOffRating: number;
-  minDefRating: number;
-  maxDefRating: number;
+  avgOffRating: number | null;
+  avgDefRating: number | null;
+  minOffRating: number | null;
+  maxOffRating: number | null;
+  minDefRating: number | null;
+  maxDefRating: number | null;
 }
 
 export interface LeagueCumNetRatingStats {
-  minCumNetRating: number;
-  maxCumNetRating: number;
+  minCumNetRating: number | null;
+  maxCumNetRating: number | null;
 }
 
 export interface NBAMatchupDataPoint {

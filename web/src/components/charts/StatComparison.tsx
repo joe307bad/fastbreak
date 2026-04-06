@@ -8,7 +8,8 @@ interface StatRowProps {
   homeAbbrev: string;
 }
 
-function formatValue(value: number, label: string): string {
+function formatValue(value: number | null | undefined, label: string): string {
+  if (value == null) return '-';
   // Format percentages
   if (label.toLowerCase().includes('%') || label.toLowerCase().includes('pct')) {
     return `${(value * 100).toFixed(1)}%`;

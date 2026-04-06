@@ -69,8 +69,8 @@ function NBAMatchupCard({ matchup, dayLabel }: { matchup: NBAMatchupDataPoint; d
         </div>
         <div className="flex items-center gap-2">
           <span className="text-[var(--muted)]">#{matchup.awayTeam.conferenceRank}</span>
-          <span className={`font-mono w-8 text-right ${matchup.awayTeam.stats.netRating >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-            {matchup.awayTeam.stats.netRating >= 0 ? '+' : ''}{matchup.awayTeam.stats.netRating.toFixed(1)}
+          <span className={`font-mono w-8 text-right ${(matchup.awayTeam.stats.netRating ?? 0) >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+            {matchup.awayTeam.stats.netRating != null ? `${matchup.awayTeam.stats.netRating >= 0 ? '+' : ''}${matchup.awayTeam.stats.netRating.toFixed(1)}` : '-'}
           </span>
         </div>
       </div>
@@ -85,8 +85,8 @@ function NBAMatchupCard({ matchup, dayLabel }: { matchup: NBAMatchupDataPoint; d
         </div>
         <div className="flex items-center gap-2">
           <span className="text-[var(--muted)]">#{matchup.homeTeam.conferenceRank}</span>
-          <span className={`font-mono w-8 text-right ${matchup.homeTeam.stats.netRating >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-            {matchup.homeTeam.stats.netRating >= 0 ? '+' : ''}{matchup.homeTeam.stats.netRating.toFixed(1)}
+          <span className={`font-mono w-8 text-right ${(matchup.homeTeam.stats.netRating ?? 0) >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+            {matchup.homeTeam.stats.netRating != null ? `${matchup.homeTeam.stats.netRating >= 0 ? '+' : ''}${matchup.homeTeam.stats.netRating.toFixed(1)}` : '-'}
           </span>
         </div>
       </div>

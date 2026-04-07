@@ -998,52 +998,59 @@ cat("\n1b. Calculating cumulative net rating and weekly efficiency...\n")
 # NBA season starts in October, so we use the season start year as reference
 season_start_date <- as.Date(paste0(NBA_SEASON - 1, "-10-01"))
 
-# Fetch official per-game advanced stats from NBA API
-# This gives us accurate NET_RATING, OFF_RATING, DEF_RATING per game
-cat("Fetching official per-game advanced stats from NBA API...\n")
+# Compute per-game advanced stats (OFF_RATING, DEF_RATING, NET_RATING) from team_box
+# Uses standard possessions estimation: POSS = FGA + 0.44*FTA - OREB + TOV
+cat("Computing per-game advanced stats from box scores...\n")
 
-# Helper function with retry logic for NBA API calls
-fetch_with_retry <- function(fetch_fn, max_retries = 2, delay_secs = 2) {
-  for (attempt in 1:max_retries) {
-    result <- tryCatch({
-      fetch_fn()
-    }, error = function(e) {
-      cat("  Attempt", attempt, "/", max_retries, "failed:", e$message, "\n")
-      NULL
-    })
-    if (!is.null(result)) return(result)
-    if (attempt < max_retries) {
-      cat("  Retrying in", delay_secs, "seconds...\n")
-      Sys.sleep(delay_secs)
-    }
-  }
-  cat("  All attempts failed. Continuing without this data.\n")
-  NULL
-}
+team_game_logs_advanced <- team_box %>%
+  select(
+    game_id, game_date,
+    team_id, team_abbreviation, team_display_name,
+    team_score, opponent_team_score,
+    field_goals_attempted, free_throws_attempted,
+    offensive_rebounds, turnovers, assists
+  ) %>%
+  # Join with opponent's stats in the same game to get opponent possession components
+  inner_join(
+    team_box %>%
+      select(
+        game_id,
+        opp_team_id = team_id,
+        opp_fga = field_goals_attempted,
+        opp_fta = free_throws_attempted,
+        opp_oreb = offensive_rebounds,
+        opp_tov = turnovers
+      ),
+    by = "game_id"
+  ) %>%
+  filter(team_id != opp_team_id) %>%
+  mutate(
+    # Estimate possessions using standard formula
+    team_poss = field_goals_attempted + 0.44 * free_throws_attempted - offensive_rebounds + turnovers,
+    opp_poss  = opp_fga + 0.44 * opp_fta - opp_oreb + opp_tov,
+    avg_poss  = (team_poss + opp_poss) / 2,
+    # Per-100-possessions ratings
+    OFF_RATING = ifelse(avg_poss > 0, (team_score / avg_poss) * 100, NA_real_),
+    DEF_RATING = ifelse(avg_poss > 0, (opponent_team_score / avg_poss) * 100, NA_real_),
+    NET_RATING = OFF_RATING - DEF_RATING,
+    GAME_DATE = game_date,
+    TEAM_ABBREVIATION = team_abbreviation
+  )
 
-team_game_logs_advanced <- fetch_with_retry(function() {
-  hoopR::nba_teamgamelogs(
-    season = NBA_SEASON_STRING,
-    season_type = "Regular Season",
-    measure_type = "Advanced"
-  )$TeamGameLogs
-})
-
-if (is.null(team_game_logs_advanced) || nrow(team_game_logs_advanced) == 0) {
-  cat("WARNING: Could not load per-game advanced stats from NBA API. Cumulative net rating and trend data will be unavailable.\n")
+if (nrow(team_game_logs_advanced) == 0) {
+  cat("WARNING: Could not compute per-game advanced stats. Cumulative net rating and trend data will be unavailable.\n")
   team_game_logs_advanced <- NULL
 }
 
 if (!is.null(team_game_logs_advanced)) {
-cat("Loaded", nrow(team_game_logs_advanced), "game logs with official ratings\n")
+cat("Computed", nrow(team_game_logs_advanced), "game logs with estimated ratings from box scores\n")
 
-# Use official per-game ratings
+# Per-game ratings computed from box scores
 game_ratings <- team_game_logs_advanced %>%
   mutate(
     game_date_parsed = as.Date(GAME_DATE),
     week_num = as.integer(floor(difftime(game_date_parsed, season_start_date, units = "weeks")) + 1),
     team_abbreviation = TEAM_ABBREVIATION,
-    # Use official ratings from NBA API
     off_rating = as.numeric(OFF_RATING),
     def_rating = as.numeric(DEF_RATING),
     game_net_rating = as.numeric(NET_RATING)

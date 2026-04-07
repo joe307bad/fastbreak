@@ -1,3 +1,6 @@
+'use client';
+
+import { useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { NHLMatchupDataPoint } from '@/types/chart';
 
@@ -61,10 +64,17 @@ interface NHLMatchupNavProps {
 
 export function NHLMatchupNav({ games, selectedGameId }: NHLMatchupNavProps) {
   const dayGroups = groupGamesByDay(games);
+  const selectedDayRef = useRef<HTMLAnchorElement>(null);
 
   const selectedGame = games.find(g => g.gameId === selectedGameId);
   const selectedDayKey = selectedGame ? getDateKey(new Date(selectedGame.gameDate)) : null;
   const selectedDayGroup = dayGroups.find(g => g.dateKey === selectedDayKey);
+
+  useEffect(() => {
+    if (selectedDayRef.current) {
+      selectedDayRef.current.scrollIntoView({ behavior: 'instant', block: 'nearest', inline: 'center' });
+    }
+  }, [selectedGameId]);
 
   const dayBadgeClasses = (isActive: boolean) =>
     `px-3 py-1 text-xs font-medium rounded-full whitespace-nowrap transition-colors border ${
@@ -91,6 +101,7 @@ export function NHLMatchupNav({ games, selectedGameId }: NHLMatchupNavProps) {
             return (
               <Link
                 key={group.dateKey}
+                ref={isSelected ? selectedDayRef : undefined}
                 href={`/nhl/matchups/${firstGameOfDay.gameId}`}
                 className={dayBadgeClasses(isSelected)}
               >

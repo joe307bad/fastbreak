@@ -1,0 +1,128 @@
+const CSS_VARS = ['--foreground', '--background', '--border', '--muted', '--card'] as const;
+
+function resolveVars(svgString: string, container: HTMLElement): { svg: string; vars: Record<string, string> } {
+  const computed = getComputedStyle(container);
+  const vars: Record<string, string> = {};
+
+  for (const v of CSS_VARS) {
+    const resolved = computed.getPropertyValue(v).trim();
+    vars[v] = resolved;
+    svgString = svgString.replaceAll(`var(${v})`, resolved);
+  }
+
+  // Replace font variable with system monospace fallback
+  svgString = svgString.replaceAll('var(--font-geist-mono), monospace', 'monospace');
+  svgString = svgString.replaceAll('var(--font-geist-mono)', 'monospace');
+
+  return { svg: svgString, vars };
+}
+
+export interface QuadrantLegendItem {
+  label: string;
+  color: string;
+  count: number;
+}
+
+export async function downloadChartAsPng(
+  chartContainer: HTMLElement,
+  title?: string,
+  quadrantLegend?: QuadrantLegendItem[],
+): Promise<void> {
+  const svgEl = chartContainer.querySelector('svg');
+  if (!svgEl) return;
+
+  const rect = svgEl.getBoundingClientRect();
+  if (!rect.width || !rect.height) return;
+
+  // Clone so we can modify attributes without affecting the live DOM
+  const clonedSvg = svgEl.cloneNode(true) as SVGSVGElement;
+
+  // Set explicit dimensions for export
+  const exportWidth = 900;
+  const scale = exportWidth / rect.width;
+  const exportHeight = Math.round(rect.height * scale);
+
+  // Ensure viewBox is set from original dimensions, then set export size
+  if (!clonedSvg.getAttribute('viewBox')) {
+    clonedSvg.setAttribute('viewBox', `0 0 ${rect.width} ${rect.height}`);
+  }
+  clonedSvg.setAttribute('width', String(exportWidth));
+  clonedSvg.setAttribute('height', String(exportHeight));
+
+  // Ensure xmlns is set (required for rendering as image)
+  clonedSvg.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+
+  // Serialize and resolve CSS custom properties
+  let svgString = new XMLSerializer().serializeToString(clonedSvg);
+  const { svg: resolvedSvg, vars } = resolveVars(svgString, chartContainer);
+  svgString = resolvedSvg;
+
+  const titleHeight = title ? 48 : 0;
+  const legendHeight = quadrantLegend?.length ? 36 : 0;
+  const padding = 16;
+  const canvasWidth = exportWidth + padding * 2;
+  const canvasHeight = exportHeight + titleHeight + legendHeight + padding * 2;
+
+  const canvas = document.createElement('canvas');
+  canvas.width = canvasWidth;
+  canvas.height = canvasHeight;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+
+  // Fill background
+  ctx.fillStyle = vars['--card'] || vars['--background'] || '#ffffff';
+  ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+
+  // Draw title
+  if (title) {
+    ctx.fillStyle = vars['--foreground'] || '#000000';
+    ctx.font = 'bold 18px monospace';
+    ctx.fillText(title, padding, padding + 28);
+  }
+
+  // Render SVG to canvas via blob URL
+  const blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const img = new Image();
+
+  return new Promise<void>((resolve) => {
+    img.onload = () => {
+      ctx.drawImage(img, padding, titleHeight + padding, exportWidth, exportHeight);
+      URL.revokeObjectURL(url);
+
+      // Draw quadrant legend below chart
+      if (quadrantLegend?.length) {
+        const legendY = titleHeight + padding + exportHeight + 20;
+        let legendX = padding;
+        ctx.font = '13px monospace';
+        for (const item of quadrantLegend) {
+          // Colored circle
+          ctx.beginPath();
+          ctx.arc(legendX + 6, legendY, 6, 0, Math.PI * 2);
+          ctx.fillStyle = item.color;
+          ctx.fill();
+          // Label + count
+          ctx.fillStyle = vars['--foreground'] || '#000000';
+          const text = `${item.label} (${item.count})`;
+          ctx.fillText(text, legendX + 18, legendY + 4);
+          legendX += ctx.measureText(text).width + 34;
+        }
+      }
+
+      const filename = title
+        ? title.replace(/[^a-zA-Z0-9\-_ ]/g, '').replace(/\s+/g, '-') + '.png'
+        : 'chart.png';
+
+      const link = document.createElement('a');
+      link.download = filename;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+      resolve();
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      resolve();
+    };
+    img.src = url;
+  });
+}

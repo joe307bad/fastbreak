@@ -1,24 +1,27 @@
 'use client';
 
 import { useRef, useCallback, ReactNode } from 'react';
-import { downloadChartAsPng } from '@/lib/chartExport';
+import { downloadChartAsPng, QuadrantLegendItem } from '@/lib/chartExport';
 
 interface Props {
   children: ReactNode;
   title?: string;
+  quadrantLegend?: QuadrantLegendItem[];
 }
 
-export function ChartDownloadWrapper({ children, title }: Props) {
+export function ChartDownloadWrapper({ children, title, quadrantLegend }: Props) {
   const chartRef = useRef<HTMLDivElement>(null);
 
   const handleDownload = useCallback(() => {
-    if (chartRef.current) {
-      downloadChartAsPng(chartRef.current, title);
-    }
-  }, [title]);
+    if (!chartRef.current) return;
+    // Read active week filter from data attribute if present
+    const activeFilterEl = chartRef.current.querySelector('[data-active-filter]');
+    const filterLabel = activeFilterEl?.getAttribute('data-active-filter') || undefined;
+    downloadChartAsPng(chartRef.current, title, quadrantLegend, filterLabel);
+  }, [title, quadrantLegend]);
 
   return (
-    <div ref={chartRef} className="relative h-full">
+    <div className="relative h-full">
       <button
         onClick={handleDownload}
         className="absolute top-[5px] right-[5px] p-1 rounded hover:bg-[var(--border)] text-[var(--muted)] hover:text-[var(--foreground)] transition-colors z-10 opacity-50 hover:opacity-100"
@@ -30,7 +33,9 @@ export function ChartDownloadWrapper({ children, title }: Props) {
           <path d="M2 11v2a1 1 0 001 1h10a1 1 0 001-1v-2" />
         </svg>
       </button>
-      {children}
+      <div ref={chartRef} className="h-full">
+        {children}
+      </div>
     </div>
   );
 }

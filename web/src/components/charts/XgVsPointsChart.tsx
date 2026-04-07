@@ -67,6 +67,7 @@ function WeekFilterNav({ filter, onFilterChange }: { filter: WeekFilter; onFilte
         <button
           key={opt.value}
           onClick={() => onFilterChange(opt.value)}
+          data-active-filter={filter === opt.value ? opt.label : undefined}
           className={`px-2 py-0.5 text-[10px] rounded-full border transition-colors ${
             filter === opt.value
               ? 'bg-[var(--foreground)] text-[var(--background)] border-[var(--foreground)]'

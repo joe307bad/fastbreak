@@ -5,6 +5,7 @@ import { NHLMatchupNav } from '@/components/ui/NHLMatchupNav';
 import { MatchupComparisons } from '@/components/charts/MatchupComparisons';
 import { CumXgChart } from '@/components/charts/CumXgChart';
 import { XgVsPointsChart } from '@/components/charts/XgVsPointsChart';
+import { ChartDownloadWrapper } from '@/components/charts/ChartDownloadWrapper';
 import { NHLPlayerComparison } from '@/components/charts/NHLPlayerComparison';
 import { getOrderedLeagues } from '@/lib/leagues';
 import { notFound } from 'next/navigation';
@@ -337,23 +338,27 @@ export default async function NHLMatchupPage({ params }: Props) {
           {/* Charts - square-ish dimensions */}
           <div className="flex flex-col gap-2 h-[700px] lg:h-[calc(100vh-80px)] order-2 lg:order-1">
             <div className="flex-1">
-              <CumXgChart
-                homeTeamStats={game.homeTeam.stats}
-                awayTeamStats={game.awayTeam.stats}
-                homeAbbrev={game.homeTeam.abbreviation}
-                awayAbbrev={game.awayTeam.abbreviation}
-                tenthXgfPctByWeek={game.tenthXgfPctByWeek}
-                leagueStats={game.leagueCumXgStats}
-              />
+              <ChartDownloadWrapper title="Cumulative xGF% by Week">
+                <CumXgChart
+                  homeTeamStats={game.homeTeam.stats}
+                  awayTeamStats={game.awayTeam.stats}
+                  homeAbbrev={game.homeTeam.abbreviation}
+                  awayAbbrev={game.awayTeam.abbreviation}
+                  tenthXgfPctByWeek={game.tenthXgfPctByWeek}
+                  leagueStats={game.leagueCumXgStats}
+                />
+              </ChartDownloadWrapper>
             </div>
             <div className="flex-1">
-              <XgVsPointsChart
-                homeTeamStats={game.homeTeam.stats}
-                awayTeamStats={game.awayTeam.stats}
-                homeAbbrev={game.homeTeam.abbreviation}
-                awayAbbrev={game.awayTeam.abbreviation}
-                leagueStats={game.leagueXgVsPointsStats}
-              />
+              <ChartDownloadWrapper title="xG For vs Points Pace">
+                <XgVsPointsChart
+                  homeTeamStats={game.homeTeam.stats}
+                  awayTeamStats={game.awayTeam.stats}
+                  homeAbbrev={game.homeTeam.abbreviation}
+                  awayAbbrev={game.awayTeam.abbreviation}
+                  leagueStats={game.leagueXgVsPointsStats}
+                />
+              </ChartDownloadWrapper>
             </div>
           </div>
 

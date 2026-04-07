@@ -5,6 +5,7 @@ import { NBAMatchupNav } from '@/components/ui/NBAMatchupNav';
 import { MatchupComparisons } from '@/components/charts/MatchupComparisons';
 import { CumNetRatingChart } from '@/components/charts/CumNetRatingChart';
 import { WeeklyEfficiencyChart } from '@/components/charts/WeeklyEfficiencyChart';
+import { ChartDownloadWrapper } from '@/components/charts/ChartDownloadWrapper';
 import { getOrderedLeagues } from '@/lib/leagues';
 import { notFound } from 'next/navigation';
 
@@ -379,24 +380,28 @@ export default async function NBAMatchupPage({ params }: Props) {
           {/* Charts - square-ish dimensions */}
           <div className="flex flex-col gap-2 h-[700px] lg:h-[calc(100vh-80px)] order-2 lg:order-1">
             <div className="flex-1">
-              <CumNetRatingChart
-                homeTeamStats={game.homeTeam.stats}
-                awayTeamStats={game.awayTeam.stats}
-                homeAbbrev={game.homeTeam.abbreviation}
-                awayAbbrev={game.awayTeam.abbreviation}
-                tenthNetRatingByWeek={game.tenthNetRatingByWeek}
-                leagueStats={game.leagueCumNetRatingStats}
-              />
+              <ChartDownloadWrapper title="Cumulative Net Rating by Week">
+                <CumNetRatingChart
+                  homeTeamStats={game.homeTeam.stats}
+                  awayTeamStats={game.awayTeam.stats}
+                  homeAbbrev={game.homeTeam.abbreviation}
+                  awayAbbrev={game.awayTeam.abbreviation}
+                  tenthNetRatingByWeek={game.tenthNetRatingByWeek}
+                  leagueStats={game.leagueCumNetRatingStats}
+                />
+              </ChartDownloadWrapper>
             </div>
             <div className="flex-1">
-              <WeeklyEfficiencyChart
-                homeTeamStats={game.homeTeam.stats}
-                awayTeamStats={game.awayTeam.stats}
-                homeAbbrev={game.homeTeam.abbreviation}
-                awayAbbrev={game.awayTeam.abbreviation}
-                leagueStats={game.leagueEfficiencyStats}
-                quadrants={matchupData.scatterPlotQuadrants}
-              />
+              <ChartDownloadWrapper title="Weekly Offensive vs Defensive Rating">
+                <WeeklyEfficiencyChart
+                  homeTeamStats={game.homeTeam.stats}
+                  awayTeamStats={game.awayTeam.stats}
+                  homeAbbrev={game.homeTeam.abbreviation}
+                  awayAbbrev={game.awayTeam.abbreviation}
+                  leagueStats={game.leagueEfficiencyStats}
+                  quadrants={matchupData.scatterPlotQuadrants}
+                />
+              </ChartDownloadWrapper>
             </div>
           </div>
 

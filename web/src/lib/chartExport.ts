@@ -20,13 +20,14 @@ function resolveVars(svgString: string, container: HTMLElement): { svg: string; 
 export interface QuadrantLegendItem {
   label: string;
   color: string;
-  count: number;
+  count?: number;
 }
 
 export async function downloadChartAsPng(
   chartContainer: HTMLElement,
   title?: string,
   quadrantLegend?: QuadrantLegendItem[],
+  filterLabel?: string,
 ): Promise<void> {
   const svgEl = chartContainer.querySelector('svg');
   if (!svgEl) return;
@@ -38,6 +39,7 @@ export async function downloadChartAsPng(
   const clonedSvg = svgEl.cloneNode(true) as SVGSVGElement;
 
   // Set explicit dimensions for export
+  const DPI_SCALE = 2;
   const exportWidth = 900;
   const scale = exportWidth / rect.width;
   const exportHeight = Math.round(rect.height * scale);
@@ -59,15 +61,20 @@ export async function downloadChartAsPng(
 
   const titleHeight = title ? 48 : 0;
   const legendHeight = quadrantLegend?.length ? 36 : 0;
+  const filterHeight = filterLabel ? 28 : 0;
   const padding = 16;
   const canvasWidth = exportWidth + padding * 2;
-  const canvasHeight = exportHeight + titleHeight + legendHeight + padding * 2;
+  const canvasHeight = exportHeight + titleHeight + filterHeight + legendHeight + padding * 2;
 
   const canvas = document.createElement('canvas');
-  canvas.width = canvasWidth;
-  canvas.height = canvasHeight;
+  canvas.width = canvasWidth * DPI_SCALE;
+  canvas.height = canvasHeight * DPI_SCALE;
+  canvas.style.width = `${canvasWidth}px`;
+  canvas.style.height = `${canvasHeight}px`;
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
+
+  ctx.scale(DPI_SCALE, DPI_SCALE);
 
   // Fill background
   ctx.fillStyle = vars['--card'] || vars['--background'] || '#ffffff';
@@ -80,6 +87,13 @@ export async function downloadChartAsPng(
     ctx.fillText(title, padding, padding + 28);
   }
 
+  // Draw filter label below title
+  if (filterLabel) {
+    ctx.fillStyle = vars['--muted'] || '#888888';
+    ctx.font = '13px monospace';
+    ctx.fillText(`Filter: ${filterLabel}`, padding, titleHeight + padding + 14);
+  }
+
   // Render SVG to canvas via blob URL
   const blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
   const url = URL.createObjectURL(blob);
@@ -87,12 +101,12 @@ export async function downloadChartAsPng(
 
   return new Promise<void>((resolve) => {
     img.onload = () => {
-      ctx.drawImage(img, padding, titleHeight + padding, exportWidth, exportHeight);
+      ctx.drawImage(img, padding, titleHeight + filterHeight + padding, exportWidth, exportHeight);
       URL.revokeObjectURL(url);
 
       // Draw quadrant legend below chart
       if (quadrantLegend?.length) {
-        const legendY = titleHeight + padding + exportHeight + 20;
+        const legendY = titleHeight + filterHeight + padding + exportHeight + 20;
         let legendX = padding;
         ctx.font = '13px monospace';
         for (const item of quadrantLegend) {
@@ -103,7 +117,7 @@ export async function downloadChartAsPng(
           ctx.fill();
           // Label + count
           ctx.fillStyle = vars['--foreground'] || '#000000';
-          const text = `${item.label} (${item.count})`;
+          const text = item.count != null ? `${item.label} (${item.count})` : item.label;
           ctx.fillText(text, legendX + 18, legendY + 4);
           legendX += ctx.measureText(text).width + 34;
         }

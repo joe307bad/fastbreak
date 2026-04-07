@@ -392,7 +392,14 @@ export default async function NBAMatchupPage({ params }: Props) {
               </ChartDownloadWrapper>
             </div>
             <div className="flex-1">
-              <ChartDownloadWrapper title="Weekly Offensive vs Defensive Rating">
+              <ChartDownloadWrapper title="Weekly Offensive vs Defensive Rating" quadrantLegend={
+                matchupData.scatterPlotQuadrants ? [
+                  matchupData.scatterPlotQuadrants.topRight,
+                  matchupData.scatterPlotQuadrants.topLeft,
+                  matchupData.scatterPlotQuadrants.bottomRight,
+                  matchupData.scatterPlotQuadrants.bottomLeft,
+                ].filter((q): q is { color: string; label: string } => !!q).map(q => ({ label: q.label, color: q.color })) : undefined
+              }>
                 <WeeklyEfficiencyChart
                   homeTeamStats={game.homeTeam.stats}
                   awayTeamStats={game.awayTeam.stats}

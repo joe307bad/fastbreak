@@ -1,21 +1,24 @@
 'use client';
 
 import { useRef, useCallback, ReactNode } from 'react';
-import { downloadChartAsPng } from '@/lib/chartExport';
+import { downloadChartAsPng, QuadrantLegendItem } from '@/lib/chartExport';
 
 interface Props {
   children: ReactNode;
   title?: string;
+  quadrantLegend?: QuadrantLegendItem[];
 }
 
-export function ChartDownloadWrapper({ children, title }: Props) {
+export function ChartDownloadWrapper({ children, title, quadrantLegend }: Props) {
   const chartRef = useRef<HTMLDivElement>(null);
 
   const handleDownload = useCallback(() => {
-    if (chartRef.current) {
-      downloadChartAsPng(chartRef.current, title);
-    }
-  }, [title]);
+    if (!chartRef.current) return;
+    // Read active week filter from data attribute if present
+    const activeFilterEl = chartRef.current.querySelector('[data-active-filter]');
+    const filterLabel = activeFilterEl?.getAttribute('data-active-filter') || undefined;
+    downloadChartAsPng(chartRef.current, title, quadrantLegend, filterLabel);
+  }, [title, quadrantLegend]);
 
   return (
     <div className="relative h-full">

@@ -18,7 +18,7 @@ export function ChartDownloadWrapper({ children, title }: Props) {
   }, [title]);
 
   return (
-    <div ref={chartRef} className="relative h-full">
+    <div className="relative h-full">
       <button
         onClick={handleDownload}
         className="absolute top-[5px] right-[5px] p-1 rounded hover:bg-[var(--border)] text-[var(--muted)] hover:text-[var(--foreground)] transition-colors z-10 opacity-50 hover:opacity-100"
@@ -30,7 +30,9 @@ export function ChartDownloadWrapper({ children, title }: Props) {
           <path d="M2 11v2a1 1 0 001 1h10a1 1 0 001-1v-2" />
         </svg>
       </button>
-      {children}
+      <div ref={chartRef} className="h-full">
+        {children}
+      </div>
     </div>
   );
 }

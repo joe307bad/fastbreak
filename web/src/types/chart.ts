@@ -290,24 +290,59 @@ export interface NBAMatchupData extends BaseChartData {
 }
 
 // NHL Matchup types
+export interface NHLMonthTrend {
+  gamesPlayed: number;
+  record: { wins: number; losses: number; rank: number; rankDisplay: string };
+  goalsPerGame: { value: number; rank: number; rankDisplay: string };
+  goalsAgainstPerGame: { value: number; rank: number; rankDisplay: string };
+  goalDiffPerGame: { value: number; rank: number; rankDisplay: string };
+  xgfPct: { value: number; rank: number; rankDisplay: string };
+}
+
 export interface NHLTeamStats {
   gamesPlayed: number;
   goalsPerGame: number;
   goalsPerGameRank: number;
+  goalsPerGameRankDisplay?: string;
   goalsAgainstPerGame: number;
   goalsAgainstPerGameRank: number;
+  goalsAgainstPerGameRankDisplay?: string;
   goalDiffPerGame: number;
   goalDiffPerGameRank: number;
+  goalDiffPerGameRankDisplay?: string;
   shotsForPerGame: number;
+  shotsForPerGameRank?: number;
+  shotsForPerGameRankDisplay?: string;
   shotsAgainstPerGame: number;
+  shotsAgainstPerGameRank?: number;
+  shotsAgainstPerGameRankDisplay?: string;
   powerPlayPct: number;
+  powerPlayPctRank?: number;
+  powerPlayPctRankDisplay?: string;
   penaltyKillPct: number;
+  penaltyKillPctRank?: number;
+  penaltyKillPctRankDisplay?: string;
   faceoffWinPct: number;
+  faceoffWinPctRank?: number;
+  faceoffWinPctRankDisplay?: string;
   pointsPct: number;
   pointsPctRank: number;
+  pointsPctRankDisplay?: string;
   xgfPct: number;
   xgfPctRank: number;
-  [key: string]: number | string | Record<string, unknown>;
+  xgfPctRankDisplay?: string;
+  cumXgfPctByWeek?: Record<string, number>;
+  weeklyXgfPct?: Record<string, number>;
+  weeklyPointsPct?: Record<string, number>;
+  monthTrend?: NHLMonthTrend;
+  [key: string]: number | string | Record<string, unknown> | NHLMonthTrend | undefined;
+}
+
+export interface NHLPlayoffProbability {
+  playoffProb: number;
+  confChampProb: number;
+  finalsProb: number;
+  champProb: number;
 }
 
 export interface NHLTeam {
@@ -326,6 +361,70 @@ export interface NHLTeam {
   streak?: string;
   last10?: string;
   stats: NHLTeamStats;
+  playoffProbability?: NHLPlayoffProbability;
+}
+
+export interface NHLPlayerStat {
+  value: number;
+  rank: number;
+  rankDisplay: string;
+}
+
+export interface NHLPlayer {
+  name: string;
+  position: string;
+  gamesPlayed: NHLPlayerStat;
+  goals: NHLPlayerStat;
+  assists: NHLPlayerStat;
+  points: NHLPlayerStat;
+  plusMinus: NHLPlayerStat;
+  pointsPerGame?: NHLPlayerStat;
+}
+
+export interface NHLBoxScore {
+  goals: number;
+  sog: number;
+  hits: number;
+  pim: number;
+  blocks: number;
+  powerPlayGoals: number;
+  giveaways: number;
+  takeaways: number;
+  faceoffWinPct: number;
+  saves: number;
+  savePct: number;
+}
+
+export interface NHLMatchupResults {
+  finalScore: {
+    home: number;
+    away: number;
+    winner: string;
+    margin: number;
+    homeWon: boolean;
+  };
+  teamBoxScore?: {
+    home: NHLBoxScore;
+    away: NHLBoxScore;
+  };
+  vsSeasonAvg?: {
+    home: Record<string, VsSeasonAvgStat>;
+    away: Record<string, VsSeasonAvgStat>;
+  };
+}
+
+export interface LeagueXgVsPointsStats {
+  avgXgPct: number;
+  avgPointsPct: number;
+  minXgPct: number;
+  maxXgPct: number;
+  minPointsPct: number;
+  maxPointsPct: number;
+}
+
+export interface LeagueCumXgStats {
+  minCumXgPct: number | null;
+  maxCumXgPct: number | null;
 }
 
 export interface NHLMatchupDataPoint {
@@ -336,6 +435,14 @@ export interface NHLMatchupDataPoint {
   gameCompleted: boolean;
   homeTeam: NHLTeam;
   awayTeam: NHLTeam;
+  homePlayers?: NHLPlayer[];
+  awayPlayers?: NHLPlayer[];
+  comparisons?: NBAComparisons;
+  results?: NHLMatchupResults;
+  location?: { stadium: string };
+  tenthXgfPctByWeek?: Record<string, number>;
+  leagueXgVsPointsStats?: LeagueXgVsPointsStats;
+  leagueCumXgStats?: LeagueCumXgStats;
 }
 
 export interface NHLMatchupData extends BaseChartData {

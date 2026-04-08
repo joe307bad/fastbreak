@@ -338,7 +338,7 @@ export default async function NHLMatchupPage({ params }: Props) {
           {/* Charts - square-ish dimensions */}
           <div className="flex flex-col gap-2 h-[700px] lg:h-[calc(100vh-80px)] order-2 lg:order-1">
             <div className="flex-1">
-              <ChartDownloadWrapper title="Cumulative xGF% by Week">
+              <ChartDownloadWrapper title="Cumulative xGF% by Week" source={matchupData.source}>
                 <CumXgChart
                   homeTeamStats={game.homeTeam.stats}
                   awayTeamStats={game.awayTeam.stats}
@@ -350,7 +350,7 @@ export default async function NHLMatchupPage({ params }: Props) {
               </ChartDownloadWrapper>
             </div>
             <div className="flex-1">
-              <ChartDownloadWrapper title="xG For vs Points Pace" quadrantLegend={[
+              <ChartDownloadWrapper title="xG For vs Points Pace" source={matchupData.source} quadrantLegend={[
                 { label: 'Elite', color: '#22c55e' },
                 { label: 'Lucky', color: '#f59e0b' },
                 { label: 'Unlucky', color: '#3b82f6' },

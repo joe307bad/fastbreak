@@ -28,6 +28,7 @@ async function renderChartToCanvas(
   title?: string,
   quadrantLegend?: QuadrantLegendItem[],
   filterLabel?: string,
+  source?: string,
 ): Promise<HTMLCanvasElement | null> {
   const svgEl = chartContainer.querySelector('svg');
   if (!svgEl) return null;
@@ -62,9 +63,10 @@ async function renderChartToCanvas(
   const titleHeight = title ? 48 : 0;
   const legendHeight = quadrantLegend?.length ? 36 : 0;
   const filterHeight = filterLabel ? 28 : 0;
+  const footerHeight = 32;
   const padding = 16;
   const canvasWidth = exportWidth + padding * 2;
-  const canvasHeight = exportHeight + titleHeight + filterHeight + legendHeight + padding * 2;
+  const canvasHeight = exportHeight + titleHeight + filterHeight + legendHeight + footerHeight + padding * 2;
 
   const canvas = document.createElement('canvas');
   canvas.width = canvasWidth * DPI_SCALE;
@@ -123,6 +125,17 @@ async function renderChartToCanvas(
         }
       }
 
+      // Draw footer with source and site URL
+      const footerY = canvasHeight - padding;
+      ctx.font = '11px monospace';
+      ctx.fillStyle = vars['--muted'] || '#888888';
+      const sourceText = source ? `Source: ${source}` : '';
+      const siteText = 'fbrk.app';
+      if (sourceText) {
+        ctx.fillText(sourceText, padding, footerY);
+      }
+      ctx.fillText(siteText, canvasWidth - padding - ctx.measureText(siteText).width, footerY);
+
       resolve(canvas);
     };
     img.onerror = () => {
@@ -138,8 +151,9 @@ export async function downloadChartAsPng(
   title?: string,
   quadrantLegend?: QuadrantLegendItem[],
   filterLabel?: string,
+  source?: string,
 ): Promise<void> {
-  const canvas = await renderChartToCanvas(chartContainer, title, quadrantLegend, filterLabel);
+  const canvas = await renderChartToCanvas(chartContainer, title, quadrantLegend, filterLabel, source);
   if (!canvas) return;
 
   const filename = title
@@ -157,8 +171,9 @@ export async function copyChartAsPng(
   title?: string,
   quadrantLegend?: QuadrantLegendItem[],
   filterLabel?: string,
+  source?: string,
 ): Promise<boolean> {
-  const canvas = await renderChartToCanvas(chartContainer, title, quadrantLegend, filterLabel);
+  const canvas = await renderChartToCanvas(chartContainer, title, quadrantLegend, filterLabel, source);
   if (!canvas) return false;
 
   return new Promise<boolean>((resolve) => {

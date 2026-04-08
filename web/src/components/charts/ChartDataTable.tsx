@@ -11,6 +11,7 @@ import {
   SortingState,
 } from '@tanstack/react-table';
 import { ChartData, ScatterPlotData } from '@/types/chart';
+import { usePinnedTeams } from '@/lib/usePinnedTeams';
 
 type QuadrantKey = 'topRight' | 'topLeft' | 'bottomLeft' | 'bottomRight';
 
@@ -192,6 +193,9 @@ interface ChartDataTableProps {
 export function ChartDataTable({ data, onHighlight, selectedLabel, getItemColor, onSelect, quadrantFilter }: ChartDataTableProps) {
   const { rows, columnKeys } = useMemo(() => buildTableData(data), [data]);
   const { conferences, divisions } = useMemo(() => extractFilterOptions(data), [data]);
+  const { pinnedTeams, getPinnedForSport } = usePinnedTeams();
+  // '' = no pinned filter, 'all' = all pinned, or a specific teamCode
+  const [pinnedFilter, setPinnedFilter] = useState<string>('');
 
   // Determine default sort column: prefer 'sum', then 'value'
   const defaultSortColumn = useMemo(() => {
@@ -242,25 +246,55 @@ export function ChartDataTable({ data, onHighlight, selectedLabel, getItemColor,
   );
 
   // Filter rows based on conference and division
+  const sportPinnedTeams = useMemo(() => {
+    if (!data.sport) return [];
+    return getPinnedForSport(data.sport);
+  }, [data.sport, getPinnedForSport]);
+
+  // Build the set of pinned team codes to match against
+  const pinnedFilterCodes = useMemo(() => {
+    if (!pinnedFilter) return null;
+    if (pinnedFilter === 'all') {
+      return new Set(sportPinnedTeams.map(t => t.teamCode.toUpperCase()));
+    }
+    return new Set([pinnedFilter.toUpperCase()]);
+  }, [pinnedFilter, sportPinnedTeams]);
+
   const filteredRows = useMemo(() => {
     return rows.filter(row => {
+      const teamVal = (row.team as string | undefined)?.toUpperCase();
+      const labelVal = row.label.toUpperCase();
+
+      // Check if row matches pinned teams filter
+      const matchesPinned = pinnedFilterCodes
+        ? pinnedFilterCodes.has(teamVal ?? '') || pinnedFilterCodes.has(labelVal)
+        : false;
+
+      // Standard filters (conference, division, quadrant)
+      let passesStandardFilters = true;
       if (conferenceFilter) {
         const confVal = row.conf as string | undefined;
-        if (!confVal) return false;
-        const parsed = parseConfValue(confVal);
-        if (parsed.conf !== conferenceFilter && confVal !== conferenceFilter) return false;
+        if (!confVal) { passesStandardFilters = false; }
+        else {
+          const parsed = parseConfValue(confVal);
+          if (parsed.conf !== conferenceFilter && confVal !== conferenceFilter) passesStandardFilters = false;
+        }
       }
-      if (divisionFilter) {
-        if (row.division !== divisionFilter) return false;
+      if (passesStandardFilters && divisionFilter) {
+        if (row.division !== divisionFilter) passesStandardFilters = false;
       }
-      // Filter by quadrant for scatter plots
-      if (quadrantFilter && data.visualizationType === 'SCATTER_PLOT') {
+      if (passesStandardFilters && quadrantFilter && data.visualizationType === 'SCATTER_PLOT') {
         const pointQuadrant = getPointQuadrant(data, row.label);
-        if (pointQuadrant !== quadrantFilter) return false;
+        if (pointQuadrant !== quadrantFilter) passesStandardFilters = false;
       }
-      return true;
+
+      // Pinned filter is additive: row shows if it matches pinned OR passes standard filters
+      if (pinnedFilterCodes) {
+        return matchesPinned || passesStandardFilters;
+      }
+      return passesStandardFilters;
     });
-  }, [rows, conferenceFilter, divisionFilter, quadrantFilter, data]);
+  }, [rows, conferenceFilter, divisionFilter, quadrantFilter, data, pinnedFilterCodes]);
 
   const table = useReactTable({
     data: filteredRows,
@@ -279,7 +313,7 @@ export function ChartDataTable({ data, onHighlight, selectedLabel, getItemColor,
       const visibleLabels = table.getFilteredRowModel().rows.map(row => row.original.label);
       onHighlight(visibleLabels);
     }
-  }, [conferenceFilter, divisionFilter, globalFilter, table, onHighlight]);
+  }, [conferenceFilter, divisionFilter, globalFilter, pinnedFilter, table, onHighlight]);
 
   if (rows.length === 0) return null;
 
@@ -288,6 +322,19 @@ export function ChartDataTable({ data, onHighlight, selectedLabel, getItemColor,
   return (
     <div className="flex flex-col min-h-0 flex-1">
       <div className="flex flex-wrap items-center gap-2 mb-3 shrink-0">
+        {sportPinnedTeams.length > 0 && (
+          <select
+            value={pinnedFilter}
+            onChange={e => setPinnedFilter(e.target.value)}
+            className="px-2 py-1.5 text-sm border border-[var(--border)] rounded bg-[var(--background)] text-[var(--foreground)]"
+          >
+            <option value="">All Teams</option>
+            <option value="all">All Pinned</option>
+            {sportPinnedTeams.map(t => (
+              <option key={t.teamCode} value={t.teamCode}>{t.teamCode} - {t.teamLabel}</option>
+            ))}
+          </select>
+        )}
         {conferences.length > 0 && (
           <select
             value={conferenceFilter}

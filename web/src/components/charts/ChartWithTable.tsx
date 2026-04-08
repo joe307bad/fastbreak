@@ -235,15 +235,15 @@ export function ChartWithTable({ data, title, subtitle, source, lastUpdated }: P
 
   const handleDownload = useCallback(() => {
     if (chartRef.current) {
-      downloadChartAsPng(chartRef.current, title, quadrantLegendItems);
+      downloadChartAsPng(chartRef.current, title, quadrantLegendItems, undefined, source);
     }
-  }, [title, quadrantLegendItems]);
+  }, [title, quadrantLegendItems, source]);
 
   const handleCopy = useCallback(() => {
     if (chartRef.current) {
-      copyChartAsPng(chartRef.current, title, quadrantLegendItems);
+      copyChartAsPng(chartRef.current, title, quadrantLegendItems, undefined, source);
     }
-  }, [title, quadrantLegendItems]);
+  }, [title, quadrantLegendItems, source]);
 
   // Compute effective highlighted labels based on table filters and quadrant filter
   const effectiveHighlightedLabels = useMemo(() => {

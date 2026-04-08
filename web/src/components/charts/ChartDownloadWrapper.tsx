@@ -7,9 +7,10 @@ interface Props {
   children: ReactNode;
   title?: string;
   quadrantLegend?: QuadrantLegendItem[];
+  source?: string;
 }
 
-export function ChartDownloadWrapper({ children, title, quadrantLegend }: Props) {
+export function ChartDownloadWrapper({ children, title, quadrantLegend, source }: Props) {
   const chartRef = useRef<HTMLDivElement>(null);
   const [copied, setCopied] = useState(false);
 
@@ -21,17 +22,17 @@ export function ChartDownloadWrapper({ children, title, quadrantLegend }: Props)
 
   const handleDownload = useCallback(() => {
     if (!chartRef.current) return;
-    downloadChartAsPng(chartRef.current, title, quadrantLegend, getFilterLabel());
-  }, [title, quadrantLegend, getFilterLabel]);
+    downloadChartAsPng(chartRef.current, title, quadrantLegend, getFilterLabel(), source);
+  }, [title, quadrantLegend, getFilterLabel, source]);
 
   const handleCopy = useCallback(async () => {
     if (!chartRef.current) return;
-    const ok = await copyChartAsPng(chartRef.current, title, quadrantLegend, getFilterLabel());
+    const ok = await copyChartAsPng(chartRef.current, title, quadrantLegend, getFilterLabel(), source);
     if (ok) {
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     }
-  }, [title, quadrantLegend, getFilterLabel]);
+  }, [title, quadrantLegend, getFilterLabel, source]);
 
   const btnClass = "p-1 rounded hover:bg-[var(--border)] text-[var(--muted)] hover:text-[var(--foreground)] transition-colors z-10 opacity-50 hover:opacity-100";
 

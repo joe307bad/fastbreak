@@ -380,7 +380,7 @@ export default async function NBAMatchupPage({ params }: Props) {
           {/* Charts - square-ish dimensions */}
           <div className="flex flex-col gap-2 h-[700px] lg:h-[calc(100vh-80px)] order-2 lg:order-1">
             <div className="flex-1">
-              <ChartDownloadWrapper title="Cumulative Net Rating by Week">
+              <ChartDownloadWrapper title="Cumulative Net Rating by Week" source={matchupData.source}>
                 <CumNetRatingChart
                   homeTeamStats={game.homeTeam.stats}
                   awayTeamStats={game.awayTeam.stats}
@@ -392,7 +392,7 @@ export default async function NBAMatchupPage({ params }: Props) {
               </ChartDownloadWrapper>
             </div>
             <div className="flex-1">
-              <ChartDownloadWrapper title="Weekly Offensive vs Defensive Rating" quadrantLegend={
+              <ChartDownloadWrapper title="Weekly Offensive vs Defensive Rating" source={matchupData.source} quadrantLegend={
                 matchupData.scatterPlotQuadrants ? [
                   matchupData.scatterPlotQuadrants.topRight,
                   matchupData.scatterPlotQuadrants.topLeft,

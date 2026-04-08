@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { MatchupData, NBAMatchupData, NBAMatchupDataPoint, NHLMatchupData, NHLMatchupDataPoint, MatchupV2Data, MatchupV2DataPoint } from '@/types/chart';
 import { MatchupNav, getFilteredMatchups } from '@/components/ui/MatchupNav';
+import { usePinnedTeams } from '@/lib/usePinnedTeams';
 
 type AnyMatchupData = MatchupData | NBAMatchupData | NHLMatchupData | MatchupV2Data;
 
@@ -36,12 +37,12 @@ function getTodayKey(): string {
 }
 
 // NBA Matchup Card
-function NBAMatchupCard({ matchup, expanded }: { matchup: NBAMatchupDataPoint; expanded?: boolean }) {
+function NBAMatchupCard({ matchup, expanded, pinned }: { matchup: NBAMatchupDataPoint; expanded?: boolean; pinned?: boolean }) {
   const { date, time } = formatGameTime(matchup.gameDate);
   const isCompleted = matchup.gameCompleted;
 
   return (
-    <div className={`border border-[var(--border)] rounded p-3 bg-[var(--card)] ${expanded ? 'ring-2 ring-[var(--foreground)]/20' : ''}`}>
+    <div className={`border border-[var(--border)] rounded p-3 bg-[var(--card)] ${expanded ? 'ring-2 ring-[var(--foreground)]/20' : ''} ${pinned ? 'border-l-2 border-l-blue-500' : ''}`}>
       {/* Header: Date/Time and Status */}
       <div className="flex justify-between items-center text-xs text-[var(--muted)] mb-2">
         <span>{date}</span>
@@ -109,12 +110,12 @@ function NBAMatchupCard({ matchup, expanded }: { matchup: NBAMatchupDataPoint; e
 }
 
 // NHL Matchup Card
-function NHLMatchupCard({ matchup, expanded }: { matchup: NHLMatchupDataPoint; expanded?: boolean }) {
+function NHLMatchupCard({ matchup, expanded, pinned }: { matchup: NHLMatchupDataPoint; expanded?: boolean; pinned?: boolean }) {
   const { date, time } = formatGameTime(matchup.gameDate);
   const isCompleted = matchup.gameCompleted;
 
   return (
-    <div className={`border border-[var(--border)] rounded p-3 bg-[var(--card)] ${expanded ? 'ring-2 ring-[var(--foreground)]/20' : ''}`}>
+    <div className={`border border-[var(--border)] rounded p-3 bg-[var(--card)] ${expanded ? 'ring-2 ring-[var(--foreground)]/20' : ''} ${pinned ? 'border-l-2 border-l-blue-500' : ''}`}>
       {/* Header: Date/Time and Status */}
       <div className="flex justify-between items-center text-xs text-[var(--muted)] mb-2">
         <span>{date}</span>
@@ -182,13 +183,13 @@ function NHLMatchupCard({ matchup, expanded }: { matchup: NHLMatchupDataPoint; e
 }
 
 // NFL/V2 Matchup Card
-function NFLMatchupCard({ matchupKey, matchup, expanded }: { matchupKey: string; matchup: MatchupV2DataPoint; expanded?: boolean }) {
+function NFLMatchupCard({ matchupKey, matchup, expanded, pinned }: { matchupKey: string; matchup: MatchupV2DataPoint; expanded?: boolean; pinned?: boolean }) {
   const { date, time } = formatGameTime(matchup.game_datetime);
   const [awayCode, homeCode] = matchupKey.split('-').map(s => s.toUpperCase());
   const odds = matchup.odds;
 
   return (
-    <div className={`border border-[var(--border)] rounded p-3 bg-[var(--card)] ${expanded ? 'ring-2 ring-[var(--foreground)]/20' : ''}`}>
+    <div className={`border border-[var(--border)] rounded p-3 bg-[var(--card)] ${expanded ? 'ring-2 ring-[var(--foreground)]/20' : ''} ${pinned ? 'border-l-2 border-l-blue-500' : ''}`}>
       {/* Header: Date/Time */}
       <div className="flex justify-between items-center text-xs text-[var(--muted)] mb-2">
         <span>{date}</span>
@@ -243,6 +244,28 @@ export function MatchupsWithNav({ data }: Props) {
   // Default to today
   const [selectedDay, setSelectedDay] = useState<string | null>(getTodayKey());
   const [selectedMatchup, setSelectedMatchup] = useState<string | null>(null);
+  const { getPinnedForSport } = usePinnedTeams();
+
+  const sport = useMemo(() => {
+    if (data.visualizationType === 'NBA_MATCHUP') return 'nba';
+    if (data.visualizationType === 'NHL_MATCHUP') return 'nhl';
+    if (data.visualizationType === 'MATCHUP_V2') return 'nfl';
+    return data.sport?.toLowerCase() ?? '';
+  }, [data]);
+
+  const pinnedCodes = useMemo(() => {
+    const pinned = getPinnedForSport(sport);
+    return new Set(pinned.map(t => t.teamCode.toUpperCase()));
+  }, [sport, getPinnedForSport]);
+
+  const sortPinnedFirst = useCallback(<T,>(items: T[], getTeams: (item: T) => string[]): T[] => {
+    if (pinnedCodes.size === 0) return items;
+    return [...items].sort((a, b) => {
+      const aPinned = getTeams(a).some(code => pinnedCodes.has(code.toUpperCase())) ? 0 : 1;
+      const bPinned = getTeams(b).some(code => pinnedCodes.has(code.toUpperCase())) ? 0 : 1;
+      return aPinned - bPinned;
+    });
+  }, [pinnedCodes]);
 
   const { matchupIds, showAll } = useMemo(
     () => getFilteredMatchups(data, selectedDay, selectedMatchup),
@@ -260,17 +283,20 @@ export function MatchupsWithNav({ data }: Props) {
         ? games
         : games.filter(g => matchupIds.includes(g.gameId));
 
-      if (filteredGames.length === 0) {
+      const sortedGames = sortPinnedFirst(filteredGames, g => [g.awayTeam.abbreviation, g.homeTeam.abbreviation]);
+
+      if (sortedGames.length === 0) {
         return <p className="text-[var(--muted)] text-sm">No upcoming games</p>;
       }
 
       return (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {filteredGames.map(matchup => (
+          {sortedGames.map(matchup => (
             <NBAMatchupCard
               key={matchup.gameId}
               matchup={matchup}
               expanded={selectedMatchup === matchup.gameId}
+              pinned={[matchup.awayTeam.abbreviation, matchup.homeTeam.abbreviation].some(c => pinnedCodes.has(c.toUpperCase()))}
             />
           ))}
         </div>
@@ -286,17 +312,20 @@ export function MatchupsWithNav({ data }: Props) {
         ? games
         : games.filter(g => matchupIds.includes(g.gameId));
 
-      if (filteredGames.length === 0) {
+      const sortedGames = sortPinnedFirst(filteredGames, g => [g.awayTeam.abbreviation, g.homeTeam.abbreviation]);
+
+      if (sortedGames.length === 0) {
         return <p className="text-[var(--muted)] text-sm">No upcoming games</p>;
       }
 
       return (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {filteredGames.map(matchup => (
+          {sortedGames.map(matchup => (
             <NHLMatchupCard
               key={matchup.gameId}
               matchup={matchup}
               expanded={selectedMatchup === matchup.gameId}
+              pinned={[matchup.awayTeam.abbreviation, matchup.homeTeam.abbreviation].some(c => pinnedCodes.has(c.toUpperCase()))}
             />
           ))}
         </div>
@@ -313,18 +342,21 @@ export function MatchupsWithNav({ data }: Props) {
         ? matchupEntries
         : matchupEntries.filter(([key]) => matchupIds.includes(key));
 
-      if (filteredEntries.length === 0) {
+      const sortedEntries = sortPinnedFirst(filteredEntries, ([key]) => key.split('-').map(s => s.toUpperCase()));
+
+      if (sortedEntries.length === 0) {
         return <p className="text-[var(--muted)] text-sm">No upcoming games</p>;
       }
 
       return (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {filteredEntries.map(([key, matchup]) => (
+          {sortedEntries.map(([key, matchup]) => (
             <NFLMatchupCard
               key={key}
               matchupKey={key}
               matchup={matchup}
               expanded={selectedMatchup === key}
+              pinned={key.split('-').some(s => pinnedCodes.has(s.toUpperCase()))}
             />
           ))}
         </div>

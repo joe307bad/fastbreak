@@ -23,17 +23,17 @@ export interface QuadrantLegendItem {
   count?: number;
 }
 
-export async function downloadChartAsPng(
+async function renderChartToCanvas(
   chartContainer: HTMLElement,
   title?: string,
   quadrantLegend?: QuadrantLegendItem[],
   filterLabel?: string,
-): Promise<void> {
+): Promise<HTMLCanvasElement | null> {
   const svgEl = chartContainer.querySelector('svg');
-  if (!svgEl) return;
+  if (!svgEl) return null;
 
   const rect = svgEl.getBoundingClientRect();
-  if (!rect.width || !rect.height) return;
+  if (!rect.width || !rect.height) return null;
 
   // Clone so we can modify attributes without affecting the live DOM
   const clonedSvg = svgEl.cloneNode(true) as SVGSVGElement;
@@ -72,7 +72,7 @@ export async function downloadChartAsPng(
   canvas.style.width = `${canvasWidth}px`;
   canvas.style.height = `${canvasHeight}px`;
   const ctx = canvas.getContext('2d');
-  if (!ctx) return;
+  if (!ctx) return null;
 
   ctx.scale(DPI_SCALE, DPI_SCALE);
 
@@ -99,7 +99,7 @@ export async function downloadChartAsPng(
   const url = URL.createObjectURL(blob);
   const img = new Image();
 
-  return new Promise<void>((resolve) => {
+  return new Promise<HTMLCanvasElement | null>((resolve) => {
     img.onload = () => {
       ctx.drawImage(img, padding, titleHeight + filterHeight + padding, exportWidth, exportHeight);
       URL.revokeObjectURL(url);
@@ -123,20 +123,53 @@ export async function downloadChartAsPng(
         }
       }
 
-      const filename = title
-        ? title.replace(/[^a-zA-Z0-9\-_ ]/g, '').replace(/\s+/g, '-') + '.png'
-        : 'chart.png';
-
-      const link = document.createElement('a');
-      link.download = filename;
-      link.href = canvas.toDataURL('image/png');
-      link.click();
-      resolve();
+      resolve(canvas);
     };
     img.onerror = () => {
       URL.revokeObjectURL(url);
-      resolve();
+      resolve(null);
     };
     img.src = url;
+  });
+}
+
+export async function downloadChartAsPng(
+  chartContainer: HTMLElement,
+  title?: string,
+  quadrantLegend?: QuadrantLegendItem[],
+  filterLabel?: string,
+): Promise<void> {
+  const canvas = await renderChartToCanvas(chartContainer, title, quadrantLegend, filterLabel);
+  if (!canvas) return;
+
+  const filename = title
+    ? title.replace(/[^a-zA-Z0-9\-_ ]/g, '').replace(/\s+/g, '-') + '.png'
+    : 'chart.png';
+
+  const link = document.createElement('a');
+  link.download = filename;
+  link.href = canvas.toDataURL('image/png');
+  link.click();
+}
+
+export async function copyChartAsPng(
+  chartContainer: HTMLElement,
+  title?: string,
+  quadrantLegend?: QuadrantLegendItem[],
+  filterLabel?: string,
+): Promise<boolean> {
+  const canvas = await renderChartToCanvas(chartContainer, title, quadrantLegend, filterLabel);
+  if (!canvas) return false;
+
+  return new Promise<boolean>((resolve) => {
+    canvas.toBlob(async (blob) => {
+      if (!blob) { resolve(false); return; }
+      try {
+        await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+        resolve(true);
+      } catch {
+        resolve(false);
+      }
+    }, 'image/png');
   });
 }

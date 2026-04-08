@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback, useMemo, useRef } from 'react';
-import { downloadChartAsPng, QuadrantLegendItem } from '@/lib/chartExport';
+import { downloadChartAsPng, copyChartAsPng, QuadrantLegendItem } from '@/lib/chartExport';
 import { ChartRenderer } from './ChartRenderer';
 import { ChartDataTable } from './ChartDataTable';
 import { ChartData, ScatterPlotData } from '@/types/chart';
@@ -159,11 +159,43 @@ function QuadrantLegend({
 
 const DOWNLOADABLE_TYPES = ['SCATTER_PLOT', 'LINE_CHART', 'BAR_CHART', 'BAR_GRAPH'];
 
+const chartBtnClass = "p-1 rounded hover:bg-[var(--border)] text-[var(--muted)] hover:text-[var(--foreground)] transition-colors opacity-50 hover:opacity-100";
+
+function CopyButton({ onClick }: { onClick: () => void }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleClick = useCallback(() => {
+    onClick();
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  }, [onClick]);
+
+  return (
+    <button
+      onClick={handleClick}
+      className={chartBtnClass}
+      title="Copy as PNG"
+      aria-label="Copy chart as PNG"
+    >
+      {copied ? (
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M3 8.5l3 3 7-7" />
+        </svg>
+      ) : (
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="5" y="5" width="8" height="8" rx="1" />
+          <path d="M3 11V3a1 1 0 011-1h8" />
+        </svg>
+      )}
+    </button>
+  );
+}
+
 function DownloadButton({ onClick }: { onClick: () => void }) {
   return (
     <button
       onClick={onClick}
-      className="absolute top-[5px] right-[5px] p-1 rounded hover:bg-[var(--border)] text-[var(--muted)] hover:text-[var(--foreground)] transition-colors z-10 opacity-50 hover:opacity-100"
+      className={chartBtnClass}
       title="Download as PNG"
       aria-label="Download chart as PNG"
     >
@@ -204,6 +236,12 @@ export function ChartWithTable({ data, title, subtitle, source, lastUpdated }: P
   const handleDownload = useCallback(() => {
     if (chartRef.current) {
       downloadChartAsPng(chartRef.current, title, quadrantLegendItems);
+    }
+  }, [title, quadrantLegendItems]);
+
+  const handleCopy = useCallback(() => {
+    if (chartRef.current) {
+      copyChartAsPng(chartRef.current, title, quadrantLegendItems);
     }
   }, [title, quadrantLegendItems]);
 
@@ -258,7 +296,12 @@ export function ChartWithTable({ data, title, subtitle, source, lastUpdated }: P
       {/* Chart + About — left 50% */}
       <div className="lg:w-1/2 lg:overflow-y-auto">
         <section className="relative border border-[var(--border)] bg-[var(--card)] rounded-none md:rounded p-2 md:p-4">
-          {showDownload && <DownloadButton onClick={handleDownload} />}
+          {showDownload && (
+            <div className="absolute top-[5px] right-[5px] flex gap-0.5 z-10">
+              <CopyButton onClick={handleCopy} />
+              <DownloadButton onClick={handleDownload} />
+            </div>
+          )}
           <div ref={chartRef} className="h-[400px] md:h-[500px]">
             <ChartRenderer
               data={data}

@@ -44,6 +44,12 @@ import com.joebad.fastbreak.platform.getImageExporter
 import com.joebad.fastbreak.ui.components.FabOption
 import com.joebad.fastbreak.ui.components.MultiOptionFab
 
+data class PlayoffExtraColumn(
+    val label: String,
+    val format: (PlayoffChanceEntry) -> String,
+    val sortValue: (PlayoffChanceEntry) -> Double
+)
+
 // Team colors for advantage indicators
 internal val Team1Color = Color(0xFF2196F3) // Blue (away team)
 internal val Team2Color = Color(0xFFFF5722) // Deep Orange (home team)
@@ -1059,16 +1065,30 @@ private fun PlayoffChancesShareImage(
     entries: List<PlayoffChanceEntry>,
     probColorFn: (Double?) -> Color,
     champProbColorFn: (Double?) -> Color = probColorFn,
-    highlightedTeams: Set<String> = emptySet()
+    highlightedTeams: Set<String> = emptySet(),
+    playoffCutoff: Int = 0,
+    playInCutoff: Int = 0,
+    extraColumns: List<PlayoffExtraColumn> = emptyList()
 ) {
     val bg = MaterialTheme.colorScheme.background
     val onBg = MaterialTheme.colorScheme.onSurface
     val dimColor = onBg.copy(alpha = 0.5f)
     val highlightColor = MaterialTheme.colorScheme.primary
 
+    val hasConferenceData = entries.any { it.conference != null }
+    val conferenceGroups: List<Pair<String, List<PlayoffChanceEntry>>>? = if (hasConferenceData) {
+        entries.groupBy { it.conference ?: "Unknown" }
+            .entries
+            .sortedBy { it.key }
+            .map { (conf, teams) ->
+                conf to teams.sortedByDescending { it.champProb }
+            }
+    } else null
+
+    val extraWidth = if (extraColumns.isNotEmpty()) (38 * extraColumns.size).dp else 0.dp
     Column(
         modifier = Modifier
-            .requiredWidth(340.dp)
+            .requiredWidth(340.dp + extraWidth)
             .background(bg)
             .padding(16.dp)
     ) {
@@ -1077,67 +1097,133 @@ private fun PlayoffChancesShareImage(
             Text(subtitle, style = MaterialTheme.typography.bodySmall, fontSize = 12.sp, color = dimColor, maxLines = 1)
         }
         Spacer(modifier = Modifier.height(8.dp))
-        Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
-            Spacer(modifier = Modifier.width(8.dp))
-            Text("RK", style = MaterialTheme.typography.labelSmall, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = dimColor, modifier = Modifier.width(22.dp), textAlign = TextAlign.Center)
-            Spacer(modifier = Modifier.width(4.dp))
-            Text("TEAM", style = MaterialTheme.typography.labelSmall, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = dimColor, modifier = Modifier.weight(1f))
-            Text("PLAYOFF", style = MaterialTheme.typography.labelSmall, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = dimColor, textAlign = TextAlign.Center, modifier = Modifier.width(52.dp), maxLines = 1)
-            Text(champLabel.uppercase(), style = MaterialTheme.typography.labelSmall, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = dimColor, textAlign = TextAlign.Center, modifier = Modifier.width(52.dp), maxLines = 1)
-        }
-        entries.forEachIndexed { index, entry ->
-            val playoffColor = probColorFn(entry.playoffProb)
-            val isHighlighted = entry.team in highlightedTeams
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .drawBehind {
-                        val y = size.height / 2
-                        val startX = 22.dp.toPx() + 4.dp.toPx() + 40.dp.toPx()
-                        val endX = size.width - 52.dp.toPx() - 4.dp.toPx() - 52.dp.toPx()
-                        if (endX > startX) {
-                            drawLine(
-                                color = playoffColor.copy(alpha = 0.25f),
-                                start = androidx.compose.ui.geometry.Offset(startX, y),
-                                end = androidx.compose.ui.geometry.Offset(endX, y),
-                                strokeWidth = 2.dp.toPx(),
-                                pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(3.dp.toPx(), 3.dp.toPx()))
-                            )
-                        }
-                    }
-                    .padding(horizontal = 4.dp, vertical = 3.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                if (isHighlighted) {
-                    Box(modifier = Modifier.size(5.dp).background(highlightColor, CircleShape))
-                    Spacer(modifier = Modifier.width(3.dp))
-                } else {
+
+        if (conferenceGroups != null) {
+            conferenceGroups.forEachIndexed { groupIndex, (confName, confEntries) ->
+                if (groupIndex > 0) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                }
+                // Conference header
+                Text(confName.uppercase(), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, color = onBg.copy(alpha = 0.7f))
+                Spacer(modifier = Modifier.height(4.dp))
+                // Column headers
+                Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
                     Spacer(modifier = Modifier.width(8.dp))
+                    Text("#", style = MaterialTheme.typography.labelSmall, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = dimColor, modifier = Modifier.width(22.dp), textAlign = TextAlign.Center)
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("TEAM", style = MaterialTheme.typography.labelSmall, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = dimColor, modifier = Modifier.weight(1f))
+                    extraColumns.forEach { col ->
+                        Text(col.label, style = MaterialTheme.typography.labelSmall, fontSize = 9.sp, fontWeight = FontWeight.Bold, color = dimColor, textAlign = TextAlign.End, modifier = Modifier.width(36.dp), maxLines = 1)
+                        Spacer(modifier = Modifier.width(2.dp))
+                    }
+                    Text("PLAYOFF", style = MaterialTheme.typography.labelSmall, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = dimColor, textAlign = TextAlign.Center, modifier = Modifier.width(52.dp), maxLines = 1)
+                    Text(champLabel.uppercase(), style = MaterialTheme.typography.labelSmall, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = dimColor, textAlign = TextAlign.Center, modifier = Modifier.width(52.dp), maxLines = 1)
                 }
-                Text("${index + 1}", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = dimColor, modifier = Modifier.width(22.dp), textAlign = TextAlign.Center)
-                Spacer(modifier = Modifier.width(4.dp))
-                Text(
-                    entry.team,
-                    fontSize = 12.sp,
-                    fontWeight = if (isHighlighted) FontWeight.ExtraBold else FontWeight.Medium,
-                    fontFamily = FontFamily.Monospace,
-                    color = if (isHighlighted) highlightColor else onBg,
-                    modifier = Modifier.weight(1f)
-                )
-                Box(modifier = Modifier.width(50.dp).background(playoffColor, RoundedCornerShape(3.dp)).padding(horizontal = 4.dp, vertical = 2.dp), contentAlignment = Alignment.Center) {
-                    Text(formatProb(entry.playoffProb), fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color.White, maxLines = 1)
-                }
-                Spacer(modifier = Modifier.width(4.dp))
-                Box(modifier = Modifier.width(50.dp).background(champProbColorFn(entry.champProb), RoundedCornerShape(3.dp)).padding(horizontal = 4.dp, vertical = 2.dp), contentAlignment = Alignment.Center) {
-                    Text(formatProb(entry.champProb), fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color.White, maxLines = 1)
+                confEntries.forEachIndexed { index, entry ->
+                    val seed = index + 1
+                    if (playoffCutoff > 0 && seed == playoffCutoff + 1) {
+                        ShareImageCutoffDivider("PLAYOFF CUTOFF", dimColor)
+                    }
+                    if (playInCutoff > 0 && seed == playInCutoff + 1) {
+                        ShareImageCutoffDivider("PLAY-IN CUTOFF", dimColor)
+                    }
+                    ShareImageTeamRow(entry, seed, highlightedTeams, probColorFn, champProbColorFn, highlightColor, onBg, dimColor, extraColumns)
                 }
             }
+        } else {
+            // Flat list fallback
+            Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("#", style = MaterialTheme.typography.labelSmall, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = dimColor, modifier = Modifier.width(22.dp), textAlign = TextAlign.Center)
+                Spacer(modifier = Modifier.width(4.dp))
+                Text("TEAM", style = MaterialTheme.typography.labelSmall, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = dimColor, modifier = Modifier.weight(1f))
+                extraColumns.forEach { col ->
+                    Text(col.label, style = MaterialTheme.typography.labelSmall, fontSize = 9.sp, fontWeight = FontWeight.Bold, color = dimColor, textAlign = TextAlign.End, modifier = Modifier.width(36.dp), maxLines = 1)
+                    Spacer(modifier = Modifier.width(2.dp))
+                }
+                Text("PLAYOFF", style = MaterialTheme.typography.labelSmall, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = dimColor, textAlign = TextAlign.Center, modifier = Modifier.width(52.dp), maxLines = 1)
+                Text(champLabel.uppercase(), style = MaterialTheme.typography.labelSmall, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = dimColor, textAlign = TextAlign.Center, modifier = Modifier.width(52.dp), maxLines = 1)
+            }
+            entries.forEachIndexed { index, entry ->
+                val seed = index + 1
+                if (playoffCutoff > 0 && seed == playoffCutoff + 1) {
+                    ShareImageCutoffDivider("PLAYOFF CUTOFF", dimColor)
+                }
+                if (playInCutoff > 0 && seed == playInCutoff + 1) {
+                    ShareImageCutoffDivider("PLAY-IN CUTOFF", dimColor)
+                }
+                ShareImageTeamRow(entry, seed, highlightedTeams, probColorFn, champProbColorFn, highlightColor, onBg, dimColor, extraColumns)
+            }
         }
+
         Spacer(modifier = Modifier.height(8.dp))
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Text(source, fontSize = 9.sp, color = dimColor, maxLines = 1)
             Text("fbrk.app", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = dimColor)
         }
+    }
+}
+
+@Composable
+private fun ShareImageTeamRow(
+    entry: PlayoffChanceEntry,
+    seed: Int,
+    highlightedTeams: Set<String>,
+    probColorFn: (Double?) -> Color,
+    champProbColorFn: (Double?) -> Color,
+    highlightColor: Color,
+    onBg: Color,
+    dimColor: Color,
+    extraColumns: List<PlayoffExtraColumn> = emptyList()
+) {
+    val playoffColor = probColorFn(entry.playoffProb)
+    val isHighlighted = entry.team in highlightedTeams
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 4.dp, vertical = 3.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        if (isHighlighted) {
+            Box(modifier = Modifier.size(5.dp).background(highlightColor, CircleShape))
+            Spacer(modifier = Modifier.width(3.dp))
+        } else {
+            Spacer(modifier = Modifier.width(8.dp))
+        }
+        Text("$seed", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = dimColor, modifier = Modifier.width(22.dp), textAlign = TextAlign.Center)
+        Spacer(modifier = Modifier.width(4.dp))
+        Text(
+            entry.team,
+            fontSize = 12.sp,
+            fontWeight = if (isHighlighted) FontWeight.ExtraBold else FontWeight.Medium,
+            fontFamily = FontFamily.Monospace,
+            color = if (isHighlighted) highlightColor else onBg,
+            modifier = Modifier.weight(1f)
+        )
+        extraColumns.forEach { col ->
+            Text(col.format(entry), fontSize = 10.sp, fontWeight = FontWeight.Medium, fontFamily = FontFamily.Monospace, color = dimColor, textAlign = TextAlign.End, modifier = Modifier.width(36.dp), maxLines = 1)
+            Spacer(modifier = Modifier.width(2.dp))
+        }
+        Box(modifier = Modifier.width(50.dp).background(playoffColor, RoundedCornerShape(3.dp)).padding(horizontal = 4.dp, vertical = 2.dp), contentAlignment = Alignment.Center) {
+            Text(formatProb(entry.playoffProb), fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color.White, maxLines = 1)
+        }
+        Spacer(modifier = Modifier.width(4.dp))
+        Box(modifier = Modifier.width(50.dp).background(champProbColorFn(entry.champProb), RoundedCornerShape(3.dp)).padding(horizontal = 4.dp, vertical = 2.dp), contentAlignment = Alignment.Center) {
+            Text(formatProb(entry.champProb), fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color.White, maxLines = 1)
+        }
+    }
+}
+
+@Composable
+private fun ShareImageCutoffDivider(label: String, dimColor: Color) {
+    Row(modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+        Box(modifier = Modifier.weight(1f).height(1.dp).drawBehind {
+            drawLine(Color.Gray.copy(alpha = 0.4f), androidx.compose.ui.geometry.Offset(0f, 0f), androidx.compose.ui.geometry.Offset(size.width, 0f), strokeWidth = 1.dp.toPx(), pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(4.dp.toPx(), 4.dp.toPx())))
+        })
+        Text(label, style = MaterialTheme.typography.labelSmall, fontSize = 7.sp, fontWeight = FontWeight.Bold, color = dimColor.copy(alpha = 0.6f), modifier = Modifier.padding(horizontal = 4.dp))
+        Box(modifier = Modifier.weight(1f).height(1.dp).drawBehind {
+            drawLine(Color.Gray.copy(alpha = 0.4f), androidx.compose.ui.geometry.Offset(0f, 0f), androidx.compose.ui.geometry.Offset(size.width, 0f), strokeWidth = 1.dp.toPx(), pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(4.dp.toPx(), 4.dp.toPx())))
+        })
     }
 }
 
@@ -1420,7 +1506,11 @@ private fun formatPctValue(value: Double): String {
 }
 
 private fun formatProb(prob: Double): String {
-    return if (prob >= 99.5) ">99%" else "${prob.toInt()}%"
+    return when {
+        prob >= 99.5 -> ">99%"
+        prob in 0.0001..0.9999 -> "<1%"
+        else -> "${prob.toInt()}%"
+    }
 }
 
 /**
@@ -1437,12 +1527,40 @@ fun PlayoffChancesBottomSheet(
     champProbColorFn: (Double?) -> Color = probColorFn,
     highlightedTeams: Set<String> = emptySet(),
     subtitle: String = "",
-    source: String = ""
+    source: String = "",
+    playoffCutoff: Int = 0,
+    playInCutoff: Int = 0,
+    extraColumns: List<PlayoffExtraColumn> = emptyList()
 ) {
     var isReversed by remember { mutableStateOf(false) }
-    val displayEntries = if (isReversed) entries.reversed() else entries
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var selectedTeams by remember { mutableStateOf(highlightedTeams) }
+
+    val hasConferenceData = entries.any { it.conference != null }
+
+    // Sort by first extra column if available, otherwise by champProb
+    val sortSelector: (PlayoffChanceEntry) -> Double = if (extraColumns.isNotEmpty()) {
+        extraColumns.first().sortValue
+    } else {
+        { it.champProb }
+    }
+
+    // Build conference groups: list of (conference name, sorted teams)
+    val conferenceGroups: List<Pair<String, List<PlayoffChanceEntry>>>? = if (hasConferenceData) {
+        entries.groupBy { it.conference ?: "Unknown" }
+            .entries
+            .sortedBy { it.key }
+            .map { (conf, teams) ->
+                val sorted = if (isReversed) {
+                    teams.sortedBy { sortSelector(it) }
+                } else {
+                    teams.sortedByDescending { sortSelector(it) }
+                }
+                conf to sorted
+            }
+    } else null
+
+    val displayEntries = if (isReversed) entries.reversed() else entries
 
     // Share capture state
     var shareRange by remember { mutableStateOf<ShareRange?>(null) }
@@ -1455,8 +1573,8 @@ fun PlayoffChancesBottomSheet(
             try {
                 val bitmap = graphicsLayer.toImageBitmap()
                 val rangeLabel = when (shareRange) {
-                    ShareRange.TOP_HALF -> "Top Half"
-                    ShareRange.BOTTOM_HALF -> "Bottom Half"
+                    ShareRange.TOP_HALF -> if (hasConferenceData) conferenceGroups?.firstOrNull()?.first ?: "Top Half" else "Top Half"
+                    ShareRange.BOTTOM_HALF -> if (hasConferenceData) conferenceGroups?.lastOrNull()?.first ?: "Bottom Half" else "Bottom Half"
                     else -> ""
                 }
                 val shareTitle = if (rangeLabel.isNotEmpty()) "$title - $rangeLabel" else title
@@ -1471,11 +1589,19 @@ fun PlayoffChancesBottomSheet(
 
     // Off-screen share image
     shareRange?.let { range ->
-        val mid = displayEntries.size / 2
-        val shareEntries = when (range) {
-            ShareRange.FULL -> displayEntries
-            ShareRange.TOP_HALF -> displayEntries.take(mid)
-            ShareRange.BOTTOM_HALF -> displayEntries.drop(mid)
+        val shareEntries = if (hasConferenceData && conferenceGroups != null) {
+            when (range) {
+                ShareRange.FULL -> displayEntries
+                ShareRange.TOP_HALF -> conferenceGroups.firstOrNull()?.second ?: emptyList()
+                ShareRange.BOTTOM_HALF -> conferenceGroups.lastOrNull()?.second ?: emptyList()
+            }
+        } else {
+            val mid = displayEntries.size / 2
+            when (range) {
+                ShareRange.FULL -> displayEntries
+                ShareRange.TOP_HALF -> displayEntries.take(mid)
+                ShareRange.BOTTOM_HALF -> displayEntries.drop(mid)
+            }
         }
         val rangeSubtitle = subtitle
         CompositionLocalProvider(LocalDensity provides Density(4f, 1f)) {
@@ -1498,7 +1624,10 @@ fun PlayoffChancesBottomSheet(
                     entries = shareEntries,
                     probColorFn = probColorFn,
                     champProbColorFn = champProbColorFn,
-                    highlightedTeams = selectedTeams
+                    highlightedTeams = selectedTeams,
+                    playoffCutoff = playoffCutoff,
+                    playInCutoff = playInCutoff,
+                    extraColumns = extraColumns
                 )
             }
         }
@@ -1545,122 +1674,71 @@ fun PlayoffChancesBottomSheet(
                         .weight(1f, fill = false)
                         .verticalScroll(rememberScrollState())
                 ) {
-                    // Header row
-                    Row(
-                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "TEAM",
-                            style = MaterialTheme.typography.labelSmall,
-                            fontSize = 9.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
-                            modifier = Modifier.width(40.dp)
-                        )
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Text(
-                            text = "PLAYOFF",
-                            style = MaterialTheme.typography.labelSmall,
-                            fontSize = 9.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.width(52.dp)
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = champLabel.uppercase(),
-                            style = MaterialTheme.typography.labelSmall,
-                            fontSize = 9.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.width(52.dp)
-                        )
-                    }
+                    if (conferenceGroups != null) {
+                        // Conference-grouped layout
+                        conferenceGroups.forEachIndexed { groupIndex, (confName, confEntries) ->
+                            if (groupIndex > 0) {
+                                Spacer(modifier = Modifier.height(16.dp))
+                            }
 
-                    displayEntries.forEach { entry ->
-                        val isSelected = entry.team in selectedTeams
-                        val playoffColor = probColorFn(entry.playoffProb)
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .then(
-                                    if (isSelected) Modifier.background(
-                                        MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
-                                        RoundedCornerShape(4.dp)
-                                    ) else Modifier
-                                )
-                                .clickable {
-                                    selectedTeams = if (entry.team in selectedTeams) selectedTeams - entry.team else selectedTeams + entry.team
-                                }
-                                .drawBehind {
-                                    val y = size.height / 2
-                                    val startX = 42.dp.toPx()
-                                    val endX = startX + 12.dp.toPx()
-                                    if (endX > startX) {
-                                        drawLine(
-                                            color = playoffColor.copy(alpha = if (isSelected) 0.3f else 0.12f),
-                                            start = androidx.compose.ui.geometry.Offset(startX, y),
-                                            end = androidx.compose.ui.geometry.Offset(endX, y),
-                                            strokeWidth = 1.dp.toPx(),
-                                            pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(3.dp.toPx(), 3.dp.toPx()))
-                                        )
-                                    }
-                                }
-                                .padding(horizontal = 4.dp, vertical = 3.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            // Team abbreviation
+                            // Conference header
                             Text(
-                                text = entry.team,
-                                style = MaterialTheme.typography.bodySmall,
-                                fontSize = 11.sp,
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                text = confName.uppercase(),
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
                                 fontFamily = FontFamily.Monospace,
-                                modifier = Modifier.width(40.dp)
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                                modifier = Modifier.padding(bottom = 4.dp)
                             )
 
-                            Spacer(modifier = Modifier.width(12.dp))
+                            // Column headers
+                            PlayoffChancesHeaderRow(champLabel, extraColumns)
 
-                            // Playoff prob badge
-                            Box(
-                                modifier = Modifier
-                                    .width(52.dp)
-                                    .background(playoffColor, RoundedCornerShape(4.dp))
-                                    .padding(horizontal = 4.dp, vertical = 3.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = formatProb(entry.playoffProb),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color.White,
-                                    maxLines = 1
+                            confEntries.forEachIndexed { index, entry ->
+                                val seed = index + 1
+                                // Playoff cutoff divider
+                                if (playoffCutoff > 0 && seed == playoffCutoff + 1) {
+                                    PlayoffCutoffDivider()
+                                }
+                                // Play-in cutoff divider
+                                if (playInCutoff > 0 && seed == playInCutoff + 1) {
+                                    PlayoffCutoffDivider("PLAY-IN CUTOFF")
+                                }
+                                PlayoffChanceTeamRow(
+                                    entry = entry,
+                                    seed = seed,
+                                    isSelected = entry.team in selectedTeams,
+                                    probColorFn = probColorFn,
+                                    champProbColorFn = champProbColorFn,
+                                    extraColumns = extraColumns,
+                                    onToggle = {
+                                        selectedTeams = if (entry.team in selectedTeams) selectedTeams - entry.team else selectedTeams + entry.team
+                                    }
                                 )
                             }
-
-                            Spacer(modifier = Modifier.width(4.dp))
-
-                            // Champ prob badge
-                            Box(
-                                modifier = Modifier
-                                    .width(52.dp)
-                                    .background(champProbColorFn(entry.champProb), RoundedCornerShape(4.dp))
-                                    .padding(horizontal = 4.dp, vertical = 3.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = formatProb(entry.champProb),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color.White,
-                                    maxLines = 1
-                                )
+                        }
+                    } else {
+                        // Flat list fallback (no conference data)
+                        PlayoffChancesHeaderRow(champLabel, extraColumns)
+                        displayEntries.forEachIndexed { index, entry ->
+                            val seed = index + 1
+                            if (playoffCutoff > 0 && seed == playoffCutoff + 1) {
+                                PlayoffCutoffDivider()
                             }
+                            if (playInCutoff > 0 && seed == playInCutoff + 1) {
+                                PlayoffCutoffDivider("PLAY-IN CUTOFF")
+                            }
+                            PlayoffChanceTeamRow(
+                                entry = entry,
+                                seed = seed,
+                                isSelected = entry.team in selectedTeams,
+                                probColorFn = probColorFn,
+                                champProbColorFn = champProbColorFn,
+                                extraColumns = extraColumns,
+                                onToggle = {
+                                    selectedTeams = if (entry.team in selectedTeams) selectedTeams - entry.team else selectedTeams + entry.team
+                                }
+                            )
                         }
                     }
 
@@ -1670,12 +1748,248 @@ fun PlayoffChancesBottomSheet(
 
             // Share FAB
             MultiOptionFab(
-                options = listOf(
-                    FabOption(Icons.Filled.Share, "Full List") { shareRange = ShareRange.FULL },
-                    FabOption(Icons.Filled.Share, "Top Half") { shareRange = ShareRange.TOP_HALF },
-                    FabOption(Icons.Filled.Share, "Bottom Half") { shareRange = ShareRange.BOTTOM_HALF }
-                ),
+                options = if (hasConferenceData && conferenceGroups != null) {
+                    listOf(
+                        FabOption(Icons.Filled.Share, "Full List") { shareRange = ShareRange.FULL },
+                        FabOption(Icons.Filled.Share, conferenceGroups.firstOrNull()?.first ?: "First") { shareRange = ShareRange.TOP_HALF },
+                        FabOption(Icons.Filled.Share, conferenceGroups.lastOrNull()?.first ?: "Second") { shareRange = ShareRange.BOTTOM_HALF }
+                    )
+                } else {
+                    listOf(
+                        FabOption(Icons.Filled.Share, "Full List") { shareRange = ShareRange.FULL },
+                        FabOption(Icons.Filled.Share, "Top Half") { shareRange = ShareRange.TOP_HALF },
+                        FabOption(Icons.Filled.Share, "Bottom Half") { shareRange = ShareRange.BOTTOM_HALF }
+                    )
+                },
                 modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun PlayoffChancesHeaderRow(champLabel: String, extraColumns: List<PlayoffExtraColumn> = emptyList()) {
+    Row(
+        modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = "#",
+            style = MaterialTheme.typography.labelSmall,
+            fontSize = 9.sp,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+            modifier = Modifier.width(20.dp),
+            textAlign = TextAlign.Center
+        )
+        Spacer(modifier = Modifier.width(4.dp))
+        Text(
+            text = "TEAM",
+            style = MaterialTheme.typography.labelSmall,
+            fontSize = 9.sp,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+            modifier = Modifier.width(40.dp)
+        )
+        extraColumns.forEach { col ->
+            Spacer(modifier = Modifier.width(4.dp))
+            Text(
+                text = col.label,
+                style = MaterialTheme.typography.labelSmall,
+                fontSize = 9.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                textAlign = TextAlign.End,
+                modifier = Modifier.width(36.dp),
+                maxLines = 1
+            )
+        }
+        Spacer(modifier = Modifier.width(12.dp))
+        Text(
+            text = "PLAYOFF",
+            style = MaterialTheme.typography.labelSmall,
+            fontSize = 9.sp,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+            textAlign = TextAlign.Center,
+            modifier = Modifier.width(52.dp)
+        )
+        Spacer(modifier = Modifier.width(4.dp))
+        Text(
+            text = champLabel.uppercase(),
+            style = MaterialTheme.typography.labelSmall,
+            fontSize = 9.sp,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+            textAlign = TextAlign.Center,
+            modifier = Modifier.width(52.dp)
+        )
+    }
+}
+
+@Composable
+private fun PlayoffCutoffDivider(label: String = "PLAYOFF CUTOFF") {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .height(1.dp)
+                .drawBehind {
+                    drawLine(
+                        color = Color.Gray.copy(alpha = 0.4f),
+                        start = androidx.compose.ui.geometry.Offset(0f, 0f),
+                        end = androidx.compose.ui.geometry.Offset(size.width, 0f),
+                        strokeWidth = 1.dp.toPx(),
+                        pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(4.dp.toPx(), 4.dp.toPx()))
+                    )
+                }
+        )
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            fontSize = 8.sp,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
+            modifier = Modifier.padding(horizontal = 8.dp)
+        )
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .height(1.dp)
+                .drawBehind {
+                    drawLine(
+                        color = Color.Gray.copy(alpha = 0.4f),
+                        start = androidx.compose.ui.geometry.Offset(0f, 0f),
+                        end = androidx.compose.ui.geometry.Offset(size.width, 0f),
+                        strokeWidth = 1.dp.toPx(),
+                        pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(4.dp.toPx(), 4.dp.toPx()))
+                    )
+                }
+        )
+    }
+}
+
+@Composable
+private fun PlayoffChanceTeamRow(
+    entry: PlayoffChanceEntry,
+    seed: Int,
+    isSelected: Boolean,
+    probColorFn: (Double?) -> Color,
+    champProbColorFn: (Double?) -> Color,
+    extraColumns: List<PlayoffExtraColumn> = emptyList(),
+    onToggle: () -> Unit
+) {
+    val playoffColor = probColorFn(entry.playoffProb)
+    val extraColumnsWidth = if (extraColumns.isNotEmpty()) (40 * extraColumns.size).dp else 0.dp
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .then(
+                if (isSelected) Modifier.background(
+                    MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
+                    RoundedCornerShape(4.dp)
+                ) else Modifier
+            )
+            .clickable { onToggle() }
+            .drawBehind {
+                val y = size.height / 2
+                val startX = 66.dp.toPx() + extraColumnsWidth.toPx()
+                val endX = startX + 12.dp.toPx()
+                if (endX > startX) {
+                    drawLine(
+                        color = playoffColor.copy(alpha = if (isSelected) 0.3f else 0.12f),
+                        start = androidx.compose.ui.geometry.Offset(startX, y),
+                        end = androidx.compose.ui.geometry.Offset(endX, y),
+                        strokeWidth = 1.dp.toPx(),
+                        pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(3.dp.toPx(), 3.dp.toPx()))
+                    )
+                }
+            }
+            .padding(horizontal = 4.dp, vertical = 3.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // Seed number
+        Text(
+            text = "$seed",
+            style = MaterialTheme.typography.bodySmall,
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Medium,
+            fontFamily = FontFamily.Monospace,
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+            modifier = Modifier.width(20.dp),
+            textAlign = TextAlign.Center
+        )
+
+        Spacer(modifier = Modifier.width(4.dp))
+
+        // Team abbreviation
+        Text(
+            text = entry.team,
+            style = MaterialTheme.typography.bodySmall,
+            fontSize = 11.sp,
+            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+            fontFamily = FontFamily.Monospace,
+            modifier = Modifier.width(40.dp)
+        )
+
+        // Extra stat columns
+        extraColumns.forEach { col ->
+            Spacer(modifier = Modifier.width(4.dp))
+            Text(
+                text = col.format(entry),
+                style = MaterialTheme.typography.bodySmall,
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Medium,
+                fontFamily = FontFamily.Monospace,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                modifier = Modifier.width(36.dp),
+                textAlign = TextAlign.End,
+                maxLines = 1
+            )
+        }
+
+        Spacer(modifier = Modifier.width(12.dp))
+
+        // Playoff prob badge
+        Box(
+            modifier = Modifier
+                .width(52.dp)
+                .background(playoffColor, RoundedCornerShape(4.dp))
+                .padding(horizontal = 4.dp, vertical = 3.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = formatProb(entry.playoffProb),
+                style = MaterialTheme.typography.bodySmall,
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.White,
+                maxLines = 1
+            )
+        }
+
+        Spacer(modifier = Modifier.width(4.dp))
+
+        // Champ prob badge
+        Box(
+            modifier = Modifier
+                .width(52.dp)
+                .background(champProbColorFn(entry.champProb), RoundedCornerShape(4.dp))
+                .padding(horizontal = 4.dp, vertical = 3.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = formatProb(entry.champProb),
+                style = MaterialTheme.typography.bodySmall,
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.White,
+                maxLines = 1
             )
         }
     }

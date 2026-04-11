@@ -428,7 +428,26 @@ fun NBAMatchupWorksheet(
                                         selectedMatchup.awayTeam.abbreviation,
                                         selectedMatchup.homeTeam.abbreviation
                                     ),
-                                    source = "PlayoffStatus.com"
+                                    source = "PlayoffStatus.com",
+                                    playoffCutoff = 6,
+                                    playInCutoff = 10,
+                                    extraColumns = listOf(
+                                        PlayoffExtraColumn(
+                                            label = "WIN%",
+                                            format = { e -> e.winPct?.let { ".${(it * 1000).toInt()}" } ?: "-" },
+                                            sortValue = { it.winPct ?: 0.0 }
+                                        ),
+                                        PlayoffExtraColumn(
+                                            label = "NRTG",
+                                            format = { e ->
+                                                e.netRating?.let { r ->
+                                                    val rounded = (kotlin.math.round(r * 10) / 10)
+                                                    if (r > 0) "+$rounded" else "$rounded"
+                                                } ?: "-"
+                                            },
+                                            sortValue = { it.netRating ?: 0.0 }
+                                        )
+                                    )
                                 )
                             }
 

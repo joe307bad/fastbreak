@@ -270,12 +270,23 @@ scrape_nhl_playoff_probabilities <- function() {
         round2_prob <- if (length(cells) >= 11) parse_pct(cells[[11]]) else 0     # Round 2
         playoff_prob <- if (length(cells) >= 12) parse_pct(cells[[12]]) else 0    # Round 1 / Playoff
 
+        # Extract conference from column 2, fallback to TEAM_CONFERENCES mapping
+        conf_text <- cells[[2]] %>% html_text(trim = TRUE)
+        if (is.na(conf_text) || conf_text == "") {
+          conf_text <- if (!is.na(TEAM_CONFERENCES[team_abbrev])) TEAM_CONFERENCES[team_abbrev] else ""
+        }
+        # Normalize to "East"/"West"
+        conf_text <- if (grepl("east", conf_text, ignore.case = TRUE)) "East"
+                     else if (grepl("west", conf_text, ignore.case = TRUE)) "West"
+                     else conf_text
+
         results[[team_abbrev]] <- list(
           playoffProb = playoff_prob,
           round2Prob = round2_prob,
           confChampProb = conf_champ_prob,
           finalsProb = finals_prob,
-          champProb = champ_prob
+          champProb = champ_prob,
+          conf = conf_text
         )
       }
     }
@@ -2522,16 +2533,23 @@ playoff_chances_list <- list()
 if (!is.null(playoff_probabilities) && length(playoff_probabilities) > 0) {
   po_df <- do.call(rbind, lapply(names(playoff_probabilities), function(team) {
     prob <- playoff_probabilities[[team]]
+    team_row <- team_stats[team_stats$team_abbreviation == team, ]
     data.frame(
       team = team,
       playoffProb = if (!is.null(prob$playoffProb)) prob$playoffProb else 0,
       champProb = if (!is.null(prob$champProb)) prob$champProb else 0,
+      conference = if (!is.null(prob$conf)) prob$conf else "",
+      leaguePoints = if (nrow(team_row) > 0 && !is.na(team_row$points[1])) as.integer(team_row$points[1]) else NA,
+      goalDiff = if (nrow(team_row) > 0 && !is.na(team_row$goals_for[1]) && !is.na(team_row$goals_against[1])) as.integer(team_row$goals_for[1] - team_row$goals_against[1]) else NA,
       stringsAsFactors = FALSE
     )
   }))
-  po_df <- po_df[order(-po_df$champProb, -po_df$playoffProb), ]
+  po_df <- po_df[order(-po_df$leaguePoints, -po_df$champProb, -po_df$playoffProb), ]
   playoff_chances_list <- lapply(seq_len(nrow(po_df)), function(i) {
-    list(team = po_df$team[i], playoffProb = po_df$playoffProb[i], champProb = po_df$champProb[i])
+    list(team = po_df$team[i], playoffProb = po_df$playoffProb[i], champProb = po_df$champProb[i],
+         conference = po_df$conference[i],
+         leaguePoints = po_df$leaguePoints[i],
+         goalDiff = po_df$goalDiff[i])
   })
 }
 

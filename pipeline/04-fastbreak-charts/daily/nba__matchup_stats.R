@@ -235,7 +235,7 @@ TEAM_NAME_TO_ABBREV <- c(
   "Knicks" = "NY", "Lakers" = "LAL", "Magic" = "ORL",
   "Mavericks" = "DAL", "Mavs" = "DAL",
   "Nets" = "BKN", "Nuggets" = "DEN", "Pacers" = "IND",
-  "Pelicans" = "NOP",
+  "Pelicans" = "NO",
   "Pistons" = "DET", "Raptors" = "TOR", "Rockets" = "HOU", "Spurs" = "SA",
   "Suns" = "PHX", "Thunder" = "OKC",
   "Timberwolves" = "MIN", "Wolves" = "MIN", "T. Wolves" = "MIN",
@@ -332,11 +332,18 @@ scrape_playoff_probabilities <- function() {
         conf_champ_prob <- if (length(cells) >= 8) parse_pct(cells[[8]]) else 0  # Conference Championship
         playoff_prob <- if (length(cells) >= 10) parse_pct(cells[[10]]) else 0   # Round 1 / Playoff
 
+        # Extract conference from column 2 and normalize to "East"/"West"
+        conf_text <- cells[[2]] %>% html_text(trim = TRUE)
+        conf_text <- if (grepl("east", conf_text, ignore.case = TRUE)) "East"
+                     else if (grepl("west", conf_text, ignore.case = TRUE)) "West"
+                     else conf_text
+
         results[[team_abbrev]] <- list(
           playoffProb = playoff_prob,
           confChampProb = conf_champ_prob,
           finalsProb = finals_prob,
-          champProb = champ_prob
+          champProb = champ_prob,
+          conf = conf_text
         )
       }
     }
@@ -759,8 +766,32 @@ team_stats <- team_stats %>%
 
 cat("Calculated stats for", nrow(team_stats), "teams\n")
 
+# Patch hoopR's internal request function to use a 3s timeout instead of 60s
+assignInNamespace("request_with_proxy", function(url, params, ...) {
+  headers <- c(
+    Host = "stats.nba.com",
+    `User-Agent` = "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:72.0) Gecko/20100101 Firefox/72.0",
+    Accept = "application/json, text/plain, */*",
+    `Accept-Language` = "en-US,en;q=0.5",
+    `Accept-Encoding` = "gzip, deflate, br",
+    `x-nba-stats-origin` = "stats",
+    `x-nba-stats-token` = "true",
+    Connection = "keep-alive",
+    Referer = "https://www.nba.com/",
+    Pragma = "no-cache",
+    `Cache-Control` = "no-cache"
+  )
+  if (length(params) >= 1) {
+    url <- httr::modify_url(url, query = params)
+  }
+  res <- rvest::session(url = url, ..., httr::add_headers(.headers = headers),
+                        httr::timeout(3))
+  json <- res$response %>% httr::content(as = "text", encoding = "UTF-8") %>%
+    jsonlite::fromJSON()
+  return(json)
+}, ns = "hoopR")
+
 # Helper to call NBA API with retries
-# hoopR has its own 60s curl timeout, so errors are catchable
 call_nba_api <- function(fn, ..., max_retries = 2) {
   for (attempt in seq_len(max_retries)) {
     result <- tryCatch({
@@ -795,8 +826,62 @@ four_factors_result <- call_nba_api(
 )
 four_factors_stats <- if (!is.null(four_factors_result)) four_factors_result$LeagueDashTeamStats else NULL
 
+# Compute per-game advanced stats (OFF_RATING, DEF_RATING, NET_RATING) from team_box
+# Uses standard possessions estimation: POSS = FGA + 0.44*FTA - OREB + TOV
+# Computed early so it can serve as fallback when NBA API is unavailable
+cat("Computing per-game advanced stats from box scores...\n")
+team_game_logs_advanced <- team_box %>%
+  select(
+    game_id, game_date,
+    team_id, team_abbreviation, team_display_name,
+    team_score, opponent_team_score,
+    field_goals_attempted, free_throws_attempted,
+    offensive_rebounds, turnovers, assists
+  ) %>%
+  inner_join(
+    team_box %>%
+      select(
+        game_id,
+        opp_team_id = team_id,
+        opp_fga = field_goals_attempted,
+        opp_fta = free_throws_attempted,
+        opp_oreb = offensive_rebounds,
+        opp_tov = turnovers
+      ),
+    by = "game_id"
+  ) %>%
+  filter(team_id != opp_team_id) %>%
+  mutate(
+    team_poss = field_goals_attempted + 0.44 * free_throws_attempted - offensive_rebounds + turnovers,
+    opp_poss  = opp_fga + 0.44 * opp_fta - opp_oreb + opp_tov,
+    avg_poss  = (team_poss + opp_poss) / 2,
+    OFF_RATING = ifelse(avg_poss > 0, (team_score / avg_poss) * 100, NA_real_),
+    DEF_RATING = ifelse(avg_poss > 0, (opponent_team_score / avg_poss) * 100, NA_real_),
+    NET_RATING = OFF_RATING - DEF_RATING,
+    GAME_DATE = game_date,
+    TEAM_ABBREVIATION = team_abbreviation
+  )
+
+if (nrow(team_game_logs_advanced) == 0) {
+  cat("WARNING: Could not compute per-game advanced stats from box scores.\n")
+  team_game_logs_advanced <- NULL
+}
+
 if (is.null(advanced_stats)) {
-  cat("WARNING: Could not load advanced stats from NBA API. Advanced stats will be unavailable.\n")
+  cat("WARNING: Could not load advanced stats from NBA API. Estimating ratings from box scores.\n")
+  if (!is.null(team_game_logs_advanced)) {
+    fallback_ratings <- team_game_logs_advanced %>%
+      group_by(team_display_name) %>%
+      summarise(
+        offensive_rating = round(mean(OFF_RATING, na.rm = TRUE), 1),
+        defensive_rating = round(mean(DEF_RATING, na.rm = TRUE), 1),
+        net_rating = round(mean(NET_RATING, na.rm = TRUE), 1),
+        .groups = "drop"
+      )
+    team_stats <- team_stats %>%
+      left_join(fallback_ratings, by = "team_display_name")
+    cat("Estimated ratings for", sum(!is.na(team_stats$net_rating)), "teams from box scores\n")
+  }
 }
 
 # Join advanced stats with team stats (join on team_display_name since IDs don't match)
@@ -917,16 +1002,11 @@ team_stats <- team_stats %>%
     opp_turnovers_per_game_rankDisplay = opp_turnovers_pg_ranks$rankDisplay
   )
 
-# Calculate advanced stat ranks (only if advanced stats were loaded)
-if (!is.null(advanced_stats)) {
+# Calculate rating ranks (if ratings are available from API or box score fallback)
+if ("net_rating" %in% names(team_stats)) {
   off_rating_ranks <- tied_rank(-team_stats$offensive_rating)
   def_rating_ranks <- tied_rank(team_stats$defensive_rating)  # Lower is better
   net_rating_ranks <- tied_rank(-team_stats$net_rating)
-  pace_ranks <- tied_rank(-team_stats$pace)
-  efg_pct_ranks <- tied_rank(-team_stats$efg_pct)
-  ts_pct_ranks <- tied_rank(-team_stats$ts_pct)
-  oreb_pct_ranks <- tied_rank(-team_stats$oreb_pct)
-  tov_pct_ranks <- tied_rank(team_stats$tm_tov_pct)  # Lower is better
 
   team_stats <- team_stats %>%
     mutate(
@@ -935,7 +1015,20 @@ if (!is.null(advanced_stats)) {
       defensive_rating_rank = def_rating_ranks$rank,
       defensive_rating_rankDisplay = def_rating_ranks$rankDisplay,
       net_rating_rank = net_rating_ranks$rank,
-      net_rating_rankDisplay = net_rating_ranks$rankDisplay,
+      net_rating_rankDisplay = net_rating_ranks$rankDisplay
+    )
+}
+
+# Calculate remaining advanced stat ranks (only when full API data is available)
+if ("pace" %in% names(team_stats)) {
+  pace_ranks <- tied_rank(-team_stats$pace)
+  efg_pct_ranks <- tied_rank(-team_stats$efg_pct)
+  ts_pct_ranks <- tied_rank(-team_stats$ts_pct)
+  oreb_pct_ranks <- tied_rank(-team_stats$oreb_pct)
+  tov_pct_ranks <- tied_rank(team_stats$tm_tov_pct)  # Lower is better
+
+  team_stats <- team_stats %>%
+    mutate(
       pace_rank = pace_ranks$rank,
       pace_rankDisplay = pace_ranks$rankDisplay,
       efg_pct_rank = efg_pct_ranks$rank,
@@ -998,52 +1091,10 @@ cat("\n1b. Calculating cumulative net rating and weekly efficiency...\n")
 # NBA season starts in October, so we use the season start year as reference
 season_start_date <- as.Date(paste0(NBA_SEASON - 1, "-10-01"))
 
-# Compute per-game advanced stats (OFF_RATING, DEF_RATING, NET_RATING) from team_box
-# Uses standard possessions estimation: POSS = FGA + 0.44*FTA - OREB + TOV
-cat("Computing per-game advanced stats from box scores...\n")
-
-team_game_logs_advanced <- team_box %>%
-  select(
-    game_id, game_date,
-    team_id, team_abbreviation, team_display_name,
-    team_score, opponent_team_score,
-    field_goals_attempted, free_throws_attempted,
-    offensive_rebounds, turnovers, assists
-  ) %>%
-  # Join with opponent's stats in the same game to get opponent possession components
-  inner_join(
-    team_box %>%
-      select(
-        game_id,
-        opp_team_id = team_id,
-        opp_fga = field_goals_attempted,
-        opp_fta = free_throws_attempted,
-        opp_oreb = offensive_rebounds,
-        opp_tov = turnovers
-      ),
-    by = "game_id"
-  ) %>%
-  filter(team_id != opp_team_id) %>%
-  mutate(
-    # Estimate possessions using standard formula
-    team_poss = field_goals_attempted + 0.44 * free_throws_attempted - offensive_rebounds + turnovers,
-    opp_poss  = opp_fga + 0.44 * opp_fta - opp_oreb + opp_tov,
-    avg_poss  = (team_poss + opp_poss) / 2,
-    # Per-100-possessions ratings
-    OFF_RATING = ifelse(avg_poss > 0, (team_score / avg_poss) * 100, NA_real_),
-    DEF_RATING = ifelse(avg_poss > 0, (opponent_team_score / avg_poss) * 100, NA_real_),
-    NET_RATING = OFF_RATING - DEF_RATING,
-    GAME_DATE = game_date,
-    TEAM_ABBREVIATION = team_abbreviation
-  )
-
-if (nrow(team_game_logs_advanced) == 0) {
-  cat("WARNING: Could not compute per-game advanced stats. Cumulative net rating and trend data will be unavailable.\n")
-  team_game_logs_advanced <- NULL
-}
+# team_game_logs_advanced already computed above (before API fallback)
 
 if (!is.null(team_game_logs_advanced)) {
-cat("Computed", nrow(team_game_logs_advanced), "game logs with estimated ratings from box scores\n")
+cat("Using", nrow(team_game_logs_advanced), "game logs with estimated ratings from box scores\n")
 
 # Per-game ratings computed from box scores
 game_ratings <- team_game_logs_advanced %>%
@@ -1893,8 +1944,16 @@ build_nba_comparisons <- function(home_stats, away_stats, home_team, away_team) 
   # Add advanced offensive stats if available
   if (is_valid_value(home_stats$offensive_rating) && is_valid_value(away_stats$offensive_rating)) {
     off_stats <- c(off_stats, list(
-      list(key = "offensiveRating", label = "Offensive Rating", value_home = home_stats$offensive_rating, rank_home = home_stats$offensive_rating_rank, rankDisplay_home = home_stats$offensive_rating_rankDisplay, value_away = away_stats$offensive_rating, rank_away = away_stats$offensive_rating_rank, rankDisplay_away = away_stats$offensive_rating_rankDisplay),
-      list(key = "trueShootingPct", label = "True Shooting %", value_home = home_stats$ts_pct, rank_home = home_stats$ts_pct_rank, rankDisplay_home = home_stats$ts_pct_rankDisplay, value_away = away_stats$ts_pct, rank_away = away_stats$ts_pct_rank, rankDisplay_away = away_stats$ts_pct_rankDisplay),
+      list(key = "offensiveRating", label = "Offensive Rating", value_home = home_stats$offensive_rating, rank_home = home_stats$offensive_rating_rank, rankDisplay_home = home_stats$offensive_rating_rankDisplay, value_away = away_stats$offensive_rating, rank_away = away_stats$offensive_rating_rank, rankDisplay_away = away_stats$offensive_rating_rankDisplay)
+    ))
+  }
+  if (is_valid_value(home_stats$ts_pct) && is_valid_value(away_stats$ts_pct)) {
+    off_stats <- c(off_stats, list(
+      list(key = "trueShootingPct", label = "True Shooting %", value_home = home_stats$ts_pct, rank_home = home_stats$ts_pct_rank, rankDisplay_home = home_stats$ts_pct_rankDisplay, value_away = away_stats$ts_pct, rank_away = away_stats$ts_pct_rank, rankDisplay_away = away_stats$ts_pct_rankDisplay)
+    ))
+  }
+  if (is_valid_value(home_stats$efg_pct) && is_valid_value(away_stats$efg_pct)) {
+    off_stats <- c(off_stats, list(
       list(key = "effectiveFgPct", label = "Effective FG %", value_home = home_stats$efg_pct, rank_home = home_stats$efg_pct_rank, rankDisplay_home = home_stats$efg_pct_rankDisplay, value_away = away_stats$efg_pct, rank_away = away_stats$efg_pct_rank, rankDisplay_away = away_stats$efg_pct_rankDisplay)
     ))
   }
@@ -2209,8 +2268,8 @@ for (game in all_games) {
     )
   )
 
-  # Add advanced stats if available
-  if (!is.null(advanced_stats) && is_valid_value(home_stats$offensive_rating)) {
+  # Add ratings if available (from NBA API or box score fallback)
+  if (is_valid_value(home_stats$offensive_rating)) {
     home_team_data$stats$offensiveRating <- round(home_stats$offensive_rating, 1)
     home_team_data$stats$offensiveRatingRank <- home_stats$offensive_rating_rank
     home_team_data$stats$offensiveRatingRankDisplay <- home_stats$offensive_rating_rankDisplay
@@ -2220,6 +2279,9 @@ for (game in all_games) {
     home_team_data$stats$netRating <- round(home_stats$net_rating, 1)
     home_team_data$stats$netRatingRank <- home_stats$net_rating_rank
     home_team_data$stats$netRatingRankDisplay <- home_stats$net_rating_rankDisplay
+  }
+  # Add remaining advanced stats only when full NBA API data is available
+  if (is_valid_value(home_stats$pace)) {
     home_team_data$stats$pace <- round(home_stats$pace, 1)
     home_team_data$stats$paceRank <- home_stats$pace_rank
     home_team_data$stats$paceRankDisplay <- home_stats$pace_rankDisplay
@@ -2385,8 +2447,8 @@ for (game in all_games) {
     )
   )
 
-  # Add advanced stats if available
-  if (!is.null(advanced_stats) && is_valid_value(away_stats$offensive_rating)) {
+  # Add ratings if available (from NBA API or box score fallback)
+  if (is_valid_value(away_stats$offensive_rating)) {
     away_team_data$stats$offensiveRating <- round(away_stats$offensive_rating, 1)
     away_team_data$stats$offensiveRatingRank <- away_stats$offensive_rating_rank
     away_team_data$stats$offensiveRatingRankDisplay <- away_stats$offensive_rating_rankDisplay
@@ -2396,6 +2458,9 @@ for (game in all_games) {
     away_team_data$stats$netRating <- round(away_stats$net_rating, 1)
     away_team_data$stats$netRatingRank <- away_stats$net_rating_rank
     away_team_data$stats$netRatingRankDisplay <- away_stats$net_rating_rankDisplay
+  }
+  # Add remaining advanced stats only when full NBA API data is available
+  if (is_valid_value(away_stats$pace)) {
     away_team_data$stats$pace <- round(away_stats$pace, 1)
     away_team_data$stats$paceRank <- away_stats$pace_rank
     away_team_data$stats$paceRankDisplay <- away_stats$pace_rankDisplay
@@ -2835,11 +2900,14 @@ rankings <- list(
   oppTurnoversPerGame = build_rankings(team_stats, "opp_turnovers_per_game", "opp_turnovers_per_game_rank", "opp_turnovers_per_game_rankDisplay")
 )
 
-# Add advanced stat rankings if available
+# Add rating rankings if available (from API or box score fallback)
 if ("offensive_rating_rank" %in% names(team_stats)) {
   rankings$offensiveRating <- build_rankings(team_stats, "offensive_rating", "offensive_rating_rank", "offensive_rating_rankDisplay")
   rankings$defensiveRating <- build_rankings(team_stats, "defensive_rating", "defensive_rating_rank", "defensive_rating_rankDisplay")
   rankings$netRating <- build_rankings(team_stats, "net_rating", "net_rating_rank", "net_rating_rankDisplay")
+}
+# Add remaining advanced stat rankings only when full NBA API data is available
+if ("pace_rank" %in% names(team_stats)) {
   rankings$pace <- build_rankings(team_stats, "pace", "pace_rank", "pace_rankDisplay")
   rankings$effectiveFgPct <- build_rankings(team_stats, "efg_pct", "efg_pct_rank", "efg_pct_rankDisplay")
   rankings$trueShootingPct <- build_rankings(team_stats, "ts_pct", "ts_pct_rank", "ts_pct_rankDisplay")
@@ -2871,18 +2939,44 @@ if (!is.null(month_trend_stats) && nrow(month_trend_stats) > 0) {
 # Build playoff chances list if available
 playoff_chances_list <- list()
 if (!is.null(playoff_probabilities) && length(playoff_probabilities) > 0) {
+  # Build a lookup from team_stats keyed by abbreviation for win_pct and net_rating
+  ts_lookup <- team_stats %>%
+    select(team_abbreviation,
+           win_pct,
+           any_of(c("net_rating", "net_rating_rank", "net_rating_rankDisplay")))
+
   po_df <- do.call(rbind, lapply(names(playoff_probabilities), function(team) {
     prob <- playoff_probabilities[[team]]
     data.frame(
       team = team,
       playoffProb = if (!is.null(prob$playoffProb)) prob$playoffProb else 0,
       champProb = if (!is.null(prob$champProb)) prob$champProb else 0,
+      conference = if (!is.null(prob$conf)) prob$conf else "",
       stringsAsFactors = FALSE
     )
   }))
-  po_df <- po_df[order(-po_df$champProb, -po_df$playoffProb), ]
+
+  # Merge team stats by abbreviation
+  po_df <- po_df %>%
+    left_join(ts_lookup, by = c("team" = "team_abbreviation"))
+
+  # Log any teams that didn't match for debugging
+  unmatched <- po_df$team[is.na(po_df$win_pct)]
+  if (length(unmatched) > 0) {
+    cat("WARNING: Playoff teams not matched in team_stats:", paste(unmatched, collapse = ", "), "\n")
+    cat("  team_stats abbreviations:", paste(sort(unique(team_stats$team_abbreviation)), collapse = ", "), "\n")
+  }
+
+  # Round values
+  po_df$win_pct <- round(po_df$win_pct, 3)
+  po_df$net_rating <- if ("net_rating" %in% names(po_df)) round(po_df$net_rating, 1) else NA
+
+  po_df <- po_df[order(-po_df$win_pct, -po_df$champProb, -po_df$playoffProb), ]
   playoff_chances_list <- lapply(seq_len(nrow(po_df)), function(i) {
-    list(team = po_df$team[i], playoffProb = po_df$playoffProb[i], champProb = po_df$champProb[i])
+    list(team = po_df$team[i], playoffProb = po_df$playoffProb[i], champProb = po_df$champProb[i],
+         conference = po_df$conference[i],
+         winPct = po_df$win_pct[i],
+         netRating = po_df$net_rating[i])
   })
 }
 

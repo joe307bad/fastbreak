@@ -440,7 +440,23 @@ fun NHLMatchupWorksheet(
                                         selectedMatchup.awayTeam.abbreviation,
                                         selectedMatchup.homeTeam.abbreviation
                                     ),
-                                    source = "PlayoffStatus.com"
+                                    source = "PlayoffStatus.com",
+                                    playoffCutoff = 8,
+                                    playInCutoff = 10,
+                                    extraColumns = listOf(
+                                        PlayoffExtraColumn(
+                                            label = "PTS",
+                                            format = { e -> e.leaguePoints?.toString() ?: "-" },
+                                            sortValue = { it.leaguePoints?.toDouble() ?: 0.0 }
+                                        ),
+                                        PlayoffExtraColumn(
+                                            label = "DIFF",
+                                            format = { e ->
+                                                e.goalDiff?.let { d -> if (d > 0) "+$d" else "$d" } ?: "-"
+                                            },
+                                            sortValue = { it.goalDiff?.toDouble() ?: 0.0 }
+                                        )
+                                    )
                                 )
                             }
 

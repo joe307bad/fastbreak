@@ -2,8 +2,7 @@ package com.joebad.fastbreak.navigation
 
 import com.arkivanov.decompose.ComponentContext
 
-class SettingsComponent(
+class TopicsV2Component(
     componentContext: ComponentContext,
-    val onNavigateBack: () -> Unit,
-    val onNavigateToTopicsV2: () -> Unit = {}
+    val onNavigateBack: () -> Unit
 ) : ComponentContext by componentContext

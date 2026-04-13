@@ -185,11 +185,11 @@ fun SettingsScreen(
                 Spacer(modifier = Modifier.height(12.dp))
 
                 OutlinedButton(
-                    onClick = component.onNavigateToBracketPrototype,
+                    onClick = component.onNavigateToTopicsV2,
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text(
-                        text = "NCAA Tournament Bracket",
+                        text = "Topics V2",
                         fontFamily = FontFamily.Monospace
                     )
                 }

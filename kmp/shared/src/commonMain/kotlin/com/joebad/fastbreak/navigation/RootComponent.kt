@@ -168,9 +168,6 @@ class RootComponent(
                         if (config.fromTopics) {
                             // Just pop back to Topics
                             navigation.pop()
-                        } else if (config.vizType == VizType.HELLO_WORLD) {
-                            // Bracket visualization - pop back to Settings
-                            navigation.pop()
                         } else {
                             navigateBackToHome()
                         }
@@ -182,9 +179,15 @@ class RootComponent(
                 SettingsComponent(
                     componentContext = componentContext,
                     onNavigateBack = { navigation.pop() },
-                    onNavigateToBracketPrototype = {
-                        navigation.push(Config.DataViz("ncaa-tournament-prototype", Sport.NBA, VizType.HELLO_WORLD))
+                    onNavigateToTopicsV2 = {
+                        navigation.push(Config.TopicsV2)
                     }
+                )
+            )
+            is Config.TopicsV2 -> Child.TopicsV2(
+                TopicsV2Component(
+                    componentContext = componentContext,
+                    onNavigateBack = { navigation.pop() }
                 )
             )
             is Config.Topics -> Child.Topics(
@@ -207,6 +210,7 @@ class RootComponent(
         data class DataViz(val component: DataVizComponent) : Child()
         data class Settings(val component: SettingsComponent) : Child()
         data class Topics(val component: TopicsComponent) : Child()
+        data class TopicsV2(val component: TopicsV2Component) : Child()
     }
 
     @Serializable
@@ -228,5 +232,8 @@ class RootComponent(
 
         @Serializable
         data object Topics : Config
+
+        @Serializable
+        data object TopicsV2 : Config
     }
 }

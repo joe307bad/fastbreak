@@ -17,6 +17,7 @@ import com.joebad.fastbreak.ui.DrawerMenu
 import com.joebad.fastbreak.ui.HomeScreen
 import com.joebad.fastbreak.ui.SettingsScreen
 import com.joebad.fastbreak.ui.TopicsScreen
+import com.joebad.fastbreak.ui.TopicsV2Screen
 import com.joebad.fastbreak.ui.theme.AppTheme
 import kotlinx.coroutines.launch
 
@@ -107,6 +108,9 @@ fun App(rootComponent: RootComponent) {
                         topics = rootComponent.registryContainer.getCachedTopics(),
                         topicsUpdatedAt = rootComponent.registryContainer.getTopicsUpdatedAt(),
                         onMenuClick = { scope.launch { drawerState.open() } }
+                    )
+                    is RootComponent.Child.TopicsV2 -> TopicsV2Screen(
+                        component = child.component
                     )
                 }
             }

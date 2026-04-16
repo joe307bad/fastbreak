@@ -1073,3 +1073,70 @@ data class NCAABracketVisualization(
     val regions: List<BracketRegionInfo> = emptyList(),
     val finalFour: BracketFinalFour? = null
 ) : VisualizationType
+
+// NBA Playoff Bracket data structures
+@Serializable
+data class PlayoffSeriesGameInfo(
+    val gameId: String? = null,
+    val gameDate: String? = null,
+    val status: String? = null,
+    val completed: Boolean = false,
+    val headline: String? = null,
+    val team1: PlayoffSeriesGameTeam? = null,
+    val team2: PlayoffSeriesGameTeam? = null
+)
+
+@Serializable
+data class PlayoffSeriesGameTeam(
+    val abbreviation: String? = null,
+    val score: Int? = null,
+    val winner: Boolean = false
+)
+
+@Serializable
+data class PlayoffMatchupInfo(
+    val gameId: String,
+    val conference: String? = null,
+    val roundNumber: Int? = null,
+    val roundName: String? = null,
+    val gameStatus: String? = null,
+    val seriesSummary: String? = null,
+    val bestOf: Int? = null,
+    val team1: BracketTeamInfo? = null,
+    val team2: BracketTeamInfo? = null,
+    val winner: String? = null,
+    val games: List<PlayoffSeriesGameInfo> = emptyList(),
+    val comparisons: MatchupComparisons? = null
+)
+
+@Serializable
+data class PlayoffRoundInfo(
+    val roundNumber: Int,
+    val roundName: String,
+    val games: List<PlayoffMatchupInfo> = emptyList()
+)
+
+@Serializable
+data class PlayoffConferenceInfo(
+    val name: String,
+    val colorHex: String,
+    val rounds: List<PlayoffRoundInfo> = emptyList()
+)
+
+@Serializable
+data class NBAPlayoffBracketVisualization(
+    override val sport: String,
+    override val visualizationType: String,
+    override val title: String,
+    override val subtitle: String,
+    override val description: String,
+    override val lastUpdated: Instant,
+    override val source: String? = null,
+    @Serializable(with = TagListSerializer::class)
+    override val tags: List<Tag>? = null,
+    override val sortOrder: Int? = null,
+    val season: Int? = null,
+    val bracketStatus: String? = null,
+    val conferences: List<PlayoffConferenceInfo> = emptyList(),
+    val finals: PlayoffMatchupInfo? = null
+) : VisualizationType

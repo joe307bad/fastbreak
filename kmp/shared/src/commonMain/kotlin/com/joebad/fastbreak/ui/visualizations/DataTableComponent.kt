@@ -129,6 +129,9 @@ fun DataTableComponent(
             is NCAABracketVisualization -> {
                 // NCAABracket doesn't need a data table - it's handled by NCAABracket
             }
+            is NBAPlayoffBracketVisualization -> {
+                // NBAPlayoffBracket doesn't need a data table
+            }
             is HelloWorldVisualization -> {
                 // HelloWorld doesn't need a data table
             }

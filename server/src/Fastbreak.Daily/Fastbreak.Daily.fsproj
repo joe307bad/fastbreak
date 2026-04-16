@@ -12,10 +12,13 @@
     <Compile Include="NarrativeGenerator.fs" />
     <Compile Include="TextSegmentConverter.fs" />
     <Compile Include="Main.fs" />
+    <Compile Include="V2NarrativeGenerator.fs" />
+    <Compile Include="V2Main.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="Argu" Version="6.2.4" />
     <PackageReference Include="AWSSDK.DynamoDBv2" Version="3.7.405.4" />
     <PackageReference Include="AWSSDK.S3" Version="3.7.405.10" />
     <PackageReference Include="System.Text.Json" Version="9.0.1" />

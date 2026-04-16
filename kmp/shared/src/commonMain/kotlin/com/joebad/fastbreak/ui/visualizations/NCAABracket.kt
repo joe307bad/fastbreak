@@ -1200,7 +1200,7 @@ private fun EmptyMatchupRow() {
 /**
  * Helper to format doubles with specified decimal places
  */
-private fun Double.formatStat(decimals: Int = 1): String {
+internal fun Double.bracketFormatStat(decimals: Int = 1): String {
     val multiplier = when (decimals) {
         0 -> 1.0
         1 -> 10.0
@@ -1497,7 +1497,7 @@ private fun MatchupBottomSheet(
  * So we use home values for LEFT column and away values for RIGHT column
  */
 @Composable
-private fun BracketTeamStatsView(comparisons: com.joebad.fastbreak.data.model.MatchupComparisons) {
+internal fun BracketTeamStatsView(comparisons: com.joebad.fastbreak.data.model.MatchupComparisons) {
     Column {
         // Offensive Stats
         val offenseStats = comparisons.sideBySide?.offense
@@ -1525,8 +1525,8 @@ private fun BracketTeamStatsView(comparisons: com.joebad.fastbreak.data.model.Ma
                     }
                 } else 0
 
-                val leftText = leftValue?.formatStat(2) ?: "-"
-                val rightText = rightValue?.formatStat(2) ?: "-"
+                val leftText = leftValue?.bracketFormatStat(2) ?: "-"
+                val rightText = rightValue?.bracketFormatStat(2) ?: "-"
 
                 FiveColumnRowWithRanks(
                     leftValue = leftText,
@@ -1568,8 +1568,8 @@ private fun BracketTeamStatsView(comparisons: com.joebad.fastbreak.data.model.Ma
                     }
                 } else 0
 
-                val leftText = leftValue?.formatStat(2) ?: "-"
-                val rightText = rightValue?.formatStat(2) ?: "-"
+                val leftText = leftValue?.bracketFormatStat(2) ?: "-"
+                val rightText = rightValue?.bracketFormatStat(2) ?: "-"
 
                 FiveColumnRowWithRanks(
                     leftValue = leftText,
@@ -1611,8 +1611,8 @@ private fun BracketTeamStatsView(comparisons: com.joebad.fastbreak.data.model.Ma
                     }
                 } else 0
 
-                val leftText = leftValue?.formatStat(2) ?: "-"
-                val rightText = rightValue?.formatStat(2) ?: "-"
+                val leftText = leftValue?.bracketFormatStat(2) ?: "-"
+                val rightText = rightValue?.bracketFormatStat(2) ?: "-"
 
                 FiveColumnRowWithRanks(
                     leftValue = leftText,
@@ -1634,7 +1634,7 @@ private fun BracketTeamStatsView(comparisons: com.joebad.fastbreak.data.model.Ma
  * Offense vs Defense view for bracket matchup
  */
 @Composable
-private fun BracketOffenseVsDefenseView(
+internal fun BracketOffenseVsDefenseView(
     comparisons: Map<String, com.joebad.fastbreak.data.model.MatchupStatComparison>,
     offTeam: String,
     defTeam: String
@@ -1663,11 +1663,11 @@ private fun BracketOffenseVsDefenseView(
 
         if (offValue != null && defValue != null) {
             FiveColumnRowWithRanks(
-                leftValue = offValue.formatStat(2),
+                leftValue = offValue.bracketFormatStat(2),
                 leftRank = offRank,
                 leftRankDisplay = offRankDisplay,
                 centerText = stat.offLabel,
-                rightValue = defValue.formatStat(2),
+                rightValue = defValue.bracketFormatStat(2),
                 rightRank = defRank,
                 rightRankDisplay = defRankDisplay,
                 advantage = stat.advantage ?: 0,
@@ -1685,7 +1685,7 @@ private fun BracketOffenseVsDefenseView(
  * Line 3: Conference
  */
 @Composable
-private fun BracketRecordSection(
+internal fun BracketRecordSection(
     team1: com.joebad.fastbreak.data.model.BracketTeamInfo?,
     team2: com.joebad.fastbreak.data.model.BracketTeamInfo?
 ) {
@@ -1881,7 +1881,7 @@ private fun MatchupSheetTeamRow(
  * TBD row shown when a team is not yet determined
  */
 @Composable
-private fun TbdMatchupRow() {
+internal fun TbdMatchupRow() {
     Row(
         modifier = Modifier
             .fillMaxWidth()

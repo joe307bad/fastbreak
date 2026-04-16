@@ -197,7 +197,33 @@ fun NBAPlayoffBracket(
                 val noLine = LineStyle(brush = SolidColor(Color.Transparent), strokeWidth = 0.dp)
                 val connLine = LineStyle(brush = SolidColor(lineColor), strokeWidth = 1.5.dp)
 
-                // East conference (index 0), West conference (index 1)
+                // PASS 1: ALL connector lines (drawn first, behind nodes)
+                conferences.forEachIndexed { idx, _ ->
+                    val r1X = if (idx == 0) pos.eastR1X else pos.westR1X
+                    val r1Y = if (idx == 0) pos.eastR1Y else pos.westR1Y
+                    val semiX = if (idx == 0) pos.eastSemiX else pos.westSemiX
+                    val semiY = if (idx == 0) pos.eastSemiY else pos.westSemiY
+                    val cfX = if (idx == 0) pos.eastCFX else pos.westCFX
+                    val cfY = if (idx == 0) pos.eastCFY else pos.westCFY
+
+                    // Left arm: R1 games 0,1 → Semi 0
+                    DrawArmConnectors(r1X[0], r1Y[0], r1X[1], r1Y[1],
+                        semiX[0], semiY[0], flowRight = true, lineStyle = connLine)
+                    // Right arm: R1 games 2,3 → Semi 1
+                    DrawArmConnectors(r1X[2], r1Y[2], r1X[3], r1Y[3],
+                        semiX[1], semiY[1], flowRight = false, lineStyle = connLine)
+                    // Semi 0 → CF
+                    LinePlot(data = listOf(DefaultPoint(semiX[0], semiY[0]), DefaultPoint(semiX[0], cfY)), lineStyle = connLine)
+                    LinePlot(data = listOf(DefaultPoint(semiX[0], cfY), DefaultPoint(cfX, cfY)), lineStyle = connLine)
+                    // Semi 1 → CF
+                    LinePlot(data = listOf(DefaultPoint(semiX[1], semiY[1]), DefaultPoint(semiX[1], cfY)), lineStyle = connLine)
+                    LinePlot(data = listOf(DefaultPoint(semiX[1], cfY), DefaultPoint(cfX, cfY)), lineStyle = connLine)
+                }
+                // CF → Finals
+                LinePlot(data = listOf(DefaultPoint(pos.eastCFX, pos.eastCFY), DefaultPoint(pos.finalsX, pos.finalsY)), lineStyle = connLine)
+                LinePlot(data = listOf(DefaultPoint(pos.westCFX, pos.westCFY), DefaultPoint(pos.finalsX, pos.finalsY)), lineStyle = connLine)
+
+                // PASS 2: ALL matchup nodes (drawn on top of connectors)
                 conferences.forEachIndexed { idx, conf ->
                     val r1X = if (idx == 0) pos.eastR1X else pos.westR1X
                     val r1Y = if (idx == 0) pos.eastR1Y else pos.westR1Y
@@ -206,45 +232,10 @@ fun NBAPlayoffBracket(
                     val cfX = if (idx == 0) pos.eastCFX else pos.westCFX
                     val cfY = if (idx == 0) pos.eastCFY else pos.westCFY
 
-                    // CONNECTORS: Left arm (R1 games 0,1 → Semi 0)
-                    DrawArmConnectors(
-                        topGameX = r1X[0], topGameY = r1Y[0],
-                        botGameX = r1X[1], botGameY = r1Y[1],
-                        targetX = semiX[0], targetY = semiY[0],
-                        flowRight = true, lineStyle = connLine
-                    )
-                    // Right arm (R1 games 2,3 → Semi 1) — flows left
-                    DrawArmConnectors(
-                        topGameX = r1X[2], topGameY = r1Y[2],
-                        botGameX = r1X[3], botGameY = r1Y[3],
-                        targetX = semiX[1], targetY = semiY[1],
-                        flowRight = false, lineStyle = connLine
-                    )
-                    // Semi 0 → CF: vertical toward center, then horizontal
-                    LinePlot(data = listOf(
-                        DefaultPoint(semiX[0], semiY[0]),
-                        DefaultPoint(semiX[0], cfY)
-                    ), lineStyle = connLine)
-                    LinePlot(data = listOf(
-                        DefaultPoint(semiX[0], cfY),
-                        DefaultPoint(cfX, cfY)
-                    ), lineStyle = connLine)
-                    // Semi 1 → CF: vertical toward center, then horizontal
-                    LinePlot(data = listOf(
-                        DefaultPoint(semiX[1], semiY[1]),
-                        DefaultPoint(semiX[1], cfY)
-                    ), lineStyle = connLine)
-                    LinePlot(data = listOf(
-                        DefaultPoint(semiX[1], cfY),
-                        DefaultPoint(cfX, cfY)
-                    ), lineStyle = connLine)
-
-                    // MATCHUP BOXES
                     val r1Games = conf.rounds.getOrNull(0) ?: emptyList()
                     val semiGames = conf.rounds.getOrNull(1) ?: emptyList()
                     val cfGames = conf.rounds.getOrNull(2) ?: emptyList()
 
-                    // R1: 4 games
                     r1Games.forEachIndexed { gi, game ->
                         if (gi < 4) {
                             LinePlot(data = listOf(DefaultPoint(r1X[gi], r1Y[gi])),
@@ -254,7 +245,6 @@ fun NBAPlayoffBracket(
                                 })
                         }
                     }
-                    // Semis: 2 games
                     semiGames.forEachIndexed { gi, game ->
                         if (gi < 2) {
                             LinePlot(data = listOf(DefaultPoint(semiX[gi], semiY[gi])),
@@ -264,7 +254,6 @@ fun NBAPlayoffBracket(
                                 })
                         }
                     }
-                    // CF: 1 game
                     cfGames.firstOrNull()?.let { game ->
                         LinePlot(data = listOf(DefaultPoint(cfX, cfY)),
                             lineStyle = noLine, symbol = {
@@ -274,17 +263,7 @@ fun NBAPlayoffBracket(
                     }
                 }
 
-                // CF → Finals connectors
-                LinePlot(data = listOf(
-                    DefaultPoint(pos.eastCFX, pos.eastCFY),
-                    DefaultPoint(pos.finalsX, pos.finalsY)
-                ), lineStyle = connLine)
-                LinePlot(data = listOf(
-                    DefaultPoint(pos.westCFX, pos.westCFY),
-                    DefaultPoint(pos.finalsX, pos.finalsY)
-                ), lineStyle = connLine)
-
-                // Finals matchup box
+                // Finals node (last, on top of everything)
                 LinePlot(
                     data = listOf(DefaultPoint(pos.finalsX, pos.finalsY)),
                     lineStyle = noLine,

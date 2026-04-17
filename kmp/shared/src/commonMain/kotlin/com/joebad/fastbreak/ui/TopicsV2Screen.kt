@@ -583,7 +583,9 @@ fun TopicsV2Screen(
                         },
                         colors = TopAppBarDefaults.topAppBarColors(
                             containerColor = MaterialTheme.colorScheme.background,
-                            titleContentColor = MaterialTheme.colorScheme.onBackground
+                            titleContentColor = MaterialTheme.colorScheme.onBackground,
+                            navigationIconContentColor = MaterialTheme.colorScheme.onBackground,
+                            actionIconContentColor = MaterialTheme.colorScheme.onBackground
                         )
                     )
 

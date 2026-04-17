@@ -2,6 +2,7 @@ package com.joebad.fastbreak.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -32,6 +33,15 @@ import com.joebad.fastbreak.ui.components.TagFilterBar
 import com.joebad.fastbreak.ui.container.RegistryState
 import kotlin.time.Clock
 import kotlin.time.Instant
+
+/**
+ * Color for "unread" indicator dots across the app.
+ * Bright orange in dark mode, red in light mode — picked for high contrast against
+ * both themes' backgrounds.
+ */
+@Composable
+internal fun unreadDotColor(): Color =
+    if (isSystemInDarkTheme()) Color(0xFFFF6D00) else Color(0xFFE53935)
 
 @Composable
 fun HomeScreen(
@@ -122,7 +132,8 @@ fun HomeScreen(
                     ) {
                         Icon(
                             imageVector = Icons.Default.Menu,
-                            contentDescription = "Menu"
+                            contentDescription = "Menu",
+                            tint = MaterialTheme.colorScheme.onBackground
                         )
                     }
                 },
@@ -131,7 +142,8 @@ fun HomeScreen(
                         Box {
                             Icon(
                                 imageVector = Icons.Default.Newspaper,
-                                contentDescription = "Topics"
+                                contentDescription = "Topics",
+                                tint = MaterialTheme.colorScheme.onBackground
                             )
                             // Show blue dot indicator for unviewed topics
                             if (!registryState.topicsViewed) {
@@ -141,7 +153,7 @@ fun HomeScreen(
                                         .align(Alignment.TopEnd)
                                         .offset(x = 2.dp, y = (-2).dp)
                                         .background(
-                                            color = Color(0xFF2196F3), // Material Blue
+                                            color = unreadDotColor(),
                                             shape = CircleShape
                                         )
                                 )
@@ -154,13 +166,16 @@ fun HomeScreen(
                     ) {
                         Icon(
                             imageVector = Icons.Default.Refresh,
-                            contentDescription = "Refresh"
+                            contentDescription = "Refresh",
+                            tint = MaterialTheme.colorScheme.onBackground
                         )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.background,
-                    titleContentColor = MaterialTheme.colorScheme.onBackground
+                    titleContentColor = MaterialTheme.colorScheme.onBackground,
+                    navigationIconContentColor = MaterialTheme.colorScheme.onBackground,
+                    actionIconContentColor = MaterialTheme.colorScheme.onBackground
                 )
             )
         }
@@ -220,13 +235,13 @@ fun HomeScreen(
                                     text = sport.displayName,
                                     style = MaterialTheme.typography.titleMedium
                                 )
-                                // Show blue dot if this sport has unviewed charts
+                                // Show unread dot if this sport has unviewed charts
                                 if (hasUnviewedCharts) {
                                     Box(
                                         modifier = Modifier
                                             .size(6.dp)
                                             .background(
-                                                color = Color(0xFF2196F3), // Material Blue
+                                                color = unreadDotColor(),
                                                 shape = CircleShape
                                             )
                                     )
@@ -238,11 +253,6 @@ fun HomeScreen(
                     )
                 }
             }
-
-            HorizontalDivider(
-                color = MaterialTheme.colorScheme.outline,
-                thickness = 1.dp
-            )
 
             // Filter charts for selected sport and sort by sortOrder (nulls last), then alphabetically by title
             // Hide NFL Playoff Bracket until it's ready for production
@@ -285,7 +295,7 @@ fun HomeScreen(
                     onTagToggle = { tag -> component.toggleTag(tag, availableTags) },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 0.dp)
+                        .padding(start = 16.dp, end = 16.dp, top = 20.dp, bottom = 0.dp)
                 )
             }
 
@@ -492,13 +502,13 @@ private fun VisualizationItem(
                         style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.onBackground.copy(alpha = alpha)
                     )
-                    // Show blue dot indicator for unviewed charts
+                    // Show unread dot indicator for unviewed charts
                     if (!viewed && isReady) {
                         Box(
                             modifier = Modifier
                                 .size(8.dp)
                                 .background(
-                                    color = Color(0xFF2196F3), // Material Blue
+                                    color = unreadDotColor(),
                                     shape = CircleShape
                                 )
                         )
@@ -543,8 +553,8 @@ private fun VisualizationItem(
         }
         Spacer(modifier = Modifier.height(12.dp))
         HorizontalDivider(
-            color = MaterialTheme.colorScheme.outline,
-            thickness = 1.dp
+            color = MaterialTheme.colorScheme.onBackground,
+            thickness = 0.5.dp
         )
     }
 }

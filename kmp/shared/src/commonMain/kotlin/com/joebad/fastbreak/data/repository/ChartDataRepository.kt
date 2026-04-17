@@ -2,6 +2,8 @@ package com.joebad.fastbreak.data.repository
 
 import com.joebad.fastbreak.data.model.CachedChartData
 import com.russhwolf.settings.Settings
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -19,6 +21,12 @@ class ChartDataRepository(
         prettyPrint = false
     }
 
+    // Serializes read-modify-write on the chart IDs index.
+    // Why: parallel chart downloads race on the index (getAllChartIds -> add -> saveChartIds)
+    // and last-write-wins drops charts from the index even though their values persist,
+    // making them invisible to buildRegistryFromCache.
+    private val indexMutex = Mutex()
+
     companion object {
         private const val KEY_CHART_IDS = "all_chart_ids"
         private const val PREFIX_CHART = "chart_"
@@ -31,12 +39,15 @@ class ChartDataRepository(
      * @param chartId The ID of the chart
      * @param data The cached chart data to save
      */
-    fun saveChartData(chartId: String, data: CachedChartData) {
+    suspend fun saveChartData(chartId: String, data: CachedChartData) {
+        indexMutex.withLock { saveChartDataLocked(chartId, data) }
+    }
+
+    private fun saveChartDataLocked(chartId: String, data: CachedChartData) {
         try {
             val jsonString = json.encodeToString(data)
             settings.putString("$PREFIX_CHART$chartId", jsonString)
 
-            // Add to chart IDs list if not already present
             val currentIds = getAllChartIds().toMutableSet()
             if (currentIds.add(chartId)) {
                 saveChartIds(currentIds.toList())
@@ -61,14 +72,15 @@ class ChartDataRepository(
                 return json.decodeFromString<CachedChartData>(jsonString)
             }
 
-            // Check for legacy dev_ prefixed key and migrate if found
+            // Check for legacy dev_ prefixed key and migrate if found.
+            // Migration runs from needsUpdate() which executes serially before
+            // parallel downloads start, so the unlocked path is safe here.
             val legacyChartId = "dev_$chartId"
             val legacyJsonString = settings.getStringOrNull("$PREFIX_CHART$legacyChartId")
             if (legacyJsonString != null) {
                 val data = json.decodeFromString<CachedChartData>(legacyJsonString)
-                // Migrate: save with new key and delete legacy key
-                saveChartData(chartId, data)
-                deleteChartData(legacyChartId)
+                saveChartDataLocked(chartId, data)
+                deleteChartDataLocked(legacyChartId)
                 return data
             }
 
@@ -116,10 +128,13 @@ class ChartDataRepository(
      *
      * @param chartId The ID of the chart to delete
      */
-    fun deleteChartData(chartId: String) {
+    suspend fun deleteChartData(chartId: String) {
+        indexMutex.withLock { deleteChartDataLocked(chartId) }
+    }
+
+    private fun deleteChartDataLocked(chartId: String) {
         settings.remove("$PREFIX_CHART$chartId")
 
-        // Remove from chart IDs list
         val currentIds = getAllChartIds().toMutableSet()
         if (currentIds.remove(chartId)) {
             saveChartIds(currentIds.toList())
@@ -130,12 +145,14 @@ class ChartDataRepository(
      * Deletes all cached chart data.
      * Useful for clearing the cache or troubleshooting.
      */
-    fun clearAllChartData() {
-        val chartIds = getAllChartIds()
-        chartIds.forEach { chartId ->
-            settings.remove("$PREFIX_CHART$chartId")
+    suspend fun clearAllChartData() {
+        indexMutex.withLock {
+            val chartIds = getAllChartIds()
+            chartIds.forEach { chartId ->
+                settings.remove("$PREFIX_CHART$chartId")
+            }
+            settings.remove(KEY_CHART_IDS)
         }
-        settings.remove(KEY_CHART_IDS)
     }
 
     /**
@@ -180,10 +197,9 @@ class ChartDataRepository(
      * @param chartId The ID of the chart to mark as viewed
      * @return true if the chart was successfully marked as viewed
      */
-    fun markChartAsViewed(chartId: String): Boolean {
+    suspend fun markChartAsViewed(chartId: String): Boolean {
         val cachedData = getChartData(chartId) ?: return false
 
-        // Only update if not already viewed
         if (cachedData.viewed) {
             return true
         }

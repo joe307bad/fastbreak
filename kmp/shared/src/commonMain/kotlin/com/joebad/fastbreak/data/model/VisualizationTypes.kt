@@ -1015,6 +1015,7 @@ data class BracketTeamInfo(
     val srsRank: Int? = null,
     val wins: Int? = null,
     val losses: Int? = null,
+    val seriesWins: Int? = null,
     val teamStats: JsonObject? = null  // Flexible stats object
 )
 
@@ -1076,14 +1077,26 @@ data class NCAABracketVisualization(
 
 // NBA Playoff Bracket data structures
 @Serializable
+data class PlayoffSeriesGameOdds(
+    val provider: String? = null,
+    val details: String? = null,         // e.g. "BOS -4.5"
+    val homeSpread: Double? = null,
+    val overUnder: Double? = null,
+    val homeMoneyLine: Int? = null,
+    val awayMoneyLine: Int? = null
+)
+
+@Serializable
 data class PlayoffSeriesGameInfo(
     val gameId: String? = null,
     val gameDate: String? = null,
     val status: String? = null,
     val completed: Boolean = false,
     val headline: String? = null,
+    val homeTeamAbbrev: String? = null,
     val team1: PlayoffSeriesGameTeam? = null,
-    val team2: PlayoffSeriesGameTeam? = null
+    val team2: PlayoffSeriesGameTeam? = null,
+    val odds: PlayoffSeriesGameOdds? = null
 )
 
 @Serializable
@@ -1091,6 +1104,53 @@ data class PlayoffSeriesGameTeam(
     val abbreviation: String? = null,
     val score: Int? = null,
     val winner: Boolean = false
+)
+
+@Serializable
+data class MonthTrendRecord(
+    val wins: Int = 0,
+    val losses: Int = 0,
+    val rank: Int? = null,
+    val rankDisplay: String? = null
+)
+
+@Serializable
+data class MonthTrendStat(
+    val value: Double? = null,
+    val rank: Int? = null,
+    val rankDisplay: String? = null
+)
+
+@Serializable
+data class MonthTrendStats(
+    val gamesPlayed: Int = 0,
+    val record: MonthTrendRecord? = null,
+    val netRating: MonthTrendStat? = null,
+    val offensiveRating: MonthTrendStat? = null,
+    val defensiveRating: MonthTrendStat? = null,
+    val pointsPerGame: MonthTrendStat? = null,
+    val assistsPerGame: MonthTrendStat? = null,
+    val turnoversPerGame: MonthTrendStat? = null,
+    val turnoverDiff: MonthTrendStat? = null
+)
+
+@Serializable
+data class RegularSeasonGame(
+    val gameDate: String? = null,
+    val homeAbbrev: String? = null,
+    val awayAbbrev: String? = null,
+    val homeScore: Int? = null,
+    val awayScore: Int? = null,
+    val winnerAbbrev: String? = null
+)
+
+@Serializable
+data class RegularSeasonHistory(
+    val teamAAbbrev: String? = null,
+    val teamBAbbrev: String? = null,
+    val teamAWins: Int = 0,
+    val teamBWins: Int = 0,
+    val games: List<RegularSeasonGame> = emptyList()
 )
 
 @Serializable
@@ -1106,7 +1166,8 @@ data class PlayoffMatchupInfo(
     val team2: BracketTeamInfo? = null,
     val winner: String? = null,
     val games: List<PlayoffSeriesGameInfo> = emptyList(),
-    val comparisons: MatchupComparisons? = null
+    val comparisons: MatchupComparisons? = null,
+    val regularSeasonHistory: RegularSeasonHistory? = null
 )
 
 @Serializable
@@ -1137,6 +1198,32 @@ data class NBAPlayoffBracketVisualization(
     override val sortOrder: Int? = null,
     val season: Int? = null,
     val bracketStatus: String? = null,
+    val tenthNetRatingByWeek: JsonObject? = null,
+    val leagueCumNetRatingStats: LeagueCumNetRatingStats? = null,
+    val leagueEfficiencyStats: LeagueEfficiencyStats? = null,
+    val scatterPlotQuadrants: ScatterPlotQuadrants? = null,
+    val conferences: List<PlayoffConferenceInfo> = emptyList(),
+    val finals: PlayoffMatchupInfo? = null
+) : VisualizationType
+
+@Serializable
+data class NHLPlayoffBracketVisualization(
+    override val sport: String,
+    override val visualizationType: String,
+    override val title: String,
+    override val subtitle: String,
+    override val description: String,
+    override val lastUpdated: Instant,
+    override val source: String? = null,
+    @Serializable(with = TagListSerializer::class)
+    override val tags: List<Tag>? = null,
+    override val sortOrder: Int? = null,
+    val season: Int? = null,
+    val bracketStatus: String? = null,
+    val tenthXgfPctByWeek: JsonObject? = null,
+    val leagueCumXgStats: LeagueCumXgStats? = null,
+    val leagueXgVsPointsStats: LeagueXgVsPointsStats? = null,
+    val scatterPlotQuadrants: ScatterPlotQuadrants? = null,
     val conferences: List<PlayoffConferenceInfo> = emptyList(),
     val finals: PlayoffMatchupInfo? = null
 ) : VisualizationType

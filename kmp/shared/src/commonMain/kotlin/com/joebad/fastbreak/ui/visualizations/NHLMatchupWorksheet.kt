@@ -1931,7 +1931,7 @@ private fun NHLMonthTrendSection(
 /**
  * NHL Month Trend data class
  */
-private data class NHLMonthTrend(
+internal data class NHLMonthTrend(
     val wins: Int,
     val losses: Int,
     val recordRank: Int?,
@@ -1953,7 +1953,7 @@ private data class NHLMonthTrend(
 /**
  * Parse NHL month trend from stats JSON
  */
-private fun parseNHLMonthTrend(stats: JsonObject): NHLMonthTrend? {
+internal fun parseNHLMonthTrend(stats: JsonObject): NHLMonthTrend? {
     val monthTrend = stats["monthTrend"] as? JsonObject ?: return null
 
     val record = monthTrend["record"] as? JsonObject
@@ -2531,7 +2531,7 @@ private fun NHLChartsTab(
 }
 
 @Composable
-private fun CumulativeXgfPctChart(
+internal fun CumulativeXgfPctChart(
     awayTeam: String,
     homeTeam: String,
     awayStats: JsonObject,
@@ -2599,7 +2599,7 @@ private fun CumulativeXgfPctChart(
 }
 
 @Composable
-private fun XgVsPointsPctScatter(
+internal fun XgVsPointsPctScatter(
     awayTeam: String,
     homeTeam: String,
     awayStats: JsonObject,

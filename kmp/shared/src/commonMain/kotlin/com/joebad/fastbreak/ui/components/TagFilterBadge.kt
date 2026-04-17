@@ -84,7 +84,7 @@ fun TagFilterBadge(
     val borderColor = if (isSelected) {
         darkColor
     } else {
-        MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
+        MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f)
     }
 
     val textColor = if (isSelected) {

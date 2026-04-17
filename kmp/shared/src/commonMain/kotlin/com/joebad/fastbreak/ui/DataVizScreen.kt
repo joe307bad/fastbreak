@@ -189,7 +189,9 @@ fun DataVizScreen(
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.background,
-                    titleContentColor = MaterialTheme.colorScheme.onBackground
+                    titleContentColor = MaterialTheme.colorScheme.onBackground,
+                    navigationIconContentColor = MaterialTheme.colorScheme.onBackground,
+                    actionIconContentColor = MaterialTheme.colorScheme.onBackground
                 )
             )
         },
@@ -365,6 +367,7 @@ private fun SuccessContent(
             && visualization !is CBBMatchupVisualization
             && visualization !is NCAABracketVisualization
             && visualization !is NBAPlayoffBracketVisualization
+            && visualization !is NHLPlayoffBracketVisualization
             && visualization !is HelloWorldVisualization) {
             val scrollState = rememberScrollState()
             Row(
@@ -543,6 +546,12 @@ private fun RenderVisualization(
             modifier = Modifier.fillMaxSize(),
             onNavigationToggleHandlerChanged = onBracketNavigationToggleHandlerChanged
         )
+    } else if (visualization is NHLPlayoffBracketVisualization) {
+        NHLPlayoffBracket(
+            visualization = visualization,
+            modifier = Modifier.fillMaxSize(),
+            onNavigationToggleHandlerChanged = onBracketNavigationToggleHandlerChanged
+        )
     } else if (visualization is HelloWorldVisualization) {
         // Placeholder bracket (for development)
         NCAABracket(
@@ -645,6 +654,9 @@ private fun RenderVisualization(
                             }
                             is NBAPlayoffBracketVisualization -> {
                                 // Handled by NBAPlayoffBracket above
+                            }
+                            is NHLPlayoffBracketVisualization -> {
+                                // Handled by NHLPlayoffBracket above
                             }
                             is HelloWorldVisualization -> {
                                 // Handled above

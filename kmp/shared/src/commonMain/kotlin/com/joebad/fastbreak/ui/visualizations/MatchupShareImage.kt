@@ -44,7 +44,12 @@ data class ShareGameInfo(
     val homeApRank: Int? = null,
     val awaySrsRank: Int? = null, // SRS ranking
     val homeSrsRank: Int? = null,
-    val isCBB: Boolean = false // Flag to use CBB display format
+    val isCBB: Boolean = false, // Flag to use CBB display format
+    // Playoff-bracket seeds (displayed alongside team name)
+    val awaySeed: Int? = null,
+    val homeSeed: Int? = null,
+    // Series status (shown below the event label), e.g. "Series tied, 0-0"
+    val seriesStatus: String? = null
 )
 
 /** Generic odds information */
@@ -537,7 +542,7 @@ fun GenericMatchupShareImage(
     Column(
         modifier = modifier
             .background(backgroundColor)
-            .padding(24.dp)
+            .padding(48.dp)
     ) {
         // Compact header row with team names and odds
         Row(
@@ -550,7 +555,7 @@ fun GenericMatchupShareImage(
                 horizontalAlignment = Alignment.Start
             ) {
                 Text(
-                    text = gameInfo.awayTeam,
+                    text = gameInfo.awaySeed?.let { "($it) ${gameInfo.awayTeam}" } ?: gameInfo.awayTeam,
                     fontSize = 72.sp,
                     fontWeight = FontWeight.Bold,
                     color = Team1Color
@@ -590,6 +595,16 @@ fun GenericMatchupShareImage(
                     maxLines = 1,
                     softWrap = false
                 )
+                gameInfo.seriesStatus?.takeIf { it.isNotBlank() }?.let { status ->
+                    Text(
+                        text = status,
+                        fontSize = 38.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = textColor.copy(alpha = 0.85f),
+                        maxLines = 1,
+                        softWrap = false
+                    )
+                }
                 if (gameInfo.formattedDate.isNotBlank()) {
                     Text(
                         text = gameInfo.formattedDate,
@@ -613,7 +628,7 @@ fun GenericMatchupShareImage(
                 horizontalAlignment = Alignment.End
             ) {
                 Text(
-                    text = gameInfo.homeTeam,
+                    text = gameInfo.homeSeed?.let { "($it) ${gameInfo.homeTeam}" } ?: gameInfo.homeTeam,
                     fontSize = 72.sp,
                     fontWeight = FontWeight.Bold,
                     color = Team2Color
@@ -994,7 +1009,7 @@ private fun GenericStatBoxContent(
     box: ShareStatBox,
     textColor: Color
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         // Render three-column stats
         box.threeColStats.forEach { stat ->
             ShareThreeColumnRow(
@@ -1045,7 +1060,7 @@ private fun ShareGenericFiveColumnRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 6.dp),
+            .padding(vertical = 2.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -1561,7 +1576,7 @@ private fun ShareThreeColumnRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 6.dp),
+            .padding(vertical = 2.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {

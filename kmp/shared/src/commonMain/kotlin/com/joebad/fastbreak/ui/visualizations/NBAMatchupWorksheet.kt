@@ -2297,7 +2297,7 @@ private fun NBAChartsTab(
  * Cumulative Net Rating line chart comparing both teams over the season
  */
 @Composable
-private fun CumulativeNetRatingChart(
+internal fun CumulativeNetRatingChart(
     awayTeam: String,
     homeTeam: String,
     awayStats: JsonObject,
@@ -2372,7 +2372,7 @@ private fun CumulativeNetRatingChart(
  * Weekly Efficiency scatter plot showing offensive vs defensive rating for last 10 weeks
  */
 @Composable
-private fun WeeklyEfficiencyScatterPlot(
+internal fun WeeklyEfficiencyScatterPlot(
     awayTeam: String,
     homeTeam: String,
     awayStats: JsonObject,

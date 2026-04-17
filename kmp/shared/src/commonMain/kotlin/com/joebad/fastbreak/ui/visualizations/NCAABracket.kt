@@ -1497,7 +1497,10 @@ private fun MatchupBottomSheet(
  * So we use home values for LEFT column and away values for RIGHT column
  */
 @Composable
-internal fun BracketTeamStatsView(comparisons: com.joebad.fastbreak.data.model.MatchupComparisons) {
+internal fun BracketTeamStatsView(
+    comparisons: com.joebad.fastbreak.data.model.MatchupComparisons,
+    rankColorFn: ((Int?) -> Color)? = null
+) {
     Column {
         // Offensive Stats
         val offenseStats = comparisons.sideBySide?.offense
@@ -1537,7 +1540,8 @@ internal fun BracketTeamStatsView(comparisons: com.joebad.fastbreak.data.model.M
                     rightRank = rightRank,
                     rightRankDisplay = rightRankDisplay,
                     advantage = advantage,
-                    useCBBRanks = true
+                    useCBBRanks = rankColorFn == null,
+                    rankColorFn = rankColorFn
                 )
             }
 
@@ -1580,7 +1584,8 @@ internal fun BracketTeamStatsView(comparisons: com.joebad.fastbreak.data.model.M
                     rightRank = rightRank,
                     rightRankDisplay = rightRankDisplay,
                     advantage = advantage,
-                    useCBBRanks = true
+                    useCBBRanks = rankColorFn == null,
+                    rankColorFn = rankColorFn
                 )
             }
 
@@ -1623,7 +1628,8 @@ internal fun BracketTeamStatsView(comparisons: com.joebad.fastbreak.data.model.M
                     rightRank = rightRank,
                     rightRankDisplay = rightRankDisplay,
                     advantage = advantage,
-                    useCBBRanks = true
+                    useCBBRanks = rankColorFn == null,
+                    rankColorFn = rankColorFn
                 )
             }
         }
@@ -1637,7 +1643,8 @@ internal fun BracketTeamStatsView(comparisons: com.joebad.fastbreak.data.model.M
 internal fun BracketOffenseVsDefenseView(
     comparisons: Map<String, com.joebad.fastbreak.data.model.MatchupStatComparison>,
     offTeam: String,
-    defTeam: String
+    defTeam: String,
+    rankColorFn: ((Int?) -> Color)? = null
 ) {
     if (comparisons.isEmpty()) {
         Text(
@@ -2202,17 +2209,23 @@ private fun convertRegionInfoToBracketRegion(regionInfo: BracketRegionInfo): Bra
  * Format a bracket game date string (ISO 8601) into a readable date and time.
  * Returns null if the date can't be parsed.
  */
-private fun formatBracketGameDate(gameDate: String): String? {
+internal fun formatBracketGameDate(gameDate: String): String? {
     return try {
         val instant = Instant.parse(gameDate)
         val eastern = TimeZone.of("America/New_York")
         val dt = instant.toLocalDateTime(eastern)
         val month = dt.month.name.take(3).lowercase().replaceFirstChar { it.uppercase() }
         val day = dt.dayOfMonth
-        val hour = if (dt.hour % 12 == 0) 12 else dt.hour % 12
-        val minute = dt.minute.toString().padStart(2, '0')
-        val amPm = if (dt.hour < 12) "AM" else "PM"
-        "$month $day · $hour:$minute $amPm ET"
+        // Midnight in ET typically means the tip-off time isn't published yet,
+        // so show only the date instead of a misleading "12:00 AM".
+        if (dt.hour == 0 && dt.minute == 0) {
+            "$month $day"
+        } else {
+            val hour = if (dt.hour % 12 == 0) 12 else dt.hour % 12
+            val minute = dt.minute.toString().padStart(2, '0')
+            val amPm = if (dt.hour < 12) "AM" else "PM"
+            "$month $day · $hour:$minute $amPm ET"
+        }
     } catch (_: Exception) {
         null
     }

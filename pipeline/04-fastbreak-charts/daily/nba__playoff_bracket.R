@@ -158,6 +158,16 @@ team_box <- hoopR::load_nba_team_box(seasons = NBA_SEASON) %>%
 
 cat("Loaded", nrow(team_box), "team box score records\n")
 
+# Regular-season games only, used for head-to-head matchup history.
+# season_type: 1=preseason, 2=regular season, 3=postseason, 4=all-star.
+regular_season_box <- if ("season_type" %in% names(team_box)) {
+  team_box %>% filter(season_type == 2)
+} else {
+  # Fallback: assume regular season when season_type is unavailable
+  team_box
+}
+cat("Regular-season box rows:", nrow(regular_season_box), "\n")
+
 team_stats <- team_box %>%
   group_by(team_id, team_display_name, team_short_display_name) %>%
   summarise(
@@ -221,7 +231,7 @@ team_stats <- team_stats %>% left_join(opponent_stats, by = "team_id")
 
 # Net rating from box scores (used when NBA API is unavailable)
 game_ratings <- team_box %>%
-  select(game_id, team_id, team_abbreviation, team_display_name,
+  select(game_id, game_date, team_id, team_abbreviation, team_display_name,
          team_score, opponent_team_score,
          field_goals_attempted, free_throws_attempted,
          offensive_rebounds, turnovers) %>%
@@ -255,6 +265,145 @@ ratings_by_team <- game_ratings %>%
   )
 
 team_stats <- team_stats %>% left_join(ratings_by_team, by = "team_display_name")
+
+# Weekly chart data (cumulative net rating + weekly efficiency)
+season_start_date <- as.Date(paste0(NBA_SEASON - 1, "-10-01"))
+chart_game_ratings <- game_ratings %>%
+  mutate(
+    game_date_parsed = game_date,
+    week_num = as.integer(floor(difftime(game_date_parsed, season_start_date, units = "weeks")) + 1)
+  ) %>%
+  filter(week_num > 0, !is.na(net_rating_g))
+
+cum_net_rating_by_team <- chart_game_ratings %>%
+  group_by(team_abbreviation) %>%
+  arrange(game_date_parsed) %>%
+  mutate(cum_avg_net_rating = cummean(net_rating_g)) %>%
+  group_by(team_abbreviation, week_num) %>%
+  slice_tail(n = 1) %>%
+  ungroup() %>%
+  select(team_abbreviation, week_num, cum_net_rating = cum_avg_net_rating)
+
+tenth_net_rating_by_week <- cum_net_rating_by_team %>%
+  group_by(week_num) %>%
+  filter(n() >= 25) %>%
+  arrange(desc(cum_net_rating)) %>%
+  slice(10) %>%
+  ungroup() %>%
+  select(week_num, tenth_net_rating = cum_net_rating)
+
+league_cum_net_rating_stats <- list(
+  minCumNetRating = round(min(cum_net_rating_by_team$cum_net_rating, na.rm = TRUE), 1),
+  maxCumNetRating = round(max(cum_net_rating_by_team$cum_net_rating, na.rm = TRUE), 1)
+)
+
+weekly_efficiency <- chart_game_ratings %>%
+  group_by(team_abbreviation, week_num) %>%
+  summarise(
+    off_rating = mean(off_rating, na.rm = TRUE),
+    def_rating = mean(def_rating, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  group_by(team_abbreviation) %>%
+  arrange(desc(week_num)) %>%
+  slice_head(n = 10) %>%
+  arrange(week_num) %>%
+  ungroup()
+
+league_efficiency_stats <- weekly_efficiency %>%
+  summarise(
+    avg_off_rating = mean(off_rating, na.rm = TRUE),
+    avg_def_rating = mean(def_rating, na.rm = TRUE),
+    min_off_rating = min(off_rating, na.rm = TRUE),
+    max_off_rating = max(off_rating, na.rm = TRUE),
+    min_def_rating = min(def_rating, na.rm = TRUE),
+    max_def_rating = max(def_rating, na.rm = TRUE)
+  )
+
+cat("Computed chart data for", length(unique(cum_net_rating_by_team$team_abbreviation)), "teams\n")
+
+# ============================================================================
+# 1-month trend (last 4 weeks of the regular season)
+# Mirrors the "monthTrend" block in nba__matchup_stats.R so each matchup can
+# show how each team was trending heading into / during the playoffs.
+# ============================================================================
+cat("\nComputing 1-month trend (last 4 weeks, regular season)...\n")
+
+rs_game_ids <- if ("season_type" %in% names(team_box)) {
+  unique(team_box$game_id[team_box$season_type == 2])
+} else {
+  unique(team_box$game_id)
+}
+
+rs_game_ratings <- game_ratings %>%
+  filter(game_id %in% rs_game_ids) %>%
+  left_join(
+    team_box %>% select(game_id, team_id,
+                        assists_game = assists,
+                        opp_abbrev = opponent_team_abbreviation),
+    by = c("game_id", "team_id")
+  ) %>%
+  mutate(
+    game_date_parsed = game_date,
+    week_num = as.integer(floor(difftime(game_date_parsed, season_start_date, units = "weeks")) + 1)
+  ) %>%
+  filter(week_num > 0, !is.na(net_rating_g))
+
+month_trend_stats <- tryCatch({
+  if (nrow(rs_game_ratings) == 0) {
+    NULL
+  } else {
+    current_week <- max(rs_game_ratings$week_num, na.rm = TRUE)
+    month_start_week <- max(current_week - 3, 1)
+
+    month_games <- rs_game_ratings %>% filter(week_num >= month_start_week)
+    cat("Month trend: weeks", month_start_week, "to", current_week,
+        "(", nrow(month_games), "team-games)\n")
+
+    base_stats <- month_games %>%
+      group_by(team_abbreviation) %>%
+      summarise(
+        games_played = n(),
+        wins = sum(team_score > opponent_team_score, na.rm = TRUE),
+        losses = sum(team_score < opponent_team_score, na.rm = TRUE),
+        avg_net_rating = mean(net_rating_g, na.rm = TRUE),
+        avg_off_rating = mean(off_rating, na.rm = TRUE),
+        avg_def_rating = mean(def_rating, na.rm = TRUE),
+        points_per_game = mean(team_score, na.rm = TRUE),
+        assists_per_game = mean(assists_game, na.rm = TRUE),
+        turnovers_per_game = mean(turnovers, na.rm = TRUE),
+        .groups = "drop"
+      )
+
+    turnovers_forced <- month_games %>%
+      group_by(defending_team = opp_abbrev) %>%
+      summarise(turnovers_forced_pg = mean(turnovers, na.rm = TRUE), .groups = "drop")
+
+    df <- base_stats %>%
+      left_join(turnovers_forced, by = c("team_abbreviation" = "defending_team")) %>%
+      mutate(
+        turnover_diff = coalesce(turnovers_forced_pg, 0) - turnovers_per_game,
+        win_pct = ifelse(wins + losses > 0, wins / (wins + losses), NA_real_)
+      )
+
+    nr  <- tied_rank(-df$avg_net_rating);    df$net_rating_rank <- nr$rank;  df$net_rating_rankDisplay <- nr$rankDisplay
+    orr <- tied_rank(-df$avg_off_rating);    df$off_rating_rank <- orr$rank; df$off_rating_rankDisplay <- orr$rankDisplay
+    dr  <- tied_rank( df$avg_def_rating);    df$def_rating_rank <- dr$rank;  df$def_rating_rankDisplay <- dr$rankDisplay
+    pp  <- tied_rank(-df$points_per_game);   df$ppg_rank <- pp$rank;         df$ppg_rankDisplay <- pp$rankDisplay
+    ap  <- tied_rank(-df$assists_per_game);  df$apg_rank <- ap$rank;         df$apg_rankDisplay <- ap$rankDisplay
+    tp  <- tied_rank( df$turnovers_per_game);df$tpg_rank <- tp$rank;         df$tpg_rankDisplay <- tp$rankDisplay
+    td  <- tied_rank(-df$turnover_diff);     df$tov_diff_rank <- td$rank;    df$tov_diff_rankDisplay <- td$rankDisplay
+    rr  <- tied_rank(-df$win_pct);           df$record_rank <- rr$rank;      df$record_rankDisplay <- rr$rankDisplay
+    df
+  }
+}, error = function(e) {
+  cat("Month trend calc error:", e$message, "\n")
+  NULL
+})
+
+if (!is.null(month_trend_stats)) {
+  cat("Computed month trend for", nrow(month_trend_stats), "teams\n")
+}
 
 # Ranks
 team_stats <- team_stats %>%
@@ -375,7 +524,7 @@ build_team <- function(name, abbrev, logo, seed = NULL, record = NULL) {
     name = name,
     abbreviation = abbrev,
     logo = logo,
-    seed = if (is_valid_value(seed)) as.integer(seed) else NULL,
+    seed = if (is_valid_value(seed)) as.integer(seed) else 0L,
     wins = if (is_valid_value(record$wins)) as.integer(record$wins) else NULL,
     losses = if (is_valid_value(record$losses)) as.integer(record$losses) else NULL,
     conference = record$conference,
@@ -439,10 +588,107 @@ build_team <- function(name, abbrev, logo, seed = NULL, record = NULL) {
                                   rankDisplay = stats_row$opp_turnovers_per_game_rankDisplay)
   )
 
+  # Add cumulative net rating by week
+  team_abbr <- stats_row$team_abbreviation
+  team_cum <- cum_net_rating_by_team %>% filter(team_abbreviation == team_abbr)
+  ts$cumNetRatingByWeek <- if (nrow(team_cum) > 0) {
+    setNames(as.list(round(team_cum$cum_net_rating, 1)),
+             paste0("week-", team_cum$week_num))
+  } else setNames(list(), character(0))
+
+  # Add weekly efficiency (off/def rating per week)
+  team_eff <- weekly_efficiency %>% filter(team_abbreviation == team_abbr)
+  ts$efficiencyByWeek <- if (nrow(team_eff) > 0) {
+    setNames(lapply(seq_len(nrow(team_eff)), function(i) {
+      list(offRating = round(team_eff$off_rating[i], 1),
+           defRating = round(team_eff$def_rating[i], 1))
+    }), paste0("week-", team_eff$week_num))
+  } else setNames(list(), character(0))
+
+  # 1-month trend rankings (last 4 weeks of regular season)
+  team_month <- if (!is.null(month_trend_stats)) {
+    month_trend_stats %>% filter(team_abbreviation == team_abbr)
+  } else data.frame()
+  ts$monthTrend <- if (nrow(team_month) > 0) {
+    list(
+      gamesPlayed = as.integer(team_month$games_played),
+      record = list(
+        wins = as.integer(team_month$wins),
+        losses = as.integer(team_month$losses),
+        rank = as.integer(team_month$record_rank),
+        rankDisplay = team_month$record_rankDisplay
+      ),
+      netRating = list(value = round(team_month$avg_net_rating, 1),
+                       rank = as.integer(team_month$net_rating_rank),
+                       rankDisplay = team_month$net_rating_rankDisplay),
+      offensiveRating = list(value = round(team_month$avg_off_rating, 1),
+                             rank = as.integer(team_month$off_rating_rank),
+                             rankDisplay = team_month$off_rating_rankDisplay),
+      defensiveRating = list(value = round(team_month$avg_def_rating, 1),
+                             rank = as.integer(team_month$def_rating_rank),
+                             rankDisplay = team_month$def_rating_rankDisplay),
+      pointsPerGame = list(value = round(team_month$points_per_game, 1),
+                           rank = as.integer(team_month$ppg_rank),
+                           rankDisplay = team_month$ppg_rankDisplay),
+      assistsPerGame = list(value = round(team_month$assists_per_game, 1),
+                            rank = as.integer(team_month$apg_rank),
+                            rankDisplay = team_month$apg_rankDisplay),
+      turnoversPerGame = list(value = round(team_month$turnovers_per_game, 1),
+                              rank = as.integer(team_month$tpg_rank),
+                              rankDisplay = team_month$tpg_rankDisplay),
+      turnoverDiff = list(value = round(team_month$turnover_diff, 1),
+                          rank = as.integer(team_month$tov_diff_rank),
+                          rankDisplay = team_month$tov_diff_rankDisplay)
+    )
+  } else NULL
+
   base$teamStats <- ts
   if (is.null(base$wins)) base$wins <- as.integer(stats_row$wins %||% NA)
   if (is.null(base$losses)) base$losses <- as.integer(stats_row$losses %||% NA)
   base
+}
+
+build_regular_season_history <- function(team_a_id, team_b_id,
+                                         team_a_abbrev, team_b_abbrev) {
+  if (!is_valid_value(team_a_id) || !is_valid_value(team_b_id)) return(NULL)
+
+  h2h <- regular_season_box %>%
+    filter(as.character(team_id) == as.character(team_a_id),
+           as.character(opponent_team_id) == as.character(team_b_id)) %>%
+    arrange(game_date)
+
+  if (nrow(h2h) == 0) return(NULL)
+
+  team_a_wins <- sum(h2h$team_score > h2h$opponent_team_score, na.rm = TRUE)
+  team_b_wins <- sum(h2h$team_score < h2h$opponent_team_score, na.rm = TRUE)
+
+  games <- lapply(seq_len(nrow(h2h)), function(i) {
+    row <- h2h[i, ]
+    a_score <- safe_num(row$team_score)
+    b_score <- safe_num(row$opponent_team_score)
+    a_home <- !is.null(row$team_home_away) &&
+              tolower(as.character(row$team_home_away)) == "home"
+    winner <- if (is.na(a_score) || is.na(b_score)) NA_character_
+              else if (a_score > b_score) team_a_abbrev
+              else if (b_score > a_score) team_b_abbrev
+              else NA_character_
+    list(
+      gameDate = as.character(row$game_date),
+      homeAbbrev = if (a_home) team_a_abbrev else team_b_abbrev,
+      awayAbbrev = if (a_home) team_b_abbrev else team_a_abbrev,
+      homeScore = if (a_home) as.integer(a_score) else as.integer(b_score),
+      awayScore = if (a_home) as.integer(b_score) else as.integer(a_score),
+      winnerAbbrev = winner
+    )
+  })
+
+  list(
+    teamAAbbrev = team_a_abbrev,
+    teamBAbbrev = team_b_abbrev,
+    teamAWins = as.integer(team_a_wins),
+    teamBWins = as.integer(team_b_wins),
+    games = games
+  )
 }
 
 stat_pair <- function(key, label, t1, t2) {
@@ -594,16 +840,65 @@ for (ev in playoff_events) {
   status_name <- if (!is.null(comp$status$type$name)) comp$status$type$name else "STATUS_SCHEDULED"
   completed <- isTRUE(comp$status$type$completed)
 
+  # Normalize date to have seconds for Instant parsing
+  game_date_str <- ev$date
+  if (grepl("T\\d{2}:\\d{2}Z$", game_date_str)) {
+    game_date_str <- sub("Z$", ":00Z", game_date_str)
+  }
+
+  # Determine home team from ESPN's homeAway field
+  home_abbrev <- NA
+  for (comp_team in comp$competitors) {
+    if (!is.null(comp_team$homeAway) && comp_team$homeAway == "home") {
+      home_abbrev <- comp_team$team$abbreviation
+      break
+    }
+  }
+
+  # Extract betting odds for upcoming games (skip completed ones to save payload).
+  # ESPN surfaces odds in competitions[0].odds[[1]] — we pull spread, total,
+  # and moneylines when present.
+  odds_data <- NULL
+  if (!completed && !is.null(comp$odds) && length(comp$odds) > 0) {
+    o <- comp$odds[[1]]
+    home_spread <- NA_real_
+    if (!is.null(o$homeTeamOdds) && !is.null(o$homeTeamOdds$spreadOdds)) {
+      home_spread <- safe_num(o$homeTeamOdds$spreadOdds)
+    } else if (!is.null(o$spread)) {
+      home_spread <- safe_num(o$spread)
+    }
+    home_ml <- if (!is.null(o$homeTeamOdds$moneyLine)) safe_num(o$homeTeamOdds$moneyLine) else NA_real_
+    away_ml <- if (!is.null(o$awayTeamOdds$moneyLine)) safe_num(o$awayTeamOdds$moneyLine) else NA_real_
+    over_under <- if (!is.null(o$overUnder)) safe_num(o$overUnder) else NA_real_
+    details <- if (!is.null(o$details)) as.character(o$details) else NA_character_
+    provider <- if (!is.null(o$provider$name)) as.character(o$provider$name) else NA_character_
+
+    has_any <- is_valid_value(home_spread) || is_valid_value(home_ml) ||
+               is_valid_value(away_ml) || is_valid_value(over_under) ||
+               is_valid_value(details)
+    if (has_any) {
+      odds_data <- list(
+        provider = if (is_valid_value(provider)) provider else NULL,
+        details = if (is_valid_value(details)) details else NULL,
+        homeSpread = if (is_valid_value(home_spread)) home_spread else NULL,
+        overUnder = if (is_valid_value(over_under)) over_under else NULL,
+        homeMoneyLine = if (is_valid_value(home_ml)) as.integer(home_ml) else NULL,
+        awayMoneyLine = if (is_valid_value(away_ml)) as.integer(away_ml) else NULL
+      )
+    }
+  }
+
   game_record <- list(
     game_id = ev$id,
-    game_date = ev$date,
+    game_date = game_date_str,
     status = status_name,
     completed = completed,
+    homeTeamAbbrev = home_abbrev,
     team1_id = t1$team$id,
     team1_abbrev = t1$team$abbreviation,
     team1_name = t1$team$displayName,
     team1_logo = if (!is.null(t1$team$logo)) t1$team$logo else NA,
-    team1_score = if (completed) safe_num(t1$score) else NA,
+    team1_score = safe_num(t1$score),
     team1_winner = isTRUE(t1$winner),
     team2_id = t2$team$id,
     team2_abbrev = t2$team$abbreviation,
@@ -611,15 +906,18 @@ for (ev in playoff_events) {
     team2_logo = if (!is.null(t2$team$logo)) t2$team$logo else NA,
     team2_score = if (completed) safe_num(t2$score) else NA,
     team2_winner = isTRUE(t2$winner),
-    headline = notes_hl
+    headline = notes_hl,
+    odds = odds_data
   )
 
+  team_abbrevs_sorted <- sort(c(t1$team$abbreviation, t2$team$abbreviation))
   if (is.null(series_map[[series_key]])) {
     series_map[[series_key]] <- list(
       conference = rinfo$conference,
       roundNumber = rinfo$roundNumber,
       roundName = rinfo$roundName,
       team_ids = team_ids,
+      team_abbrevs = team_abbrevs_sorted,
       games = list()
     )
   }
@@ -688,6 +986,7 @@ build_series_matchup <- function(team1, team2, conference, round_number, round_n
         status = g$status,
         completed = g$completed,
         headline = g$headline,
+        homeTeamAbbrev = g$homeTeamAbbrev,
         team1 = list(
           abbreviation = g$team1_abbrev, score = g$team1_score,
           winner = g$team1_winner
@@ -695,12 +994,18 @@ build_series_matchup <- function(team1, team2, conference, round_number, round_n
         team2 = list(
           abbreviation = g$team2_abbrev, score = g$team2_score,
           winner = g$team2_winner
-        )
+        ),
+        odds = g$odds
       )
     })
   }
 
   comparisons <- build_comparisons(team1, team2)
+
+  regular_season_history <- build_regular_season_history(
+    team1$abbreviation_id, team2$abbreviation_id,
+    team1$abbreviation, team2$abbreviation
+  )
 
   list(
     gameId = game_id,
@@ -716,7 +1021,8 @@ build_series_matchup <- function(team1, team2, conference, round_number, round_n
              else if (isTRUE(team2$isWinner)) team2$name
              else NULL,
     games = games_list,
-    comparisons = comparisons
+    comparisons = comparisons,
+    regularSeasonHistory = regular_season_history
   )
 }
 
@@ -735,49 +1041,76 @@ seeded_team <- function(conference, seed) {
   tm
 }
 
-# Find matching series entry by team IDs
-find_series <- function(conference, round_number, team_a_id, team_b_id) {
-  key_ids <- sort(as.character(c(team_a_id, team_b_id)))
+# Find matching series by abbreviation or team ID
+find_series_by_abbrevs <- function(conference, round_number, abbrev_a, abbrev_b) {
+  key_abbrevs <- sort(c(abbrev_a, abbrev_b))
   for (k in names(series_map)) {
     s <- series_map[[k]]
-    if (identical(s$conference, conference) &&
-        identical(s$roundNumber, round_number) &&
-        identical(s$team_ids, key_ids)) {
-      return(s)
-    }
+    if (identical(s$conference, conference) && s$roundNumber == round_number &&
+        !is.null(s$team_abbrevs) && identical(s$team_abbrevs, key_abbrevs)) return(s)
   }
-  # NBA Finals uses conference = "Finals"
   if (round_number == 4) {
     for (k in names(series_map)) {
       s <- series_map[[k]]
-      if (identical(s$roundNumber, 4) && identical(s$team_ids, key_ids)) return(s)
+      if (s$roundNumber == 4 && !is.null(s$team_abbrevs) && identical(s$team_abbrevs, key_abbrevs)) return(s)
     }
   }
   NULL
 }
 
-# Build projected/live bracket per conference
+# Build bracket per conference — ESPN series as source of truth
 conferences_out <- list()
 
 for (conf in c("East", "West")) {
   cat("Building", conf, "conference bracket...\n")
 
-  r1_games <- vector("list", length(FIRST_ROUND_SEEDS))
-  r1_winners <- vector("list", length(FIRST_ROUND_SEEDS))
+  # Check if ESPN has actual R1 series for this conference
+  espn_r1_series <- Filter(function(s) identical(s$conference, conf) && s$roundNumber == 1, series_map)
 
-  for (i in seq_along(FIRST_ROUND_SEEDS)) {
-    pair <- FIRST_ROUND_SEEDS[[i]]
-    t1 <- seeded_team(conf, pair[1])
-    t2 <- seeded_team(conf, pair[2])
-    if (is.null(t1) || is.null(t2)) next
+  r1_games <- vector("list", 4)
+  r1_winners <- vector("list", 4)
 
-    series_entry <- find_series(conf, 1, t1$abbreviation_id, t2$abbreviation_id)
-    mu <- build_series_matchup(t1, t2, conf, 1, "First Round",
-                               paste0("nba_", tolower(conf), "_r1_", i), series_entry)
-    r1_games[[i]] <- mu
-    if (isTRUE(mu$team1$isWinner)) r1_winners[[i]] <- mu$team1
-    else if (isTRUE(mu$team2$isWinner)) r1_winners[[i]] <- mu$team2
-    else r1_winners[i] <- list(NULL)
+  if (length(espn_r1_series) >= 4) {
+    # Use actual ESPN matchups
+    for (i in seq_along(espn_r1_series)) {
+      if (i > 4) break
+      se <- espn_r1_series[[i]]
+      abbrevs <- se$team_abbrevs
+      # Look up full team info from standings
+      conf_seeds <- seeds[[conf]]
+      t1 <- NULL; t2 <- NULL
+      if (is.data.frame(conf_seeds) && nrow(conf_seeds) > 0) {
+        s1 <- conf_seeds %>% filter(team_abbrev == abbrevs[1])
+        s2 <- conf_seeds %>% filter(team_abbrev == abbrevs[2])
+        if (nrow(s1) > 0) t1 <- seeded_team(conf, s1$seed[1])
+        if (nrow(s2) > 0) t2 <- seeded_team(conf, s2$seed[1])
+      }
+      # Fallback: build minimal team from abbreviation
+      if (is.null(t1)) t1 <- build_team(abbrevs[1], abbrevs[1], NA, seed = NULL, record = list(conference = conf))
+      if (is.null(t2)) t2 <- build_team(abbrevs[2], abbrevs[2], NA, seed = NULL, record = list(conference = conf))
+
+      mu <- build_series_matchup(t1, t2, conf, 1, "First Round",
+                                 paste0("nba_", tolower(conf), "_r1_", i), se)
+      r1_games[[i]] <- mu
+      if (isTRUE(mu$team1$isWinner)) r1_winners[[i]] <- mu$team1
+      else if (isTRUE(mu$team2$isWinner)) r1_winners[[i]] <- mu$team2
+      else r1_winners[i] <- list(NULL)
+    }
+  } else {
+    # Fall back to standings projection
+    for (i in seq_along(FIRST_ROUND_SEEDS)) {
+      pair <- FIRST_ROUND_SEEDS[[i]]
+      t1 <- seeded_team(conf, pair[1])
+      t2 <- seeded_team(conf, pair[2])
+      if (is.null(t1) || is.null(t2)) next
+      se <- find_series_by_abbrevs(conf, 1, t1$abbreviation, t2$abbreviation)
+      mu <- build_series_matchup(t1, t2, conf, 1, "First Round",
+                                 paste0("nba_", tolower(conf), "_r1_", i), se)
+      r1_games[[i]] <- mu
+      if (isTRUE(mu$team1$isWinner)) r1_winners[[i]] <- mu$team1
+      else if (isTRUE(mu$team2$isWinner)) r1_winners[[i]] <- mu$team2
+      else r1_winners[i] <- list(NULL)
+    }
   }
 
   # Conference Semifinals: pairings (1v8 winner vs 4v5 winner), (3v6 winner vs 2v7 winner)
@@ -798,7 +1131,7 @@ for (conf in c("East", "West")) {
       r2_winners[i] <- list(NULL)
       next
     }
-    series_entry <- find_series(conf, 2, a$abbreviation_id, b$abbreviation_id)
+    series_entry <- find_series_by_abbrevs(conf, 2, a$abbreviation, b$abbreviation)
     mu <- build_series_matchup(a, b, conf, 2, "Conference Semifinals",
                                paste0("nba_", tolower(conf), "_r2_", i), series_entry)
     r2_games[[i]] <- mu
@@ -810,7 +1143,7 @@ for (conf in c("East", "West")) {
   # Conference Finals
   a <- r2_winners[[1]]; b <- r2_winners[[2]]
   if (!is.null(a) && !is.null(b)) {
-    series_entry <- find_series(conf, 3, a$abbreviation_id, b$abbreviation_id)
+    series_entry <- find_series_by_abbrevs(conf, 3, a$abbreviation, b$abbreviation)
     cf_game <- build_series_matchup(a, b, conf, 3, "Conference Finals",
                                     paste0("nba_", tolower(conf), "_r3"), series_entry)
   } else {
@@ -826,8 +1159,8 @@ for (conf in c("East", "West")) {
     name = conf,
     colorHex = CONFERENCE_COLORS[[conf]],
     rounds = list(
-      list(roundNumber = 1, roundName = "First Round",            games = r1_games),
-      list(roundNumber = 2, roundName = "Conference Semifinals",  games = r2_games),
+      list(roundNumber = 1, roundName = "First Round",            games = Filter(Negate(is.null), r1_games)),
+      list(roundNumber = 2, roundName = "Conference Semifinals",  games = Filter(Negate(is.null), r2_games)),
       list(roundNumber = 3, roundName = "Conference Finals",      games = list(cf_game))
     ),
     champion = if (!is.null(cf_game$winner))
@@ -841,7 +1174,7 @@ east_champ <- conferences_out[[1]]$champion
 west_champ <- conferences_out[[2]]$champion
 
 finals_game <- if (!is.null(east_champ) && !is.null(west_champ)) {
-  series_entry <- find_series("Finals", 4, east_champ$abbreviation_id, west_champ$abbreviation_id)
+  series_entry <- find_series_by_abbrevs("Finals", 4, east_champ$abbreviation, west_champ$abbreviation)
   build_series_matchup(east_champ, west_champ, "Finals", 4, "NBA Finals",
                        "nba_finals", series_entry)
 } else {
@@ -885,6 +1218,25 @@ output_data <- list(
   sortOrder = -1,
   season = NBA_SEASON,
   bracketStatus = bracket_status,
+  tenthNetRatingByWeek = if (nrow(tenth_net_rating_by_week) > 0) {
+    setNames(as.list(round(tenth_net_rating_by_week$tenth_net_rating, 1)),
+             paste0("week-", tenth_net_rating_by_week$week_num))
+  } else setNames(list(), character(0)),
+  leagueCumNetRatingStats = league_cum_net_rating_stats,
+  leagueEfficiencyStats = list(
+    avgOffRating = round(league_efficiency_stats$avg_off_rating, 1),
+    avgDefRating = round(league_efficiency_stats$avg_def_rating, 1),
+    minOffRating = round(league_efficiency_stats$min_off_rating, 1),
+    maxOffRating = round(league_efficiency_stats$max_off_rating, 1),
+    minDefRating = round(league_efficiency_stats$min_def_rating, 1),
+    maxDefRating = round(league_efficiency_stats$max_def_rating, 1)
+  ),
+  scatterPlotQuadrants = list(
+    topRight = list(label = "Elite", color = "#4CAF50", lightModeColor = "#4CAF50"),
+    topLeft = list(label = "Defensive", color = "#2196F3", lightModeColor = "#2196F3"),
+    bottomLeft = list(label = "Struggling", color = "#F44336", lightModeColor = "#F44336"),
+    bottomRight = list(label = "Offensive", color = "#FF9800", lightModeColor = "#FF9800")
+  ),
   conferences = conferences_out,
   finals = finals_game
 )

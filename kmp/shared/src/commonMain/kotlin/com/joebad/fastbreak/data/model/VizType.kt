@@ -19,5 +19,6 @@ enum class VizType {
     CBB_MATCHUP,
     NCAA_BRACKET,
     NBA_PLAYOFF_BRACKET,
+    NHL_PLAYOFF_BRACKET,
     HELLO_WORLD
 }

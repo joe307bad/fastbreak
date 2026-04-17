@@ -81,22 +81,31 @@ fun MultiOptionFab(
         label = "expansion"
     )
 
-    // Vertical spacing between option labels
-    val spacing = 64.dp
-    val mainFabOffset = 60.dp  // Offset to clear the main FAB
+    // Approximate material sizes, used to compute tight stacking offsets
+    // that behave identically on any density.
+    val fabHeight = 56.dp            // Default FloatingActionButton height
+    val optionHeight = 40.dp         // Approx. pill height (text + vertical padding)
+    val gapAboveFab = 4.dp           // Visible gap between the FAB and the closest option
+    val gapBetweenOptions = 4.dp     // Visible gap between each option
 
     BoxWithConstraints(
         contentAlignment = Alignment.BottomEnd,
         modifier = modifier
     ) {
-        // Slide far enough to ensure longest option is fully off-screen
-        val slideDistance = maxWidth.value + 200f
+        // Slide far enough to ensure longest option is fully off-screen,
+        // kept in dp so behavior is consistent across densities.
+        val slideDistance = maxWidth + 200.dp
 
-        // Option labels - stacked vertically above main FAB
+        // Option labels - stacked vertically above main FAB.
+        // Last option in the list sits just above the FAB; each prior option
+        // stacks one (optionHeight + gapBetweenOptions) higher.
         options.forEachIndexed { index, option ->
-            // Fixed vertical position, slide in horizontally from right
-            val offsetY = -(mainFabOffset + spacing * (options.size - index)).value.roundToInt()
-            val offsetX = ((1f - expansionProgress) * slideDistance).roundToInt()
+            val optionsBelowThis = options.size - 1 - index
+            val offsetYDp = -(
+                fabHeight + gapAboveFab +
+                    (optionHeight + gapBetweenOptions) * optionsBelowThis
+            )
+            val offsetXDp = slideDistance * (1f - expansionProgress)
 
             Surface(
                 onClick = {
@@ -108,12 +117,19 @@ fun MultiOptionFab(
                 shadowElevation = 4.dp,
                 shape = RoundedCornerShape(16.dp),
                 modifier = Modifier
-                    .offset { IntOffset(offsetX, offsetY) }
+                    .offset {
+                        IntOffset(
+                            offsetXDp.toPx().roundToInt(),
+                            offsetYDp.toPx().roundToInt()
+                        )
+                    }
             ) {
                 Text(
                     text = option.label,
                     style = MaterialTheme.typography.labelMedium,
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                    maxLines = 1,
+                    softWrap = false,
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)
                 )
             }
         }

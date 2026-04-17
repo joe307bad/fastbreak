@@ -4,6 +4,7 @@ import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -15,9 +16,22 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.layer.drawLayer
+import androidx.compose.ui.graphics.rememberGraphicsLayer
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.TrendingUp
 import com.joebad.fastbreak.data.model.*
+import com.joebad.fastbreak.platform.getImageExporter
+import com.joebad.fastbreak.ui.components.FabOption
+import com.joebad.fastbreak.ui.components.MultiOptionFab
+import com.joebad.fastbreak.ui.components.ShareFab
 import com.joebad.fastbreak.ui.visualizations.BracketTeamStatsView
 import com.joebad.fastbreak.ui.visualizations.BracketOffenseVsDefenseView
 import com.joebad.fastbreak.ui.visualizations.BracketRecordSection
@@ -31,37 +45,24 @@ import io.github.koalaplot.core.xygraph.XYGraph
 import io.github.koalaplot.core.xygraph.XYGraphScope
 import io.github.koalaplot.core.xygraph.rememberAxisStyle
 import io.github.koalaplot.core.gestures.GestureConfig
+import kotlinx.datetime.Instant
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.decodeFromJsonElement
 import kotlin.math.round
 
 // ============================================================================
 // Local data types (mirroring NCAABracket's BracketTeam / BracketGame)
 // ============================================================================
 
-private data class NBABracketTeam(
-    val seed: Int,
-    val name: String,
-    val seriesWins: Int? = null,
-    val isWinner: Boolean = false
-)
-
-private data class NBABracketGame(
-    val team1: NBABracketTeam?,
-    val team2: NBABracketTeam?,
-    val seriesSummary: String? = null,
-    val sourceMatchup: PlayoffMatchupInfo? = null
-)
-
-private data class NBABracketConference(
-    val name: String,
-    val color: Color,
-    val rounds: List<List<NBABracketGame>>  // 3 rounds: First Round (4), Semis (2), Finals (1)
-)
-
 private data class NBAMatchupSheetData(
     val matchup: PlayoffMatchupInfo,
     val conferenceName: String,
     val conferenceColor: Color,
-    val roundName: String
+    val roundName: String,
+    val visualization: NBAPlayoffBracketVisualization? = null
 )
 
 // ============================================================================
@@ -82,48 +83,6 @@ private data class NBAMatchupSheetData(
 //       └─ 4v5 ─┘           └─ 2v7 ─┘
 // ============================================================================
 
-private class BracketPositions(isPortrait: Boolean) {
-    val centerX = 6f
-    val centerY = 10f
-
-    // Tuning knobs
-    val armSpacingX = 0.9f     // Horizontal gap between rounds within an arm
-    val r1PairGapY = 1.8f      // Vertical gap between two R1 games in same quadrant
-    val halfSpreadY = if (isPortrait) 2.5f else 3.5f  // Conference spread from center
-    val cfGapY = if (isPortrait) 0.8f else 1.5f       // CF-to-Finals gap (wider in landscape)
-
-    // Per-conference: 4 R1 positions, 2 Semi positions, 1 CF position
-    // R1 games: [0]=1v8(left-top), [1]=4v5(left-bot), [2]=3v6(right-top), [3]=2v7(right-bot)
-
-    // East conference (top half, Y > centerY)
-    private val eastMidY = centerY + halfSpreadY
-    val eastR1X = listOf(centerX - 2 * armSpacingX, centerX - 2 * armSpacingX,
-                         centerX + 2 * armSpacingX, centerX + 2 * armSpacingX)
-    val eastR1Y = listOf(eastMidY + r1PairGapY / 2, eastMidY - r1PairGapY / 2,
-                         eastMidY + r1PairGapY / 2, eastMidY - r1PairGapY / 2)
-    val eastSemiX = listOf(centerX - armSpacingX, centerX + armSpacingX)
-    val eastSemiY = listOf(eastMidY, eastMidY)
-    val eastCFX = centerX
-    val eastCFY = centerY + cfGapY
-
-    // West conference (bottom half, Y < centerY) — mirrored vertically
-    private val westMidY = centerY - halfSpreadY
-    val westR1X = listOf(centerX - 2 * armSpacingX, centerX - 2 * armSpacingX,
-                         centerX + 2 * armSpacingX, centerX + 2 * armSpacingX)
-    val westR1Y = listOf(westMidY - r1PairGapY / 2, westMidY + r1PairGapY / 2,
-                         westMidY - r1PairGapY / 2, westMidY + r1PairGapY / 2)
-    val westSemiX = listOf(centerX - armSpacingX, centerX + armSpacingX)
-    val westSemiY = listOf(westMidY, westMidY)
-    val westCFX = centerX
-    val westCFY = centerY - cfGapY
-
-    val finalsX = centerX
-    val finalsY = centerY
-}
-
-private const val BOX_OFFSET = 0.5f
-
-
 // ============================================================================
 // Main composable
 // ============================================================================
@@ -135,153 +94,24 @@ fun NBAPlayoffBracket(
     modifier: Modifier = Modifier,
     onNavigationToggleHandlerChanged: ((BracketNavigationToggleHandler?) -> Unit)? = null
 ) {
-    val conferences = remember(visualization) {
-        visualization.conferences.map { conf ->
-            convertConference(conf)
-        }
-    }
-
-    val finalsGame = remember(visualization) {
-        convertMatchupToGame(visualization.finals)
-    }
-
+    val conferences = remember(visualization) { visualization.conferences.map { convertPlayoffConference(it) } }
+    val finalsGame = remember(visualization) { convertPlayoffMatchupToGame(visualization.finals) }
     var selectedMatchup by remember { mutableStateOf<NBAMatchupSheetData?>(null) }
-
-    val backgroundColor = MaterialTheme.colorScheme.background
-    val textColor = MaterialTheme.colorScheme.onBackground
-    val lineColor = MaterialTheme.colorScheme.onBackground
 
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
         val isPortrait = maxWidth < maxHeight
-        val pos = remember(isPortrait) { BracketPositions(isPortrait) }
+        val pos = remember(isPortrait) { PlayoffBracketPositions(isPortrait) }
 
-        // Canvas bounds from all node positions
-        val allNodeX = pos.eastR1X + pos.westR1X + listOf(pos.finalsX)
-        val allNodeY = pos.eastR1Y + pos.westR1Y + listOf(pos.eastCFY, pos.westCFY, pos.finalsY)
-        val pad = 0.8f
-        val xMin = allNodeX.min() - pad
-        val xMax = allNodeX.max() + pad
-        val yMin = allNodeY.min() - pad
-        val yMax = allNodeY.max() + pad
-
-        val xAxisModel = remember(isPortrait) {
-            FloatLinearAxisModel(range = xMin..xMax, minViewExtent = xMax - xMin, maxViewExtent = xMax - xMin)
-        }
-        val yAxisModel = remember(isPortrait) {
-            FloatLinearAxisModel(range = yMin..yMax, minViewExtent = yMax - yMin, maxViewExtent = yMax - yMin)
-        }
         Box(modifier = Modifier.fillMaxSize()) {
-            XYGraph(
-                xAxisModel = xAxisModel,
-                yAxisModel = yAxisModel,
-                gestureConfig = GestureConfig(
-                    panXEnabled = false, panYEnabled = false,
-                    zoomXEnabled = false, zoomYEnabled = false
-                ),
-                xAxisStyle = rememberAxisStyle(
-                    color = Color.Transparent,
-                    tickPosition = io.github.koalaplot.core.xygraph.TickPosition.None
-                ),
-                yAxisStyle = rememberAxisStyle(
-                    color = Color.Transparent,
-                    tickPosition = io.github.koalaplot.core.xygraph.TickPosition.None
-                ),
-                xAxisLabels = {}, yAxisLabels = {},
-                xAxisTitle = {}, yAxisTitle = {},
-                horizontalMajorGridLineStyle = null,
-                horizontalMinorGridLineStyle = null,
-                verticalMajorGridLineStyle = null,
-                verticalMinorGridLineStyle = null,
-                modifier = Modifier.fillMaxSize().semantics { contentDescription = "chart" }
-            ) {
-                val noLine = LineStyle(brush = SolidColor(Color.Transparent), strokeWidth = 0.dp)
-                val connLine = LineStyle(brush = SolidColor(lineColor), strokeWidth = 1.5.dp)
-
-                // PASS 1: ALL connector lines (drawn first, behind nodes)
-                conferences.forEachIndexed { idx, _ ->
-                    val r1X = if (idx == 0) pos.eastR1X else pos.westR1X
-                    val r1Y = if (idx == 0) pos.eastR1Y else pos.westR1Y
-                    val semiX = if (idx == 0) pos.eastSemiX else pos.westSemiX
-                    val semiY = if (idx == 0) pos.eastSemiY else pos.westSemiY
-                    val cfX = if (idx == 0) pos.eastCFX else pos.westCFX
-                    val cfY = if (idx == 0) pos.eastCFY else pos.westCFY
-
-                    // Left arm: R1 games 0,1 → Semi 0
-                    DrawArmConnectors(r1X[0], r1Y[0], r1X[1], r1Y[1],
-                        semiX[0], semiY[0], flowRight = true, lineStyle = connLine)
-                    // Right arm: R1 games 2,3 → Semi 1
-                    DrawArmConnectors(r1X[2], r1Y[2], r1X[3], r1Y[3],
-                        semiX[1], semiY[1], flowRight = false, lineStyle = connLine)
-                    // Semi 0 → CF
-                    LinePlot(data = listOf(DefaultPoint(semiX[0], semiY[0]), DefaultPoint(semiX[0], cfY)), lineStyle = connLine)
-                    LinePlot(data = listOf(DefaultPoint(semiX[0], cfY), DefaultPoint(cfX, cfY)), lineStyle = connLine)
-                    // Semi 1 → CF
-                    LinePlot(data = listOf(DefaultPoint(semiX[1], semiY[1]), DefaultPoint(semiX[1], cfY)), lineStyle = connLine)
-                    LinePlot(data = listOf(DefaultPoint(semiX[1], cfY), DefaultPoint(cfX, cfY)), lineStyle = connLine)
+            PlayoffBracketCanvas(
+                conferences = conferences,
+                finalsGame = finalsGame,
+                finalsLabel = "NBA Finals",
+                pos = pos,
+                onMatchupClick = { mu, confName, roundName, color ->
+                    selectedMatchup = NBAMatchupSheetData(mu, confName, color, roundName, visualization)
                 }
-                // CF → Finals
-                LinePlot(data = listOf(DefaultPoint(pos.eastCFX, pos.eastCFY), DefaultPoint(pos.finalsX, pos.finalsY)), lineStyle = connLine)
-                LinePlot(data = listOf(DefaultPoint(pos.westCFX, pos.westCFY), DefaultPoint(pos.finalsX, pos.finalsY)), lineStyle = connLine)
-
-                // PASS 2: ALL matchup nodes (drawn on top of connectors)
-                conferences.forEachIndexed { idx, conf ->
-                    val r1X = if (idx == 0) pos.eastR1X else pos.westR1X
-                    val r1Y = if (idx == 0) pos.eastR1Y else pos.westR1Y
-                    val semiX = if (idx == 0) pos.eastSemiX else pos.westSemiX
-                    val semiY = if (idx == 0) pos.eastSemiY else pos.westSemiY
-                    val cfX = if (idx == 0) pos.eastCFX else pos.westCFX
-                    val cfY = if (idx == 0) pos.eastCFY else pos.westCFY
-
-                    val r1Games = conf.rounds.getOrNull(0) ?: emptyList()
-                    val semiGames = conf.rounds.getOrNull(1) ?: emptyList()
-                    val cfGames = conf.rounds.getOrNull(2) ?: emptyList()
-
-                    r1Games.forEachIndexed { gi, game ->
-                        if (gi < 4) {
-                            LinePlot(data = listOf(DefaultPoint(r1X[gi], r1Y[gi])),
-                                lineStyle = noLine, symbol = {
-                                    NBAMatchupBoxSymbol(game, conf.color, textColor, backgroundColor,
-                                        onClick = { game.sourceMatchup?.let { selectedMatchup = NBAMatchupSheetData(it, conf.name, conf.color, "First Round") } })
-                                })
-                        }
-                    }
-                    semiGames.forEachIndexed { gi, game ->
-                        if (gi < 2) {
-                            LinePlot(data = listOf(DefaultPoint(semiX[gi], semiY[gi])),
-                                lineStyle = noLine, symbol = {
-                                    NBAMatchupBoxSymbol(game, conf.color, textColor, backgroundColor,
-                                        onClick = { game.sourceMatchup?.let { selectedMatchup = NBAMatchupSheetData(it, conf.name, conf.color, "Conference Semifinals") } })
-                                })
-                        }
-                    }
-                    cfGames.firstOrNull()?.let { game ->
-                        LinePlot(data = listOf(DefaultPoint(cfX, cfY)),
-                            lineStyle = noLine, symbol = {
-                                NBAMatchupBoxSymbol(game, conf.color, textColor, backgroundColor,
-                                    onClick = { game.sourceMatchup?.let { selectedMatchup = NBAMatchupSheetData(it, conf.name, conf.color, "Conference Finals") } })
-                            })
-                    }
-                }
-
-                // Finals node (last, on top of everything)
-                LinePlot(
-                    data = listOf(DefaultPoint(pos.finalsX, pos.finalsY)),
-                    lineStyle = noLine,
-                    symbol = {
-                        NBAMatchupBoxSymbol(
-                            game = finalsGame,
-                            accentColor = Color(0xFFFFD700),
-                            textColor = textColor,
-                            backgroundColor = backgroundColor,
-                            onClick = {
-                                visualization.finals?.let { mu ->
-                                    selectedMatchup = NBAMatchupSheetData(mu, "Finals", Color(0xFFFFD700), "NBA Finals")
-                                }
-                            }
-                        )
-                    }
-                )
-            }
+            )
         }
     }
 
@@ -291,182 +121,284 @@ fun NBAPlayoffBracket(
     }
 }
 
-// ============================================================================
-// Connector drawing: two games converge into one target
-// ============================================================================
-
-@OptIn(ExperimentalKoalaPlotApi::class)
 @Composable
-private fun XYGraphScope<Float, Float>.DrawArmConnectors(
-    topGameX: Float, topGameY: Float,
-    botGameX: Float, botGameY: Float,
-    targetX: Float, targetY: Float,
-    flowRight: Boolean,
-    lineStyle: LineStyle
+private fun NBASeriesResultsView(
+    games: List<PlayoffSeriesGameInfo>,
+    t1Abbrev: String,
+    t2Abbrev: String
 ) {
-    // Vertical bar sits 30% of the way from games toward target
-    val t = 0.3f
-    val barX = topGameX + t * (targetX - topGameX)
+    SectionHeader("Best of 7")
+    Spacer(modifier = Modifier.height(4.dp))
 
-    // Horizontal from each game to the vertical bar
-    LinePlot(data = listOf(DefaultPoint(topGameX, topGameY), DefaultPoint(barX, topGameY)), lineStyle = lineStyle)
-    LinePlot(data = listOf(DefaultPoint(botGameX, botGameY), DefaultPoint(barX, botGameY)), lineStyle = lineStyle)
-    // Vertical bar
-    LinePlot(data = listOf(DefaultPoint(barX, topGameY), DefaultPoint(barX, botGameY)), lineStyle = lineStyle)
-    // Horizontal from bar to target
-    LinePlot(data = listOf(DefaultPoint(barX, targetY), DefaultPoint(targetX, targetY)), lineStyle = lineStyle)
-}
+    // Column headers
+    FiveColumnRowWithRanks(
+        leftValue = t1Abbrev, leftRank = null, leftRankDisplay = null,
+        centerText = "", rightValue = t2Abbrev, rightRank = null, rightRankDisplay = null,
+        advantage = 0
+    )
 
-@Composable
-private fun NBAMatchupBoxSymbol(
-    game: NBABracketGame,
-    accentColor: Color,
-    textColor: Color,
-    backgroundColor: Color,
-    onClick: () -> Unit
-) {
-    val isDarkTheme = isSystemInDarkTheme()
+    // Always show 7 game slots
+    for (idx in 0 until 7) {
+        val game = games.getOrNull(idx)
 
-    Card(
-        modifier = Modifier
-            .width(110.dp)
-            .semantics { contentDescription = "matchup-node" }
-            .clickable(onClick = onClick),
-        shape = RoundedCornerShape(4.dp),
-        colors = CardDefaults.cardColors(containerColor = backgroundColor),
-        border = if (isDarkTheme) null else BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.4f))
-    ) {
-        Column {
-            // Series summary header
-            game.seriesSummary?.let { summary ->
-                Text(
-                    text = summary,
-                    style = MaterialTheme.typography.labelSmall,
-                    fontSize = 8.sp,
-                    color = accentColor,
-                    maxLines = 1,
-                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
-                )
+        if (game != null) {
+            val t1Score = game.team1?.score
+            val t2Score = game.team2?.score
+            val t1Won = game.team1?.winner == true
+            val t2Won = game.team2?.winner == true
+            val isCompleted = game.completed
+            val dateLabel = game.gameDate?.let { formatBracketGameDate(it) }
+            val homeLabel = game.homeTeamAbbrev?.let { "@ $it" } ?: ""
+
+            val advantage = when {
+                t1Won -> -1
+                t2Won -> 1
+                else -> 0
             }
 
-            game.team1?.let { team ->
-                NBATeamRow(team = team, accentColor = accentColor, textColor = textColor)
-            } ?: NBAEmptyRow()
+            val centerText = "Game ${idx + 1}" + if (homeLabel.isNotEmpty()) "\n$homeLabel" else ""
 
-            HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f), thickness = 0.5.dp)
-
-            game.team2?.let { team ->
-                NBATeamRow(team = team, accentColor = accentColor, textColor = textColor)
-            } ?: NBAEmptyRow()
-        }
-    }
-}
-
-@Composable
-private fun NBATeamRow(team: NBABracketTeam, accentColor: Color, textColor: Color) {
-    val rowBg = if (team.isWinner) accentColor.copy(alpha = 0.15f) else Color.Transparent
-
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(rowBg)
-            .padding(horizontal = 4.dp, vertical = 3.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
-            Text(
-                text = "${team.seed}",
-                style = MaterialTheme.typography.labelSmall,
-                fontWeight = FontWeight.Bold,
-                color = if (team.isWinner) accentColor else textColor.copy(alpha = 0.6f),
-                modifier = Modifier.width(16.dp)
-            )
-            Text(
-                text = team.name,
-                style = MaterialTheme.typography.labelSmall,
-                fontWeight = if (team.isWinner) FontWeight.Bold else FontWeight.Normal,
-                color = textColor,
-                maxLines = 1,
-                softWrap = false,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f)
-            )
-        }
-        team.seriesWins?.let { wins ->
-            Text(
-                text = "$wins",
-                style = MaterialTheme.typography.labelSmall,
-                fontWeight = if (team.isWinner) FontWeight.Bold else FontWeight.Normal,
-                color = if (team.isWinner) accentColor else textColor
-            )
-        }
-    }
-}
-
-@Composable
-private fun NBAEmptyRow() {
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 3.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text("?", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-            modifier = Modifier.width(16.dp))
-        Text("TBD", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Medium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f))
-    }
-}
-
-// ============================================================================
-// Data conversion
-// ============================================================================
-
-private fun convertConference(conf: PlayoffConferenceInfo): NBABracketConference {
-    val color = parseNBAHexColor(conf.colorHex) ?: Color.Gray
-
-    val expectedPerRound = listOf(4, 2, 1)
-    val rounds = (0 until 3).map { roundIdx ->
-        val roundInfo = conf.rounds.getOrNull(roundIdx)
-        val expected = expectedPerRound[roundIdx]
-        val games = roundInfo?.games?.map { convertMatchupToGame(it) } ?: emptyList()
-
-        if (games.size < expected) {
-            games + (games.size until expected).map { NBABracketGame(null, null) }
+            if (isCompleted) {
+                FiveColumnRowWithRanks(
+                    leftValue = "${t1Score ?: "-"}",
+                    leftRank = null, leftRankDisplay = null,
+                    centerText = centerText,
+                    rightValue = "${t2Score ?: "-"}",
+                    rightRank = null, rightRankDisplay = null,
+                    advantage = advantage
+                )
+                dateLabel?.let {
+                    Text(it, style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                        modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center,
+                        fontSize = 10.sp)
+                }
+            } else {
+                FiveColumnRowWithRanks(
+                    leftValue = "-",
+                    leftRank = null, leftRankDisplay = null,
+                    centerText = centerText,
+                    rightValue = "-",
+                    rightRank = null, rightRankDisplay = null,
+                    advantage = 0
+                )
+                val oddsLabel = game.odds?.let { formatPlayoffGameOddsLine(it) }
+                val scheduleLine = listOfNotNull(dateLabel, oddsLabel).joinToString(" · ")
+                if (scheduleLine.isNotEmpty()) {
+                    Text(scheduleLine, style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
+                        modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center,
+                        fontSize = 10.sp)
+                }
+            }
         } else {
-            games
+            FiveColumnRowWithRanks(
+                leftValue = "-",
+                leftRank = null, leftRankDisplay = null,
+                centerText = "Game ${idx + 1}",
+                rightValue = "-",
+                rightRank = null, rightRankDisplay = null,
+                advantage = 0
+            )
         }
     }
-
-    return NBABracketConference(name = conf.name, color = color, rounds = rounds)
 }
 
-private fun convertMatchupToGame(matchup: PlayoffMatchupInfo?): NBABracketGame {
-    if (matchup == null) return NBABracketGame(null, null)
+private val monthTrendJson = Json { ignoreUnknownKeys = true; coerceInputValues = true }
 
-    val status = matchup.gameStatus?.uppercase() ?: ""
-    val isDecided = status == "FINAL"
+private fun parseMonthTrend(teamStats: JsonObject?): MonthTrendStats? {
+    val element = teamStats?.get("monthTrend") ?: return null
+    return try {
+        monthTrendJson.decodeFromJsonElement<MonthTrendStats>(element)
+    } catch (_: Exception) {
+        null
+    }
+}
 
-    fun toTeam(info: BracketTeamInfo?, isWinnerByName: Boolean): NBABracketTeam? {
-        if (info == null || info.name.equals("TBD", ignoreCase = true) || info.name.isBlank()) return null
-        // Extract seriesWins from teamStats JSON if available, or check the info field
-        return NBABracketTeam(
-            seed = info.seed,
-            name = info.name,
-            seriesWins = info.score,  // R script stores seriesWins in the score field
-            isWinner = isDecided && (isWinnerByName || info.isWinner)
+@Composable
+private fun NBAMonthTrendView(
+    t1Abbrev: String,
+    t2Abbrev: String,
+    t1Trend: MonthTrendStats,
+    t2Trend: MonthTrendStats
+) {
+    val gp = t1Trend.gamesPlayed.coerceAtLeast(t2Trend.gamesPlayed)
+    SectionHeader("Last Month (Last $gp Games)")
+    Spacer(modifier = Modifier.height(4.dp))
+
+    // Column headers
+    FiveColumnRowWithRanks(
+        leftValue = t1Abbrev, leftRank = null, leftRankDisplay = null,
+        centerText = "", rightValue = t2Abbrev, rightRank = null, rightRankDisplay = null,
+        advantage = 0
+    )
+
+    // Record row
+    val r1 = t1Trend.record
+    val r2 = t2Trend.record
+    if (r1 != null && r2 != null) {
+        val leftText = "${r1.wins}-${r1.losses}"
+        val rightText = "${r2.wins}-${r2.losses}"
+        val advantage = when {
+            r1.rank != null && r2.rank != null && r1.rank < r2.rank -> -1
+            r1.rank != null && r2.rank != null && r1.rank > r2.rank -> 1
+            else -> 0
+        }
+        FiveColumnRowWithRanks(
+            leftValue = leftText,
+            leftRank = r1.rank, leftRankDisplay = r1.rankDisplay,
+            centerText = "Record",
+            rightValue = rightText,
+            rightRank = r2.rank, rightRankDisplay = r2.rankDisplay,
+            advantage = advantage,
+            useCBBRanks = false,
+            rankColorFn = ::nbaPlayoffRankColor
         )
     }
 
-    val t1Winner = matchup.winner == matchup.team1?.name
-    val t2Winner = matchup.winner == matchup.team2?.name
-
-    return NBABracketGame(
-        team1 = toTeam(matchup.team1, t1Winner),
-        team2 = toTeam(matchup.team2, t2Winner),
-        seriesSummary = matchup.seriesSummary,
-        sourceMatchup = matchup
+    val rows = listOf(
+        "Net Rating" to (t1Trend.netRating to t2Trend.netRating),
+        "Offensive Rating" to (t1Trend.offensiveRating to t2Trend.offensiveRating),
+        "Defensive Rating" to (t1Trend.defensiveRating to t2Trend.defensiveRating),
+        "Points/Game" to (t1Trend.pointsPerGame to t2Trend.pointsPerGame),
+        "Assists/Game" to (t1Trend.assistsPerGame to t2Trend.assistsPerGame),
+        "Turnovers/Game" to (t1Trend.turnoversPerGame to t2Trend.turnoversPerGame),
+        "Turnover Diff" to (t1Trend.turnoverDiff to t2Trend.turnoverDiff)
     )
+    rows.forEach { (label, pair) ->
+        val (s1, s2) = pair
+        if (s1 == null && s2 == null) return@forEach
+        val advantage = when {
+            s1?.rank != null && s2?.rank != null && s1.rank < s2.rank -> -1
+            s1?.rank != null && s2?.rank != null && s1.rank > s2.rank -> 1
+            else -> 0
+        }
+        FiveColumnRowWithRanks(
+            leftValue = s1?.value?.bracketFormatStat(2) ?: "-",
+            leftRank = s1?.rank, leftRankDisplay = s1?.rankDisplay,
+            centerText = label,
+            rightValue = s2?.value?.bracketFormatStat(2) ?: "-",
+            rightRank = s2?.rank, rightRankDisplay = s2?.rankDisplay,
+            advantage = advantage,
+            useCBBRanks = false,
+            rankColorFn = ::nbaPlayoffRankColor
+        )
+    }
+}
+
+@Composable
+private fun NBARegularSeasonHistoryView(history: RegularSeasonHistory) {
+    val teamA = history.teamAAbbrev ?: "A"
+    val teamB = history.teamBAbbrev ?: "B"
+
+    SectionHeader("Regular Season Series")
+    Spacer(modifier = Modifier.height(4.dp))
+
+    val recordAdvantage = when {
+        history.teamAWins > history.teamBWins -> -1
+        history.teamBWins > history.teamAWins -> 1
+        else -> 0
+    }
+    FiveColumnRowWithRanks(
+        leftValue = history.teamAWins.toString(),
+        leftRank = null, leftRankDisplay = null,
+        centerText = "Record",
+        rightValue = history.teamBWins.toString(),
+        rightRank = null, rightRankDisplay = null,
+        advantage = recordAdvantage
+    )
+
+    if (history.games.isEmpty()) return
+
+    Spacer(modifier = Modifier.height(8.dp))
+
+    FiveColumnRowWithRanks(
+        leftValue = teamA,
+        leftRank = null, leftRankDisplay = null,
+        centerText = "",
+        rightValue = teamB,
+        rightRank = null, rightRankDisplay = null,
+        advantage = 0
+    )
+
+    history.games.forEach { game ->
+        val aIsHome = game.homeAbbrev == teamA
+        val aScore = if (aIsHome) game.homeScore else game.awayScore
+        val bScore = if (aIsHome) game.awayScore else game.homeScore
+        val advantage = when (game.winnerAbbrev) {
+            teamA -> -1
+            teamB -> 1
+            else -> 0
+        }
+        val homeLabel = game.homeAbbrev?.let { "@ $it" }.orEmpty()
+        val dateLabel = formatRegularSeasonDate(game.gameDate)
+        val centerText = buildString {
+            if (dateLabel != null) append(dateLabel)
+            if (homeLabel.isNotEmpty()) {
+                if (isNotEmpty()) append("\n")
+                append(homeLabel)
+            }
+        }
+
+        FiveColumnRowWithRanks(
+            leftValue = aScore?.toString() ?: "-",
+            leftRank = null, leftRankDisplay = null,
+            centerText = centerText,
+            rightValue = bScore?.toString() ?: "-",
+            rightRank = null, rightRankDisplay = null,
+            advantage = advantage
+        )
+    }
+}
+
+private fun formatRegularSeasonDate(date: String?): String? {
+    if (date.isNullOrBlank()) return null
+    return try {
+        val parts = date.take(10).split("-")
+        if (parts.size != 3) return null
+        val month = parts[1].toInt()
+        val day = parts[2].toInt()
+        val monthName = listOf(
+            "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+            "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+        )[month - 1]
+        "$monthName $day"
+    } catch (_: Exception) {
+        null
+    }
+}
+
+private fun nbaPlayoffRankColor(rank: Int?): Color {
+    if (rank == null || rank <= 0) return Color.Transparent
+    return when {
+        rank <= 5 -> {
+            // Green gradient: bright green (#00962A) → darker green (#507D32)
+            val ratio = (rank - 1) / 4f
+            Color(
+                red = (0 + ratio * 80).toInt(),
+                green = (150 - ratio * 25).toInt(),
+                blue = (42 - ratio * 32).toInt()
+            )
+        }
+        rank <= 15 -> {
+            // Orange gradient: bright orange (#FFA000) → dark orange (#C86400)
+            val ratio = (rank - 6) / 9f
+            Color(
+                red = (255 - ratio * 55).toInt(),
+                green = (160 - ratio * 60).toInt(),
+                blue = 0
+            )
+        }
+        else -> {
+            // Red gradient: red (#C83232) → dark red (#8B0000)
+            val ratio = ((rank - 16).coerceAtMost(14)) / 14f
+            Color(
+                red = (200 - ratio * 61).toInt(),
+                green = (50 - ratio * 50).toInt(),
+                blue = 0
+            )
+        }
+    }
 }
 
 private fun parseNBAHexColor(hexColor: String): Color? {
@@ -503,11 +435,24 @@ private fun NBAPlayoffMatchupBottomSheet(data: NBAMatchupSheetData, onDismiss: (
     val hasTbdTeam = t1 == null || t2 == null ||
         t1.name.equals("TBD", ignoreCase = true) || t2.name.equals("TBD", ignoreCase = true)
 
+    // 0 = Comparisons, 1 = Series, 2 = Charts
+    var topNavSelection by remember { mutableIntStateOf(0) }
+
+    // Share capture state
+    var captureRequested by remember { mutableStateOf(false) }
+
+    // Chart share callbacks (set by chart composables)
+    var netRatingShareCallback by remember { mutableStateOf<(() -> Unit)?>(null) }
+    var offDefRatingShareCallback by remember { mutableStateOf<(() -> Unit)?>(null) }
+    val graphicsLayer = rememberGraphicsLayer()
+    val imageExporter = remember { getImageExporter() }
+
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
         containerColor = MaterialTheme.colorScheme.surface
     ) {
+        Box(modifier = Modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier.fillMaxWidth()
                 .padding(start = 16.dp, end = 16.dp, bottom = 16.dp)
@@ -518,88 +463,33 @@ private fun NBAPlayoffMatchupBottomSheet(data: NBAMatchupSheetData, onDismiss: (
                 Column(
                     modifier = Modifier.fillMaxSize()
                         .verticalScroll(rememberScrollState())
-                        .padding(top = 36.dp)
+                        .padding(top = 36.dp, bottom = 96.dp)
                 ) {
-                    // Record section (reused from NCAA bracket)
+                    // Record row: team1 record (left) | series status (center) | team2 record (right)
                     if (t1 != null || t2 != null) {
-                        BracketRecordSection(team1 = t1, team2 = t2)
+                        PlayoffMatchupRecordRow(
+                            team1 = t1,
+                            team2 = t2,
+                            seriesStatus = playoffSeriesStatus(matchup, t1, t2),
+                            seriesStatusColor = data.conferenceColor
+                        )
                     }
-
-                    Spacer(modifier = Modifier.height(8.dp))
 
                     // Round and conference info
                     Row(
-                        modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp),
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
                         horizontalArrangement = Arrangement.Center,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Box(modifier = Modifier.size(8.dp)
                             .background(data.conferenceColor, RoundedCornerShape(4.dp)))
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = "${data.roundName} • ${data.conferenceName}",
+                        Text("${data.roundName} • ${data.conferenceName}",
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
 
-                    // Series summary
-                    matchup.seriesSummary?.let {
-                        Text(it, style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp),
-                            textAlign = TextAlign.Center)
-                    }
-
-                    // Game scores row
-                    if (matchup.games.isNotEmpty()) {
-                        NBAGameScoresRow(matchup.games)
-                        Spacer(modifier = Modifier.height(8.dp))
-                    }
-
-                    // Stat comparisons - same pattern as NCAA bracket
-                    if (comparisons != null && !hasTbdTeam) {
-                        Spacer(modifier = Modifier.height(4.dp))
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth()
-                                .horizontalScroll(rememberScrollState()),
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            TeamStatsNavBadge(
-                                text = "Team",
-                                isSelected = viewSelection == 0,
-                                onClick = { viewSelection = 0 }
-                            )
-                            TeamStatsNavBadge(
-                                text = "$t1Abbrev Off vs $t2Abbrev Def",
-                                isSelected = viewSelection == 1,
-                                onClick = { viewSelection = 1 }
-                            )
-                            TeamStatsNavBadge(
-                                text = "$t2Abbrev Off vs $t1Abbrev Def",
-                                isSelected = viewSelection == 2,
-                                onClick = { viewSelection = 2 }
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.height(8.dp))
-
-                        when (viewSelection) {
-                            0 -> BracketTeamStatsView(comparisons)
-                            1 -> BracketOffenseVsDefenseView(
-                                comparisons = comparisons.homeOffVsAwayDef,
-                                offTeam = t1Name,
-                                defTeam = t2Name
-                            )
-                            2 -> BracketOffenseVsDefenseView(
-                                comparisons = comparisons.awayOffVsHomeDef,
-                                offTeam = t2Name,
-                                defTeam = t1Name
-                            )
-                        }
-                    } else if (hasTbdTeam) {
+                    if (hasTbdTeam) {
                         Spacer(modifier = Modifier.height(16.dp))
                         TbdMatchupRow()
                         Row(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
@@ -614,16 +504,101 @@ private fun NBAPlayoffMatchupBottomSheet(data: NBAMatchupSheetData, onDismiss: (
                             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                             modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
                     } else {
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Row(modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            TeamStatsNavBadge(text = "Team", isSelected = true, onClick = {})
+                        // Top-level nav: Comparisons | Series | Charts
+                        Row(
+                            modifier = Modifier.fillMaxWidth()
+                                .horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            TeamStatsNavBadge("Comparisons", topNavSelection == 0) { topNavSelection = 0 }
+                            TeamStatsNavBadge("Series", topNavSelection == 1) { topNavSelection = 1 }
+                            TeamStatsNavBadge("Charts", topNavSelection == 2) { topNavSelection = 2 }
                         }
+
                         Spacer(modifier = Modifier.height(8.dp))
-                        Text("Detailed comparison stats will be available when game data is loaded",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                            modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
+
+                        when (topNavSelection) {
+                            0 -> {
+                                // Comparisons sub-nav
+                                if (comparisons != null) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth()
+                                            .horizontalScroll(rememberScrollState()),
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        TeamStatsNavBadge("Team", viewSelection == 0) { viewSelection = 0 }
+                                        TeamStatsNavBadge("$t1Abbrev Off vs $t2Abbrev Def", viewSelection == 1) { viewSelection = 1 }
+                                        TeamStatsNavBadge("$t2Abbrev Off vs $t1Abbrev Def", viewSelection == 2) { viewSelection = 2 }
+                                    }
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    when (viewSelection) {
+                                        0 -> {
+                                            BracketTeamStatsView(comparisons, rankColorFn = ::nbaPlayoffRankColor)
+                                            val t1Trend = parseMonthTrend(t1?.teamStats)
+                                            val t2Trend = parseMonthTrend(t2?.teamStats)
+                                            if (t1Trend != null && t2Trend != null) {
+                                                Spacer(modifier = Modifier.height(12.dp))
+                                                NBAMonthTrendView(t1Abbrev, t2Abbrev, t1Trend, t2Trend)
+                                            }
+                                        }
+                                        1 -> BracketOffenseVsDefenseView(comparisons.homeOffVsAwayDef, t1Name, t2Name, ::nbaPlayoffRankColor)
+                                        2 -> BracketOffenseVsDefenseView(comparisons.awayOffVsHomeDef, t2Name, t1Name, ::nbaPlayoffRankColor)
+                                    }
+                                } else {
+                                    Text("Comparison stats not available",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                                        modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
+                                }
+
+                                matchup.regularSeasonHistory?.let { history ->
+                                    Spacer(modifier = Modifier.height(16.dp))
+                                    NBARegularSeasonHistoryView(history)
+                                }
+                            }
+                            1 -> {
+                                // Series Results view
+                                NBASeriesResultsView(
+                                    games = matchup.games,
+                                    t1Abbrev = t1Abbrev,
+                                    t2Abbrev = t2Abbrev
+                                )
+                            }
+                            2 -> {
+                                // Charts view
+                                val viz = data.visualization
+                                val t1Stats = t1?.teamStats
+                                val t2Stats = t2?.teamStats
+                                if (t1Stats != null && t2Stats != null) {
+                                    CumulativeNetRatingChart(
+                                        awayTeam = t1Abbrev,
+                                        homeTeam = t2Abbrev,
+                                        awayStats = t1Stats,
+                                        homeStats = t2Stats,
+                                        tenthNetRatingByWeek = viz?.tenthNetRatingByWeek,
+                                        leagueCumNetRatingStats = viz?.leagueCumNetRatingStats,
+                                        onShareClick = { callback -> netRatingShareCallback = callback }
+                                    )
+                                    Spacer(modifier = Modifier.height(16.dp))
+                                    WeeklyEfficiencyScatterPlot(
+                                        awayTeam = t1Abbrev,
+                                        homeTeam = t2Abbrev,
+                                        awayStats = t1Stats,
+                                        homeStats = t2Stats,
+                                        leagueStats = viz?.leagueEfficiencyStats,
+                                        quadrantConfig = viz?.scatterPlotQuadrants,
+                                        onShareClick = { callback -> offDefRatingShareCallback = callback }
+                                    )
+                                } else {
+                                    Text("Chart data not available",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                                        modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
+                                }
+                            }
+                        }
                     }
                 }
 
@@ -637,6 +612,263 @@ private fun NBAPlayoffMatchupBottomSheet(data: NBAMatchupSheetData, onDismiss: (
                 )
             }
         }
+
+        // Share FAB
+        if (!hasTbdTeam) {
+            when (topNavSelection) {
+                2 -> {
+                    // Charts tab: multi-option FAB for chart sharing
+                    val chartOptions = listOfNotNull(
+                        netRatingShareCallback?.let { cb ->
+                            FabOption(
+                                icon = Icons.Filled.TrendingUp,
+                                label = "Cumulative Net Rating",
+                                onClick = { cb() }
+                            )
+                        },
+                        offDefRatingShareCallback?.let { cb ->
+                            FabOption(
+                                icon = Icons.Filled.Star,
+                                label = "Off vs Def Rating",
+                                onClick = { cb() }
+                            )
+                        }
+                    )
+                    if (chartOptions.isNotEmpty()) {
+                        MultiOptionFab(
+                            options = chartOptions,
+                            modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp)
+                        )
+                    }
+                }
+                0 -> {
+                    // Comparisons tab: share matchup worksheet
+                    if (comparisons != null) {
+                        ShareFab(
+                            onClick = { captureRequested = true },
+                            modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp)
+                        )
+                    }
+                }
+                else -> {}
+            }
+        }
+
+        // Off-screen capture content
+        if (captureRequested) {
+            val shareTitle = "$t1Abbrev vs $t2Abbrev - ${data.roundName}"
+
+            LaunchedEffect(Unit) {
+                kotlinx.coroutines.delay(50)
+                try {
+                    val bitmap = graphicsLayer.toImageBitmap()
+                    imageExporter.shareImage(bitmap, shareTitle)
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                } finally {
+                    captureRequested = false
+                }
+            }
+
+            CompositionLocalProvider(LocalDensity provides Density(2f, 1f)) {
+                Box(
+                    modifier = Modifier
+                        .requiredWidth(3400.dp)
+                        .requiredHeight(1400.dp)
+                        .offset { IntOffset(-10000, 0) }
+                        .drawWithContent {
+                            graphicsLayer.record {
+                                this@drawWithContent.drawContent()
+                            }
+                            drawLayer(graphicsLayer)
+                        }
+                ) {
+                    val nextGameDate = matchup.games
+                        .firstOrNull { !it.completed && it.gameDate != null }
+                        ?.gameDate
+                        ?.let { formatBracketGameDate(it) }
+                    val gameInfo = ShareGameInfo(
+                        awayTeam = t1Abbrev,
+                        homeTeam = t2Abbrev,
+                        eventLabel = "${data.roundName} • ${data.conferenceName}",
+                        formattedDate = nextGameDate?.let { "Next: $it" } ?: "",
+                        source = "hoopR / ESPN",
+                        awayRecord = t1?.wins?.let { w -> t1.losses?.let { l -> "$w-$l" } },
+                        homeRecord = t2?.wins?.let { w -> t2.losses?.let { l -> "$w-$l" } },
+                        awaySeed = t1?.seed?.takeIf { it > 0 },
+                        homeSeed = t2?.seed?.takeIf { it > 0 },
+                        seriesStatus = playoffSeriesStatus(matchup, t1, t2)
+                    )
+
+                    val comp = comparisons ?: return@Box
+                    val statBoxes = buildList {
+                        // Box 1: Offensive Stats
+                        add(ShareStatBox(
+                            title = "Offensive Stats",
+                            fiveColStats = comp.sideBySide?.offense?.mapNotNull { (_, stat) ->
+                                val isPct = stat.label.contains("%")
+                                val leftVal = stat.home.value?.let { if (isPct) (it * 100).bracketFormatStat(1) else it.bracketFormatStat(2) } ?: return@mapNotNull null
+                                val rightVal = stat.away.value?.let { if (isPct) (it * 100).bracketFormatStat(1) else it.bracketFormatStat(2) } ?: return@mapNotNull null
+                                val adv = if (stat.home.rank != null && stat.away.rank != null) {
+                                    when { stat.home.rank < stat.away.rank -> -1; stat.home.rank > stat.away.rank -> 1; else -> 0 }
+                                } else 0
+                                ShareFiveColStat(leftVal, stat.home.rank, stat.home.rankDisplay, stat.label, rightVal, stat.away.rank, stat.away.rankDisplay, adv)
+                            }?.take(9) ?: emptyList()
+                        ))
+
+                        // Box 2: Defensive Stats
+                        add(ShareStatBox(
+                            title = "Defensive Stats",
+                            fiveColStats = comp.sideBySide?.defense?.mapNotNull { (_, stat) ->
+                                val isPct = stat.label.contains("%")
+                                val leftVal = stat.home.value?.let { if (isPct) (it * 100).bracketFormatStat(1) else it.bracketFormatStat(2) } ?: return@mapNotNull null
+                                val rightVal = stat.away.value?.let { if (isPct) (it * 100).bracketFormatStat(1) else it.bracketFormatStat(2) } ?: return@mapNotNull null
+                                val adv = if (stat.home.rank != null && stat.away.rank != null) {
+                                    when { stat.home.rank < stat.away.rank -> -1; stat.home.rank > stat.away.rank -> 1; else -> 0 }
+                                } else 0
+                                ShareFiveColStat(leftVal, stat.home.rank, stat.home.rankDisplay, stat.label, rightVal, stat.away.rank, stat.away.rankDisplay, adv)
+                            }?.take(9) ?: emptyList()
+                        ))
+
+                        // Box 3: T1 Off vs T2 Def
+                        add(ShareStatBox(
+                            title = "$t1Abbrev Off vs $t2Abbrev Def",
+                            leftLabel = "$t1Abbrev Off",
+                            middleLabel = "vs",
+                            rightLabel = "$t2Abbrev Def",
+                            fiveColStats = comp.homeOffVsAwayDef.mapNotNull { (_, stat) ->
+                                val isPct = stat.offLabel.contains("%")
+                                val offVal = stat.offense.value?.let { if (isPct) (it * 100).bracketFormatStat(1) else it.bracketFormatStat(2) } ?: return@mapNotNull null
+                                val defVal = stat.defense.value?.let { if (isPct) (it * 100).bracketFormatStat(1) else it.bracketFormatStat(2) } ?: return@mapNotNull null
+                                ShareFiveColStat(offVal, stat.offense.rank, stat.offense.rankDisplay, stat.offLabel, defVal, stat.defense.rank, stat.defense.rankDisplay, stat.advantage ?: 0)
+                            }.take(9)
+                        ))
+
+                        // Box 4: T2 Off vs T1 Def
+                        add(ShareStatBox(
+                            title = "$t2Abbrev Off vs $t1Abbrev Def",
+                            leftLabel = "$t2Abbrev Off",
+                            middleLabel = "vs",
+                            rightLabel = "$t1Abbrev Def",
+                            leftColor = Team2Color,
+                            rightColor = Team1Color,
+                            fiveColStats = comp.awayOffVsHomeDef.mapNotNull { (_, stat) ->
+                                val isPct = stat.offLabel.contains("%")
+                                val offVal = stat.offense.value?.let { if (isPct) (it * 100).bracketFormatStat(1) else it.bracketFormatStat(2) } ?: return@mapNotNull null
+                                val defVal = stat.defense.value?.let { if (isPct) (it * 100).bracketFormatStat(1) else it.bracketFormatStat(2) } ?: return@mapNotNull null
+                                ShareFiveColStat(offVal, stat.offense.rank, stat.offense.rankDisplay, stat.offLabel, defVal, stat.defense.rank, stat.defense.rankDisplay, stat.advantage ?: 0)
+                            }.take(9)
+                        ))
+
+                        // Box 5: 1-month trend
+                        val t1Trend = parseMonthTrend(t1?.teamStats)
+                        val t2Trend = parseMonthTrend(t2?.teamStats)
+                        if (t1Trend != null && t2Trend != null) {
+                            val gp = maxOf(t1Trend.gamesPlayed, t2Trend.gamesPlayed)
+                            val trendRows = buildList<ShareFiveColStat> {
+                                val r1 = t1Trend.record
+                                val r2 = t2Trend.record
+                                if (r1 != null && r2 != null) {
+                                    val adv = if (r1.rank != null && r2.rank != null) {
+                                        when { r1.rank < r2.rank -> -1; r1.rank > r2.rank -> 1; else -> 0 }
+                                    } else 0
+                                    add(ShareFiveColStat(
+                                        "${r1.wins}-${r1.losses}", r1.rank, r1.rankDisplay,
+                                        "Record",
+                                        "${r2.wins}-${r2.losses}", r2.rank, r2.rankDisplay,
+                                        adv
+                                    ))
+                                }
+                                fun stat(label: String, s1: MonthTrendStat?, s2: MonthTrendStat?) {
+                                    if (s1 == null && s2 == null) return
+                                    val adv = if (s1?.rank != null && s2?.rank != null) {
+                                        when { s1.rank < s2.rank -> -1; s1.rank > s2.rank -> 1; else -> 0 }
+                                    } else 0
+                                    add(ShareFiveColStat(
+                                        s1?.value?.bracketFormatStat(2) ?: "-",
+                                        s1?.rank, s1?.rankDisplay,
+                                        label,
+                                        s2?.value?.bracketFormatStat(2) ?: "-",
+                                        s2?.rank, s2?.rankDisplay,
+                                        adv
+                                    ))
+                                }
+                                stat("Net Rating", t1Trend.netRating, t2Trend.netRating)
+                                stat("Off Rating", t1Trend.offensiveRating, t2Trend.offensiveRating)
+                                stat("Def Rating", t1Trend.defensiveRating, t2Trend.defensiveRating)
+                                stat("Points/Game", t1Trend.pointsPerGame, t2Trend.pointsPerGame)
+                                stat("Assists/Game", t1Trend.assistsPerGame, t2Trend.assistsPerGame)
+                                stat("Turnovers/Game", t1Trend.turnoversPerGame, t2Trend.turnoversPerGame)
+                                stat("Turnover Diff", t1Trend.turnoverDiff, t2Trend.turnoverDiff)
+                            }
+                            if (trendRows.isNotEmpty()) {
+                                add(ShareStatBox(
+                                    title = "Last $gp Games",
+                                    fiveColStats = trendRows.take(9)
+                                ))
+                            }
+                        }
+
+                        // Box 6: Regular-season head-to-head
+                        matchup.regularSeasonHistory?.let { history ->
+                            val teamA = history.teamAAbbrev ?: t1Abbrev
+                            val teamB = history.teamBAbbrev ?: t2Abbrev
+                            val historyRows = buildList<ShareFiveColStat> {
+                                val recAdv = when {
+                                    history.teamAWins > history.teamBWins -> -1
+                                    history.teamBWins > history.teamAWins -> 1
+                                    else -> 0
+                                }
+                                add(ShareFiveColStat(
+                                    history.teamAWins.toString(), null, null,
+                                    "Series",
+                                    history.teamBWins.toString(), null, null,
+                                    recAdv
+                                ))
+                                history.games.forEach { g ->
+                                    val aIsHome = g.homeAbbrev == teamA
+                                    val aScore = if (aIsHome) g.homeScore else g.awayScore
+                                    val bScore = if (aIsHome) g.awayScore else g.homeScore
+                                    val adv = when (g.winnerAbbrev) {
+                                        teamA -> -1
+                                        teamB -> 1
+                                        else -> 0
+                                    }
+                                    val homeLabel = g.homeAbbrev?.let { "@$it" }.orEmpty()
+                                    val dateLabel = formatRegularSeasonDate(g.gameDate).orEmpty()
+                                    val center = listOf(dateLabel, homeLabel)
+                                        .filter { it.isNotEmpty() }
+                                        .joinToString(" ")
+                                    add(ShareFiveColStat(
+                                        aScore?.toString() ?: "-", null, null,
+                                        center,
+                                        bScore?.toString() ?: "-", null, null,
+                                        adv
+                                    ))
+                                }
+                            }
+                            if (historyRows.isNotEmpty()) {
+                                add(ShareStatBox(
+                                    title = "Regular Season Series",
+                                    fiveColStats = historyRows.take(9)
+                                ))
+                            }
+                        }
+                    }
+
+                    val finalBoxes = statBoxes + List((6 - statBoxes.size).coerceAtLeast(0)) {
+                        ShareStatBox(title = "", fiveColStats = emptyList())
+                    }
+
+                    GenericMatchupShareImage(
+                        gameInfo = gameInfo,
+                        statBoxes = finalBoxes.take(6),
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
+            }
+        }
+        } // end outer Box
     }
 }
 

@@ -12,6 +12,7 @@ import com.joebad.fastbreak.data.model.MatchupVisualization
 import com.joebad.fastbreak.data.model.MatchupV2Visualization
 import com.joebad.fastbreak.data.model.NBAMatchupVisualization
 import com.joebad.fastbreak.data.model.NBAPlayoffBracketVisualization
+import com.joebad.fastbreak.data.model.NHLPlayoffBracketVisualization
 import com.joebad.fastbreak.data.model.NCAABracketVisualization
 import com.joebad.fastbreak.data.model.NHLMatchupVisualization
 import com.joebad.fastbreak.data.model.RegistryEntry
@@ -318,6 +319,7 @@ class ChartDataSynchronizer(
                 VizType.CBB_MATCHUP -> json.decodeFromString<CBBMatchupVisualization>(rawJson)
                 VizType.NCAA_BRACKET -> json.decodeFromString<NCAABracketVisualization>(rawJson)
                 VizType.NBA_PLAYOFF_BRACKET -> json.decodeFromString<NBAPlayoffBracketVisualization>(rawJson)
+                VizType.NHL_PLAYOFF_BRACKET -> json.decodeFromString<NHLPlayoffBracketVisualization>(rawJson)
                 VizType.HELLO_WORLD -> json.decodeFromString<HelloWorldVisualization>(rawJson)
             }
 
@@ -439,7 +441,7 @@ class ChartDataSynchronizer(
      * Clears all cached chart data.
      * Useful for troubleshooting or when the user wants to reset.
      */
-    fun clearAllCache() {
+    suspend fun clearAllCache() {
         chartDataRepository.clearAllChartData()
     }
 
@@ -470,7 +472,7 @@ class ChartDataSynchronizer(
      * @param chartId The chart ID to mark as viewed
      * @return true if the chart was successfully marked as viewed
      */
-    fun markChartAsViewed(chartId: String): Boolean {
+    suspend fun markChartAsViewed(chartId: String): Boolean {
         return chartDataRepository.markChartAsViewed(chartId)
     }
 
@@ -480,7 +482,7 @@ class ChartDataSynchronizer(
      *
      * @param registryEntries Map of file_key to RegistryEntry from the current registry
      */
-    private fun cleanupOrphanedCharts(registryEntries: Map<String, RegistryEntry>) {
+    private suspend fun cleanupOrphanedCharts(registryEntries: Map<String, RegistryEntry>) {
         println("═══════════════════════════════════════════════════════")
         println("🧹 CLEANUP: Starting orphaned charts cleanup")
         println("═══════════════════════════════════════════════════════")

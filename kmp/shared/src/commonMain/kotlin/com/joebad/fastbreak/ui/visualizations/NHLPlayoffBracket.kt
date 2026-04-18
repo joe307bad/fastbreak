@@ -257,17 +257,24 @@ private fun NHLPlayoffMatchupBottomSheet(
                     catch (e: Exception) { e.printStackTrace() } finally { captureRequested = false }
                 }
                 CompositionLocalProvider(LocalDensity provides Density(2f, 1f)) {
-                    Box(modifier = Modifier.requiredWidth(3400.dp).requiredHeight(1900.dp).offset { IntOffset(-10000, 0) }
+                    Box(modifier = Modifier.requiredWidth(3400.dp).requiredHeight(1400.dp).offset { IntOffset(-10000, 0) }
                         .drawWithContent { graphicsLayer.record { this@drawWithContent.drawContent() }; drawLayer(graphicsLayer) }) {
                         val comp = comparisons
                         val t1Trend = t1?.teamStats?.let { parseNHLMonthTrend(it) }
                         val t2Trend = t2?.teamStats?.let { parseNHLMonthTrend(it) }
                         val history = matchup.regularSeasonHistory
+                        val nextGameDate = matchup.games
+                            .firstOrNull { !it.completed && it.gameDate != null }
+                            ?.gameDate?.let { formatBracketGameDate(it) }
                         val gameInfo = ShareGameInfo(awayTeam = t1Abbrev, homeTeam = t2Abbrev,
                             eventLabel = "${data.roundName} • ${data.conferenceName}",
-                            formattedDate = matchup.seriesSummary ?: "", source = "NHL API / ESPN",
+                            formattedDate = nextGameDate?.let { "Next: $it" } ?: "",
+                            source = "NHL API / ESPN",
                             awayRecord = t1?.wins?.let { w -> t1.losses?.let { l -> "$w-$l" } },
-                            homeRecord = t2?.wins?.let { w -> t2.losses?.let { l -> "$w-$l" } })
+                            homeRecord = t2?.wins?.let { w -> t2.losses?.let { l -> "$w-$l" } },
+                            awaySeed = t1?.seed?.takeIf { it > 0 },
+                            homeSeed = t2?.seed?.takeIf { it > 0 },
+                            seriesStatus = playoffSeriesStatus(matchup, t1, t2))
                         val statBoxes = buildList {
                             add(ShareStatBox(title = "Offensive Stats", fiveColStats = comp.sideBySide?.offense?.mapNotNull { (_, stat) ->
                                 val lv = stat.home.value?.bracketFormatStat(2) ?: return@mapNotNull null

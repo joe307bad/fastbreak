@@ -2216,15 +2216,14 @@ internal fun formatBracketGameDate(gameDate: String): String? {
         val dt = instant.toLocalDateTime(eastern)
         val month = dt.month.name.take(3).lowercase().replaceFirstChar { it.uppercase() }
         val day = dt.dayOfMonth
-        // Midnight in ET typically means the tip-off time isn't published yet,
-        // so show only the date instead of a misleading "12:00 AM".
+        val dow = dt.dayOfWeek.name.take(3).lowercase().replaceFirstChar { it.uppercase() }
         if (dt.hour == 0 && dt.minute == 0) {
-            "$month $day"
+            "$dow, $month $day"
         } else {
             val hour = if (dt.hour % 12 == 0) 12 else dt.hour % 12
             val minute = dt.minute.toString().padStart(2, '0')
             val amPm = if (dt.hour < 12) "AM" else "PM"
-            "$month $day · $hour:$minute $amPm ET"
+            "$dow, $month $day · $hour:$minute $amPm ET"
         }
     } catch (_: Exception) {
         null

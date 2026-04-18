@@ -18,6 +18,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.joebad.fastbreak.data.model.*
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
 import io.github.koalaplot.core.line.LinePlot
 import io.github.koalaplot.core.style.LineStyle
 import io.github.koalaplot.core.util.ExperimentalKoalaPlotApi
@@ -142,6 +144,25 @@ internal fun convertPlayoffMatchupToGame(matchup: PlayoffMatchupInfo?): PlayoffB
         nextGameDate = nextDate,
         sourceMatchup = matchup
     )
+}
+
+// Compact date for matchup nodes: "Sat, Apr 18 · 7:30"
+internal fun formatBracketNodeDate(gameDate: String): String? {
+    return try {
+        val instant = kotlinx.datetime.Instant.parse(gameDate)
+        val eastern = kotlinx.datetime.TimeZone.of("America/New_York")
+        val dt = instant.toLocalDateTime(eastern)
+        val dow = dt.dayOfWeek.name.take(3).lowercase().replaceFirstChar { it.uppercase() }
+        val month = dt.month.name.take(3).lowercase().replaceFirstChar { it.uppercase() }
+        val day = dt.dayOfMonth
+        if (dt.hour == 0 && dt.minute == 0) {
+            "$dow, $month $day"
+        } else {
+            val hour = if (dt.hour % 12 == 0) 12 else dt.hour % 12
+            val minute = dt.minute.toString().padStart(2, '0')
+            "$dow, $month $day · $hour:$minute"
+        }
+    } catch (_: Exception) { null }
 }
 
 internal fun parsePlayoffHexColor(hexColor: String): Color? {
@@ -337,10 +358,10 @@ internal fun PlayoffMatchupBoxSymbol(
     ) {
         Column {
             game.nextGameDate?.let { dateStr ->
-                formatBracketGameDate(dateStr)?.let { formatted ->
-                    Text(formatted, style = MaterialTheme.typography.labelSmall, fontSize = 9.sp,
+                formatBracketNodeDate(dateStr)?.let { formatted ->
+                    Text(formatted, style = MaterialTheme.typography.labelSmall, fontSize = 8.sp,
                         color = MaterialTheme.colorScheme.onBackground, maxLines = 1,
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 1.dp),
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 2.dp, vertical = 1.dp),
                         textAlign = TextAlign.Center)
                 }
             }

@@ -830,20 +830,28 @@ while (current_date <= fetch_end) {
           home_ml <- if (!is.null(o$homeTeamOdds$moneyLine)) safe_num(o$homeTeamOdds$moneyLine) else NA_real_
           away_ml <- if (!is.null(o$awayTeamOdds$moneyLine)) safe_num(o$awayTeamOdds$moneyLine) else NA_real_
           over_under <- if (!is.null(o$overUnder)) safe_num(o$overUnder) else NA_real_
-          details <- if (!is.null(o$details)) as.character(o$details) else NA_character_
           provider <- if (!is.null(o$provider$name)) as.character(o$provider$name) else NA_character_
 
-          has_any <- is_valid_value(home_spread) || is_valid_value(home_ml) ||
-                     is_valid_value(away_ml) || is_valid_value(over_under) ||
-                     is_valid_value(details)
+          # Build details as goal spread (e.g. "CAR -1.5") instead of money line
+          details <- NA_character_
+          if (is_valid_value(home_spread)) {
+            spread_team <- home_abbrev
+            spread_val <- home_spread
+            if (home_spread > 0) {
+              # Away team is favored
+              spread_team <- t2$team$abbreviation
+              spread_val <- -home_spread
+            }
+            details <- sprintf("%s %s", spread_team, ifelse(spread_val >= 0, paste0("+", spread_val), as.character(spread_val)))
+          }
+
+          has_any <- is_valid_value(home_spread) || is_valid_value(over_under) || is_valid_value(details)
           if (has_any) {
             odds_data <- list(
               provider = if (is_valid_value(provider)) provider else NULL,
               details = if (is_valid_value(details)) details else NULL,
               homeSpread = if (is_valid_value(home_spread)) home_spread else NULL,
-              overUnder = if (is_valid_value(over_under)) over_under else NULL,
-              homeMoneyLine = if (is_valid_value(home_ml)) as.integer(home_ml) else NULL,
-              awayMoneyLine = if (is_valid_value(away_ml)) as.integer(away_ml) else NULL
+              overUnder = if (is_valid_value(over_under)) over_under else NULL
             )
           }
         }

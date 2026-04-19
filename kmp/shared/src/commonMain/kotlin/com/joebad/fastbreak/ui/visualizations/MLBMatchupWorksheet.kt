@@ -297,32 +297,9 @@ private fun MLBMatchupContent(matchup: MLBMatchup, modifier: Modifier = Modifier
     val awayTeam = matchup.awayTeam
 
     Column(modifier = modifier.verticalScroll(rememberScrollState()).padding(start = 8.dp, end = 8.dp, top = 36.dp)) {
-        // Record section (matches NHL/NBA pattern)
-        MLBRecordSection(awayTeam = awayTeam, homeTeam = homeTeam)
-
-        // Location + date/time
-        matchup.location?.let { loc ->
-            Text(listOfNotNull(loc.stadium, loc.city).joinToString(", "),
-                style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.fillMaxWidth().padding(bottom = 2.dp), textAlign = TextAlign.Center)
-        }
-        if (!matchup.gameCompleted) {
-            val formatted = try { formatBracketGameDate(matchup.gameDate) } catch (_: Exception) { null }
-            formatted?.let {
-                Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
-            }
-        }
-
-        // Odds
-        matchup.odds?.let { odds ->
-            val parts = listOfNotNull(odds.details, odds.overUnder?.let { "O/U $it" })
-            if (parts.isNotEmpty()) {
-                Text(parts.joinToString("  •  "),
-                    style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.fillMaxWidth().padding(top = 2.dp), textAlign = TextAlign.Center)
-            }
-        }
+        // Record / location / odds — three rows, all using the same
+        // away-left / home-right horizontal alignment as the record row.
+        MLBMatchupMetaRows(matchup = matchup, awayTeam = awayTeam, homeTeam = homeTeam)
 
         Spacer(modifier = Modifier.height(8.dp))
 
@@ -415,35 +392,86 @@ private fun MLBTeamStatsView(comparisons: MatchupComparisons, awayAbbrev: String
     }
 }
 
-// MLB Record Section (matches NHL/NBA record section layout)
+// Three-row meta section laid out as a 3-column grid (away | center | home).
+//   Row 1: stadium/city + date/time (centered, spans all columns)
+//   Row 2: away record | (center) | home record
+//   Row 3: away division | odds | home division
 @Composable
-private fun MLBRecordSection(awayTeam: MLBTeamInfo, homeTeam: MLBTeamInfo) {
-    val textStyle = MaterialTheme.typography.bodySmall.copy(lineHeight = 14.sp)
-    val textColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+private fun MLBMatchupMetaRows(
+    matchup: MLBMatchup,
+    awayTeam: MLBTeamInfo,
+    homeTeam: MLBTeamInfo
+) {
+    val textStyle = MaterialTheme.typography.labelSmall
+    val recordColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+    val metaColor = MaterialTheme.colorScheme.onSurfaceVariant
+    val oddsColor = MaterialTheme.colorScheme.primary
 
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
-        horizontalArrangement = Arrangement.SpaceBetween
+    val formattedDate = if (!matchup.gameCompleted) {
+        try { formatBracketGameDate(matchup.gameDate) } catch (_: Exception) { null }
+    } else null
+    val stadiumLine = matchup.location?.let { loc ->
+        listOfNotNull(loc.stadium, loc.city).joinToString(", ").takeIf { it.isNotBlank() }
+    }
+    val locationLine = listOfNotNull(stadiumLine, formattedDate).joinToString(" • ").takeIf { it.isNotBlank() }
+    val oddsLine = matchup.odds?.let { odds ->
+        listOfNotNull(odds.details?.takeIf { it.isNotBlank() }, odds.overUnder?.let { "O/U $it" })
+            .joinToString(" • ").takeIf { it.isNotBlank() }
+    }
+
+    @Composable
+    fun ThreeColumnRow(
+        left: String?,
+        center: String?,
+        right: String?,
+        leftColor: Color,
+        centerColor: Color,
+        rightColor: Color
     ) {
-        // Away team (left)
-        Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.Start) {
-            awayTeam.record?.let {
-                Text(it, style = textStyle, fontSize = 11.sp, color = textColor)
-            }
-            awayTeam.division?.let {
-                Text(it, style = textStyle, fontSize = 11.sp, color = textColor)
-            }
-        }
-        // Home team (right)
-        Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.End) {
-            homeTeam.record?.let {
-                Text(it, style = textStyle, fontSize = 11.sp, color = textColor, textAlign = TextAlign.End)
-            }
-            homeTeam.division?.let {
-                Text(it, style = textStyle, fontSize = 11.sp, color = textColor, textAlign = TextAlign.End)
-            }
+        if (left == null && center == null && right == null) return
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 2.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                left ?: "",
+                style = textStyle, fontSize = 11.sp, color = leftColor,
+                modifier = Modifier.weight(1f), textAlign = TextAlign.Start
+            )
+            Text(
+                center ?: "",
+                style = textStyle, fontSize = 11.sp, color = centerColor,
+                modifier = Modifier.weight(1f), textAlign = TextAlign.Center
+            )
+            Text(
+                right ?: "",
+                style = textStyle, fontSize = 11.sp, color = rightColor,
+                modifier = Modifier.weight(1f), textAlign = TextAlign.End
+            )
         }
     }
+
+    // Row 1: stadium/city + date/time, centered across the full width
+    locationLine?.let {
+        Text(
+            it,
+            style = textStyle, fontSize = 11.sp, color = metaColor,
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 2.dp),
+            textAlign = TextAlign.Center
+        )
+    }
+
+    // Row 2: records (away left, home right), center reserved for alignment
+    ThreeColumnRow(
+        left = awayTeam.record, center = null, right = homeTeam.record,
+        leftColor = recordColor, centerColor = recordColor, rightColor = recordColor
+    )
+
+    // Row 3: division (away left, home right), odds in the center
+    ThreeColumnRow(
+        left = awayTeam.division, center = oddsLine, right = homeTeam.division,
+        leftColor = recordColor, centerColor = oddsColor, rightColor = recordColor
+    )
 }
 
 // MLB rank colors (30 teams)

@@ -907,17 +907,28 @@ build_series_matchup <- function(team1, team2, conference, round_number, round_n
   series_summary <- NULL
   games_list <- list()
 
+  # Compare a game competitor's abbreviation to a bracket team's abbreviation,
+  # normalizing ESPN's short forms (e.g. "TB" -> "TBL") in both directions so
+  # bracket teams sourced from the seeds CSV still match game records sourced
+  # from ESPN.
+  abbrevs_match <- function(a, b) {
+    if (is.null(a) || is.null(b) || length(a) == 0 || length(b) == 0) return(FALSE)
+    a <- as.character(a); b <- as.character(b)
+    if (is.na(a) || is.na(b)) return(FALSE)
+    a == b || normalize_abbrev(a) == normalize_abbrev(b)
+  }
+
   if (!is.null(series_entry)) {
     t1_wins <- sum(vapply(series_entry$games, function(g) {
       if (!isTRUE(g$completed)) return(0L)
-      if (g$team1_abbrev == team1$abbreviation && isTRUE(g$team1_winner)) return(1L)
-      if (g$team2_abbrev == team1$abbreviation && isTRUE(g$team2_winner)) return(1L)
+      if (abbrevs_match(g$team1_abbrev, team1$abbreviation) && isTRUE(g$team1_winner)) return(1L)
+      if (abbrevs_match(g$team2_abbrev, team1$abbreviation) && isTRUE(g$team2_winner)) return(1L)
       0L
     }, integer(1)))
     t2_wins <- sum(vapply(series_entry$games, function(g) {
       if (!isTRUE(g$completed)) return(0L)
-      if (g$team1_abbrev == team2$abbreviation && isTRUE(g$team1_winner)) return(1L)
-      if (g$team2_abbrev == team2$abbreviation && isTRUE(g$team2_winner)) return(1L)
+      if (abbrevs_match(g$team1_abbrev, team2$abbreviation) && isTRUE(g$team1_winner)) return(1L)
+      if (abbrevs_match(g$team2_abbrev, team2$abbreviation) && isTRUE(g$team2_winner)) return(1L)
       0L
     }, integer(1)))
 
@@ -938,8 +949,8 @@ build_series_matchup <- function(team1, team2, conference, round_number, round_n
     # order across games in the same series, so without this the per-game
     # winner indicator can end up on the wrong side.
     games_list <- lapply(series_entry$games, function(g) {
-      swap <- !is.null(team1$abbreviation) && !is.null(g$team2_abbrev) &&
-              g$team2_abbrev == team1$abbreviation
+      swap <- abbrevs_match(g$team2_abbrev, team1$abbreviation) ||
+              abbrevs_match(g$team1_abbrev, team2$abbreviation)
       if (swap) {
         list(gameId = g$game_id, gameDate = g$game_date, status = g$status, completed = g$completed,
              homeTeamAbbrev = g$home_abbrev,

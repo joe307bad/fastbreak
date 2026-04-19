@@ -130,7 +130,7 @@ internal fun convertPlayoffMatchupToGame(matchup: PlayoffMatchupInfo?): PlayoffB
         return PlayoffBracketTeam(
             seed = info.seed, name = info.name,
             abbreviation = info.abbreviation ?: info.name.take(3).uppercase(),
-            seriesWins = info.score,
+            seriesWins = info.seriesWins,
             isWinner = isDecided && (isWinnerByName || info.isWinner)
         )
     }

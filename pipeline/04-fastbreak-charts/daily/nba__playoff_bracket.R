@@ -946,21 +946,40 @@ cat("Bracket status:", bracket_status, "\n")
 # Build a matchup (series wrapper) game object
 build_series_matchup <- function(team1, team2, conference, round_number, round_name,
                                  game_id, series_entry = NULL) {
+  # Reset state in case teams were carried over from an earlier round as winners.
+  team1$isWinner <- FALSE
+  team2$isWinner <- FALSE
+  team1$seriesWins <- NULL
+  team2$seriesWins <- NULL
+
   game_status <- "PROJECTED"
   series_summary <- NULL
   games_list <- list()
 
+  # Match a game competitor against a bracket team by ESPN numeric id first,
+  # falling back to abbreviation so we still count wins when abbreviation_id is
+  # missing (e.g. teams rehydrated from a minimal fallback record).
+  competitor_matches_team <- function(comp_id, comp_abbrev, team) {
+    if (!is.null(team$abbreviation_id) && length(team$abbreviation_id) > 0 &&
+        !is.null(comp_id) && length(comp_id) > 0 &&
+        as.character(comp_id) == as.character(team$abbreviation_id)) return(TRUE)
+    if (!is.null(team$abbreviation) && length(team$abbreviation) > 0 &&
+        !is.null(comp_abbrev) && length(comp_abbrev) > 0 &&
+        as.character(comp_abbrev) == as.character(team$abbreviation)) return(TRUE)
+    FALSE
+  }
+
   if (!is.null(series_entry)) {
     t1_wins <- sum(vapply(series_entry$games, function(g) {
       if (!isTRUE(g$completed)) return(0L)
-      if (as.character(g$team1_id) == as.character(team1$abbreviation_id) && isTRUE(g$team1_winner)) return(1L)
-      if (as.character(g$team2_id) == as.character(team1$abbreviation_id) && isTRUE(g$team2_winner)) return(1L)
+      if (competitor_matches_team(g$team1_id, g$team1_abbrev, team1) && isTRUE(g$team1_winner)) return(1L)
+      if (competitor_matches_team(g$team2_id, g$team2_abbrev, team1) && isTRUE(g$team2_winner)) return(1L)
       0L
     }, integer(1)))
     t2_wins <- sum(vapply(series_entry$games, function(g) {
       if (!isTRUE(g$completed)) return(0L)
-      if (as.character(g$team1_id) == as.character(team2$abbreviation_id) && isTRUE(g$team1_winner)) return(1L)
-      if (as.character(g$team2_id) == as.character(team2$abbreviation_id) && isTRUE(g$team2_winner)) return(1L)
+      if (competitor_matches_team(g$team1_id, g$team1_abbrev, team2) && isTRUE(g$team1_winner)) return(1L)
+      if (competitor_matches_team(g$team2_id, g$team2_abbrev, team2) && isTRUE(g$team2_winner)) return(1L)
       0L
     }, integer(1)))
 
@@ -979,24 +998,50 @@ build_series_matchup <- function(team1, team2, conference, round_number, round_n
       game_status <- "SCHEDULED"
     }
 
+    # Normalize each game so team1 always refers to the matchup's team1 (the
+    # "left" column in the KMP series tab). ESPN can list home/away in either
+    # order across games in the same series, so without this the per-game
+    # winner indicator can end up on the wrong side.
     games_list <- lapply(series_entry$games, function(g) {
-      list(
-        gameId = g$game_id,
-        gameDate = g$game_date,
-        status = g$status,
-        completed = g$completed,
-        headline = g$headline,
-        homeTeamAbbrev = g$homeTeamAbbrev,
-        team1 = list(
-          abbreviation = g$team1_abbrev, score = g$team1_score,
-          winner = g$team1_winner
-        ),
-        team2 = list(
-          abbreviation = g$team2_abbrev, score = g$team2_score,
-          winner = g$team2_winner
-        ),
-        odds = g$odds
-      )
+      swap <- competitor_matches_team(g$team2_id, g$team2_abbrev, team1) ||
+              competitor_matches_team(g$team1_id, g$team1_abbrev, team2)
+      if (swap) {
+        list(
+          gameId = g$game_id,
+          gameDate = g$game_date,
+          status = g$status,
+          completed = g$completed,
+          headline = g$headline,
+          homeTeamAbbrev = g$homeTeamAbbrev,
+          team1 = list(
+            abbreviation = g$team2_abbrev, score = g$team2_score,
+            winner = g$team2_winner
+          ),
+          team2 = list(
+            abbreviation = g$team1_abbrev, score = g$team1_score,
+            winner = g$team1_winner
+          ),
+          odds = g$odds
+        )
+      } else {
+        list(
+          gameId = g$game_id,
+          gameDate = g$game_date,
+          status = g$status,
+          completed = g$completed,
+          headline = g$headline,
+          homeTeamAbbrev = g$homeTeamAbbrev,
+          team1 = list(
+            abbreviation = g$team1_abbrev, score = g$team1_score,
+            winner = g$team1_winner
+          ),
+          team2 = list(
+            abbreviation = g$team2_abbrev, score = g$team2_score,
+            winner = g$team2_winner
+          ),
+          odds = g$odds
+        )
+      }
     })
   }
 

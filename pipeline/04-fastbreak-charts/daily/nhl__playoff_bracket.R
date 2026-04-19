@@ -412,15 +412,20 @@ cat("East seeds:", east_n, " West seeds:", west_n, "\n")
 # ============================================================================
 # STEP 2b: Month trend + head-to-head from ESPN regular season
 # ============================================================================
-cat("\n2b. Fetching recent regular season games for trend + h2h...\n")
+cat("\n2b. Fetching regular season games for trend + h2h...\n")
 
-trend_start <- today - days(28)
+# Fetch the full regular season so head-to-head comparisons reflect the
+# regular-season series rather than the in-progress playoff matchup. ESPN's
+# scoreboard returns postseason games on playoff dates unless seasontype=2
+# is explicitly requested.
+regular_season_start <- as.Date(paste0(NHL_SEASON_START, "-10-01"))
+rs_fetch_end <- min(today, PLAYOFFS_START - 1)
 recent_games <- list()
 
-d <- trend_start
-while (d <= today) {
+d <- regular_season_start
+while (d <= rs_fetch_end) {
   date_str <- format(d, "%Y%m%d")
-  url <- paste0("https://site.api.espn.com/apis/site/v2/sports/hockey/nhl/scoreboard?dates=", date_str)
+  url <- paste0("https://site.api.espn.com/apis/site/v2/sports/hockey/nhl/scoreboard?seasontype=2&dates=", date_str)
   Sys.sleep(0.5)
   resp <- tryCatch(GET(url), error = function(e) NULL)
   if (!is.null(resp) && status_code(resp) == 200) {
@@ -450,12 +455,14 @@ while (d <= today) {
   d <- d + 1
 }
 
-cat("Fetched", length(recent_games), "recent regular season games\n")
+cat("Fetched", length(recent_games), "regular season games\n")
 
-# Compute month trend from recent games
+# Compute month trend from the last 28 days of regular season games.
 month_trend_stats <- NULL
 if (length(recent_games) > 0) {
-  games_df <- bind_rows(recent_games)
+  month_cutoff <- rs_fetch_end - days(27)
+  games_df <- bind_rows(recent_games) %>%
+    filter(as.Date(game_date) >= month_cutoff)
   home_stats <- games_df %>%
     group_by(team_abbreviation = home_abbrev) %>%
     summarise(games = n(), wins = sum(home_winner, na.rm = TRUE),

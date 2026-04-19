@@ -125,14 +125,13 @@ fun MLBMatchupWorksheet(
                     exit = androidx.compose.animation.shrinkVertically()
                 ) {
                     Column {
-                        // First row: Date badges — scroll so selected date is centered
+                        // First row: Date badges — scroll today's date into center on initial load only
                         val dateScrollState = rememberScrollState()
-                        LaunchedEffect(selectedDateIndex) {
-                            // Each badge is roughly 60dp wide + 6dp spacing
+                        LaunchedEffect(Unit) {
                             val badgeWidth = 66
                             val screenCenter = (screenWidth.value / 2).toInt()
                             val targetScroll = (selectedDateIndex * badgeWidth - screenCenter + badgeWidth / 2).coerceAtLeast(0)
-                            dateScrollState.animateScrollTo(targetScroll)
+                            dateScrollState.scrollTo(targetScroll)
                         }
 
                         Row(

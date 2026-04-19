@@ -16,6 +16,7 @@ enum class VizType {
     MATCHUP_V2,
     NBA_MATCHUP,
     NHL_MATCHUP,
+    MLB_MATCHUP,
     CBB_MATCHUP,
     NCAA_BRACKET,
     NBA_PLAYOFF_BRACKET,

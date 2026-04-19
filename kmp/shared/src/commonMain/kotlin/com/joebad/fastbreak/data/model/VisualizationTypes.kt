@@ -986,6 +986,66 @@ data class NHLMatchupVisualization(
     val dataPoints: List<NHLMatchup>
 ) : VisualizationType
 
+// MLB Matchup data structures
+@Serializable
+data class MLBTeamInfo(
+    val id: String,
+    val name: String,
+    val abbreviation: String,
+    val logo: String? = null,
+    val record: String? = null,
+    val division: String? = null,
+    val league: String? = null,
+    val stats: JsonObject? = null
+)
+
+@Serializable
+data class MLBMatchupOdds(
+    val provider: String? = null,
+    val spread: Double? = null,
+    val overUnder: Double? = null,
+    val homeMoneyline: Int? = null,
+    val awayMoneyline: Int? = null,
+    val details: String? = null
+)
+
+@Serializable
+data class MLBGameResults(
+    val homeScore: Int? = null,
+    val awayScore: Int? = null,
+    val winner: String? = null
+)
+
+@Serializable
+data class MLBMatchup(
+    val gameId: String,
+    val gameDate: String,
+    val gameName: String,
+    val gameStatus: String? = null,
+    val gameCompleted: Boolean = false,
+    val homeTeam: MLBTeamInfo,
+    val awayTeam: MLBTeamInfo,
+    val location: MatchupLocation? = null,
+    val odds: MLBMatchupOdds? = null,
+    val comparisons: MatchupComparisons? = null,
+    val results: MLBGameResults? = null
+)
+
+@Serializable
+data class MLBMatchupVisualization(
+    override val sport: String,
+    override val visualizationType: String,
+    override val title: String,
+    override val subtitle: String,
+    override val description: String,
+    override val lastUpdated: Instant,
+    override val source: String? = null,
+    @Serializable(with = TagListSerializer::class)
+    override val tags: List<Tag>? = null,
+    override val sortOrder: Int? = null,
+    val dataPoints: List<MLBMatchup>
+) : VisualizationType
+
 // Hello World visualization (placeholder for future features)
 @Serializable
 data class HelloWorldVisualization(

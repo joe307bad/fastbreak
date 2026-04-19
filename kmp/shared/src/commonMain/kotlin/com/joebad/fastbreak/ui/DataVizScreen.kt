@@ -364,6 +364,7 @@ private fun SuccessContent(
             && visualization !is MatchupV2Visualization
             && visualization !is NBAMatchupVisualization
             && visualization !is NHLMatchupVisualization
+            && visualization !is MLBMatchupVisualization
             && visualization !is CBBMatchupVisualization
             && visualization !is NCAABracketVisualization
             && visualization !is NBAPlayoffBracketVisualization
@@ -524,6 +525,14 @@ private fun RenderVisualization(
             highlightedTeamCodes = highlightedTeamCodes,
             onScheduleToggleHandlerChanged = onScheduleToggleHandlerChanged
         )
+    } else if (visualization is MLBMatchupVisualization) {
+        MLBMatchupWorksheet(
+            visualization = visualization,
+            modifier = Modifier.fillMaxSize(),
+            pinnedTeams = pinnedTeams,
+            highlightedTeamCodes = highlightedTeamCodes,
+            onScheduleToggleHandlerChanged = onScheduleToggleHandlerChanged
+        )
     } else if (visualization is CBBMatchupVisualization) {
         // CBB Matchup has its own dedicated screen with two-row navigation
         CBBMatchupWorksheet(
@@ -646,6 +655,9 @@ private fun RenderVisualization(
                             is NHLMatchupVisualization -> {
                                 // Handled by NHLMatchupWorksheet above
                             }
+                            is MLBMatchupVisualization -> {
+                                // Handled by MLBMatchupWorksheet above
+                            }
                             is CBBMatchupVisualization -> {
                                 // Handled by CBBMatchupWorksheet above
                             }
@@ -764,7 +776,10 @@ private fun extractFiltersAndCalculateHighlights(
             emptyList<FilterOption>() to highlights
         }
         is NHLMatchupVisualization -> {
-            // For NHLMatchup, calculate highlighted teams from the "team" filter
+            val highlights = selectedFilters["team"]?.let { setOf(it.uppercase()) } ?: emptySet()
+            emptyList<FilterOption>() to highlights
+        }
+        is MLBMatchupVisualization -> {
             val highlights = selectedFilters["team"]?.let { setOf(it.uppercase()) } ?: emptySet()
             emptyList<FilterOption>() to highlights
         }

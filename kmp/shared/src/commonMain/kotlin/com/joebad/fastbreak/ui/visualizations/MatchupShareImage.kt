@@ -533,7 +533,10 @@ fun GenericMatchupShareImage(
     gameInfo: ShareGameInfo,
     odds: ShareOdds? = null,
     statBoxes: List<ShareStatBox>,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    rowSpacing: androidx.compose.ui.unit.Dp = 6.dp,
+    firstRowWeight: Float = 1f,
+    secondRowWeight: Float = 1f
 ) {
     val backgroundColor = MaterialTheme.colorScheme.surface
     val textColor = MaterialTheme.colorScheme.onSurface
@@ -930,12 +933,12 @@ fun GenericMatchupShareImage(
         // 2x3 Grid of stat boxes
         Column(
             modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
+            verticalArrangement = Arrangement.spacedBy(rowSpacing)
         ) {
             // Row 1: Boxes 0-2
             Row(
                 modifier = Modifier
-                    .weight(1f)
+                    .weight(firstRowWeight)
                     .fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
@@ -958,7 +961,7 @@ fun GenericMatchupShareImage(
             // Row 2: Boxes 3-5
             Row(
                 modifier = Modifier
-                    .weight(1f)
+                    .weight(secondRowWeight)
                     .fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {

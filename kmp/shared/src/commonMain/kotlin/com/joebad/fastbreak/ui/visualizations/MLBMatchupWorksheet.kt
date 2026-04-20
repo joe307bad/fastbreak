@@ -28,6 +28,9 @@ import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import kotlin.math.round
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.doubleOrNull
 
 private fun Double.formatStat(decimals: Int = 1): String {
     val multiplier = when (decimals) { 0 -> 1.0; 1 -> 10.0; 2 -> 100.0; 3 -> 1000.0; else -> 10.0 }
@@ -273,14 +276,104 @@ fun MLBMatchupWorksheet(
                                 }.take(9))
                         }
 
+                        // Build trend box
+                        val awayTrend = parseMLBMonthTrend(mu.awayTeam.stats)
+                        val homeTrend = parseMLBMonthTrend(mu.homeTeam.stats)
+                        val trendRankAdv = { a: Int?, h: Int? ->
+                            if (a != null && h != null) when {
+                                a < h -> -1; h < a -> 1; else -> 0
+                            } else 0
+                        }
+                        val trendBox = ShareStatBox(
+                            title = "One Month Trend",
+                            fiveColStats = listOfNotNull(
+                                ShareFiveColStat(
+                                    awayTrend?.let { "${it.wins}-${it.losses}" } ?: "-",
+                                    awayTrend?.recordRank, awayTrend?.recordRankDisplay,
+                                    "Record",
+                                    homeTrend?.let { "${it.wins}-${it.losses}" } ?: "-",
+                                    homeTrend?.recordRank, homeTrend?.recordRankDisplay,
+                                    trendRankAdv(awayTrend?.recordRank, homeTrend?.recordRank)
+                                ),
+                                ShareFiveColStat(
+                                    awayTrend?.runDiffPerGame?.let { if (it >= 0) "+${it.formatStat(2)}" else it.formatStat(2) } ?: "-",
+                                    awayTrend?.runDiffPerGameRank, awayTrend?.runDiffPerGameRankDisplay,
+                                    "Run Diff/G",
+                                    homeTrend?.runDiffPerGame?.let { if (it >= 0) "+${it.formatStat(2)}" else it.formatStat(2) } ?: "-",
+                                    homeTrend?.runDiffPerGameRank, homeTrend?.runDiffPerGameRankDisplay,
+                                    trendRankAdv(awayTrend?.runDiffPerGameRank, homeTrend?.runDiffPerGameRank)
+                                ),
+                                ShareFiveColStat(
+                                    awayTrend?.runsPerGame?.formatStat(2) ?: "-",
+                                    awayTrend?.runsPerGameRank, awayTrend?.runsPerGameRankDisplay,
+                                    "Runs/G",
+                                    homeTrend?.runsPerGame?.formatStat(2) ?: "-",
+                                    homeTrend?.runsPerGameRank, homeTrend?.runsPerGameRankDisplay,
+                                    trendRankAdv(awayTrend?.runsPerGameRank, homeTrend?.runsPerGameRank)
+                                ),
+                                ShareFiveColStat(
+                                    awayTrend?.runsAllowedPerGame?.formatStat(2) ?: "-",
+                                    awayTrend?.runsAllowedPerGameRank, awayTrend?.runsAllowedPerGameRankDisplay,
+                                    "RA/G",
+                                    homeTrend?.runsAllowedPerGame?.formatStat(2) ?: "-",
+                                    homeTrend?.runsAllowedPerGameRank, homeTrend?.runsAllowedPerGameRankDisplay,
+                                    trendRankAdv(awayTrend?.runsAllowedPerGameRank, homeTrend?.runsAllowedPerGameRank)
+                                ),
+                                ShareFiveColStat(
+                                    awayTrend?.hitsPerGame?.formatStat(2) ?: "-",
+                                    awayTrend?.hitsPerGameRank, awayTrend?.hitsPerGameRankDisplay,
+                                    "Hits/G",
+                                    homeTrend?.hitsPerGame?.formatStat(2) ?: "-",
+                                    homeTrend?.hitsPerGameRank, homeTrend?.hitsPerGameRankDisplay,
+                                    trendRankAdv(awayTrend?.hitsPerGameRank, homeTrend?.hitsPerGameRank)
+                                ),
+                                ShareFiveColStat(
+                                    awayTrend?.hrsPerGame?.formatStat(2) ?: "-",
+                                    awayTrend?.hrsPerGameRank, awayTrend?.hrsPerGameRankDisplay,
+                                    "HR/G",
+                                    homeTrend?.hrsPerGame?.formatStat(2) ?: "-",
+                                    homeTrend?.hrsPerGameRank, homeTrend?.hrsPerGameRankDisplay,
+                                    trendRankAdv(awayTrend?.hrsPerGameRank, homeTrend?.hrsPerGameRank)
+                                )
+                            )
+                        )
+
+                        // Build H2H box
+                        val h2h = mu.h2h
+                        val h2hBox = if (h2h != null && h2h.totalGames > 0) {
+                            ShareStatBox(
+                                title = "H2H (${h2h.teamAWins}-${h2h.teamBWins})",
+                                threeColStats = h2h.series.map { series ->
+                                    val awayWon = series.teamAWins > series.teamBWins
+                                    val homeWon = series.teamBWins > series.teamAWins
+                                    ShareThreeColStat(
+                                        leftText = "${series.teamAWins}W-${series.teamBWins}L",
+                                        centerText = series.dateRange,
+                                        rightText = "${series.teamBWins}W-${series.teamAWins}L",
+                                        advantage = when {
+                                            awayWon -> -1
+                                            homeWon -> 1
+                                            else -> 0
+                                        }
+                                    )
+                                }
+                            )
+                        } else {
+                            ShareStatBox(title = "H2H", threeColStats = listOf(
+                                ShareThreeColStat("", "No games yet", "", 0)
+                            ))
+                        }
+
                         val statBoxes = listOf(
                             buildStatBox("Batting Stats", comp.sideBySide?.offense),
                             buildStatBox("Pitching Stats", comp.sideBySide?.defense),
+                            trendBox,
                             buildOvdBox("$awayAbbrev Bat vs $homeAbbrev Pitch", "$awayAbbrev Bat", "$homeAbbrev Pitch", comp.awayOffVsHomeDef),
-                            buildOvdBox("$homeAbbrev Bat vs $awayAbbrev Pitch", "$homeAbbrev Bat", "$awayAbbrev Pitch", comp.homeOffVsAwayDef, Team2Color, Team1Color)
+                            buildOvdBox("$homeAbbrev Bat vs $awayAbbrev Pitch", "$homeAbbrev Bat", "$awayAbbrev Pitch", comp.homeOffVsAwayDef, Team2Color, Team1Color),
+                            h2hBox
                         )
                         val finalBoxes = statBoxes + List((6 - statBoxes.size).coerceAtLeast(0)) { ShareStatBox(title = "", fiveColStats = emptyList()) }
-                        GenericMatchupShareImage(gameInfo = gameInfo, statBoxes = finalBoxes.take(6), modifier = Modifier.fillMaxSize())
+                        GenericMatchupShareImage(gameInfo = gameInfo, statBoxes = finalBoxes.take(6), modifier = Modifier.fillMaxSize(), rowSpacing = 48.dp, firstRowWeight = 1.5f, secondRowWeight = 1f)
                     }
                 }
             }
@@ -315,10 +408,16 @@ private fun MLBMatchupContent(matchup: MLBMatchup, modifier: Modifier = Modifier
             Spacer(modifier = Modifier.height(8.dp))
 
             when (viewSelection) {
-                0 -> MLBTeamStatsView(comparisons, awayTeam.abbreviation, homeTeam.abbreviation)
+                0 -> MLBTeamStatsView(comparisons, awayTeam, homeTeam)
                 1 -> BracketOffenseVsDefenseView(comparisons.awayOffVsHomeDef, awayTeam.name, homeTeam.name, ::mlbRankColor)
                 2 -> BracketOffenseVsDefenseView(comparisons.homeOffVsAwayDef, homeTeam.name, awayTeam.name, ::mlbRankColor)
             }
+        }
+
+        // Head-to-Head
+        if (matchup.h2h != null && matchup.h2h.totalGames > 0) {
+            Spacer(modifier = Modifier.height(8.dp))
+            MLBH2HSection(h2h = matchup.h2h)
         }
 
         Spacer(modifier = Modifier.height(80.dp))
@@ -326,8 +425,10 @@ private fun MLBMatchupContent(matchup: MLBMatchup, modifier: Modifier = Modifier
 }
 
 @Composable
-private fun MLBTeamStatsView(comparisons: MatchupComparisons, awayAbbrev: String, homeAbbrev: String) {
+private fun MLBTeamStatsView(comparisons: MatchupComparisons, awayTeam: MLBTeamInfo, homeTeam: MLBTeamInfo) {
     val sideBySide = comparisons.sideBySide ?: return
+    val awayAbbrev = awayTeam.abbreviation
+    val homeAbbrev = homeTeam.abbreviation
 
     // Batting (offense)
     if (sideBySide.offense.isNotEmpty()) {
@@ -349,9 +450,7 @@ private fun MLBTeamStatsView(comparisons: MatchupComparisons, awayAbbrev: String
         Spacer(modifier = Modifier.height(8.dp))
     }
 
-    // Pitching — MLB uses "pitching" key but MatchupComparisons maps it to different field
-    // The R script outputs sideBySide.pitching but KMP's SideBySideComparison has offense/defense/overall
-    // MLB puts pitching stats in "defense" since that's the second sideBySide section
+    // Pitching
     if (sideBySide.defense.isNotEmpty()) {
         SectionHeader("Pitching")
         Spacer(modifier = Modifier.height(4.dp))
@@ -388,7 +487,11 @@ private fun MLBTeamStatsView(comparisons: MatchupComparisons, awayAbbrev: String
                 advantage = advantage, rankColorFn = ::mlbRankColor
             )
         }
+        Spacer(modifier = Modifier.height(8.dp))
     }
+
+    // One Month Trend
+    MLBOneMonthTrendSection(awayTeam = awayTeam, homeTeam = homeTeam)
 }
 
 // Three-row meta section laid out as a 3-column grid (away | center | home).
@@ -480,5 +583,222 @@ private fun mlbRankColor(rank: Int?): Color {
         rank <= 5 -> { val r = (rank - 1) / 4f; Color((0 + r * 80).toInt(), (150 - r * 25).toInt(), (42 - r * 32).toInt()) }
         rank <= 15 -> { val r = (rank - 6) / 9f; Color((255 - r * 55).toInt(), (160 - r * 60).toInt(), 0) }
         else -> { val r = ((rank - 16).coerceAtMost(14)) / 14f; Color((200 - r * 61).toInt(), (50 - r * 50).toInt(), 0) }
+    }
+}
+
+// ============================================================================
+// One Month Trend
+// ============================================================================
+
+private data class MLBMonthTrendData(
+    val wins: Int,
+    val losses: Int,
+    val recordRank: Int?,
+    val recordRankDisplay: String?,
+    val runsPerGame: Double?,
+    val runsPerGameRank: Int?,
+    val runsPerGameRankDisplay: String?,
+    val runsAllowedPerGame: Double?,
+    val runsAllowedPerGameRank: Int?,
+    val runsAllowedPerGameRankDisplay: String?,
+    val runDiffPerGame: Double?,
+    val runDiffPerGameRank: Int?,
+    val runDiffPerGameRankDisplay: String?,
+    val hitsPerGame: Double?,
+    val hitsPerGameRank: Int?,
+    val hitsPerGameRankDisplay: String?,
+    val hrsPerGame: Double?,
+    val hrsPerGameRank: Int?,
+    val hrsPerGameRankDisplay: String?
+)
+
+private fun parseMLBMonthTrend(stats: JsonObject?): MLBMonthTrendData? {
+    if (stats == null) return null
+    val monthTrend = stats["monthTrend"]
+    if (monthTrend !is JsonObject) return null
+
+    val record = monthTrend["record"] as? JsonObject
+    val wins = (record?.get("wins") as? JsonPrimitive)?.content?.toIntOrNull() ?: 0
+    val losses = (record?.get("losses") as? JsonPrimitive)?.content?.toIntOrNull() ?: 0
+    val recordRank = (record?.get("rank") as? JsonPrimitive)?.content?.toIntOrNull()
+    val recordRankDisplay = (record?.get("rankDisplay") as? JsonPrimitive)?.content
+
+    fun parseStat(key: String): Triple<Double?, Int?, String?> {
+        val obj = monthTrend[key] as? JsonObject ?: return Triple(null, null, null)
+        val value = (obj["value"] as? JsonPrimitive)?.doubleOrNull
+        val rank = (obj["rank"] as? JsonPrimitive)?.content?.toIntOrNull()
+        val rankDisplay = (obj["rankDisplay"] as? JsonPrimitive)?.content
+        return Triple(value, rank, rankDisplay)
+    }
+
+    val rpg = parseStat("runsPerGame")
+    val rapg = parseStat("runsAllowedPerGame")
+    val rdpg = parseStat("runDiffPerGame")
+    val hpg = parseStat("hitsPerGame")
+    val hrpg = parseStat("hrsPerGame")
+
+    return MLBMonthTrendData(
+        wins = wins, losses = losses, recordRank = recordRank, recordRankDisplay = recordRankDisplay,
+        runsPerGame = rpg.first, runsPerGameRank = rpg.second, runsPerGameRankDisplay = rpg.third,
+        runsAllowedPerGame = rapg.first, runsAllowedPerGameRank = rapg.second, runsAllowedPerGameRankDisplay = rapg.third,
+        runDiffPerGame = rdpg.first, runDiffPerGameRank = rdpg.second, runDiffPerGameRankDisplay = rdpg.third,
+        hitsPerGame = hpg.first, hitsPerGameRank = hpg.second, hitsPerGameRankDisplay = hpg.third,
+        hrsPerGame = hrpg.first, hrsPerGameRank = hrpg.second, hrsPerGameRankDisplay = hrpg.third
+    )
+}
+
+@Composable
+private fun MLBOneMonthTrendSection(awayTeam: MLBTeamInfo, homeTeam: MLBTeamInfo) {
+    val awayTrend = parseMLBMonthTrend(awayTeam.stats)
+    val homeTrend = parseMLBMonthTrend(homeTeam.stats)
+
+    if (awayTrend == null && homeTrend == null) return
+
+    val rankAdv = { a: Int?, h: Int? ->
+        if (a != null && h != null) when {
+            a < h -> -1; h < a -> 1; else -> 0
+        } else 0
+    }
+
+    SectionHeader("One Month Trend")
+    Spacer(modifier = Modifier.height(4.dp))
+
+    // Record
+    FiveColumnRowWithRanks(
+        leftValue = awayTrend?.let { "${it.wins}-${it.losses}" } ?: "-",
+        leftRank = awayTrend?.recordRank, leftRankDisplay = awayTrend?.recordRankDisplay,
+        centerText = "Record",
+        rightValue = homeTrend?.let { "${it.wins}-${it.losses}" } ?: "-",
+        rightRank = homeTrend?.recordRank, rightRankDisplay = homeTrend?.recordRankDisplay,
+        advantage = rankAdv(awayTrend?.recordRank, homeTrend?.recordRank),
+        rankColorFn = ::mlbRankColor
+    )
+
+    // Run Diff/Game
+    FiveColumnRowWithRanks(
+        leftValue = awayTrend?.runDiffPerGame?.let { if (it >= 0) "+${it.formatStat(2)}" else it.formatStat(2) } ?: "-",
+        leftRank = awayTrend?.runDiffPerGameRank, leftRankDisplay = awayTrend?.runDiffPerGameRankDisplay,
+        centerText = "Run Diff/G",
+        rightValue = homeTrend?.runDiffPerGame?.let { if (it >= 0) "+${it.formatStat(2)}" else it.formatStat(2) } ?: "-",
+        rightRank = homeTrend?.runDiffPerGameRank, rightRankDisplay = homeTrend?.runDiffPerGameRankDisplay,
+        advantage = rankAdv(awayTrend?.runDiffPerGameRank, homeTrend?.runDiffPerGameRank),
+        rankColorFn = ::mlbRankColor
+    )
+
+    // Runs/Game
+    FiveColumnRowWithRanks(
+        leftValue = awayTrend?.runsPerGame?.formatStat(2) ?: "-",
+        leftRank = awayTrend?.runsPerGameRank, leftRankDisplay = awayTrend?.runsPerGameRankDisplay,
+        centerText = "Runs/G",
+        rightValue = homeTrend?.runsPerGame?.formatStat(2) ?: "-",
+        rightRank = homeTrend?.runsPerGameRank, rightRankDisplay = homeTrend?.runsPerGameRankDisplay,
+        advantage = rankAdv(awayTrend?.runsPerGameRank, homeTrend?.runsPerGameRank),
+        rankColorFn = ::mlbRankColor
+    )
+
+    // Runs Allowed/Game
+    FiveColumnRowWithRanks(
+        leftValue = awayTrend?.runsAllowedPerGame?.formatStat(2) ?: "-",
+        leftRank = awayTrend?.runsAllowedPerGameRank, leftRankDisplay = awayTrend?.runsAllowedPerGameRankDisplay,
+        centerText = "RA/G",
+        rightValue = homeTrend?.runsAllowedPerGame?.formatStat(2) ?: "-",
+        rightRank = homeTrend?.runsAllowedPerGameRank, rightRankDisplay = homeTrend?.runsAllowedPerGameRankDisplay,
+        advantage = rankAdv(awayTrend?.runsAllowedPerGameRank, homeTrend?.runsAllowedPerGameRank),
+        rankColorFn = ::mlbRankColor
+    )
+
+    // Hits/Game
+    FiveColumnRowWithRanks(
+        leftValue = awayTrend?.hitsPerGame?.formatStat(2) ?: "-",
+        leftRank = awayTrend?.hitsPerGameRank, leftRankDisplay = awayTrend?.hitsPerGameRankDisplay,
+        centerText = "Hits/G",
+        rightValue = homeTrend?.hitsPerGame?.formatStat(2) ?: "-",
+        rightRank = homeTrend?.hitsPerGameRank, rightRankDisplay = homeTrend?.hitsPerGameRankDisplay,
+        advantage = rankAdv(awayTrend?.hitsPerGameRank, homeTrend?.hitsPerGameRank),
+        rankColorFn = ::mlbRankColor
+    )
+
+    // HR/Game
+    FiveColumnRowWithRanks(
+        leftValue = awayTrend?.hrsPerGame?.formatStat(2) ?: "-",
+        leftRank = awayTrend?.hrsPerGameRank, leftRankDisplay = awayTrend?.hrsPerGameRankDisplay,
+        centerText = "HR/G",
+        rightValue = homeTrend?.hrsPerGame?.formatStat(2) ?: "-",
+        rightRank = homeTrend?.hrsPerGameRank, rightRankDisplay = homeTrend?.hrsPerGameRankDisplay,
+        advantage = rankAdv(awayTrend?.hrsPerGameRank, homeTrend?.hrsPerGameRank),
+        rankColorFn = ::mlbRankColor
+    )
+}
+
+// ============================================================================
+// Head-to-Head Section
+// ============================================================================
+
+@Composable
+private fun MLBH2HSection(h2h: MLBH2H) {
+    val textColor = MaterialTheme.colorScheme.onSurface
+    val mutedColor = MaterialTheme.colorScheme.onSurfaceVariant
+
+    SectionHeader("Head-to-Head (${h2h.teamAWins}-${h2h.teamBWins})")
+    Spacer(modifier = Modifier.height(4.dp))
+
+    h2h.series.forEach { series ->
+        // Series row: away wins | date range | home wins
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp, horizontal = 4.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Away team wins in this series
+            val awayWon = series.teamAWins > series.teamBWins
+            val homeWon = series.teamBWins > series.teamAWins
+            Text(
+                text = "${series.teamAWins}W",
+                fontSize = 13.sp,
+                fontWeight = if (awayWon) FontWeight.Bold else FontWeight.Normal,
+                color = if (awayWon) Color(0xFF4CAF50) else textColor,
+                modifier = Modifier.width(36.dp),
+                textAlign = TextAlign.Start
+            )
+
+            // Date range + game scores
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.weight(1f)
+            ) {
+                Text(
+                    text = series.dateRange,
+                    fontSize = 11.sp,
+                    color = mutedColor
+                )
+                // Individual game scores
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    series.games.forEach { game ->
+                        val isAwayTeamA = game.awayTeam == h2h.teamA
+                        val teamAScore = if (isAwayTeamA) game.awayScore else game.homeScore
+                        val teamBScore = if (isAwayTeamA) game.homeScore else game.awayScore
+                        val winColor = if (game.winner == h2h.teamA) Team1Color else Team2Color
+                        Text(
+                            text = "$teamAScore-$teamBScore",
+                            fontSize = 11.sp,
+                            color = winColor,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                }
+            }
+
+            // Home team wins in this series
+            Text(
+                text = "${series.teamBWins}W",
+                fontSize = 13.sp,
+                fontWeight = if (homeWon) FontWeight.Bold else FontWeight.Normal,
+                color = if (homeWon) Color(0xFF4CAF50) else textColor,
+                modifier = Modifier.width(36.dp),
+                textAlign = TextAlign.End
+            )
+        }
     }
 }

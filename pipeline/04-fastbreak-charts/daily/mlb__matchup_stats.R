@@ -181,6 +181,229 @@ for (stat in c("era", "whip", "runs_allowed_per_game", "bb_per_9",
 cat("Computed ranks for", nrow(team_stats), "teams\n")
 
 # ============================================================================
+# STEP 1b: Fetch season game results (for trends + H2H)
+# ============================================================================
+cat("\n1b. Fetching season game results...\n")
+
+TREND_DAYS <- 30
+SEASON_START <- as.Date(paste0(format(Sys.Date(), "%Y"), "-03-15"))  # approx Opening Day window
+season_fetch_start <- max(SEASON_START, Sys.Date() - days(180))  # cap at 180 days
+season_fetch_end <- Sys.Date() - days(1)  # yesterday
+
+# Fetch completed game scores from ESPN scoreboard
+# season_game_results: one entry per game (not per team) for H2H grouping
+season_game_results <- list()
+# trend_games: one entry per team-game for trend stats
+trend_games <- list()
+fetch_date <- season_fetch_start
+
+extract_team_stats <- function(competitor) {
+  stats <- list()
+  if (!is.null(competitor$statistics)) {
+    for (s in competitor$statistics) {
+      if (!is.null(s$name) && !is.null(s$displayValue)) {
+        stats[[s$name]] <- safe_num(s$displayValue)
+      }
+    }
+  }
+  stats
+}
+
+while (fetch_date <= season_fetch_end) {
+  date_str <- format(fetch_date, "%Y%m%d")
+  url <- paste0("https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/scoreboard?dates=", date_str)
+  add_api_delay()
+
+  resp <- tryCatch(GET(url), error = function(e) NULL)
+  if (!is.null(resp) && status_code(resp) == 200) {
+    data <- content(resp, as = "parsed")
+    if (!is.null(data$events)) {
+      for (ev in data$events) {
+        comp <- ev$competitions[[1]]
+        if (length(comp$competitors) != 2) next
+        if (!isTRUE(comp$status$type$completed)) next
+
+        home <- NULL; away <- NULL
+        for (ct in comp$competitors) {
+          if (ct$homeAway == "home") home <- ct else away <- ct
+        }
+        if (is.null(home) || is.null(away)) next
+
+        home_score <- safe_num(home$score)
+        away_score <- safe_num(away$score)
+        if (is.na(home_score) || is.na(away_score)) next
+
+        home_abbrev <- home$team$abbreviation
+        away_abbrev <- away$team$abbreviation
+        game_date_str <- format(fetch_date, "%Y-%m-%d")
+        winner <- if (home_score > away_score) home_abbrev else away_abbrev
+
+        # Store one entry per game for H2H
+        season_game_results[[length(season_game_results) + 1]] <- list(
+          date = game_date_str,
+          home_team = home_abbrev,
+          away_team = away_abbrev,
+          home_score = home_score,
+          away_score = away_score,
+          winner = winner
+        )
+
+        # Store per-team entries for trend (only last 30 days)
+        if (fetch_date >= (Sys.Date() - days(TREND_DAYS))) {
+          home_box <- extract_team_stats(home)
+          away_box <- extract_team_stats(away)
+
+          trend_games[[length(trend_games) + 1]] <- list(
+            team = home_abbrev, opponent = away_abbrev,
+            runs_scored = home_score, runs_allowed = away_score,
+            won = home_score > away_score,
+            hits = safe_num(home_box[["hits"]]), hrs = safe_num(home_box[["homeRuns"]]),
+            date = game_date_str
+          )
+          trend_games[[length(trend_games) + 1]] <- list(
+            team = away_abbrev, opponent = home_abbrev,
+            runs_scored = away_score, runs_allowed = home_score,
+            won = away_score > home_score,
+            hits = safe_num(away_box[["hits"]]), hrs = safe_num(away_box[["homeRuns"]]),
+            date = game_date_str
+          )
+        }
+      }
+    }
+  }
+  fetch_date <- fetch_date + days(1)
+}
+
+cat("Fetched", length(season_game_results), "season games,", length(trend_games), "trend entries\n")
+
+# Build season games data frame for H2H lookups
+season_games_df <- if (length(season_game_results) > 0) bind_rows(season_game_results) else data.frame()
+
+# Compute 1-month trend stats per team
+month_trend_stats <- NULL
+if (length(trend_games) > 0) {
+  trend_df <- bind_rows(trend_games)
+
+  month_trend_stats <- trend_df %>%
+    group_by(team) %>%
+    summarise(
+      games_played = n(),
+      wins = sum(won, na.rm = TRUE),
+      losses = sum(!won, na.rm = TRUE),
+      runs_per_game = mean(runs_scored, na.rm = TRUE),
+      runs_allowed_per_game = mean(runs_allowed, na.rm = TRUE),
+      run_diff_per_game = mean(runs_scored - runs_allowed, na.rm = TRUE),
+      hits_per_game = mean(hits, na.rm = TRUE),
+      hrs_per_game = mean(hrs, na.rm = TRUE),
+      .groups = "drop"
+    ) %>%
+    mutate(win_pct = wins / (wins + losses))
+
+  for (stat in c("win_pct", "runs_per_game", "run_diff_per_game", "hits_per_game", "hrs_per_game")) {
+    rk <- tied_rank(-month_trend_stats[[stat]])
+    month_trend_stats[[paste0(stat, "_rank")]] <- rk$rank
+    month_trend_stats[[paste0(stat, "_rankDisplay")]] <- rk$rankDisplay
+  }
+  for (stat in c("runs_allowed_per_game")) {
+    rk <- tied_rank(month_trend_stats[[stat]])
+    month_trend_stats[[paste0(stat, "_rank")]] <- rk$rank
+    month_trend_stats[[paste0(stat, "_rankDisplay")]] <- rk$rankDisplay
+  }
+
+  cat("Calculated month trend rankings for", nrow(month_trend_stats), "teams\n")
+}
+
+# ============================================================================
+# H2H builder: find all season games between two teams, group into series
+# ============================================================================
+build_h2h <- function(team_a, team_b) {
+  if (nrow(season_games_df) == 0) return(NULL)
+
+  # Find all games between these two teams (in either home/away direction)
+  h2h_games <- season_games_df %>%
+    filter(
+      (home_team == team_a & away_team == team_b) |
+      (home_team == team_b & away_team == team_a)
+    ) %>%
+    arrange(date)
+
+  if (nrow(h2h_games) == 0) return(NULL)
+
+  # Overall record from team_a's perspective
+  a_wins <- sum(h2h_games$winner == team_a)
+  b_wins <- sum(h2h_games$winner == team_b)
+
+  # Group consecutive games into series
+  # A new series starts when there's a gap of more than 1 day between games
+  h2h_games$date_parsed <- as.Date(h2h_games$date)
+  h2h_games$series_id <- 1
+  if (nrow(h2h_games) > 1) {
+    for (i in 2:nrow(h2h_games)) {
+      gap <- as.integer(h2h_games$date_parsed[i] - h2h_games$date_parsed[i - 1])
+      if (gap > 2) {
+        h2h_games$series_id[i] <- h2h_games$series_id[i - 1] + 1
+      } else {
+        h2h_games$series_id[i] <- h2h_games$series_id[i - 1]
+      }
+    }
+  }
+
+  series_list <- list()
+  for (sid in unique(h2h_games$series_id)) {
+    sg <- h2h_games %>% filter(series_id == sid)
+    start_date <- min(sg$date)
+    end_date <- max(sg$date)
+
+    # Format dates for display
+    start_d <- as.Date(start_date)
+    end_d <- as.Date(end_date)
+    if (start_date == end_date) {
+      date_range <- format(start_d, "%b %d")
+    } else {
+      if (format(start_d, "%b") == format(end_d, "%b")) {
+        date_range <- paste0(format(start_d, "%b %d"), "-", format(end_d, "%d"))
+      } else {
+        date_range <- paste0(format(start_d, "%b %d"), " - ", format(end_d, "%b %d"))
+      }
+    }
+
+    a_series_wins <- sum(sg$winner == team_a)
+    b_series_wins <- sum(sg$winner == team_b)
+
+    games_detail <- list()
+    for (r in 1:nrow(sg)) {
+      row <- sg[r, ]
+      games_detail[[r]] <- list(
+        date = row$date,
+        homeTeam = row$home_team,
+        awayTeam = row$away_team,
+        homeScore = as.integer(row$home_score),
+        awayScore = as.integer(row$away_score),
+        winner = row$winner
+      )
+    }
+
+    series_list[[length(series_list) + 1]] <- list(
+      dateRange = date_range,
+      startDate = start_date,
+      endDate = end_date,
+      teamAWins = as.integer(a_series_wins),
+      teamBWins = as.integer(b_series_wins),
+      games = games_detail
+    )
+  }
+
+  list(
+    teamA = team_a,
+    teamB = team_b,
+    teamAWins = as.integer(a_wins),
+    teamBWins = as.integer(b_wins),
+    totalGames = as.integer(nrow(h2h_games)),
+    series = series_list
+  )
+}
+
+# ============================================================================
 # STEP 2: Fetch games from ESPN scoreboard
 # ============================================================================
 cat("\n2. Fetching games...\n")
@@ -423,7 +646,59 @@ for (game in all_games) {
   home_team_data <- build_team_data("home", home_s)
   away_team_data <- build_team_data("away", away_s)
 
+  # Add 1-month trend to each team's stats
+  build_month_trend <- function(abbrev) {
+    if (is.null(month_trend_stats)) return(setNames(list(), character(0)))
+    row <- month_trend_stats %>% filter(team == abbrev)
+    if (nrow(row) == 0) return(setNames(list(), character(0)))
+    row <- row[1, ]
+    list(
+      gamesPlayed = as.integer(row$games_played),
+      record = list(
+        wins = as.integer(row$wins),
+        losses = as.integer(row$losses),
+        rank = as.integer(row$win_pct_rank),
+        rankDisplay = row$win_pct_rankDisplay
+      ),
+      runsPerGame = list(
+        value = round(row$runs_per_game, 2),
+        rank = as.integer(row$runs_per_game_rank),
+        rankDisplay = row$runs_per_game_rankDisplay
+      ),
+      runsAllowedPerGame = list(
+        value = round(row$runs_allowed_per_game, 2),
+        rank = as.integer(row$runs_allowed_per_game_rank),
+        rankDisplay = row$runs_allowed_per_game_rankDisplay
+      ),
+      runDiffPerGame = list(
+        value = round(row$run_diff_per_game, 2),
+        rank = as.integer(row$run_diff_per_game_rank),
+        rankDisplay = row$run_diff_per_game_rankDisplay
+      ),
+      hitsPerGame = list(
+        value = round(row$hits_per_game, 2),
+        rank = as.integer(row$hits_per_game_rank),
+        rankDisplay = row$hits_per_game_rankDisplay
+      ),
+      hrsPerGame = list(
+        value = round(row$hrs_per_game, 2),
+        rank = as.integer(row$hrs_per_game_rank),
+        rankDisplay = row$hrs_per_game_rankDisplay
+      )
+    )
+  }
+
+  if (!is.null(home_team_data$stats)) {
+    home_team_data$stats$monthTrend <- build_month_trend(game$home_team_abbrev)
+  }
+  if (!is.null(away_team_data$stats)) {
+    away_team_data$stats$monthTrend <- build_month_trend(game$away_team_abbrev)
+  }
+
   comparisons <- build_comparisons(home_s, away_s, game$home_team_abbrev, game$away_team_abbrev)
+
+  # Build H2H data (away team = teamA, home team = teamB to match matchup layout)
+  h2h_data <- build_h2h(game$away_team_abbrev, game$home_team_abbrev)
 
   matchup <- list(
     gameId = game$game_id,
@@ -435,7 +710,8 @@ for (game in all_games) {
     awayTeam = away_team_data,
     location = game$location,
     odds = game$odds,
-    comparisons = comparisons
+    comparisons = comparisons,
+    h2h = h2h_data
   )
 
   # Add results for completed games

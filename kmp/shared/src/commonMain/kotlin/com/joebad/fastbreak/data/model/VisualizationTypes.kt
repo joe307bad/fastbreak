@@ -1017,6 +1017,36 @@ data class MLBGameResults(
 )
 
 @Serializable
+data class MLBH2HGame(
+    val date: String,
+    val homeTeam: String,
+    val awayTeam: String,
+    val homeScore: Int,
+    val awayScore: Int,
+    val winner: String
+)
+
+@Serializable
+data class MLBH2HSeries(
+    val dateRange: String,
+    val startDate: String,
+    val endDate: String,
+    val teamAWins: Int,
+    val teamBWins: Int,
+    val games: List<MLBH2HGame> = emptyList()
+)
+
+@Serializable
+data class MLBH2H(
+    val teamA: String,
+    val teamB: String,
+    val teamAWins: Int,
+    val teamBWins: Int,
+    val totalGames: Int,
+    val series: List<MLBH2HSeries> = emptyList()
+)
+
+@Serializable
 data class MLBMatchup(
     val gameId: String,
     val gameDate: String,
@@ -1028,7 +1058,8 @@ data class MLBMatchup(
     val location: MatchupLocation? = null,
     val odds: MLBMatchupOdds? = null,
     val comparisons: MatchupComparisons? = null,
-    val results: MLBGameResults? = null
+    val results: MLBGameResults? = null,
+    val h2h: MLBH2H? = null
 )
 
 @Serializable

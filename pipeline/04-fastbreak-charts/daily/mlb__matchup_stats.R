@@ -16,6 +16,7 @@ library(lubridate)
 # ============================================================================
 DAYS_AHEAD <- 7
 DAYS_BEHIND <- 4
+MAX_RESULTS_GAMES <- 40  # Max completed games to fetch box scores for
 
 # ============================================================================
 # Helpers
@@ -600,6 +601,128 @@ build_comparisons <- function(home_stats, away_stats, home_abbrev, away_abbrev) 
   )
 }
 
+# ============================================================================
+# Helper: fetch MLB box score from ESPN summary endpoint
+# ============================================================================
+build_mlb_game_results <- function(game, home_season_stats, away_season_stats) {
+  game_id <- game$game_id
+  cat("  Fetching box score for game", game_id, "...\n")
+
+  home_won <- game$home_score > game$away_score
+  winner <- if (home_won) game$home_team_abbrev else game$away_team_abbrev
+
+  result <- list(
+    homeScore = as.integer(game$home_score),
+    awayScore = as.integer(game$away_score),
+    winner = winner,
+    margin = as.integer(abs(game$home_score - game$away_score)),
+    homeWon = home_won
+  )
+
+  add_api_delay()
+  url <- paste0("https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/summary?event=", game_id)
+  resp <- tryCatch(GET(url), error = function(e) NULL)
+  if (is.null(resp) || status_code(resp) != 200) return(result)
+
+  data <- tryCatch(content(resp, as = "parsed"), error = function(e) NULL)
+  if (is.null(data) || is.null(data$boxscore)) return(result)
+
+  bs <- data$boxscore
+  teams <- bs$teams
+  if (is.null(teams) || length(teams) < 2) return(result)
+
+  # Find home and away team data
+  home_bs <- NULL; away_bs <- NULL
+  for (t in teams) {
+    abbrev <- t$team$abbreviation
+    if (abbrev == game$home_team_abbrev) home_bs <- t
+    else if (abbrev == game$away_team_abbrev) away_bs <- t
+  }
+  if (is.null(home_bs) || is.null(away_bs)) return(result)
+
+  # Extract stats from a team's boxscore
+  extract_box <- function(team_data) {
+    batting <- list(); pitching <- list()
+    for (sg in team_data$statistics) {
+      stats <- list()
+      for (s in sg$stats) stats[[s$name]] <- s$displayValue
+      if (sg$name == "batting") batting <- stats
+      else if (sg$name == "pitching") pitching <- stats
+    }
+    list(
+      # Batting
+      runs = safe_num(batting[["runs"]]),
+      hits = safe_num(batting[["hits"]]),
+      doubles = safe_num(batting[["doubles"]]),
+      triples = safe_num(batting[["triples"]]),
+      homeRuns = safe_num(batting[["homeRuns"]]),
+      rbis = safe_num(batting[["RBIs"]]),
+      walks = safe_num(batting[["walks"]]),
+      strikeouts = safe_num(batting[["strikeouts"]]),
+      stolenBases = safe_num(batting[["stolenBases"]]),
+      atBats = safe_num(batting[["atBats"]]),
+      avg = batting[["avg"]],
+      obp = batting[["onBasePct"]],
+      slg = batting[["slugAvg"]],
+      ops = batting[["OPS"]],
+      runnersLOB = safe_num(batting[["runnersLeftOnBase"]]),
+      # Pitching
+      era = pitching[["ERA"]],
+      pitchingHits = safe_num(pitching[["hits"]]),
+      earnedRuns = safe_num(pitching[["earnedRuns"]]),
+      pitchingWalks = safe_num(pitching[["walks"]]),
+      pitchingStrikeouts = safe_num(pitching[["strikeouts"]]),
+      pitchingHomeRuns = safe_num(pitching[["homeRuns"]]),
+      pitches = safe_num(pitching[["pitches"]]),
+      innings = pitching[["thirdInnings"]]
+    )
+  }
+
+  home_box <- extract_box(home_bs)
+  away_box <- extract_box(away_bs)
+
+  result$teamBoxScore <- list(
+    home = home_box,
+    away = away_box
+  )
+
+  # Compare key stats to season averages
+  compare_stat <- function(game_val, season_val) {
+    if (is.null(game_val) || is.null(season_val) || is.na(game_val) || is.na(season_val)) return(NULL)
+    list(gameValue = round(game_val, 3), seasonAvg = round(season_val, 3), difference = round(game_val - season_val, 3))
+  }
+
+  if (!is.null(home_season_stats) && !is.null(away_season_stats)) {
+    result$vsSeasonAvg <- list(
+      home = list(
+        runs = compare_stat(home_box$runs, home_season_stats$runs_per_game),
+        hits = compare_stat(home_box$hits, home_season_stats$hits_per_game * home_season_stats$games_played / home_season_stats$games_played),
+        homeRuns = compare_stat(home_box$homeRuns, home_season_stats$hr_per_game * home_season_stats$games_played / home_season_stats$games_played),
+        strikeoutsBatting = compare_stat(home_box$strikeouts, home_season_stats$strikeouts_batting / home_season_stats$games_played),
+        walksBatting = compare_stat(home_box$walks, home_season_stats$walks_batting / home_season_stats$games_played)
+      ),
+      away = list(
+        runs = compare_stat(away_box$runs, away_season_stats$runs_per_game),
+        hits = compare_stat(away_box$hits, away_season_stats$hits_per_game * away_season_stats$games_played / away_season_stats$games_played),
+        homeRuns = compare_stat(away_box$homeRuns, away_season_stats$hr_per_game * away_season_stats$games_played / away_season_stats$games_played),
+        strikeoutsBatting = compare_stat(away_box$strikeouts, away_season_stats$strikeouts_batting / away_season_stats$games_played),
+        walksBatting = compare_stat(away_box$walks, away_season_stats$walks_batting / away_season_stats$games_played)
+      )
+    )
+  }
+
+  result
+}
+
+# Sort games: most recent completed first, then future games
+# This ensures box score fetching prioritizes recent games
+all_games <- all_games[order(
+  -sapply(all_games, function(g) if (isTRUE(g$game_completed)) 1 else 0),  # completed first
+  -sapply(all_games, function(g) as.numeric(as.POSIXct(g$game_date, format="%Y-%m-%dT%H:%M", tz="UTC"))),  # most recent first
+  na.last = TRUE
+)]
+
+results_fetched <- 0
 matchups_json <- list()
 
 for (game in all_games) {
@@ -714,15 +837,20 @@ for (game in all_games) {
     h2h = h2h_data
   )
 
-  # Add results for completed games
-  if (isTRUE(game$game_completed)) {
-    matchup$results <- list(
-      homeScore = game$home_score,
-      awayScore = game$away_score,
-      winner = if (!is.null(game$home_score) && !is.null(game$away_score)) {
-        if (game$home_score > game$away_score) game$home_team_abbrev else game$away_team_abbrev
-      } else NULL
-    )
+  # Add results for completed games (with box score for recent games)
+  if (isTRUE(game$game_completed) && !is.null(game$home_score) && !is.null(game$away_score)) {
+    if (results_fetched < MAX_RESULTS_GAMES) {
+      matchup$results <- build_mlb_game_results(game, home_s, away_s)
+      results_fetched <- results_fetched + 1
+    } else {
+      matchup$results <- list(
+        homeScore = as.integer(game$home_score),
+        awayScore = as.integer(game$away_score),
+        winner = if (game$home_score > game$away_score) game$home_team_abbrev else game$away_team_abbrev,
+        margin = as.integer(abs(game$home_score - game$away_score)),
+        homeWon = game$home_score > game$away_score
+      )
+    }
   }
 
   matchups_json[[length(matchups_json) + 1]] <- matchup

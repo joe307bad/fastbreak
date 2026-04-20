@@ -22,7 +22,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.joebad.fastbreak.data.model.*
 import com.joebad.fastbreak.platform.getImageExporter
+import com.joebad.fastbreak.ui.components.FabOption
+import com.joebad.fastbreak.ui.components.MultiOptionFab
 import com.joebad.fastbreak.ui.components.ShareFab
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.PlayArrow
 import kotlinx.datetime.Instant
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
@@ -31,6 +36,8 @@ import kotlin.math.round
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.doubleOrNull
+
+private enum class MlbCaptureTarget { PRE_GAME, POST_GAME }
 
 private fun Double.formatStat(decimals: Int = 1): String {
     val multiplier = when (decimals) { 0 -> 1.0; 1 -> 10.0; 2 -> 100.0; 3 -> 1000.0; else -> 10.0 }
@@ -111,7 +118,7 @@ fun MLBMatchupWorksheet(
     DisposableEffect(Unit) { onDispose { onScheduleToggleHandlerChanged?.invoke(null) } }
 
     // Share state
-    var captureRequested by remember { mutableStateOf(false) }
+    var captureTarget by remember { mutableStateOf<MlbCaptureTarget?>(null) }
     val graphicsLayer = rememberGraphicsLayer()
     val imageExporter = remember { getImageExporter() }
 
@@ -217,34 +224,63 @@ fun MLBMatchupWorksheet(
                 }
             }
 
-            // Share FAB
+            // Share FAB - multi-option if game completed, single if not
             if (selectedMatchup?.comparisons != null) {
-                ShareFab(
-                    onClick = { captureRequested = true },
-                    modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp)
-                )
+                val hasResults = selectedMatchup.gameCompleted && selectedMatchup.results?.teamBoxScore != null
+                if (hasResults) {
+                    val shareTitle = "${selectedMatchup.awayTeam.abbreviation} @ ${selectedMatchup.homeTeam.abbreviation}"
+                    MultiOptionFab(
+                        options = listOf(
+                            FabOption(icon = Icons.Filled.PlayArrow, label = "Pre Game",
+                                onClick = { captureTarget = MlbCaptureTarget.PRE_GAME }),
+                            FabOption(icon = Icons.Filled.Check, label = "Post Game",
+                                onClick = { captureTarget = MlbCaptureTarget.POST_GAME })
+                        ),
+                        modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp)
+                    )
+                } else {
+                    ShareFab(
+                        onClick = { captureTarget = MlbCaptureTarget.PRE_GAME },
+                        modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp)
+                    )
+                }
             }
 
             // Off-screen capture
-            if (captureRequested && selectedMatchup != null) {
-                val mu = selectedMatchup
-                val shareTitle = "${mu.awayTeam.abbreviation} @ ${mu.homeTeam.abbreviation}"
+            captureTarget?.let { target ->
+                val mu = selectedMatchup ?: return@let
+                val shareTitle = "${mu.awayTeam.abbreviation} @ ${mu.homeTeam.abbreviation}" +
+                    if (target == MlbCaptureTarget.POST_GAME) " - Results" else ""
 
-                LaunchedEffect(Unit) {
-                    kotlinx.coroutines.delay(50)
-                    try { val bmp = graphicsLayer.toImageBitmap(); imageExporter.shareImage(bmp, shareTitle) }
-                    catch (e: Exception) { e.printStackTrace() } finally { captureRequested = false }
+                val (captureWidth, captureHeight) = when (target) {
+                    MlbCaptureTarget.PRE_GAME -> 3400.dp to 1400.dp
+                    MlbCaptureTarget.POST_GAME -> 420.dp to 640.dp
                 }
 
+                LaunchedEffect(target) {
+                    kotlinx.coroutines.delay(50)
+                    try { val bmp = graphicsLayer.toImageBitmap(); imageExporter.shareImage(bmp, shareTitle) }
+                    catch (e: Exception) { e.printStackTrace() } finally { captureTarget = null }
+                }
+
+                when (target) {
+                    MlbCaptureTarget.PRE_GAME -> {
                 CompositionLocalProvider(LocalDensity provides Density(2f, 1f)) {
-                    Box(modifier = Modifier.requiredWidth(3400.dp).requiredHeight(1400.dp).offset { IntOffset(-10000, 0) }
+                    Box(modifier = Modifier.requiredWidth(captureWidth).requiredHeight(captureHeight).offset { IntOffset(-10000, 0) }
                         .drawWithContent { graphicsLayer.record { this@drawWithContent.drawContent() }; drawLayer(graphicsLayer) }) {
                         val comp = mu.comparisons ?: return@Box
                         val awayAbbrev = mu.awayTeam.abbreviation
                         val homeAbbrev = mu.homeTeam.abbreviation
+                        val shareDate = try {
+                            formatBracketGameDate(mu.gameDate) ?: mu.gameDate.substringBefore("T")
+                        } catch (_: Exception) { mu.gameDate.substringBefore("T") }
+                        val shareOddsLine = mu.odds?.let { odds ->
+                            listOfNotNull(odds.details?.takeIf { it.isNotBlank() }, odds.overUnder?.let { "O/U ${it.toInt()}" })
+                                .joinToString(" • ")
+                        } ?: ""
                         val gameInfo = ShareGameInfo(
                             awayTeam = awayAbbrev, homeTeam = homeAbbrev,
-                            eventLabel = mu.awayTeam.division ?: "", formattedDate = "",
+                            eventLabel = shareDate, formattedDate = shareOddsLine,
                             source = "ESPN",
                             awayRecord = mu.awayTeam.record, homeRecord = mu.homeTeam.record
                         )
@@ -276,104 +312,29 @@ fun MLBMatchupWorksheet(
                                 }.take(9))
                         }
 
-                        // Build trend box
-                        val awayTrend = parseMLBMonthTrend(mu.awayTeam.stats)
-                        val homeTrend = parseMLBMonthTrend(mu.homeTeam.stats)
-                        val trendRankAdv = { a: Int?, h: Int? ->
-                            if (a != null && h != null) when {
-                                a < h -> -1; h < a -> 1; else -> 0
-                            } else 0
+                        val statBoxes = buildList {
+                            add(buildStatBox("Batting Stats", comp.sideBySide?.offense))
+                            add(buildStatBox("Pitching Stats", comp.sideBySide?.defense))
+                            add(buildMLBTrendShareBox(mu))
+                            add(buildOvdBox("$awayAbbrev Bat vs $homeAbbrev Pitch", "$awayAbbrev Bat", "$homeAbbrev Pitch", comp.awayOffVsHomeDef))
+                            add(buildOvdBox("$homeAbbrev Bat vs $awayAbbrev Pitch", "$homeAbbrev Bat", "$awayAbbrev Pitch", comp.homeOffVsAwayDef, Team2Color, Team1Color))
+                            add(buildMLBH2HShareBox(mu))
                         }
-                        val trendBox = ShareStatBox(
-                            title = "One Month Trend",
-                            fiveColStats = listOfNotNull(
-                                ShareFiveColStat(
-                                    awayTrend?.let { "${it.wins}-${it.losses}" } ?: "-",
-                                    awayTrend?.recordRank, awayTrend?.recordRankDisplay,
-                                    "Record",
-                                    homeTrend?.let { "${it.wins}-${it.losses}" } ?: "-",
-                                    homeTrend?.recordRank, homeTrend?.recordRankDisplay,
-                                    trendRankAdv(awayTrend?.recordRank, homeTrend?.recordRank)
-                                ),
-                                ShareFiveColStat(
-                                    awayTrend?.runDiffPerGame?.let { if (it >= 0) "+${it.formatStat(2)}" else it.formatStat(2) } ?: "-",
-                                    awayTrend?.runDiffPerGameRank, awayTrend?.runDiffPerGameRankDisplay,
-                                    "Run Diff/G",
-                                    homeTrend?.runDiffPerGame?.let { if (it >= 0) "+${it.formatStat(2)}" else it.formatStat(2) } ?: "-",
-                                    homeTrend?.runDiffPerGameRank, homeTrend?.runDiffPerGameRankDisplay,
-                                    trendRankAdv(awayTrend?.runDiffPerGameRank, homeTrend?.runDiffPerGameRank)
-                                ),
-                                ShareFiveColStat(
-                                    awayTrend?.runsPerGame?.formatStat(2) ?: "-",
-                                    awayTrend?.runsPerGameRank, awayTrend?.runsPerGameRankDisplay,
-                                    "Runs/G",
-                                    homeTrend?.runsPerGame?.formatStat(2) ?: "-",
-                                    homeTrend?.runsPerGameRank, homeTrend?.runsPerGameRankDisplay,
-                                    trendRankAdv(awayTrend?.runsPerGameRank, homeTrend?.runsPerGameRank)
-                                ),
-                                ShareFiveColStat(
-                                    awayTrend?.runsAllowedPerGame?.formatStat(2) ?: "-",
-                                    awayTrend?.runsAllowedPerGameRank, awayTrend?.runsAllowedPerGameRankDisplay,
-                                    "RA/G",
-                                    homeTrend?.runsAllowedPerGame?.formatStat(2) ?: "-",
-                                    homeTrend?.runsAllowedPerGameRank, homeTrend?.runsAllowedPerGameRankDisplay,
-                                    trendRankAdv(awayTrend?.runsAllowedPerGameRank, homeTrend?.runsAllowedPerGameRank)
-                                ),
-                                ShareFiveColStat(
-                                    awayTrend?.hitsPerGame?.formatStat(2) ?: "-",
-                                    awayTrend?.hitsPerGameRank, awayTrend?.hitsPerGameRankDisplay,
-                                    "Hits/G",
-                                    homeTrend?.hitsPerGame?.formatStat(2) ?: "-",
-                                    homeTrend?.hitsPerGameRank, homeTrend?.hitsPerGameRankDisplay,
-                                    trendRankAdv(awayTrend?.hitsPerGameRank, homeTrend?.hitsPerGameRank)
-                                ),
-                                ShareFiveColStat(
-                                    awayTrend?.hrsPerGame?.formatStat(2) ?: "-",
-                                    awayTrend?.hrsPerGameRank, awayTrend?.hrsPerGameRankDisplay,
-                                    "HR/G",
-                                    homeTrend?.hrsPerGame?.formatStat(2) ?: "-",
-                                    homeTrend?.hrsPerGameRank, homeTrend?.hrsPerGameRankDisplay,
-                                    trendRankAdv(awayTrend?.hrsPerGameRank, homeTrend?.hrsPerGameRank)
-                                )
-                            )
-                        )
-
-                        // Build H2H box
-                        val h2h = mu.h2h
-                        val h2hBox = if (h2h != null && h2h.totalGames > 0) {
-                            ShareStatBox(
-                                title = "H2H (${h2h.teamAWins}-${h2h.teamBWins})",
-                                threeColStats = h2h.series.map { series ->
-                                    val awayWon = series.teamAWins > series.teamBWins
-                                    val homeWon = series.teamBWins > series.teamAWins
-                                    ShareThreeColStat(
-                                        leftText = "${series.teamAWins}W-${series.teamBWins}L",
-                                        centerText = series.dateRange,
-                                        rightText = "${series.teamBWins}W-${series.teamAWins}L",
-                                        advantage = when {
-                                            awayWon -> -1
-                                            homeWon -> 1
-                                            else -> 0
-                                        }
-                                    )
-                                }
-                            )
-                        } else {
-                            ShareStatBox(title = "H2H", threeColStats = listOf(
-                                ShareThreeColStat("", "No games yet", "", 0)
-                            ))
-                        }
-
-                        val statBoxes = listOf(
-                            buildStatBox("Batting Stats", comp.sideBySide?.offense),
-                            buildStatBox("Pitching Stats", comp.sideBySide?.defense),
-                            trendBox,
-                            buildOvdBox("$awayAbbrev Bat vs $homeAbbrev Pitch", "$awayAbbrev Bat", "$homeAbbrev Pitch", comp.awayOffVsHomeDef),
-                            buildOvdBox("$homeAbbrev Bat vs $awayAbbrev Pitch", "$homeAbbrev Bat", "$awayAbbrev Pitch", comp.homeOffVsAwayDef, Team2Color, Team1Color),
-                            h2hBox
-                        )
                         val finalBoxes = statBoxes + List((6 - statBoxes.size).coerceAtLeast(0)) { ShareStatBox(title = "", fiveColStats = emptyList()) }
                         GenericMatchupShareImage(gameInfo = gameInfo, statBoxes = finalBoxes.take(6), modifier = Modifier.fillMaxSize(), rowSpacing = 48.dp, firstRowWeight = 1.5f, secondRowWeight = 1f)
+                    }
+                }
+                    }
+                    MlbCaptureTarget.POST_GAME -> {
+                        CompositionLocalProvider(LocalDensity provides Density(2f, 1f)) {
+                            Box(modifier = Modifier.requiredWidth(captureWidth).requiredHeight(captureHeight).offset { IntOffset(-10000, 0) }
+                                .drawWithContent { graphicsLayer.record { this@drawWithContent.drawContent() }; drawLayer(graphicsLayer) }
+                                .background(MaterialTheme.colorScheme.background)) {
+                                if (mu.gameCompleted && mu.results != null) {
+                                    MLBPostGameShareContent(matchup = mu)
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -392,6 +353,12 @@ private fun MLBMatchupContent(matchup: MLBMatchup, modifier: Modifier = Modifier
         // Record / location / odds — three rows, all using the same
         // away-left / home-right horizontal alignment as the record row.
         MLBMatchupMetaRows(matchup = matchup, awayTeam = awayTeam, homeTeam = homeTeam)
+
+        // Post-game box score (if available)
+        if (matchup.results?.teamBoxScore != null) {
+            Spacer(modifier = Modifier.height(8.dp))
+            MLBBoxScoreSection(results = matchup.results, awayAbbrev = awayTeam.abbreviation, homeAbbrev = homeTeam.abbreviation)
+        }
 
         Spacer(modifier = Modifier.height(8.dp))
 
@@ -427,8 +394,6 @@ private fun MLBMatchupContent(matchup: MLBMatchup, modifier: Modifier = Modifier
 @Composable
 private fun MLBTeamStatsView(comparisons: MatchupComparisons, awayTeam: MLBTeamInfo, homeTeam: MLBTeamInfo) {
     val sideBySide = comparisons.sideBySide ?: return
-    val awayAbbrev = awayTeam.abbreviation
-    val homeAbbrev = homeTeam.abbreviation
 
     // Batting (offense)
     if (sideBySide.offense.isNotEmpty()) {
@@ -494,10 +459,6 @@ private fun MLBTeamStatsView(comparisons: MatchupComparisons, awayTeam: MLBTeamI
     MLBOneMonthTrendSection(awayTeam = awayTeam, homeTeam = homeTeam)
 }
 
-// Three-row meta section laid out as a 3-column grid (away | center | home).
-//   Row 1: stadium/city + date/time (centered, spans all columns)
-//   Row 2: away record | (center) | home record
-//   Row 3: away division | odds | home division
 @Composable
 private fun MLBMatchupMetaRows(
     matchup: MLBMatchup,
@@ -509,71 +470,50 @@ private fun MLBMatchupMetaRows(
     val metaColor = MaterialTheme.colorScheme.onSurfaceVariant
     val oddsColor = MaterialTheme.colorScheme.primary
 
-    val formattedDate = if (!matchup.gameCompleted) {
-        try { formatBracketGameDate(matchup.gameDate) } catch (_: Exception) { null }
-    } else null
-    val stadiumLine = matchup.location?.let { loc ->
-        listOfNotNull(loc.stadium, loc.city).joinToString(", ").takeIf { it.isNotBlank() }
-    }
-    val locationLine = listOfNotNull(stadiumLine, formattedDate).joinToString(" • ").takeIf { it.isNotBlank() }
     val oddsLine = matchup.odds?.let { odds ->
         listOfNotNull(odds.details?.takeIf { it.isNotBlank() }, odds.overUnder?.let { "O/U $it" })
             .joinToString(" • ").takeIf { it.isNotBlank() }
     }
 
-    @Composable
-    fun ThreeColumnRow(
-        left: String?,
-        center: String?,
-        right: String?,
-        leftColor: Color,
-        centerColor: Color,
-        rightColor: Color
+    // Row 1: record | odds | record
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        if (left == null && center == null && right == null) return
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 2.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                left ?: "",
-                style = textStyle, fontSize = 11.sp, color = leftColor,
-                modifier = Modifier.weight(1f), textAlign = TextAlign.Start
-            )
-            Text(
-                center ?: "",
-                style = textStyle, fontSize = 11.sp, color = centerColor,
-                modifier = Modifier.weight(1f), textAlign = TextAlign.Center
-            )
-            Text(
-                right ?: "",
-                style = textStyle, fontSize = 11.sp, color = rightColor,
-                modifier = Modifier.weight(1f), textAlign = TextAlign.End
-            )
-        }
-    }
-
-    // Row 1: stadium/city + date/time, centered across the full width
-    locationLine?.let {
         Text(
-            it,
-            style = textStyle, fontSize = 11.sp, color = metaColor,
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 2.dp),
+            awayTeam.record ?: "",
+            style = textStyle, fontSize = 11.sp, color = recordColor,
+            modifier = Modifier.weight(1f), textAlign = TextAlign.Start
+        )
+        Text(
+            oddsLine ?: "",
+            style = textStyle, fontSize = 11.sp, color = oddsColor,
+            maxLines = 1, softWrap = false,
             textAlign = TextAlign.Center
+        )
+        Text(
+            homeTeam.record ?: "",
+            style = textStyle, fontSize = 11.sp, color = recordColor,
+            modifier = Modifier.weight(1f), textAlign = TextAlign.End
         )
     }
 
-    // Row 2: records (away left, home right), center reserved for alignment
-    ThreeColumnRow(
-        left = awayTeam.record, center = null, right = homeTeam.record,
-        leftColor = recordColor, centerColor = recordColor, rightColor = recordColor
-    )
-
-    // Row 3: division (away left, home right), odds in the center
-    ThreeColumnRow(
-        left = awayTeam.division, center = oddsLine, right = homeTeam.division,
-        leftColor = recordColor, centerColor = oddsColor, rightColor = recordColor
-    )
+    // Row 2: division | | division
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            awayTeam.division ?: "",
+            style = textStyle, fontSize = 11.sp, color = metaColor,
+            modifier = Modifier.weight(1f), textAlign = TextAlign.Start
+        )
+        Text(
+            homeTeam.division ?: "",
+            style = textStyle, fontSize = 11.sp, color = metaColor,
+            modifier = Modifier.weight(1f), textAlign = TextAlign.End
+        )
+    }
 }
 
 // MLB rank colors (30 teams)
@@ -800,5 +740,261 @@ private fun MLBH2HSection(h2h: MLBH2H) {
                 textAlign = TextAlign.End
             )
         }
+    }
+}
+
+// ============================================================================
+// Post-game box score section
+// ============================================================================
+
+@Composable
+private fun MLBBoxScoreSection(results: MLBGameResults, awayAbbrev: String, homeAbbrev: String) {
+    val awayBox = results.teamBoxScore?.away ?: return
+    val homeBox = results.teamBoxScore?.home ?: return
+    val vsAvg = results.vsSeasonAvg
+
+    fun formatDiff(stat: MLBVsSeasonAvgStat?): String {
+        val diff = stat?.difference ?: return ""
+        val prefix = if (diff >= 0) "+" else ""
+        return " (${prefix}${diff.formatStat(1)})"
+    }
+
+    fun formatDiffPrefix(stat: MLBVsSeasonAvgStat?): String {
+        val diff = stat?.difference ?: return ""
+        val prefix = if (diff >= 0) "+" else ""
+        return "(${prefix}${diff.formatStat(1)}) "
+    }
+
+    fun intAdv(a: Int?, h: Int?, higher: Boolean = true): Int {
+        if (a == null || h == null) return 0
+        return if (higher) { when { a > h -> -1; h > a -> 1; else -> 0 } }
+        else { when { a < h -> -1; h < a -> 1; else -> 0 } }
+    }
+
+    SectionHeader("Box Score (vs Season Avg)")
+    Spacer(modifier = Modifier.height(4.dp))
+
+    // Hits
+    ThreeColumnRow(
+        leftText = "${awayBox.hits ?: "-"}${formatDiff(vsAvg?.away?.hits)}",
+        centerText = "H", rightText = "${formatDiffPrefix(vsAvg?.home?.hits)}${homeBox.hits ?: "-"}",
+        advantage = intAdv(awayBox.hits, homeBox.hits)
+    )
+    // Home Runs
+    ThreeColumnRow(
+        leftText = "${awayBox.homeRuns ?: "-"}${formatDiff(vsAvg?.away?.homeRuns)}",
+        centerText = "HR", rightText = "${formatDiffPrefix(vsAvg?.home?.homeRuns)}${homeBox.homeRuns ?: "-"}",
+        advantage = intAdv(awayBox.homeRuns, homeBox.homeRuns)
+    )
+    // RBI
+    ThreeColumnRow(
+        leftText = "${awayBox.rbis ?: "-"}", centerText = "RBI", rightText = "${homeBox.rbis ?: "-"}",
+        advantage = intAdv(awayBox.rbis, homeBox.rbis)
+    )
+    // Doubles
+    ThreeColumnRow(
+        leftText = "${awayBox.doubles ?: "-"}", centerText = "2B", rightText = "${homeBox.doubles ?: "-"}",
+        advantage = intAdv(awayBox.doubles, homeBox.doubles)
+    )
+    // Walks
+    ThreeColumnRow(
+        leftText = "${awayBox.walks ?: "-"}${formatDiff(vsAvg?.away?.walksBatting)}",
+        centerText = "BB", rightText = "${formatDiffPrefix(vsAvg?.home?.walksBatting)}${homeBox.walks ?: "-"}",
+        advantage = intAdv(awayBox.walks, homeBox.walks)
+    )
+    // Strikeouts (lower is better for batters)
+    ThreeColumnRow(
+        leftText = "${awayBox.strikeouts ?: "-"}${formatDiff(vsAvg?.away?.strikeoutsBatting)}",
+        centerText = "K", rightText = "${formatDiffPrefix(vsAvg?.home?.strikeoutsBatting)}${homeBox.strikeouts ?: "-"}",
+        advantage = intAdv(awayBox.strikeouts, homeBox.strikeouts, higher = false)
+    )
+    // Stolen Bases
+    ThreeColumnRow(
+        leftText = "${awayBox.stolenBases ?: "-"}", centerText = "SB", rightText = "${homeBox.stolenBases ?: "-"}",
+        advantage = intAdv(awayBox.stolenBases, homeBox.stolenBases)
+    )
+    // LOB (lower is better)
+    ThreeColumnRow(
+        leftText = "${awayBox.runnersLOB ?: "-"}", centerText = "LOB", rightText = "${homeBox.runnersLOB ?: "-"}",
+        advantage = intAdv(awayBox.runnersLOB, homeBox.runnersLOB, higher = false)
+    )
+    // Slash line
+    ThreeColumnRow(leftText = awayBox.avg ?: "-", centerText = "AVG", rightText = homeBox.avg ?: "-")
+    ThreeColumnRow(leftText = awayBox.obp ?: "-", centerText = "OBP", rightText = homeBox.obp ?: "-")
+    ThreeColumnRow(leftText = awayBox.slg ?: "-", centerText = "SLG", rightText = homeBox.slg ?: "-")
+    ThreeColumnRow(leftText = awayBox.ops ?: "-", centerText = "OPS", rightText = homeBox.ops ?: "-")
+    // Pitching
+    ThreeColumnRow(
+        leftText = "${awayBox.pitchingStrikeouts ?: "-"}", centerText = "K (P)", rightText = "${homeBox.pitchingStrikeouts ?: "-"}",
+        advantage = intAdv(awayBox.pitchingStrikeouts, homeBox.pitchingStrikeouts)
+    )
+    ThreeColumnRow(
+        leftText = "${awayBox.pitchingWalks ?: "-"}", centerText = "BB (P)", rightText = "${homeBox.pitchingWalks ?: "-"}",
+        advantage = intAdv(awayBox.pitchingWalks, homeBox.pitchingWalks, higher = false)
+    )
+    ThreeColumnRow(leftText = "${awayBox.pitches ?: "-"}", centerText = "Pitches", rightText = "${homeBox.pitches ?: "-"}")
+
+    Spacer(modifier = Modifier.height(6.dp))
+}
+
+// ============================================================================
+// Share image helpers
+// ============================================================================
+
+private fun buildMLBTrendShareBox(mu: MLBMatchup): ShareStatBox {
+    val awayTrend = parseMLBMonthTrend(mu.awayTeam.stats)
+    val homeTrend = parseMLBMonthTrend(mu.homeTeam.stats)
+    val adv = { a: Int?, h: Int? ->
+        if (a != null && h != null) when { a < h -> -1; h < a -> 1; else -> 0 } else 0
+    }
+    return ShareStatBox(title = "One Month Trend", fiveColStats = listOfNotNull(
+        ShareFiveColStat(awayTrend?.let { "${it.wins}-${it.losses}" } ?: "-", awayTrend?.recordRank, awayTrend?.recordRankDisplay, "Record",
+            homeTrend?.let { "${it.wins}-${it.losses}" } ?: "-", homeTrend?.recordRank, homeTrend?.recordRankDisplay, adv(awayTrend?.recordRank, homeTrend?.recordRank)),
+        ShareFiveColStat(awayTrend?.runDiffPerGame?.let { if (it >= 0) "+${it.formatStat(2)}" else it.formatStat(2) } ?: "-", awayTrend?.runDiffPerGameRank, awayTrend?.runDiffPerGameRankDisplay, "Run Diff/G",
+            homeTrend?.runDiffPerGame?.let { if (it >= 0) "+${it.formatStat(2)}" else it.formatStat(2) } ?: "-", homeTrend?.runDiffPerGameRank, homeTrend?.runDiffPerGameRankDisplay, adv(awayTrend?.runDiffPerGameRank, homeTrend?.runDiffPerGameRank)),
+        ShareFiveColStat(awayTrend?.runsPerGame?.formatStat(2) ?: "-", awayTrend?.runsPerGameRank, awayTrend?.runsPerGameRankDisplay, "Runs/G",
+            homeTrend?.runsPerGame?.formatStat(2) ?: "-", homeTrend?.runsPerGameRank, homeTrend?.runsPerGameRankDisplay, adv(awayTrend?.runsPerGameRank, homeTrend?.runsPerGameRank)),
+        ShareFiveColStat(awayTrend?.runsAllowedPerGame?.formatStat(2) ?: "-", awayTrend?.runsAllowedPerGameRank, awayTrend?.runsAllowedPerGameRankDisplay, "RA/G",
+            homeTrend?.runsAllowedPerGame?.formatStat(2) ?: "-", homeTrend?.runsAllowedPerGameRank, homeTrend?.runsAllowedPerGameRankDisplay, adv(awayTrend?.runsAllowedPerGameRank, homeTrend?.runsAllowedPerGameRank)),
+        ShareFiveColStat(awayTrend?.hitsPerGame?.formatStat(2) ?: "-", awayTrend?.hitsPerGameRank, awayTrend?.hitsPerGameRankDisplay, "Hits/G",
+            homeTrend?.hitsPerGame?.formatStat(2) ?: "-", homeTrend?.hitsPerGameRank, homeTrend?.hitsPerGameRankDisplay, adv(awayTrend?.hitsPerGameRank, homeTrend?.hitsPerGameRank)),
+        ShareFiveColStat(awayTrend?.hrsPerGame?.formatStat(2) ?: "-", awayTrend?.hrsPerGameRank, awayTrend?.hrsPerGameRankDisplay, "HR/G",
+            homeTrend?.hrsPerGame?.formatStat(2) ?: "-", homeTrend?.hrsPerGameRank, homeTrend?.hrsPerGameRankDisplay, adv(awayTrend?.hrsPerGameRank, homeTrend?.hrsPerGameRank))
+    ))
+}
+
+private fun buildMLBH2HShareBox(mu: MLBMatchup): ShareStatBox {
+    val h2h = mu.h2h
+    return if (h2h != null && h2h.totalGames > 0) {
+        ShareStatBox(title = "H2H (${h2h.teamAWins}-${h2h.teamBWins})", threeColStats = h2h.series.map { series ->
+            ShareThreeColStat(
+                "${series.teamAWins}W-${series.teamBWins}L", series.dateRange, "${series.teamBWins}W-${series.teamAWins}L",
+                when { series.teamAWins > series.teamBWins -> -1; series.teamBWins > series.teamAWins -> 1; else -> 0 }
+            )
+        })
+    } else {
+        ShareStatBox(title = "H2H", threeColStats = listOf(ShareThreeColStat("", "No games yet", "", 0)))
+    }
+}
+
+// ============================================================================
+// Post-game share content
+// ============================================================================
+
+@Composable
+private fun MLBPostGameShareContent(matchup: MLBMatchup) {
+    val results = matchup.results ?: return
+    val awayBox = results.teamBoxScore?.away
+    val homeBox = results.teamBoxScore?.home
+    val vsAvg = results.vsSeasonAvg
+    val awayWon = results.homeWon == false
+    val homeWon = results.homeWon == true
+
+    val bg = MaterialTheme.colorScheme.background
+    val isDark = (0.299f * bg.red + 0.587f * bg.green + 0.114f * bg.blue) < 0.5f
+    val textColor = if (isDark) Color.White else Color.Black
+    val secondaryTextColor = if (isDark) Color.LightGray else Color.DarkGray
+    val edgeColor = Color(0xFF4CAF50)
+    val diffUp = Color(0xFF4CAF50)
+    val diffDown = Color(0xFFF44336)
+
+    Column(modifier = Modifier.fillMaxSize().padding(12.dp)) {
+        // Score row
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(matchup.awayTeam.abbreviation, style = MaterialTheme.typography.bodyLarge, color = textColor, fontWeight = if (awayWon) FontWeight.Bold else FontWeight.Normal)
+                Spacer(modifier = Modifier.width(6.dp))
+                Text("${results.awayScore}", style = MaterialTheme.typography.bodyLarge, color = textColor, fontWeight = if (awayWon) FontWeight.Bold else FontWeight.Normal)
+            }
+            Text("${results.winner} +${results.margin}", style = MaterialTheme.typography.bodyMedium, color = secondaryTextColor)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("${results.homeScore}", style = MaterialTheme.typography.bodyLarge, color = textColor, fontWeight = if (homeWon) FontWeight.Bold else FontWeight.Normal)
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(matchup.homeTeam.abbreviation, style = MaterialTheme.typography.bodyLarge, color = textColor, fontWeight = if (homeWon) FontWeight.Bold else FontWeight.Normal)
+            }
+        }
+
+        // Date
+        val shareDate = try { formatBracketGameDate(matchup.gameDate) } catch (_: Exception) { null }
+        shareDate?.let {
+            Text(it, style = MaterialTheme.typography.bodyMedium, color = secondaryTextColor, modifier = Modifier.align(Alignment.CenterHorizontally))
+        }
+
+        Spacer(modifier = Modifier.height(6.dp))
+
+        if (awayBox != null && homeBox != null) {
+            // Header
+            Row(modifier = Modifier.fillMaxWidth()) {
+                Spacer(modifier = Modifier.width(16.dp))
+                Text(matchup.awayTeam.abbreviation, style = MaterialTheme.typography.bodyLarge, color = textColor, fontWeight = FontWeight.Bold, modifier = Modifier.weight(0.8f), textAlign = TextAlign.End)
+                Spacer(modifier = Modifier.weight(0.6f))
+                Text("STAT (vs avg)", style = MaterialTheme.typography.bodyMedium, color = textColor, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
+                Spacer(modifier = Modifier.weight(0.6f))
+                Text(matchup.homeTeam.abbreviation, style = MaterialTheme.typography.bodyLarge, color = textColor, fontWeight = FontWeight.Bold, modifier = Modifier.weight(0.8f), textAlign = TextAlign.Start)
+                Spacer(modifier = Modifier.width(16.dp))
+            }
+            Spacer(modifier = Modifier.height(4.dp))
+
+            // Reusable stat row with edge indicators and vs-avg diffs
+            @Composable
+            fun StatRow(away: String, label: String, home: String, awayN: Double? = null, homeN: Double? = null, higher: Boolean = true,
+                        awayDiff: Double? = null, homeDiff: Double? = null) {
+                val aEdge = if (awayN != null && homeN != null) { if (higher) awayN > homeN else awayN < homeN } else false
+                val hEdge = if (awayN != null && homeN != null) { if (higher) homeN > awayN else homeN < awayN } else false
+                Row(modifier = Modifier.fillMaxWidth().padding(vertical = 1.dp), verticalAlignment = Alignment.CenterVertically) {
+                    // Away edge
+                    Box(modifier = Modifier.width(16.dp), contentAlignment = Alignment.Center) {
+                        if (aEdge) Text("◀", style = MaterialTheme.typography.bodyMedium, color = edgeColor, maxLines = 1)
+                    }
+                    // Away value
+                    Text(away, style = MaterialTheme.typography.bodyMedium, color = textColor, fontWeight = if (aEdge) FontWeight.Bold else FontWeight.Normal, maxLines = 1, modifier = Modifier.weight(0.8f), textAlign = TextAlign.End)
+                    Spacer(modifier = Modifier.width(4.dp))
+                    // Away diff
+                    Text(
+                        text = awayDiff?.let { "(${if (it >= 0) "+" else ""}${it.formatStat(1)})" } ?: "",
+                        style = MaterialTheme.typography.labelSmall, color = if ((awayDiff ?: 0.0) >= 0) diffUp else diffDown,
+                        maxLines = 1, modifier = Modifier.weight(0.6f), textAlign = TextAlign.Start
+                    )
+                    // Label
+                    Text(label, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, color = secondaryTextColor, maxLines = 1, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
+                    // Home diff
+                    Text(
+                        text = homeDiff?.let { "(${if (it >= 0) "+" else ""}${it.formatStat(1)})" } ?: "",
+                        style = MaterialTheme.typography.labelSmall, color = if ((homeDiff ?: 0.0) >= 0) diffUp else diffDown,
+                        maxLines = 1, modifier = Modifier.weight(0.6f), textAlign = TextAlign.End
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    // Home value
+                    Text(home, style = MaterialTheme.typography.bodyMedium, color = textColor, fontWeight = if (hEdge) FontWeight.Bold else FontWeight.Normal, maxLines = 1, modifier = Modifier.weight(0.8f), textAlign = TextAlign.Start)
+                    // Home edge
+                    Box(modifier = Modifier.width(16.dp), contentAlignment = Alignment.Center) {
+                        if (hEdge) Text("▶", style = MaterialTheme.typography.bodyMedium, color = edgeColor, maxLines = 1)
+                    }
+                }
+            }
+
+            StatRow("${awayBox.hits ?: "-"}", "H", "${homeBox.hits ?: "-"}", awayBox.hits?.toDouble(), homeBox.hits?.toDouble(), true,
+                vsAvg?.away?.hits?.difference, vsAvg?.home?.hits?.difference)
+            StatRow("${awayBox.homeRuns ?: "-"}", "HR", "${homeBox.homeRuns ?: "-"}", awayBox.homeRuns?.toDouble(), homeBox.homeRuns?.toDouble(), true,
+                vsAvg?.away?.homeRuns?.difference, vsAvg?.home?.homeRuns?.difference)
+            StatRow("${awayBox.rbis ?: "-"}", "RBI", "${homeBox.rbis ?: "-"}", awayBox.rbis?.toDouble(), homeBox.rbis?.toDouble())
+            StatRow("${awayBox.doubles ?: "-"}", "2B", "${homeBox.doubles ?: "-"}", awayBox.doubles?.toDouble(), homeBox.doubles?.toDouble())
+            StatRow("${awayBox.walks ?: "-"}", "BB", "${homeBox.walks ?: "-"}", awayBox.walks?.toDouble(), homeBox.walks?.toDouble(), true,
+                vsAvg?.away?.walksBatting?.difference, vsAvg?.home?.walksBatting?.difference)
+            StatRow("${awayBox.strikeouts ?: "-"}", "K", "${homeBox.strikeouts ?: "-"}", awayBox.strikeouts?.toDouble(), homeBox.strikeouts?.toDouble(), false,
+                vsAvg?.away?.strikeoutsBatting?.difference, vsAvg?.home?.strikeoutsBatting?.difference)
+            StatRow("${awayBox.stolenBases ?: "-"}", "SB", "${homeBox.stolenBases ?: "-"}", awayBox.stolenBases?.toDouble(), homeBox.stolenBases?.toDouble())
+            StatRow("${awayBox.runnersLOB ?: "-"}", "LOB", "${homeBox.runnersLOB ?: "-"}", awayBox.runnersLOB?.toDouble(), homeBox.runnersLOB?.toDouble(), false)
+            StatRow(awayBox.avg ?: "-", "AVG", homeBox.avg ?: "-")
+            StatRow(awayBox.obp ?: "-", "OBP", homeBox.obp ?: "-")
+            StatRow(awayBox.slg ?: "-", "SLG", homeBox.slg ?: "-")
+            StatRow(awayBox.ops ?: "-", "OPS", homeBox.ops ?: "-")
+            StatRow("${awayBox.pitchingStrikeouts ?: "-"}", "K (P)", "${homeBox.pitchingStrikeouts ?: "-"}", awayBox.pitchingStrikeouts?.toDouble(), homeBox.pitchingStrikeouts?.toDouble())
+            StatRow("${awayBox.pitchingWalks ?: "-"}", "BB (P)", "${homeBox.pitchingWalks ?: "-"}", awayBox.pitchingWalks?.toDouble(), homeBox.pitchingWalks?.toDouble(), false)
+            StatRow("${awayBox.pitches ?: "-"}", "Pitches", "${homeBox.pitches ?: "-"}")
+        }
+
+        Spacer(modifier = Modifier.weight(1f))
+        Text("fbrk.app  •  ESPN", style = MaterialTheme.typography.bodyMedium, color = secondaryTextColor, modifier = Modifier.align(Alignment.CenterHorizontally))
     }
 }

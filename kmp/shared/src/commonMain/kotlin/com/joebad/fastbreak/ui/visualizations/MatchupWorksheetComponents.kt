@@ -15,6 +15,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -375,7 +376,9 @@ fun ThreeColumnRow(
     advantage: Int = 0, // -1 for left (away team), 0 for even, 1 for right (home team)
     centerMaxLines: Int = Int.MAX_VALUE,
     centerOverflow: androidx.compose.ui.text.style.TextOverflow = androidx.compose.ui.text.style.TextOverflow.Clip,
-    centerSoftWrap: Boolean = false
+    centerSoftWrap: Boolean = false,
+    leftSeasonHigh: com.joebad.fastbreak.data.model.SeasonHighEntry? = null,
+    rightSeasonHigh: com.joebad.fastbreak.data.model.SeasonHighEntry? = null
 ) {
     Row(
         modifier = modifier
@@ -384,12 +387,27 @@ fun ThreeColumnRow(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
+        val starColor = Color(0xFFE91E63)
+
         Row(
             modifier = Modifier.weight(1f),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.Start
         ) {
-            if (advantage == -1) {
+            if (leftSeasonHigh != null) {
+                Box(
+                    modifier = Modifier.size(6.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Star,
+                        contentDescription = null,
+                        tint = starColor,
+                        modifier = Modifier.requiredSize(10.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.width(4.dp))
+            } else if (advantage == -1) {
                 Box(
                     modifier = Modifier
                         .size(6.dp)
@@ -401,7 +419,7 @@ fun ThreeColumnRow(
                 text = leftText,
                 style = MaterialTheme.typography.bodySmall,
                 fontSize = 10.sp,
-                fontWeight = leftWeight,
+                fontWeight = if (leftSeasonHigh != null) FontWeight.Bold else leftWeight,
                 color = leftColor,
                 maxLines = 1,
                 softWrap = false
@@ -430,12 +448,25 @@ fun ThreeColumnRow(
                 text = rightText,
                 style = MaterialTheme.typography.bodySmall,
                 fontSize = 10.sp,
-                fontWeight = rightWeight,
+                fontWeight = if (rightSeasonHigh != null) FontWeight.Bold else rightWeight,
                 color = rightColor,
                 maxLines = 1,
                 softWrap = false
             )
-            if (advantage == 1) {
+            if (rightSeasonHigh != null) {
+                Spacer(modifier = Modifier.width(4.dp))
+                Box(
+                    modifier = Modifier.size(6.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Star,
+                        contentDescription = null,
+                        tint = starColor,
+                        modifier = Modifier.requiredSize(10.dp)
+                    )
+                }
+            } else if (advantage == 1) {
                 Spacer(modifier = Modifier.width(4.dp))
                 Box(
                     modifier = Modifier

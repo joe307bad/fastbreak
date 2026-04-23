@@ -683,6 +683,107 @@ team_box <- team_box %>%
 
 cat("After filtering All-Star teams:", nrow(team_box), "records\n")
 
+# Compute per-team season highs for box score stats (for season-high indicators)
+season_high_stats <- c("team_score", "total_rebounds", "offensive_rebounds", "assists",
+                       "steals", "blocks", "three_point_field_goals_made",
+                       "points_in_paint", "fast_break_points", "turnover_points", "largest_lead")
+
+# Map from box score column names to result JSON keys
+season_high_key_map <- c(
+  team_score = "pts", total_rebounds = "reb", offensive_rebounds = "oreb",
+  assists = "ast", steals = "stl", blocks = "blk",
+  three_point_field_goals_made = "fg3m", points_in_paint = "ptsPaint",
+  fast_break_points = "ptsFb", turnover_points = "ptsOffTov", largest_lead = "largestLead"
+)
+
+# For each team, compute the max of each stat across ALL season games
+team_season_highs <- team_box %>%
+  group_by(team_id) %>%
+  summarise(across(all_of(season_high_stats), ~max(.x, na.rm = TRUE)), .groups = "drop")
+
+# Build a lookup: team_id -> list(stat_key -> max_value)
+season_highs_lookup <- list()
+for (i in 1:nrow(team_season_highs)) {
+  row <- team_season_highs[i, ]
+  tid <- as.character(row$team_id)
+  highs <- list()
+  for (col in season_high_stats) {
+    key <- season_high_key_map[[col]]
+    val <- as.numeric(row[[col]])
+    if (!is.na(val) && is.finite(val)) highs[[key]] <- val
+  }
+  season_highs_lookup[[tid]] <- highs
+}
+
+# Helper: check if game stats are season highs. Needs PRIOR max (excluding this game).
+# We compute per-team per-stat: for each game, what was the max before this game?
+# Sort by game_date, compute cummax shifted by 1
+compute_prior_season_highs <- function() {
+  team_box_sorted <- team_box %>% arrange(game_date)
+  prior_highs <- list()  # team_id -> game_id -> list(stat_key -> prior_max)
+
+  for (tid in unique(team_box_sorted$team_id)) {
+    team_games <- team_box_sorted %>% filter(team_id == tid)
+    tid_str <- as.character(tid)
+    prior_highs[[tid_str]] <- list()
+
+    for (col in season_high_stats) {
+      key <- season_high_key_map[[col]]
+      vals <- as.numeric(team_games[[col]])
+      # Running max of all games BEFORE this one
+      prior_max <- rep(NA_real_, length(vals))
+      if (length(vals) > 1) {
+        running <- vals[1]
+        for (j in 2:length(vals)) {
+          prior_max[j] <- running
+          running <- max(running, vals[j], na.rm = TRUE)
+        }
+      }
+      game_ids <- as.character(team_games$game_id)
+      for (j in seq_along(game_ids)) {
+        gid <- game_ids[j]
+        if (is.null(prior_highs[[tid_str]][[gid]])) prior_highs[[tid_str]][[gid]] <- list()
+        prior_highs[[tid_str]][[gid]][[key]] <- prior_max[j]
+      }
+    }
+  }
+  prior_highs
+}
+
+prior_season_highs <- compute_prior_season_highs()
+cat("Computed season high lookups for", length(season_highs_lookup), "teams\n")
+
+# Helper function: build seasonHighs entry for a team's game
+build_season_highs_for_team <- function(team_id, game_id, game_box_score) {
+  tid <- as.character(team_id)
+  gid <- as.character(game_id)
+  prior <- prior_season_highs[[tid]][[gid]]
+  if (is.null(prior)) return(NULL)
+
+  highs <- list()
+  # Map from result key to the game box score field name
+  result_fields <- list(
+    pts = "team_score", reb = "total_rebounds", oreb = "offensive_rebounds",
+    ast = "assists", stl = "steals", blk = "blocks",
+    fg3m = "three_point_field_goals_made", ptsPaint = "points_in_paint",
+    ptsFb = "fast_break_points", ptsOffTov = "turnover_points", largestLead = "largest_lead"
+  )
+
+  for (key in names(result_fields)) {
+    col <- result_fields[[key]]
+    game_val <- tryCatch(as.numeric(game_box_score[[col]]), error = function(e) NA_real_)
+    prior_max <- prior[[key]]
+    if (!is.null(game_val) && !is.na(game_val) && !is.null(prior_max) && !is.na(prior_max)) {
+      if (game_val > prior_max) {
+        highs[[key]] <- list(previousHigh = prior_max, differential = round(game_val - prior_max, 1))
+      }
+    }
+  }
+
+  if (length(highs) == 0) return(NULL)
+  highs
+}
+
 # Calculate team season statistics
 team_stats <- team_box %>%
   group_by(team_id, team_display_name, team_short_display_name) %>%
@@ -2851,6 +2952,15 @@ for (game in all_games) {
     total_results_time <- total_results_time + result_duration
     cat("  -> Results fetched in", sprintf("%.1f seconds", result_duration), "\n")
     results_fetched <- results_fetched + 1
+
+    # Add season highs
+    home_box_row <- team_box %>% filter(game_id == game$game_id, team_id == as.character(game$home_team_id))
+    away_box_row <- team_box %>% filter(game_id == game$game_id, team_id == as.character(game$away_team_id))
+    home_sh <- if (nrow(home_box_row) > 0) build_season_highs_for_team(game$home_team_id, game$game_id, home_box_row[1, ]) else NULL
+    away_sh <- if (nrow(away_box_row) > 0) build_season_highs_for_team(game$away_team_id, game$game_id, away_box_row[1, ]) else NULL
+    if (!is.null(home_sh) || !is.null(away_sh)) {
+      matchup$results$seasonHighs <- list(home = home_sh, away = away_sh)
+    }
   }
 
   matchups_json[[length(matchups_json) + 1]] <- matchup

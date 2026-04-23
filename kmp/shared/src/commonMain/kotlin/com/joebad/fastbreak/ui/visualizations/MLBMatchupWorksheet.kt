@@ -28,6 +28,7 @@ import com.joebad.fastbreak.ui.components.ShareFab
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Star
 import kotlinx.datetime.Instant
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
@@ -254,7 +255,7 @@ fun MLBMatchupWorksheet(
 
                 val (captureWidth, captureHeight) = when (target) {
                     MlbCaptureTarget.PRE_GAME -> 3400.dp to 1400.dp
-                    MlbCaptureTarget.POST_GAME -> 420.dp to 640.dp
+                    MlbCaptureTarget.POST_GAME -> 420.dp to 520.dp
                 }
 
                 LaunchedEffect(target) {
@@ -752,6 +753,8 @@ private fun MLBBoxScoreSection(results: MLBGameResults, awayAbbrev: String, home
     val awayBox = results.teamBoxScore?.away ?: return
     val homeBox = results.teamBoxScore?.home ?: return
     val vsAvg = results.vsSeasonAvg
+    val awaySH = results.seasonHighs?.away
+    val homeSH = results.seasonHighs?.home
 
     fun formatDiff(stat: MLBVsSeasonAvgStat?): String {
         val diff = stat?.difference ?: return ""
@@ -774,6 +777,13 @@ private fun MLBBoxScoreSection(results: MLBGameResults, awayAbbrev: String, home
     SectionHeader("Box Score (vs Season Avg)")
     Spacer(modifier = Modifier.height(4.dp))
 
+    // Runs
+    ThreeColumnRow(
+        leftText = "${awayBox.runs ?: "-"}${formatDiff(vsAvg?.away?.runs)}",
+        centerText = "R", rightText = "${formatDiffPrefix(vsAvg?.home?.runs)}${homeBox.runs ?: "-"}",
+        advantage = intAdv(awayBox.runs, homeBox.runs),
+        leftSeasonHigh = awaySH?.get("runs"), rightSeasonHigh = homeSH?.get("runs")
+    )
     // Hits
     ThreeColumnRow(
         leftText = "${awayBox.hits ?: "-"}${formatDiff(vsAvg?.away?.hits)}",
@@ -887,6 +897,8 @@ private fun MLBPostGameShareContent(matchup: MLBMatchup) {
     val awayBox = results.teamBoxScore?.away
     val homeBox = results.teamBoxScore?.home
     val vsAvg = results.vsSeasonAvg
+    val awaySH = results.seasonHighs?.away
+    val homeSH = results.seasonHighs?.home
     val awayWon = results.homeWon == false
     val homeWon = results.homeWon == true
 
@@ -895,6 +907,7 @@ private fun MLBPostGameShareContent(matchup: MLBMatchup) {
     val textColor = if (isDark) Color.White else Color.Black
     val secondaryTextColor = if (isDark) Color.LightGray else Color.DarkGray
     val edgeColor = Color(0xFF4CAF50)
+    val starColor = Color(0xFFE91E63) // Magenta
     val diffUp = Color(0xFF4CAF50)
     val diffDown = Color(0xFFF44336)
 
@@ -935,19 +948,34 @@ private fun MLBPostGameShareContent(matchup: MLBMatchup) {
             }
             Spacer(modifier = Modifier.height(4.dp))
 
-            // Reusable stat row with edge indicators and vs-avg diffs
+            // Reusable stat row with edge indicators, vs-avg diffs, and season high stars
             @Composable
             fun StatRow(away: String, label: String, home: String, awayN: Double? = null, homeN: Double? = null, higher: Boolean = true,
-                        awayDiff: Double? = null, homeDiff: Double? = null) {
+                        awayDiff: Double? = null, homeDiff: Double? = null,
+                        awaySHEntry: SeasonHighEntry? = null, homeSHEntry: SeasonHighEntry? = null) {
                 val aEdge = if (awayN != null && homeN != null) { if (higher) awayN > homeN else awayN < homeN } else false
                 val hEdge = if (awayN != null && homeN != null) { if (higher) homeN > awayN else homeN < awayN } else false
                 Row(modifier = Modifier.fillMaxWidth().padding(vertical = 1.dp), verticalAlignment = Alignment.CenterVertically) {
-                    // Away edge
-                    Box(modifier = Modifier.width(16.dp), contentAlignment = Alignment.Center) {
-                        if (aEdge) Text("◀", style = MaterialTheme.typography.bodyMedium, color = edgeColor, maxLines = 1)
+                    // Away edge / season high indicator (star replaces edge when season high)
+                    Box(modifier = Modifier.width(24.dp), contentAlignment = Alignment.CenterEnd) {
+                        when {
+                            awaySHEntry != null -> Icon(
+                                imageVector = Icons.Filled.Star,
+                                contentDescription = null,
+                                tint = starColor,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            aEdge -> Text("◀", style = MaterialTheme.typography.bodyMedium, color = edgeColor, maxLines = 1)
+                        }
                     }
                     // Away value
-                    Text(away, style = MaterialTheme.typography.bodyMedium, color = textColor, fontWeight = if (aEdge) FontWeight.Bold else FontWeight.Normal, maxLines = 1, modifier = Modifier.weight(0.8f), textAlign = TextAlign.End)
+                    Text(
+                        away,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = textColor,
+                        fontWeight = if (aEdge || awaySHEntry != null) FontWeight.Bold else FontWeight.Normal,
+                        maxLines = 1, modifier = Modifier.weight(0.8f), textAlign = TextAlign.End
+                    )
                     Spacer(modifier = Modifier.width(4.dp))
                     // Away diff
                     Text(
@@ -965,14 +993,31 @@ private fun MLBPostGameShareContent(matchup: MLBMatchup) {
                     )
                     Spacer(modifier = Modifier.width(4.dp))
                     // Home value
-                    Text(home, style = MaterialTheme.typography.bodyMedium, color = textColor, fontWeight = if (hEdge) FontWeight.Bold else FontWeight.Normal, maxLines = 1, modifier = Modifier.weight(0.8f), textAlign = TextAlign.Start)
-                    // Home edge
-                    Box(modifier = Modifier.width(16.dp), contentAlignment = Alignment.Center) {
-                        if (hEdge) Text("▶", style = MaterialTheme.typography.bodyMedium, color = edgeColor, maxLines = 1)
+                    Text(
+                        home,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = textColor,
+                        fontWeight = if (hEdge || homeSHEntry != null) FontWeight.Bold else FontWeight.Normal,
+                        maxLines = 1, modifier = Modifier.weight(0.8f), textAlign = TextAlign.Start
+                    )
+                    // Home edge / season high indicator (star replaces edge when season high)
+                    Box(modifier = Modifier.width(24.dp), contentAlignment = Alignment.CenterStart) {
+                        when {
+                            homeSHEntry != null -> Icon(
+                                imageVector = Icons.Filled.Star,
+                                contentDescription = null,
+                                tint = starColor,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            hEdge -> Text("▶", style = MaterialTheme.typography.bodyMedium, color = edgeColor, maxLines = 1)
+                        }
                     }
                 }
             }
 
+            StatRow("${awayBox.runs ?: "-"}", "R", "${homeBox.runs ?: "-"}", awayBox.runs?.toDouble(), homeBox.runs?.toDouble(), true,
+                vsAvg?.away?.runs?.difference, vsAvg?.home?.runs?.difference,
+                awaySH?.get("runs"), homeSH?.get("runs"))
             StatRow("${awayBox.hits ?: "-"}", "H", "${homeBox.hits ?: "-"}", awayBox.hits?.toDouble(), homeBox.hits?.toDouble(), true,
                 vsAvg?.away?.hits?.difference, vsAvg?.home?.hits?.difference)
             StatRow("${awayBox.homeRuns ?: "-"}", "HR", "${homeBox.homeRuns ?: "-"}", awayBox.homeRuns?.toDouble(), homeBox.homeRuns?.toDouble(), true,

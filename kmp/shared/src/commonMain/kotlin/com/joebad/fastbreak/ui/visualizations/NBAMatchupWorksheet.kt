@@ -1038,6 +1038,8 @@ private fun PostGameShareContent(
     val awayBox = results.teamBoxScore?.away
     val homeBox = results.teamBoxScore?.home
     val vsAvg = results.vsSeasonAvg
+    val awaySH = results.seasonHighs?.away
+    val homeSH = results.seasonHighs?.home
 
     val margin = kotlin.math.abs(finalScore.away - finalScore.home)
     val awayWon = !finalScore.homeWon
@@ -1163,19 +1165,19 @@ private fun PostGameShareContent(
             CompactStatRow(awayBox.ftm?.toString() ?: "-", awayBox.fta?.toString() ?: "-", "FTM-A", homeBox.ftm?.toString() ?: "-", homeBox.fta?.toString() ?: "-")
             CompactStatRow(awayBox.ftPct.formatPct(1), "FT%", homeBox.ftPct.formatPct(1), vsAvg?.away?.freeThrowPct?.difference?.let { it * 100 }, vsAvg?.home?.freeThrowPct?.difference?.let { it * 100 }, awayBox.ftPct?.let { it * 100 }, homeBox.ftPct?.let { it * 100 }, true)
 
-            CompactStatRow(awayBox.oreb?.toString() ?: "-", "OREB", homeBox.oreb?.toString() ?: "-", vsAvg?.away?.offRebounds?.difference, vsAvg?.home?.offRebounds?.difference, awayBox.oreb?.toDouble(), homeBox.oreb?.toDouble(), true)
+            CompactStatRow(awayBox.oreb?.toString() ?: "-", "OREB", homeBox.oreb?.toString() ?: "-", vsAvg?.away?.offRebounds?.difference, vsAvg?.home?.offRebounds?.difference, awayBox.oreb?.toDouble(), homeBox.oreb?.toDouble(), true, awaySH?.get("oreb"), homeSH?.get("oreb"))
             CompactStatRow(awayBox.dreb?.toString() ?: "-", "DREB", homeBox.dreb?.toString() ?: "-", null, null, awayBox.dreb?.toDouble(), homeBox.dreb?.toDouble(), true)
-            CompactStatRow(awayBox.reb?.toString() ?: "-", "REB", homeBox.reb?.toString() ?: "-", vsAvg?.away?.rebounds?.difference, vsAvg?.home?.rebounds?.difference, awayBox.reb?.toDouble(), homeBox.reb?.toDouble(), true)
-            CompactStatRow(awayBox.ast?.toString() ?: "-", "AST", homeBox.ast?.toString() ?: "-", vsAvg?.away?.assists?.difference, vsAvg?.home?.assists?.difference, awayBox.ast?.toDouble(), homeBox.ast?.toDouble(), true)
-            CompactStatRow(awayBox.stl?.toString() ?: "-", "STL", homeBox.stl?.toString() ?: "-", vsAvg?.away?.steals?.difference, vsAvg?.home?.steals?.difference, awayBox.stl?.toDouble(), homeBox.stl?.toDouble(), true)
-            CompactStatRow(awayBox.blk?.toString() ?: "-", "BLK", homeBox.blk?.toString() ?: "-", vsAvg?.away?.blocks?.difference, vsAvg?.home?.blocks?.difference, awayBox.blk?.toDouble(), homeBox.blk?.toDouble(), true)
+            CompactStatRow(awayBox.reb?.toString() ?: "-", "REB", homeBox.reb?.toString() ?: "-", vsAvg?.away?.rebounds?.difference, vsAvg?.home?.rebounds?.difference, awayBox.reb?.toDouble(), homeBox.reb?.toDouble(), true, awaySH?.get("reb"), homeSH?.get("reb"))
+            CompactStatRow(awayBox.ast?.toString() ?: "-", "AST", homeBox.ast?.toString() ?: "-", vsAvg?.away?.assists?.difference, vsAvg?.home?.assists?.difference, awayBox.ast?.toDouble(), homeBox.ast?.toDouble(), true, awaySH?.get("ast"), homeSH?.get("ast"))
+            CompactStatRow(awayBox.stl?.toString() ?: "-", "STL", homeBox.stl?.toString() ?: "-", vsAvg?.away?.steals?.difference, vsAvg?.home?.steals?.difference, awayBox.stl?.toDouble(), homeBox.stl?.toDouble(), true, awaySH?.get("stl"), homeSH?.get("stl"))
+            CompactStatRow(awayBox.blk?.toString() ?: "-", "BLK", homeBox.blk?.toString() ?: "-", vsAvg?.away?.blocks?.difference, vsAvg?.home?.blocks?.difference, awayBox.blk?.toDouble(), homeBox.blk?.toDouble(), true, awaySH?.get("blk"), homeSH?.get("blk"))
             CompactStatRow(awayBox.tov?.toString() ?: "-", "TO", homeBox.tov?.toString() ?: "-", vsAvg?.away?.turnovers?.difference, vsAvg?.home?.turnovers?.difference, awayBox.tov?.toDouble(), homeBox.tov?.toDouble(), false)
             CompactStatRow(awayBox.pf?.toString() ?: "-", "PF", homeBox.pf?.toString() ?: "-", null, null, awayBox.pf?.toDouble(), homeBox.pf?.toDouble(), false)
 
-            CompactStatRow(awayBox.ptsPaint?.toString() ?: "-", "PTS PAINT", homeBox.ptsPaint?.toString() ?: "-", null, null, awayBox.ptsPaint?.toDouble(), homeBox.ptsPaint?.toDouble(), true)
-            CompactStatRow(awayBox.ptsFb?.toString() ?: "-", "FAST BRK", homeBox.ptsFb?.toString() ?: "-", null, null, awayBox.ptsFb?.toDouble(), homeBox.ptsFb?.toDouble(), true)
-            CompactStatRow(awayBox.ptsOffTov?.toString() ?: "-", "PTS OFF TO", homeBox.ptsOffTov?.toString() ?: "-", null, null, awayBox.ptsOffTov?.toDouble(), homeBox.ptsOffTov?.toDouble(), true)
-            CompactStatRow(awayBox.largestLead?.toString() ?: "-", "LRG LEAD", homeBox.largestLead?.toString() ?: "-", null, null, awayBox.largestLead?.toDouble(), homeBox.largestLead?.toDouble(), true)
+            CompactStatRow(awayBox.ptsPaint?.toString() ?: "-", "PTS PAINT", homeBox.ptsPaint?.toString() ?: "-", null, null, awayBox.ptsPaint?.toDouble(), homeBox.ptsPaint?.toDouble(), true, awaySH?.get("ptsPaint"), homeSH?.get("ptsPaint"))
+            CompactStatRow(awayBox.ptsFb?.toString() ?: "-", "FAST BRK", homeBox.ptsFb?.toString() ?: "-", null, null, awayBox.ptsFb?.toDouble(), homeBox.ptsFb?.toDouble(), true, awaySH?.get("ptsFb"), homeSH?.get("ptsFb"))
+            CompactStatRow(awayBox.ptsOffTov?.toString() ?: "-", "PTS OFF TO", homeBox.ptsOffTov?.toString() ?: "-", null, null, awayBox.ptsOffTov?.toDouble(), homeBox.ptsOffTov?.toDouble(), true, awaySH?.get("ptsOffTov"), homeSH?.get("ptsOffTov"))
+            CompactStatRow(awayBox.largestLead?.toString() ?: "-", "LRG LEAD", homeBox.largestLead?.toString() ?: "-", null, null, awayBox.largestLead?.toDouble(), homeBox.largestLead?.toDouble(), true, awaySH?.get("largestLead"), homeSH?.get("largestLead"))
 
             CompactStatRow(awayBox.tsPct.formatPct(1), "TS%", homeBox.tsPct.formatPct(1), vsAvg?.away?.tsPct?.difference?.let { it * 100 }, vsAvg?.home?.tsPct?.difference?.let { it * 100 }, awayBox.tsPct?.let { it * 100 }, homeBox.tsPct?.let { it * 100 }, true)
             CompactStatRow(awayBox.efgPct.formatPct(1), "EFG%", homeBox.efgPct.formatPct(1), vsAvg?.away?.efgPct?.difference?.let { it * 100 }, vsAvg?.home?.efgPct?.difference?.let { it * 100 }, awayBox.efgPct?.let { it * 100 }, homeBox.efgPct?.let { it * 100 }, true)
@@ -1206,7 +1208,9 @@ private fun CompactStatRow(
     homeDiff: Double? = null,
     awayRaw: Double? = null,
     homeRaw: Double? = null,
-    higherIsBetter: Boolean = true
+    higherIsBetter: Boolean = true,
+    awaySeasonHigh: com.joebad.fastbreak.data.model.SeasonHighEntry? = null,
+    homeSeasonHigh: com.joebad.fastbreak.data.model.SeasonHighEntry? = null
 ) {
     // Determine edge
     val awayHasEdge = if (awayRaw != null && homeRaw != null) {
@@ -1228,10 +1232,18 @@ private fun CompactStatRow(
             .padding(vertical = 1.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Away: edge indicator column
-        Box(modifier = Modifier.width(16.dp), contentAlignment = Alignment.Center) {
-            if (awayHasEdge) {
-                Text(text = "◀", style = MaterialTheme.typography.bodyMedium, color = Color(0xFF4CAF50), maxLines = 1)
+        val starColor = Color(0xFFE91E63) // Magenta
+
+        // Away: edge / season high indicator (star replaces edge when season high)
+        Box(modifier = Modifier.width(16.dp), contentAlignment = Alignment.CenterEnd) {
+            when {
+                awaySeasonHigh != null -> Icon(
+                    imageVector = Icons.Filled.Star,
+                    contentDescription = null,
+                    tint = starColor,
+                    modifier = Modifier.size(16.dp)
+                )
+                awayHasEdge -> Text(text = "◀", style = MaterialTheme.typography.bodyMedium, color = Color(0xFF4CAF50), maxLines = 1)
             }
         }
 
@@ -1240,7 +1252,7 @@ private fun CompactStatRow(
             text = awayValue,
             style = MaterialTheme.typography.bodyMedium,
             color = textColor,
-            fontWeight = if (awayHasEdge) FontWeight.Bold else FontWeight.Normal,
+            fontWeight = if (awayHasEdge || awaySeasonHigh != null) FontWeight.Bold else FontWeight.Normal,
             maxLines = 1,
             modifier = Modifier.weight(0.8f),
             textAlign = TextAlign.End
@@ -1286,16 +1298,22 @@ private fun CompactStatRow(
             text = homeValue,
             style = MaterialTheme.typography.bodyMedium,
             color = textColor,
-            fontWeight = if (homeHasEdge) FontWeight.Bold else FontWeight.Normal,
+            fontWeight = if (homeHasEdge || homeSeasonHigh != null) FontWeight.Bold else FontWeight.Normal,
             maxLines = 1,
             modifier = Modifier.weight(0.8f),
             textAlign = TextAlign.Start
         )
 
-        // Home: edge indicator column
-        Box(modifier = Modifier.width(16.dp), contentAlignment = Alignment.Center) {
-            if (homeHasEdge) {
-                Text(text = "▶", style = MaterialTheme.typography.bodyMedium, color = Color(0xFF4CAF50), maxLines = 1)
+        // Home: edge / season high indicator (star replaces edge when season high)
+        Box(modifier = Modifier.width(16.dp), contentAlignment = Alignment.CenterStart) {
+            when {
+                homeSeasonHigh != null -> Icon(
+                    imageVector = Icons.Filled.Star,
+                    contentDescription = null,
+                    tint = starColor,
+                    modifier = Modifier.size(16.dp)
+                )
+                homeHasEdge -> Text(text = "▶", style = MaterialTheme.typography.bodyMedium, color = Color(0xFF4CAF50), maxLines = 1)
             }
         }
     }
@@ -2854,6 +2872,8 @@ private fun CompletedGameSection(
     val results = matchup.results ?: return
     val teamBoxScore = results.teamBoxScore
     val vsSeasonAvg = results.vsSeasonAvg
+    val awaySH = results.seasonHighs?.away
+    val homeSH = results.seasonHighs?.home
 
     // Team Box Score Section (combined with vs Season Average)
     if (teamBoxScore != null) {
@@ -2901,7 +2921,8 @@ private fun CompletedGameSection(
                 leftText = "${awayBox?.fg3m ?: 0}/${awayBox?.fg3a ?: 0} ${(awayVal * 100).formatStat(0)}%${formatDiff(awayComps?.threePtPct, isPct = true)}",
                 centerText = "3PT",
                 rightText = "${formatDiffPrefix(homeComps?.threePtPct, isPct = true)}${homeBox?.fg3m ?: 0}/${homeBox?.fg3a ?: 0} ${(homeVal * 100).formatStat(0)}%",
-                advantage = if (awayVal > homeVal) -1 else if (homeVal > awayVal) 1 else 0
+                advantage = if (awayVal > homeVal) -1 else if (homeVal > awayVal) 1 else 0,
+                leftSeasonHigh = awaySH?.get("fg3m"), rightSeasonHigh = homeSH?.get("fg3m")
             )
         }
 
@@ -2925,7 +2946,9 @@ private fun CompletedGameSection(
                 leftText = "$awayVal (${awayBox?.oreb ?: 0}/${awayBox?.dreb ?: 0})${formatDiff(awayComps?.rebounds)}",
                 centerText = "REB",
                 rightText = "${formatDiffPrefix(homeComps?.rebounds)}$homeVal (${homeBox?.oreb ?: 0}/${homeBox?.dreb ?: 0})",
-                advantage = if (awayVal > homeVal) -1 else if (homeVal > awayVal) 1 else 0
+                advantage = if (awayVal > homeVal) -1 else if (homeVal > awayVal) 1 else 0,
+                leftSeasonHigh = awaySH?.get("reb") ?: awaySH?.get("oreb"),
+                rightSeasonHigh = homeSH?.get("reb") ?: homeSH?.get("oreb")
             )
         }
 
@@ -2937,7 +2960,8 @@ private fun CompletedGameSection(
                 leftText = "$awayVal${formatDiff(awayComps?.assists)}",
                 centerText = "AST",
                 rightText = "${formatDiffPrefix(homeComps?.assists)}$homeVal",
-                advantage = if (awayVal > homeVal) -1 else if (homeVal > awayVal) 1 else 0
+                advantage = if (awayVal > homeVal) -1 else if (homeVal > awayVal) 1 else 0,
+                leftSeasonHigh = awaySH?.get("ast"), rightSeasonHigh = homeSH?.get("ast")
             )
         }
 
@@ -2949,7 +2973,8 @@ private fun CompletedGameSection(
                 leftText = "$awayVal${formatDiff(awayComps?.steals)}",
                 centerText = "STL",
                 rightText = "${formatDiffPrefix(homeComps?.steals)}$homeVal",
-                advantage = if (awayVal > homeVal) -1 else if (homeVal > awayVal) 1 else 0
+                advantage = if (awayVal > homeVal) -1 else if (homeVal > awayVal) 1 else 0,
+                leftSeasonHigh = awaySH?.get("stl"), rightSeasonHigh = homeSH?.get("stl")
             )
         }
 
@@ -2961,7 +2986,8 @@ private fun CompletedGameSection(
                 leftText = "$awayVal${formatDiff(awayComps?.blocks)}",
                 centerText = "BLK",
                 rightText = "${formatDiffPrefix(homeComps?.blocks)}$homeVal",
-                advantage = if (awayVal > homeVal) -1 else if (homeVal > awayVal) 1 else 0
+                advantage = if (awayVal > homeVal) -1 else if (homeVal > awayVal) 1 else 0,
+                leftSeasonHigh = awaySH?.get("blk"), rightSeasonHigh = homeSH?.get("blk")
             )
         }
 
@@ -2985,7 +3011,8 @@ private fun CompletedGameSection(
                 leftText = awayVal.toString(),
                 centerText = "Paint",
                 rightText = homeVal.toString(),
-                advantage = if (awayVal > homeVal) -1 else if (homeVal > awayVal) 1 else 0
+                advantage = if (awayVal > homeVal) -1 else if (homeVal > awayVal) 1 else 0,
+                leftSeasonHigh = awaySH?.get("ptsPaint"), rightSeasonHigh = homeSH?.get("ptsPaint")
             )
         }
 
@@ -2997,7 +3024,8 @@ private fun CompletedGameSection(
                 leftText = awayVal.toString(),
                 centerText = "Fast Break",
                 rightText = homeVal.toString(),
-                advantage = if (awayVal > homeVal) -1 else if (homeVal > awayVal) 1 else 0
+                advantage = if (awayVal > homeVal) -1 else if (homeVal > awayVal) 1 else 0,
+                leftSeasonHigh = awaySH?.get("ptsFb"), rightSeasonHigh = homeSH?.get("ptsFb")
             )
         }
 

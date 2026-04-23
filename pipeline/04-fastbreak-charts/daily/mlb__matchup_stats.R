@@ -722,6 +722,74 @@ all_games <- all_games[order(
   na.last = TRUE
 )]
 
+# Compute per-team season high runs from season_game_results
+mlb_season_highs <- list()
+if (nrow(season_games_df) > 0) {
+  # For each team, compute max runs scored across all season games
+  home_max <- season_games_df %>%
+    group_by(team = home_team) %>%
+    summarise(max_runs = max(home_score, na.rm = TRUE), .groups = "drop")
+  away_max <- season_games_df %>%
+    group_by(team = away_team) %>%
+    summarise(max_runs = max(away_score, na.rm = TRUE), .groups = "drop")
+  all_max <- bind_rows(home_max, away_max) %>%
+    group_by(team) %>%
+    summarise(max_runs = max(max_runs, na.rm = TRUE), .groups = "drop")
+
+  # Also compute prior max (max of all games BEFORE each game, per team)
+  # Sort all team-game entries by date
+  team_runs_by_date <- bind_rows(
+    season_games_df %>% transmute(team = home_team, runs = home_score, date = date),
+    season_games_df %>% transmute(team = away_team, runs = away_score, date = date)
+  ) %>% arrange(date)
+
+  for (t in unique(team_runs_by_date$team)) {
+    tg <- team_runs_by_date %>% filter(team == t)
+    vals <- tg$runs
+    prior_max <- rep(NA_real_, length(vals))
+    if (length(vals) > 1) {
+      running <- vals[1]
+      for (j in 2:length(vals)) {
+        prior_max[j] <- running
+        running <- max(running, vals[j], na.rm = TRUE)
+      }
+    }
+    mlb_season_highs[[t]] <- list(dates = tg$date, runs = vals, prior_max_runs = prior_max)
+  }
+}
+
+# Helper: check if a team's box score stats are season highs
+check_mlb_season_highs <- function(team_abbrev, game_date, box_score) {
+  highs <- list()
+  team_data <- mlb_season_highs[[team_abbrev]]
+  if (!is.null(team_data)) {
+    # Find the matching game by date (approximate - use last entry for that date)
+    date_str <- substr(game_date, 1, 10)
+    idx <- which(team_data$dates == date_str)
+    if (length(idx) > 0) {
+      i <- tail(idx, 1)  # Use last match for that date
+      runs <- team_data$runs[i]
+      prior <- team_data$prior_max_runs[i]
+      if (!is.na(runs) && !is.na(prior) && runs > prior) {
+        highs[["runs"]] <- list(previousHigh = prior, differential = round(runs - prior, 0))
+      }
+    }
+  }
+  # Check box score stats (hits, HR, RBI, etc.) - these are per-game values
+  if (!is.null(box_score)) {
+    box_stats <- list(
+      hits = safe_num(box_score$hits),
+      homeRuns = safe_num(box_score$homeRuns),
+      rbis = safe_num(box_score$rbis),
+      stolenBases = safe_num(box_score$stolenBases)
+    )
+    # For box score stats, we don't have full season data, so skip season high check
+    # (would need to cache all historical box scores)
+  }
+  if (length(highs) == 0) return(NULL)
+  highs
+}
+
 results_fetched <- 0
 matchups_json <- list()
 
@@ -850,6 +918,12 @@ for (game in all_games) {
         margin = as.integer(abs(game$home_score - game$away_score)),
         homeWon = game$home_score > game$away_score
       )
+    }
+    # Add season highs
+    home_sh <- check_mlb_season_highs(game$home_team_abbrev, game$game_date, matchup$results$teamBoxScore$home)
+    away_sh <- check_mlb_season_highs(game$away_team_abbrev, game$game_date, matchup$results$teamBoxScore$away)
+    if (!is.null(home_sh) || !is.null(away_sh)) {
+      matchup$results$seasonHighs <- list(home = home_sh, away = away_sh)
     }
   }
 

@@ -660,11 +660,25 @@ data class NBATeamSeasonComparison(
     val efgPct: NBAStatComparison? = null
 )
 
+// Shared season-high tracking for post-game box scores (all sports)
+@Serializable
+data class SeasonHighEntry(
+    val previousHigh: Double,
+    val differential: Double
+)
+
+@Serializable
+data class SeasonHighsWrapper(
+    val home: Map<String, SeasonHighEntry>? = null,
+    val away: Map<String, SeasonHighEntry>? = null
+)
+
 @Serializable
 data class NBAGameResults(
     val finalScore: NBAFinalScore,
     val teamBoxScore: NBATeamBoxScores? = null,
-    val vsSeasonAvg: NBASeasonAvgComparison? = null
+    val vsSeasonAvg: NBASeasonAvgComparison? = null,
+    val seasonHighs: SeasonHighsWrapper? = null
 )
 
 @Serializable
@@ -937,7 +951,8 @@ data class NHLGameResults(
     val finalScore: NHLFinalScore,
     val teamBoxScore: NHLTeamBoxScores? = null,
     val periodScores: List<NHLPeriodScore>? = null,
-    val vsSeasonAvg: NHLSeasonAvgComparison? = null
+    val vsSeasonAvg: NHLSeasonAvgComparison? = null,
+    val seasonHighs: SeasonHighsWrapper? = null
 )
 
 @Serializable
@@ -1061,7 +1076,8 @@ data class MLBGameResults(
     val margin: Int? = null,
     val homeWon: Boolean? = null,
     val teamBoxScore: MLBTeamBoxScoreWrapper? = null,
-    val vsSeasonAvg: MLBVsSeasonAvgWrapper? = null
+    val vsSeasonAvg: MLBVsSeasonAvgWrapper? = null,
+    val seasonHighs: SeasonHighsWrapper? = null
 )
 
 @Serializable

@@ -2028,6 +2028,53 @@ build_nhl_comparisons <- function(home_stats, away_stats, home_team, away_team) 
   ))
 }
 
+# Compute per-team season high goals from trend_games (schedule data)
+nhl_season_highs <- list()
+if (!is.null(month_games_data) && nrow(month_games_data) > 0) {
+  team_goals_by_date <- bind_rows(
+    month_games_data %>% transmute(team = home_team_abbrev, goals = home_score, date = game_date),
+    month_games_data %>% transmute(team = away_team_abbrev, goals = away_score, date = game_date)
+  ) %>% arrange(date)
+
+  for (t in unique(team_goals_by_date$team)) {
+    tg <- team_goals_by_date %>% filter(team == t)
+    vals <- tg$goals
+    prior_max <- rep(NA_real_, length(vals))
+    if (length(vals) > 1) {
+      running <- vals[1]
+      for (j in 2:length(vals)) {
+        prior_max[j] <- running
+        running <- max(running, vals[j], na.rm = TRUE)
+      }
+    }
+    nhl_season_highs[[t]] <- list(dates = tg$date, goals = vals, prior_max_goals = prior_max)
+  }
+}
+
+check_nhl_season_highs <- function(team_abbrev, game_date, box_score) {
+  highs <- list()
+  team_data <- nhl_season_highs[[team_abbrev]]
+  if (!is.null(team_data)) {
+    date_str <- substr(game_date, 1, 10)
+    idx <- which(team_data$dates == date_str)
+    if (length(idx) > 0) {
+      i <- tail(idx, 1)
+      goals <- team_data$goals[i]
+      prior <- team_data$prior_max_goals[i]
+      if (!is.na(goals) && !is.na(prior) && goals > prior) {
+        highs[["goals"]] <- list(previousHigh = prior, differential = round(goals - prior, 0))
+      }
+    }
+  }
+  # Box score stats: SOG, hits, blocks, PP goals
+  if (!is.null(box_score)) {
+    # These would need historical data to compute season highs
+    # For now, only goals are tracked from schedule data
+  }
+  if (length(highs) == 0) return(NULL)
+  highs
+}
+
 matchups_json <- list()
 results_fetched <- 0
 total_results_time <- 0
@@ -2460,6 +2507,13 @@ for (game in all_games) {
     total_results_time <- total_results_time + result_duration
     cat("  -> Results fetched in", sprintf("%.1f seconds", result_duration), "\n")
     results_fetched <- results_fetched + 1
+
+    # Add season highs
+    home_sh <- check_nhl_season_highs(game$home_team_abbrev, game$game_date, matchup$results$teamBoxScore$home)
+    away_sh <- check_nhl_season_highs(game$away_team_abbrev, game$game_date, matchup$results$teamBoxScore$away)
+    if (!is.null(home_sh) || !is.null(away_sh)) {
+      matchup$results$seasonHighs <- list(home = home_sh, away = away_sh)
+    }
   }
 
   matchups_json[[length(matchups_json) + 1]] <- matchup

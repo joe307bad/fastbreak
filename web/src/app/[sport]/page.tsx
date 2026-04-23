@@ -3,6 +3,7 @@ import { ChartData, MatchupData, MatchupV2Data, NBAMatchupData, NHLMatchupData }
 import { SportTabs } from '@/components/ui/SportTabs';
 import { ChartGrid } from '@/components/ui/ChartGrid';
 import { getOrderedLeagues } from '@/lib/leagues';
+import { selectTopMatchups } from '@/lib/topMatchups';
 import { notFound } from 'next/navigation';
 
 type AnyMatchupData = MatchupData | MatchupV2Data | NBAMatchupData | NHLMatchupData;
@@ -58,10 +59,15 @@ export default async function SportPage({ params }: Props) {
     chart => MATCHUP_TYPES.includes(chart.data.visualizationType)
   ) as { key: string; data: AnyMatchupData }[];
 
+  const topMatchupEntry = matchups.find(
+    m => m.data.visualizationType === 'NBA_MATCHUP' || m.data.visualizationType === 'NHL_MATCHUP'
+  ) as { key: string; data: NBAMatchupData | NHLMatchupData } | undefined;
+  const topMatchupGameIds = topMatchupEntry ? selectTopMatchups(topMatchupEntry.data) : [];
+
   return (
     <main className="max-w-[2000px] mx-auto px-0 md:px-4">
       <SportTabs orderedSports={orderedSports} />
-      <ChartGrid charts={charts} matchups={matchups} />
+      <ChartGrid charts={charts} matchups={matchups} topMatchupGameIds={topMatchupGameIds} />
     </main>
   );
 }

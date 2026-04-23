@@ -13,6 +13,7 @@ type AnyMatchupData = MatchupData | MatchupV2Data | NBAMatchupData | NHLMatchupD
 interface ChartGridProps {
   charts: { key: string; data: ChartData }[];
   matchups: { key: string; data: AnyMatchupData }[];
+  topMatchupGameIds?: string[];
 }
 
 function slugify(text: string): string {
@@ -26,7 +27,7 @@ function keyToSlug(key: string): string {
   return key.replace('dev/', '').replace('.json', '');
 }
 
-export function ChartGrid({ charts, matchups }: ChartGridProps) {
+export function ChartGrid({ charts, matchups, topMatchupGameIds = [] }: ChartGridProps) {
   const [activeChart, setActiveChart] = useState<string | null>(null);
 
   // Find NBA or NHL matchup for the top matchups widget
@@ -110,7 +111,7 @@ export function ChartGrid({ charts, matchups }: ChartGridProps) {
 
       <div className="grid gap-2 md:gap-6 grid-cols-1 lg:grid-cols-2">
         {/* Top Matchups Widget - First position */}
-        {topMatchupData && (
+        {topMatchupData && topMatchupGameIds.length > 0 && (
           <article
             id="chart-matchups"
             className={`border bg-[var(--card)] rounded-none md:rounded p-2 md:p-4 transition-all duration-300 scroll-mt-24 md:scroll-mt-4 ${
@@ -149,7 +150,7 @@ export function ChartGrid({ charts, matchups }: ChartGridProps) {
               </div>
             </header>
 
-            <TopMatchupsWidget data={topMatchupData.data} />
+            <TopMatchupsWidget data={topMatchupData.data} selectedGameIds={topMatchupGameIds} />
 
             <footer className="mt-3 pt-3 border-t border-[var(--border)] text-xs text-[var(--muted)] flex justify-between">
               <span>{topMatchupData.data.source}</span>

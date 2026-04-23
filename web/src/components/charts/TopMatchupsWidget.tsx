@@ -6,6 +6,7 @@ type AnyMatchupWidgetData = NBAMatchupData | NHLMatchupData;
 
 interface Props {
   data: AnyMatchupWidgetData;
+  selectedGameIds: string[];
 }
 
 function getDaysFromNow(gameDate: string): number {
@@ -27,14 +28,9 @@ function getRelativeDayLabel(gameDate: string): string {
   if (diffDays === 2) return '2 Days';
   if (diffDays === 3) return '3 Days';
 
-  // Fallback to date format for games further out
+  // Fallback to date format for games further out or in the past
   const game = new Date(gameDate);
   return game.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
-}
-
-function getDayKey(gameDate: string): string {
-  const game = new Date(gameDate);
-  return `${game.getFullYear()}-${game.getMonth()}-${game.getDate()}`;
 }
 
 function getConferenceAbbrev(conference: string): string {
@@ -156,114 +152,48 @@ function NHLMatchupCard({ matchup, dayLabel }: { matchup: NHLMatchupDataPoint; d
   );
 }
 
-export function TopMatchupsWidget({ data }: Props) {
+export function TopMatchupsWidget({ data, selectedGameIds }: Props) {
+  if (selectedGameIds.length === 0) return null;
+
   if (data.visualizationType === 'NBA_MATCHUP') {
-    const nbaData = data as NBAMatchupData;
-    // Filter to upcoming games within 4 days (today, tomorrow, 2 days, 3 days)
-    const upcomingGames = nbaData.dataPoints.filter(m => {
-      if (m.gameCompleted) return false;
-      const days = getDaysFromNow(m.gameDate);
-      return days >= 0 && days <= 3;
-    });
-
-    // Group by day
-    const gamesByDay = new Map<string, NBAMatchupDataPoint[]>();
-    for (const game of upcomingGames) {
-      const dayKey = getDayKey(game.gameDate);
-      if (!gamesByDay.has(dayKey)) {
-        gamesByDay.set(dayKey, []);
-      }
-      gamesByDay.get(dayKey)!.push(game);
-    }
-
-    // Sort each day's games by net rating and take top 2
-    const topMatchups: { matchup: NBAMatchupDataPoint; dayLabel: string }[] = [];
-
-    // Sort days chronologically
-    const sortedDays = [...gamesByDay.entries()].sort((a, b) => {
-      const dateA = new Date(a[1][0].gameDate);
-      const dateB = new Date(b[1][0].gameDate);
-      return dateA.getTime() - dateB.getTime();
-    });
-
-    for (const [, games] of sortedDays) {
-      const sortedGames = [...games].sort((a, b) => {
-        const totalA = a.homeTeam.stats.netRating + a.awayTeam.stats.netRating;
-        const totalB = b.homeTeam.stats.netRating + b.awayTeam.stats.netRating;
-        return totalB - totalA;
-      });
-
-      const top2 = sortedGames.slice(0, 2);
-      for (const game of top2) {
-        topMatchups.push({
-          matchup: game,
-          dayLabel: getRelativeDayLabel(game.gameDate),
-        });
-      }
-    }
-
-    if (topMatchups.length === 0) return null;
+    const byId = new Map<string, NBAMatchupDataPoint>(
+      (data as NBAMatchupData).dataPoints.map(g => [g.gameId, g])
+    );
+    const matchups = selectedGameIds
+      .map(id => byId.get(id))
+      .filter((g): g is NBAMatchupDataPoint => g !== undefined);
+    if (matchups.length === 0) return null;
 
     return (
       <div className="grid grid-cols-2 gap-2">
-        {topMatchups.map(({ matchup, dayLabel }) => (
-          <NBAMatchupCard key={matchup.gameId} matchup={matchup} dayLabel={dayLabel} />
+        {matchups.map(matchup => (
+          <NBAMatchupCard
+            key={matchup.gameId}
+            matchup={matchup}
+            dayLabel={getRelativeDayLabel(matchup.gameDate)}
+          />
         ))}
       </div>
     );
   }
 
   if (data.visualizationType === 'NHL_MATCHUP') {
-    const nhlData = data as NHLMatchupData;
-    // Filter to upcoming games within 4 days (today, tomorrow, 2 days, 3 days)
-    const upcomingGames = nhlData.dataPoints.filter(m => {
-      if (m.gameCompleted) return false;
-      const days = getDaysFromNow(m.gameDate);
-      return days >= 0 && days <= 3;
-    });
-
-    // Group by day
-    const gamesByDay = new Map<string, NHLMatchupDataPoint[]>();
-    for (const game of upcomingGames) {
-      const dayKey = getDayKey(game.gameDate);
-      if (!gamesByDay.has(dayKey)) {
-        gamesByDay.set(dayKey, []);
-      }
-      gamesByDay.get(dayKey)!.push(game);
-    }
-
-    // Sort each day's games by goal diff and take top 2
-    const topMatchups: { matchup: NHLMatchupDataPoint; dayLabel: string }[] = [];
-
-    // Sort days chronologically
-    const sortedDays = [...gamesByDay.entries()].sort((a, b) => {
-      const dateA = new Date(a[1][0].gameDate);
-      const dateB = new Date(b[1][0].gameDate);
-      return dateA.getTime() - dateB.getTime();
-    });
-
-    for (const [, games] of sortedDays) {
-      const sortedGames = [...games].sort((a, b) => {
-        const totalA = a.homeTeam.stats.goalDiffPerGame + a.awayTeam.stats.goalDiffPerGame;
-        const totalB = b.homeTeam.stats.goalDiffPerGame + b.awayTeam.stats.goalDiffPerGame;
-        return totalB - totalA;
-      });
-
-      const top2 = sortedGames.slice(0, 2);
-      for (const game of top2) {
-        topMatchups.push({
-          matchup: game,
-          dayLabel: getRelativeDayLabel(game.gameDate),
-        });
-      }
-    }
-
-    if (topMatchups.length === 0) return null;
+    const byId = new Map<string, NHLMatchupDataPoint>(
+      (data as NHLMatchupData).dataPoints.map(g => [g.gameId, g])
+    );
+    const matchups = selectedGameIds
+      .map(id => byId.get(id))
+      .filter((g): g is NHLMatchupDataPoint => g !== undefined);
+    if (matchups.length === 0) return null;
 
     return (
       <div className="grid grid-cols-2 gap-2">
-        {topMatchups.map(({ matchup, dayLabel }) => (
-          <NHLMatchupCard key={matchup.gameId} matchup={matchup} dayLabel={dayLabel} />
+        {matchups.map(matchup => (
+          <NHLMatchupCard
+            key={matchup.gameId}
+            matchup={matchup}
+            dayLabel={getRelativeDayLabel(matchup.gameDate)}
+          />
         ))}
       </div>
     );

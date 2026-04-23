@@ -11,8 +11,18 @@ interface Props {
 function formatGameTime(gameTime: string): { date: string; time: string } {
   const d = new Date(gameTime);
   return {
-    date: d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' }),
-    time: d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }),
+    date: d.toLocaleDateString('en-US', {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+      timeZone: 'UTC',
+    }),
+    time: d.toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      timeZone: 'UTC',
+      timeZoneName: 'short',
+    }),
   };
 }
 

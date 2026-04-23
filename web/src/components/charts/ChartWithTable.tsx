@@ -326,7 +326,7 @@ export function ChartWithTable({ data, title, subtitle, source, lastUpdated }: P
             )}
             {source && lastUpdated && (
               <div className="mt-2 text-xs text-[var(--muted)]">
-                {source} · {new Date(lastUpdated).toLocaleDateString()}
+                {source} · {new Date(lastUpdated).toLocaleDateString('en-US', { timeZone: 'UTC' })}
               </div>
             )}
           </div>

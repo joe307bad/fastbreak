@@ -201,7 +201,7 @@ export function ChartGrid({ charts, matchups, topMatchupGameIds = [] }: ChartGri
 
             <footer className="mt-3 pt-3 border-t border-[var(--border)] text-xs text-[var(--muted)] flex justify-between">
               <span>{nflMatchupData.data.source}</span>
-              <span>{new Date(nflMatchupData.data.lastUpdated).toLocaleDateString()}</span>
+              <span>{new Date(nflMatchupData.data.lastUpdated).toLocaleDateString('en-US', { timeZone: 'UTC' })}</span>
             </footer>
           </article>
         )}
@@ -251,7 +251,7 @@ export function ChartGrid({ charts, matchups, topMatchupGameIds = [] }: ChartGri
 
               <footer className="mt-3 pt-3 border-t border-[var(--border)] text-xs text-[var(--muted)] flex justify-between">
                 <span>{data.source}</span>
-                <span>{new Date(data.lastUpdated).toLocaleDateString()}</span>
+                <span>{new Date(data.lastUpdated).toLocaleDateString('en-US', { timeZone: 'UTC' })}</span>
               </footer>
             </article>
           );
@@ -277,7 +277,7 @@ export function ChartGrid({ charts, matchups, topMatchupGameIds = [] }: ChartGri
                 <h2 className="text-sm font-bold mb-4">{data.title}</h2>
                 <UpcomingMatchups data={data} />
                 <div className="mt-4 text-xs text-[var(--muted)]">
-                  {data.source} · {new Date(data.lastUpdated).toLocaleDateString()}
+                  {data.source} · {new Date(data.lastUpdated).toLocaleDateString('en-US', { timeZone: 'UTC' })}
                 </div>
               </div>
             );

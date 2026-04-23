@@ -154,7 +154,7 @@ export function ChartGrid({ charts, matchups, topMatchupGameIds = [] }: ChartGri
 
             <footer className="mt-3 pt-3 border-t border-[var(--border)] text-xs text-[var(--muted)] flex justify-between">
               <span>{topMatchupData.data.source}</span>
-              <span>{new Date(topMatchupData.data.lastUpdated).toLocaleDateString()}</span>
+              <span>{new Date(topMatchupData.data.lastUpdated).toLocaleDateString('en-US', { timeZone: 'UTC' })}</span>
             </footer>
           </article>
         )}

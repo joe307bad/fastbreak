@@ -9,28 +9,16 @@ interface Props {
   selectedGameIds: string[];
 }
 
-function getDaysFromNow(gameDate: string): number {
-  const now = new Date();
-  const game = new Date(gameDate);
-
-  // Normalize to start of day in local timezone
-  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const gameStart = new Date(game.getFullYear(), game.getMonth(), game.getDate());
-
-  return Math.round((gameStart.getTime() - todayStart.getTime()) / (1000 * 60 * 60 * 24));
-}
-
-function getRelativeDayLabel(gameDate: string): string {
-  const diffDays = getDaysFromNow(gameDate);
-
-  if (diffDays === 0) return 'Today';
-  if (diffDays === 1) return 'Tomorrow';
-  if (diffDays === 2) return '2 Days';
-  if (diffDays === 3) return '3 Days';
-
-  // Fallback to date format for games further out or in the past
-  const game = new Date(gameDate);
-  return game.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+function getDayLabel(gameDate: string): string {
+  const datePart = gameDate.slice(0, 10);
+  const [y, m, d] = datePart.split('-').map(Number);
+  const date = new Date(Date.UTC(y, m - 1, d));
+  return date.toLocaleDateString('en-US', {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+    timeZone: 'UTC',
+  });
 }
 
 function getConferenceAbbrev(conference: string): string {
@@ -170,7 +158,7 @@ export function TopMatchupsWidget({ data, selectedGameIds }: Props) {
           <NBAMatchupCard
             key={matchup.gameId}
             matchup={matchup}
-            dayLabel={getRelativeDayLabel(matchup.gameDate)}
+            dayLabel={getDayLabel(matchup.gameDate)}
           />
         ))}
       </div>
@@ -192,7 +180,7 @@ export function TopMatchupsWidget({ data, selectedGameIds }: Props) {
           <NHLMatchupCard
             key={matchup.gameId}
             matchup={matchup}
-            dayLabel={getRelativeDayLabel(matchup.gameDate)}
+            dayLabel={getDayLabel(matchup.gameDate)}
           />
         ))}
       </div>

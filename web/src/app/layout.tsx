@@ -39,11 +39,12 @@ export default function RootLayout({
           dangerouslySetInnerHTML={{
             __html: `
               (function() {
-                const stored = localStorage.getItem('theme');
-                const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-                if (stored === 'dark' || (!stored && prefersDark)) {
-                  document.documentElement.classList.add('dark');
-                }
+                try {
+                  var stored = localStorage.getItem('theme');
+                  var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                  var isDark = stored === 'dark' || (!stored && prefersDark);
+                  document.documentElement.classList.toggle('dark', isDark);
+                } catch (_) {}
               })();
             `,
           }}

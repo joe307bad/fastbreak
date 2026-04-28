@@ -11,8 +11,11 @@ RUN npm ci
 # Copy source files
 COPY . .
 
-# Download charts and build
-RUN npm run download-charts && npm run build
+# Bust the cache for the chart download + build so daily scheduled deploys
+# always pick up the latest chart data, even when no source files changed.
+# The workflow passes a per-day value via --build-arg CACHEBUST=$(date ...).
+ARG CACHEBUST=0
+RUN echo "CACHEBUST=$CACHEBUST" && npm run download-charts && npm run build
 
 # Production stage - standalone output requires minimal files
 FROM node:20-alpine

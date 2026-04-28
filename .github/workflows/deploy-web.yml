@@ -22,4 +22,8 @@ jobs:
         working-directory: web
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
-        run: flyctl deploy --remote-only
+        # CACHEBUST is wired into the Dockerfile so the chart-download +
+        # next build layer is re-run every time this workflow does. We use
+        # the run id (unique per workflow execution) so manual dispatches,
+        # pushes, and the daily cron all bypass the cache.
+        run: flyctl deploy --remote-only --build-arg CACHEBUST=${{ github.run_id }}

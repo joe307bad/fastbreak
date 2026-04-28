@@ -564,7 +564,7 @@ class ChartDataSynchronizer(
                 println("   Request duration: ${requestDurationMs.toLong()}ms")
 
                 val topicsResponse = json.decodeFromString<TopicsResponse>(rawJson)
-                println("   ✅ Parsed topics: ${topicsResponse.narratives.size} narratives")
+                println("   ✅ Parsed topics: ${topicsResponse.topics.size} topics")
 
                 // Save to repository and reset viewed/collapsed state since we have new topics
                 topicsRepository.saveTopics(topicsResponse, entry.updatedAt)
@@ -669,14 +669,26 @@ class ChartDataSynchronizer(
     }
 
     /**
-     * Checks if all narratives have been read (collapsed at least once).
+     * Persists the user's preferred font size for the topics screen.
+     */
+    fun saveTopicsFontSize(size: Float) {
+        topicsRepository.saveFontSize(size)
+    }
+
+    /**
+     * Retrieves the persisted font size, or null if the user hasn't picked one.
+     */
+    fun getTopicsFontSize(): Float? = topicsRepository.getFontSize()
+
+    /**
+     * Checks if all topics have been read (collapsed at least once).
      *
-     * @return true if all narratives have been read
+     * @return true if all topics have been read
      */
     fun areAllNarrativesRead(): Boolean {
         val topics = topicsRepository.getTopics() ?: return true
-        if (topics.narratives.isEmpty()) return true
+        if (topics.topics.isEmpty()) return true
         val readIndices = topicsRepository.getReadIndices(topics.date)
-        return readIndices.size >= topics.narratives.size
+        return readIndices.size >= topics.topics.size
     }
 }

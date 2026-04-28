@@ -176,7 +176,7 @@ let callGemini (client: HttpClient) (apiKey: string) (prompt: string) (temperatu
     // Add defensive delay before each call
     do! defensiveDelay ()
 
-    let url = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={apiKey}"
+    let url = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={apiKey}"
 
     let request: GeminiRequest = {
         contents = [| { parts = [| { text = prompt } |] } |]
@@ -274,7 +274,7 @@ let callGeminiWithSearch (client: HttpClient) (apiKey: string) (prompt: string) 
     // Add defensive delay before each call
     do! defensiveDelay ()
 
-    let url = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={apiKey}"
+    let url = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={apiKey}"
 
     // Temperature 1.0 recommended for grounded search per Google docs
     let request: GeminiRequestWithTools = {

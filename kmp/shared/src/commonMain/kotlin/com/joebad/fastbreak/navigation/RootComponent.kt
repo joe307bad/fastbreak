@@ -103,8 +103,8 @@ class RootComponent(
 
     fun navigateToTopics() {
         // Don't mark topics as viewed here - they're only marked as viewed
-        // when all narratives have been collapsed at least once
-        navigation.push(Config.Topics)
+        // when all topics have been collapsed at least once
+        navigation.push(Config.TopicsV2)
     }
 
     fun navigateToChart(
@@ -187,20 +187,13 @@ class RootComponent(
             is Config.TopicsV2 -> Child.TopicsV2(
                 TopicsV2Component(
                     componentContext = componentContext,
-                    onNavigateBack = { navigation.pop() }
-                )
-            )
-            is Config.Topics -> Child.Topics(
-                TopicsComponent(
-                    componentContext = componentContext,
                     onNavigateBack = { navigation.pop() },
                     onNavigateToChart = { chartId, sport, vizType, filters ->
                         navigateToChart(chartId, sport, vizType, filters, fromTopics = true)
                     },
-                    getCollapsedIndices = { registryContainer.getCollapsedIndices() },
-                    saveCollapsedIndices = { indices -> registryContainer.saveCollapsedIndices(indices) },
-                    getReadIndices = { registryContainer.getReadIndices() },
-                    saveReadIndices = { indices -> registryContainer.saveReadIndices(indices) }
+                    getFontSize = { registryContainer.getTopicsFontSize() },
+                    saveFontSize = { size -> registryContainer.saveTopicsFontSize(size) },
+                    getUpdatedAt = { registryContainer.getTopicsUpdatedAt() }
                 )
             )
         }
@@ -209,7 +202,6 @@ class RootComponent(
         data class Home(val component: HomeComponent) : Child()
         data class DataViz(val component: DataVizComponent) : Child()
         data class Settings(val component: SettingsComponent) : Child()
-        data class Topics(val component: TopicsComponent) : Child()
         data class TopicsV2(val component: TopicsV2Component) : Child()
     }
 
@@ -229,9 +221,6 @@ class RootComponent(
 
         @Serializable
         data object Settings : Config
-
-        @Serializable
-        data object Topics : Config
 
         @Serializable
         data object TopicsV2 : Config

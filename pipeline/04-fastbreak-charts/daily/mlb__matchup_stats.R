@@ -454,22 +454,58 @@ while (current_date <= end_date) {
           over_under <- safe_num(o$overUnder)
           home_ml <- if (!is.null(o$homeTeamOdds$moneyLine)) safe_num(o$homeTeamOdds$moneyLine) else NA
           away_ml <- if (!is.null(o$awayTeamOdds$moneyLine)) safe_num(o$awayTeamOdds$moneyLine) else NA
+          raw_details <- if (!is.null(o$details)) as.character(o$details) else NA_character_
 
-          # Build details as the run-line spread (e.g. "NYY -1.5") rather than
-          # ESPN's default moneyline string. Mirrors the NHL bracket formatting.
-          details <- NA_character_
-          if (is_valid_value(home_spread)) {
-            spread_team <- home$team$abbreviation
-            spread_val <- home_spread
-            if (home_spread > 0) {
-              spread_team <- away$team$abbreviation
-              spread_val <- -home_spread
+          # Build details as the run-line spread (e.g. "ATL -1.5") rather than
+          # ESPN's moneyline string. We need two pieces:
+          #   1. Which team is favored.
+          #   2. The run-line magnitude (almost always 1.5 for MLB).
+          #
+          # ESPN's `o$spread` is sometimes reported home-relative and sometimes
+          # favorite-relative (the latter especially when homeMoneyline /
+          # awayMoneyline are null), so it can't be trusted to identify the
+          # favored side on its own. ESPN's pre-formatted `o$details` string
+          # ("ATL -149") always leads with the favored team abbreviation, so
+          # use that as the source of truth and fall back to other signals.
+          spread_team <- NA_character_
+
+          # 1) Prefer the leading abbreviation in ESPN's details string, but only
+          #    if it matches one of the two competitors (guards against parsing
+          #    over/under or unrelated strings).
+          if (!is.na(raw_details) && nchar(raw_details) > 0) {
+            tokens <- strsplit(raw_details, "\\s+")[[1]]
+            if (length(tokens) > 0) {
+              candidate <- tokens[1]
+              if (!is.na(candidate)
+                  && candidate %in% c(home$team$abbreviation, away$team$abbreviation)) {
+                spread_team <- candidate
+              }
             }
-            details <- sprintf(
-              "%s %s",
-              spread_team,
-              ifelse(spread_val >= 0, paste0("+", spread_val), as.character(spread_val))
-            )
+          }
+
+          # 2) Otherwise, use moneylines: the more negative ML is the favorite.
+          if (is.na(spread_team)
+              && is_valid_value(home_ml) && is_valid_value(away_ml)
+              && home_ml != away_ml) {
+            spread_team <- if (home_ml < away_ml) home$team$abbreviation
+                           else away$team$abbreviation
+          }
+
+          # 3) Last resort: treat o$spread as home-relative.
+          if (is.na(spread_team) && is_valid_value(home_spread) && home_spread != 0) {
+            spread_team <- if (home_spread < 0) home$team$abbreviation
+                           else away$team$abbreviation
+          }
+
+          # MLB run line is effectively fixed at 1.5 — use abs(spread) when
+          # ESPN gives us a non-zero magnitude, otherwise default to 1.5.
+          spread_magnitude <-
+            if (is_valid_value(home_spread) && home_spread != 0) abs(home_spread)
+            else 1.5
+
+          details <- NA_character_
+          if (!is.na(spread_team)) {
+            details <- sprintf("%s -%s", spread_team, format(spread_magnitude, nsmall = 1))
           }
 
           if (is_valid_value(home_spread) || is_valid_value(over_under) || is_valid_value(details)) {

@@ -12,8 +12,13 @@
     <Compile Include="NarrativeGenerator.fs" />
     <Compile Include="TextSegmentConverter.fs" />
     <Compile Include="Main.fs" />
-    <Compile Include="V2NarrativeGenerator.fs" />
-    <Compile Include="V2Main.fs" />
+    <Compile Include="v2/SeasonState.fs" />
+    <Compile Include="v2/TopicMapper.fs" />
+    <Compile Include="v2/PromptBuilder.fs" />
+    <Compile Include="v2/TopicGenerator.fs" />
+    <Compile Include="v2/TopicEnricher.fs" />
+    <Compile Include="v2/DataPointEnricher.fs" />
+    <Compile Include="v2/Main.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 

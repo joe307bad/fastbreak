@@ -3,7 +3,7 @@ library(dplyr)
 library(jsonlite)
 
 # ============================================================================
-# MLB Pitcher Leaders — scatter of K-BB% vs xFIP for qualified starters
+# MLB Pitching Leaders — scatter of K-BB% vs xFIP for qualified starters
 #
 # Why these two stats:
 #  - K-BB%  = strikeout-rate minus walk-rate. Among the simplest rate stats and
@@ -24,7 +24,7 @@ current_month <- as.numeric(format(Sys.Date(), "%m"))
 # the prior season so we never produce an empty chart.
 mlb_season <- if (current_month >= 3) current_year else current_year - 1
 
-cat("Processing MLB Pitcher Leaders for", mlb_season, "season\n")
+cat("Processing MLB Pitching Leaders for", mlb_season, "season\n")
 
 # Pull pitcher leaderboard from FanGraphs (qual="0" so we filter ourselves)
 pitcher_stats <- tryCatch({
@@ -117,7 +117,7 @@ data_points <- top_pitchers %>%
 output_data <- list(
   sport = "MLB",
   visualizationType = "SCATTER_PLOT",
-  title = paste0("MLB Pitcher Leaders - ", mlb_season),
+  title = paste0("MLB Pitching Leaders - ", mlb_season),
   subtitle = "K-BB% vs xFIP",
   description = paste0(
     "Top 50 starting pitchers (min ", min_ip, " IP, ", min_gs,
@@ -181,7 +181,7 @@ if (system(ddb_cmd) != 0) {
   cat("Updated DynamoDB:", dynamodb_table, "key:", s3_key, "\n")
 }
 
-cat("\n=== MLB Pitcher Leaders generation complete ===\n")
+cat("\n=== MLB Pitching Leaders generation complete ===\n")
 cat("Pitchers shown:", length(data_points), "\n")
 cat("\nTop 5 by xFIP (best):\n")
 print(head(top_pitchers %>% arrange(xFIP), 5))

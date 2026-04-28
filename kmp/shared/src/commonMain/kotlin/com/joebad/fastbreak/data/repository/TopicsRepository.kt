@@ -28,6 +28,7 @@ class TopicsRepository(
         private const val KEY_COLLAPSED_INDICES = "topics_collapsed_indices"
         private const val KEY_READ_INDICES = "topics_read_indices"
         private const val KEY_TOPICS_DATE = "topics_date"
+        private const val KEY_TOPICS_FONT_SIZE = "topics_font_size"
     }
 
     /**
@@ -39,7 +40,7 @@ class TopicsRepository(
     fun saveTopics(topics: TopicsResponse, updatedAt: Instant) {
         println("💾 TopicsRepository.saveTopics()")
         println("   Date: ${topics.date}")
-        println("   Narratives count: ${topics.narratives.size}")
+        println("   Topics count: ${topics.topics.size}")
         try {
             val jsonString = json.encodeToString(topics)
             settings.putString(KEY_TOPICS_DATA, jsonString)
@@ -194,6 +195,21 @@ class TopicsRepository(
         }
         val indicesStr = settings.getStringOrNull(KEY_READ_INDICES) ?: return emptySet()
         return indicesStr.split(",").mapNotNull { it.toIntOrNull() }.toSet()
+    }
+
+    /**
+     * Persists the user's preferred font size for the topics screen.
+     */
+    fun saveFontSize(size: Float) {
+        settings.putFloat(KEY_TOPICS_FONT_SIZE, size)
+    }
+
+    /**
+     * Retrieves the persisted font size, or null if the user hasn't picked one.
+     */
+    fun getFontSize(): Float? {
+        if (!settings.hasKey(KEY_TOPICS_FONT_SIZE)) return null
+        return settings.getFloat(KEY_TOPICS_FONT_SIZE, 18f)
     }
 
     /**

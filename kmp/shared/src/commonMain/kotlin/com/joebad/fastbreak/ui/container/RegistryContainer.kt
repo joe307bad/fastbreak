@@ -747,4 +747,14 @@ class RegistryContainer(
      * Checks if all narratives have been read.
      */
     fun areAllNarrativesRead(): Boolean = chartDataSynchronizer.areAllNarrativesRead()
+
+    /**
+     * Persists the user's preferred font size for the topics screen.
+     */
+    fun saveTopicsFontSize(size: Float) = chartDataSynchronizer.saveTopicsFontSize(size)
+
+    /**
+     * Retrieves the persisted font size, or null if the user hasn't picked one.
+     */
+    fun getTopicsFontSize(): Float? = chartDataSynchronizer.getTopicsFontSize()
 }

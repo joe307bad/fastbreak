@@ -3,6 +3,7 @@ package com.joebad.fastbreak.ui
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,13 +17,12 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.text.InlineTextContent
-import androidx.compose.foundation.text.appendInlineContent
+import androidx.compose.foundation.text.ClickableText
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -30,317 +30,82 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.text.Placeholder
-import androidx.compose.ui.text.PlaceholderVerticalAlign
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
+import com.joebad.fastbreak.data.model.Sport
+import com.joebad.fastbreak.data.model.TextSegment
+import com.joebad.fastbreak.data.model.Topic
+import com.joebad.fastbreak.data.model.TopicDataPoint
+import com.joebad.fastbreak.data.model.TopicsResponse
+import com.joebad.fastbreak.data.model.VizType
 import com.joebad.fastbreak.navigation.TopicsV2Component
+import com.joebad.fastbreak.platform.UrlLauncher
+import com.joebad.fastbreak.ui.components.InfoBottomSheet
 import kotlin.math.abs
 import kotlin.math.roundToInt
+import kotlin.time.Clock
+import kotlin.time.Instant
 import kotlinx.coroutines.launch
 
-private sealed interface Segment {
-    data class Text(val text: String) : Segment
-    data class Link(val text: String) : Segment
+private fun formatRelativeTime(instant: Instant?): String {
+    if (instant == null) return "never"
+    val now = Clock.System.now()
+    val diff = now - instant
+    val minutes = diff.inWholeMinutes
+    val hours = diff.inWholeHours
+    val days = diff.inWholeDays
+    return when {
+        minutes < 1 -> "just now"
+        minutes < 60 -> "${minutes}m ago"
+        hours < 24 -> "${hours}h ago"
+        days < 7 -> "${days}d ago"
+        else -> "${days / 7}w ago"
+    }
 }
 
-private data class StatRow(val subject: String, val stat: String, val value: String)
+private fun leagueToSport(league: String): Sport? = when (league.uppercase()) {
+    "NBA" -> Sport.NBA
+    "NFL" -> Sport.NFL
+    "NHL" -> Sport.NHL
+    "MLB" -> Sport.MLB
+    "CBB" -> Sport.CBB
+    else -> null
+}
 
-private data class TopicItem(
-    val id: Int,
-    val league: String,
-    val category: String,
-    val segments: List<Segment>,
-    val stats: List<StatRow>
-)
+private fun stringToVizType(vizType: String): VizType? =
+    if (vizType.isBlank()) null
+    else try {
+        VizType.valueOf(vizType.uppercase())
+    } catch (_: IllegalArgumentException) {
+        null
+    }
 
-private val topicItems: List<TopicItem> = listOf(
-    TopicItem(
-        1,
-        "NBA",
-        "Player Performance",
-        listOf(
-            Segment.Link("Shai Gilgeous-Alexander"),
-            Segment.Text(" dropped 52 points on 18-of-27 shooting as the "),
-            Segment.Link("Thunder"),
-            Segment.Text(" held off the "),
-            Segment.Link("Nuggets"),
-            Segment.Text(" in double overtime. It's his fourth 50-point game of the season, extending his lead in the MVP race over "),
-            Segment.Link("Jokic"),
-            Segment.Text("."),
-        ),
-        listOf(
-            StatRow("SGA", "PTS", "52"),
-            StatRow("SGA", "FG", "18-27"),
-            StatRow("SGA", "PPG", "32.8"),
-            StatRow("OKC", "REC", "58-18"),
-        )
-    ),
-    TopicItem(
-        2,
-        "NBA",
-        "Team Highlight",
-        listOf(
-            Segment.Text("The "),
-            Segment.Link("Celtics"),
-            Segment.Text(" clinched the top seed in the East with a 118-104 win over "),
-            Segment.Link("Milwaukee"),
-            Segment.Text(", their 14th straight home victory. "),
-            Segment.Link("Jayson Tatum"),
-            Segment.Text(" added 34 points and 11 rebounds, cementing Boston's case as title favorites."),
-        ),
-        listOf(
-            StatRow("BOS", "REC", "62-18"),
-            StatRow("Tatum", "PTS", "34"),
-            StatRow("Tatum", "REB", "11"),
-            StatRow("BOS", "HOME W", "14"),
-        )
-    ),
-    TopicItem(
-        3,
-        "NBA",
-        "Transaction",
-        listOf(
-            Segment.Text("The "),
-            Segment.Link("Lakers"),
-            Segment.Text(" acquired "),
-            Segment.Link("Zach LaVine"),
-            Segment.Text(" from the "),
-            Segment.Link("Bulls"),
-            Segment.Text(" in a three-team deal that sends "),
-            Segment.Link("D'Angelo Russell"),
-            Segment.Text(" and two first-round picks to Chicago. LaVine is expected to debut Friday against the "),
-            Segment.Link("Warriors"),
-            Segment.Text(" after passing his physical."),
-        ),
-        listOf(
-            StatRow("LaVine", "PPG", "24.1"),
-            StatRow("LaVine", "3P%", "38.2"),
-            StatRow("LAL", "REC", "34-30"),
-            StatRow("CHI", "PICKS", "2 1st"),
-        )
-    ),
-    TopicItem(
-        4,
-        "NBA",
-        "Milestone",
-        listOf(
-            Segment.Link("Nikola Jokic"),
-            Segment.Text(" recorded his 30th triple-double of the season, the most ever by a center in a single year. "),
-            Segment.Link("Denver"),
-            Segment.Text(" has won nine straight with Jokic averaging 32-14-11 over that stretch."),
-        ),
-        listOf(
-            StatRow("Jokic", "TD", "30"),
-            StatRow("Jokic", "PPG", "32.0"),
-            StatRow("Jokic", "RPG", "14.0"),
-            StatRow("DEN", "STRK", "9"),
-        )
-    ),
-    TopicItem(
-        5,
-        "NHL",
-        "Streak",
-        listOf(
-            Segment.Link("Connor McDavid"),
-            Segment.Text(" tallied four assists against the "),
-            Segment.Link("Flames"),
-            Segment.Text(", pushing his points streak to 18 games. He's within six points of "),
-            Segment.Link("Wayne Gretzky"),
-            Segment.Text("'s modern-era scoring pace from 1985-86."),
-        ),
-        listOf(
-            StatRow("McDavid", "AST", "4"),
-            StatRow("McDavid", "STRK", "18"),
-            StatRow("McDavid", "PTS", "124"),
-            StatRow("EDM", "REC", "44-18-4"),
-        )
-    ),
-    TopicItem(
-        6,
-        "NHL",
-        "Milestone",
-        listOf(
-            Segment.Link("Auston Matthews"),
-            Segment.Text(" scored his 60th goal of the season in the Leafs' 5-2 win over "),
-            Segment.Link("Tampa Bay"),
-            Segment.Text(", becoming the first American-born player to hit 60 twice. Toronto clinched the Atlantic Division title with the victory."),
-        ),
-        listOf(
-            StatRow("Matthews", "G", "60"),
-            StatRow("Matthews", "GP", "68"),
-            StatRow("TOR", "REC", "47-18-5"),
-            StatRow("TOR", "FIN", "5-2"),
-        )
-    ),
-    TopicItem(
-        7,
-        "NHL",
-        "Transaction",
-        listOf(
-            Segment.Text("The "),
-            Segment.Link("Rangers"),
-            Segment.Text(" traded for defenseman "),
-            Segment.Link("Jakob Chychrun"),
-            Segment.Text(", sending a 2026 first-rounder and a conditional second to "),
-            Segment.Link("Ottawa"),
-            Segment.Text(". Chychrun gives New York a top-four left-shot blueliner for their Cup push."),
-        ),
-        listOf(
-            StatRow("Chychrun", "G", "14"),
-            StatRow("Chychrun", "PTS", "41"),
-            StatRow("Chychrun", "TOI", "22:30"),
-            StatRow("NYR", "REC", "48-17-5"),
-        )
-    ),
-    TopicItem(
-        8,
-        "NBA",
-        "Player Performance",
-        listOf(
-            Segment.Link("Victor Wembanyama"),
-            Segment.Text(" posted the first 5x5 game by a rookie since "),
-            Segment.Link("David Robinson"),
-            Segment.Text(" in 1994, finishing with 27 points, 10 rebounds, 5 assists, 5 blocks, and 5 steals. The "),
-            Segment.Link("Spurs"),
-            Segment.Text(" still lost to "),
-            Segment.Link("Phoenix"),
-            Segment.Text(" in overtime, 132-128."),
-        ),
-        listOf(
-            StatRow("Wemby", "PTS", "27"),
-            StatRow("Wemby", "REB", "10"),
-            StatRow("Wemby", "BLK", "5"),
-            StatRow("Wemby", "STL", "5"),
-        )
-    ),
-    TopicItem(
-        9,
-        "NHL",
-        "Team Highlight",
-        listOf(
-            Segment.Text("The "),
-            Segment.Link("Panthers"),
-            Segment.Text(" extended their franchise-record winning streak to 13 games with a 4-1 victory over the "),
-            Segment.Link("Bruins"),
-            Segment.Text(". "),
-            Segment.Link("Sergei Bobrovsky"),
-            Segment.Text(" has been the difference, posting a .945 save percentage during the run."),
-        ),
-        listOf(
-            StatRow("FLA", "STRK", "13"),
-            StatRow("Bobrovsky", "SV%", ".945"),
-            StatRow("Bobrovsky", "GAA", "1.88"),
-            StatRow("FLA", "FIN", "4-1"),
-        )
-    ),
-    TopicItem(
-        10,
-        "NBA",
-        "Injury",
-        listOf(
-            Segment.Link("Luka Doncic"),
-            Segment.Text(" was ruled out 4-6 weeks with a calf strain suffered late in Tuesday's loss to "),
-            Segment.Link("Minnesota"),
-            Segment.Text(". The injury threatens Dallas's playoff seeding as they sit one game up on the 7th-place "),
-            Segment.Link("Kings"),
-            Segment.Text("."),
-        ),
-        listOf(
-            StatRow("Luka", "PPG", "33.5"),
-            StatRow("Luka", "APG", "9.8"),
-            StatRow("DAL", "REC", "40-26"),
-            StatRow("DAL", "LEAD", "1.0 GB"),
-        )
-    ),
-    TopicItem(
-        11,
-        "NHL",
-        "Milestone",
-        listOf(
-            Segment.Link("Cale Makar"),
-            Segment.Text(" recorded his 100th point of the season, becoming the fourth defenseman in NHL history to hit the mark. "),
-            Segment.Link("Colorado"),
-            Segment.Text("'s blueliner is the odds-on "),
-            Segment.Link("Norris Trophy"),
-            Segment.Text(" favorite for the third straight year."),
-        ),
-        listOf(
-            StatRow("Makar", "PTS", "100"),
-            StatRow("Makar", "G", "24"),
-            StatRow("Makar", "AST", "76"),
-            StatRow("COL", "REC", "46-20-6"),
-        )
-    ),
-    TopicItem(
-        12,
-        "NBA",
-        "Transaction",
-        listOf(
-            Segment.Text("The "),
-            Segment.Link("Knicks"),
-            Segment.Text(" acquired "),
-            Segment.Link("OG Anunoby"),
-            Segment.Text(" from Toronto ahead of the trade deadline, giving up "),
-            Segment.Link("RJ Barrett"),
-            Segment.Text(" and "),
-            Segment.Link("Immanuel Quickley"),
-            Segment.Text(". New York has gone 8-1 since the deal, surging into second place in the East."),
-        ),
-        listOf(
-            StatRow("Anunoby", "PPG", "14.1"),
-            StatRow("Anunoby", "3P%", "37.8"),
-            StatRow("NYK", "REC (POST)", "8-1"),
-            StatRow("NYK", "STANDING", "2nd"),
-        )
-    ),
-    TopicItem(
-        13,
-        "NHL",
-        "Playoffs",
-        listOf(
-            Segment.Text("The "),
-            Segment.Link("Oilers"),
-            Segment.Text(" opened their first-round series with a 5-2 win over the "),
-            Segment.Link("Kings"),
-            Segment.Text(" as "),
-            Segment.Link("Connor McDavid"),
-            Segment.Text(" notched a hat trick in Game 1. Edmonton has now won 12 straight playoff games dating back to last year's Western Conference Finals."),
-        ),
-        listOf(
-            StatRow("McDavid", "G", "3"),
-            StatRow("McDavid", "PTS", "4"),
-            StatRow("EDM", "FIN", "5-2"),
-            StatRow("EDM", "PO STRK", "12"),
-        )
-    ),
-    TopicItem(
-        14,
-        "NBA",
-        "Draft",
-        listOf(
-            Segment.Text("Duke freshman "),
-            Segment.Link("Cooper Flagg"),
-            Segment.Text(" cemented his place as the consensus #1 pick in the 2026 NBA Draft after a dominant Final Four performance. The "),
-            Segment.Link("Wizards"),
-            Segment.Text(" hold the best lottery odds at 14% following their 18-64 finish."),
-        ),
-        listOf(
-            StatRow("Flagg", "PPG", "18.4"),
-            StatRow("Flagg", "RPG", "8.2"),
-            StatRow("Flagg", "BPG", "1.9"),
-            StatRow("WAS", "LOT %", "14.0"),
-        )
-    ),
-)
+// Truncate a numeric stat string to at most two decimal places without rounding.
+// Non-numeric values (e.g. "true") and integer-formatted values pass through unchanged.
+private fun truncateToTwoDecimals(value: String): String {
+    if (!value.contains('.')) return value
+    val parts = value.split('.', limit = 2)
+    val decimals = parts[1].take(2)
+    return if (decimals.isEmpty()) parts[0] else "${parts[0]}.$decimals"
+}
+
+private fun buildFiltersForDataPoint(dp: TopicDataPoint): Map<String, String>? {
+    val filters = mutableMapOf<String, String>()
+    when (dp.subjectType.lowercase()) {
+        "team" -> if (dp.subject.isNotBlank()) filters["team"] = dp.subject
+        "player" -> if (dp.subject.isNotBlank()) filters["player"] = dp.subject
+    }
+    return filters.takeIf { it.isNotEmpty() }
+}
 
 @Composable
 private fun SwipeToDismissItem(
@@ -412,86 +177,100 @@ private fun TopicLabel(
             fontFamily = FontFamily.SansSerif,
             color = accentColor
         )
-        Text(
-            text = "  \u2022  ",
-            fontSize = size,
-            fontFamily = FontFamily.SansSerif,
-            color = labelColor
-        )
-        Text(
-            text = category.uppercase(),
-            fontSize = size,
-            fontWeight = FontWeight.SemiBold,
-            fontFamily = FontFamily.SansSerif,
-            color = labelColor
-        )
+        if (category.isNotBlank()) {
+            Text(
+                text = "  •  ",
+                fontSize = size,
+                fontFamily = FontFamily.SansSerif,
+                color = labelColor
+            )
+            Text(
+                text = category.uppercase(),
+                fontSize = size,
+                fontWeight = FontWeight.SemiBold,
+                fontFamily = FontFamily.SansSerif,
+                color = labelColor
+            )
+        }
     }
 }
 
 @Composable
-private fun SegmentedTopicText(
-    segments: List<Segment>,
+private fun SegmentedSummary(
+    segments: List<TextSegment>,
+    fallbackSummary: String,
     fontSize: Float,
     modifier: Modifier = Modifier
 ) {
     val linkColor = MaterialTheme.colorScheme.primary
     val textColor = MaterialTheme.colorScheme.onBackground
 
-    val inlineContent = mutableMapOf<String, InlineTextContent>()
+    // Fall back to plain summary text if no segments are present.
+    if (segments.isEmpty()) {
+        Text(
+            text = fallbackSummary,
+            fontFamily = FontFamily.Serif,
+            fontWeight = FontWeight.Light,
+            fontSize = fontSize.sp,
+            lineHeight = (fontSize * 1.4f).sp,
+            color = textColor,
+            modifier = modifier
+        )
+        return
+    }
+
     val annotated = buildAnnotatedString {
-        segments.forEachIndexed { idx, seg ->
-            when (seg) {
-                is Segment.Text -> append(seg.text)
-                is Segment.Link -> {
+        segments.forEach { seg ->
+            when (seg.type) {
+                "link" -> {
+                    val url = seg.url.orEmpty()
+                    pushStringAnnotation(tag = "URL", annotation = url)
                     withStyle(
                         SpanStyle(
                             color = linkColor,
                             textDecoration = TextDecoration.Underline
                         )
-                    ) { append(seg.text) }
-                    val id = "link_$idx"
-                    appendInlineContent(id, "\u2197")
-                    inlineContent[id] = InlineTextContent(
-                        Placeholder(
-                            width = 1.1.em,
-                            height = 1.em,
-                            placeholderVerticalAlign = PlaceholderVerticalAlign.Center
-                        )
-                    ) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.OpenInNew,
-                            contentDescription = null,
-                            tint = linkColor,
-                            modifier = Modifier.fillMaxSize().padding(start = 2.dp)
-                        )
-                    }
+                    ) { append(seg.value) }
+                    pop()
                 }
+                else -> append(seg.value)
             }
         }
     }
 
-    Text(
+    ClickableText(
         text = annotated,
-        inlineContent = inlineContent,
-        fontFamily = FontFamily.Serif,
-        fontWeight = FontWeight.Light,
-        fontSize = fontSize.sp,
-        lineHeight = (fontSize * 1.4f).sp,
-        color = textColor,
-        modifier = modifier
+        modifier = modifier,
+        style = androidx.compose.ui.text.TextStyle(
+            color = textColor,
+            fontFamily = FontFamily.Serif,
+            fontWeight = FontWeight.Light,
+            fontSize = fontSize.sp,
+            lineHeight = (fontSize * 1.4f).sp
+        ),
+        onClick = { offset ->
+            annotated.getStringAnnotations(tag = "URL", start = offset, end = offset)
+                .firstOrNull()?.let { ann ->
+                    if (ann.item.isNotBlank()) UrlLauncher.openUrl(ann.item)
+                }
+        }
     )
 }
 
 @Composable
 private fun DataPointsSection(
-    stats: List<StatRow>,
+    league: String,
+    points: List<TopicDataPoint>,
+    onNavigateToChart: (chartId: String, sport: Sport, vizType: VizType, filters: Map<String, String>?) -> Unit,
     fontSize: Float,
     modifier: Modifier = Modifier
 ) {
     val labelColor = MaterialTheme.colorScheme.onSurfaceVariant
     val valueColor = MaterialTheme.colorScheme.onBackground
+    val accentColor = MaterialTheme.colorScheme.primary
     val headerSize = (fontSize * 0.6f).sp
     val rowSize = (fontSize * 0.72f).sp
+    val sport = leagueToSport(league)
 
     Column(modifier = modifier) {
         Text(
@@ -502,47 +281,78 @@ private fun DataPointsSection(
             color = labelColor,
             modifier = Modifier.padding(bottom = 6.dp)
         )
-        stats.forEach { row ->
+        points.forEach { dp ->
+            val vizType = stringToVizType(dp.vizType)
+            val filters = buildFiltersForDataPoint(dp)
+            val isClickable = sport != null && vizType != null && dp.source.isNotBlank()
+            val rowModifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 2.dp)
+                .let {
+                    if (isClickable) {
+                        it.clickable {
+                            onNavigateToChart(dp.source, sport!!, vizType!!, filters)
+                        }
+                    } else it
+                }
             Row(
-                modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
+                modifier = rowModifier,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = row.subject,
+                    text = dp.subject,
                     fontSize = rowSize,
                     fontFamily = FontFamily.SansSerif,
                     fontWeight = FontWeight.Medium,
                     color = valueColor,
-                    modifier = Modifier.weight(2f)
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    // Fixed 20% of the row width so the middle column starts at
+                    // the same x-offset on every row, regardless of how wide
+                    // the right-aligned value column is.
+                    modifier = Modifier.fillMaxWidth(0.2f)
                 )
                 Text(
-                    text = row.stat,
+                    text = dp.name,
                     fontSize = rowSize,
                     fontFamily = FontFamily.SansSerif,
                     color = labelColor,
-                    modifier = Modifier.weight(1.5f)
+                    textAlign = TextAlign.Start,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f).padding(horizontal = 8.dp)
                 )
                 Text(
-                    text = row.value,
+                    text = truncateToTwoDecimals(dp.value) + (dp.rank?.let { " (#${it})" } ?: ""),
                     fontSize = rowSize,
                     fontFamily = FontFamily.SansSerif,
                     fontWeight = FontWeight.SemiBold,
-                    color = valueColor,
-                    modifier = Modifier.weight(1f)
+                    color = if (isClickable) accentColor else valueColor,
+                    textDecoration = if (isClickable) TextDecoration.Underline else TextDecoration.None,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    textAlign = TextAlign.End
                 )
             }
         }
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TopicsV2Screen(
-    component: TopicsV2Component
+    component: TopicsV2Component,
+    topics: TopicsResponse?
 ) {
-    val items = remember { mutableStateListOf(*topicItems.toTypedArray()) }
+    val initial = remember(topics) { topics?.topics ?: emptyList() }
+    val items = remember(initial) { mutableStateListOf<Topic>().apply { addAll(initial) } }
     var headerVisible by remember { mutableStateOf(true) }
     var showSizeSlider by remember { mutableStateOf(false) }
-    var fontSize by remember { mutableStateOf(18f) }
+    var showInfoSheet by remember { mutableStateOf(false) }
+    // Restore the persisted font size on entry; default to 18sp if none has been saved yet.
+    var fontSize by remember { mutableStateOf(component.getFontSize() ?: 18f) }
+    val updatedAt = remember(topics) { component.getUpdatedAt() }
+    val hasInfo = (topics?.infoSegments?.isNotEmpty() == true) || (topics?.info?.isNotBlank() == true)
     val listState = rememberLazyListState()
     val scrollScope = rememberCoroutineScope()
 
@@ -551,117 +361,150 @@ fun TopicsV2Screen(
         color = MaterialTheme.colorScheme.background
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
-        Column(modifier = Modifier.fillMaxSize()) {
-            // Header
-            if (headerVisible) {
-                Column {
-                    TopAppBar(
-                        title = { },
-                        navigationIcon = {
-                            IconButton(onClick = component.onNavigateBack) {
-                                Icon(
-                                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                    contentDescription = "Back"
-                                )
-                            }
-                        },
-                        actions = {
-                            TextButton(onClick = { showSizeSlider = !showSizeSlider }) {
+            Column(modifier = Modifier.fillMaxSize()) {
+                if (headerVisible) {
+                    Column {
+                        TopAppBar(
+                            title = {
                                 Text(
-                                    text = "Aa",
+                                    text = "Updated ${formatRelativeTime(updatedAt)}",
+                                    fontFamily = FontFamily.SansSerif,
+                                    fontWeight = FontWeight.Normal,
+                                    fontSize = 12.sp,
+                                    color = MaterialTheme.colorScheme.onBackground
+                                )
+                            },
+                            navigationIcon = {
+                                IconButton(onClick = component.onNavigateBack) {
+                                    Icon(
+                                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                        contentDescription = "Back"
+                                    )
+                                }
+                            },
+                            actions = {
+                                if (hasInfo) {
+                                    IconButton(onClick = { showInfoSheet = true }) {
+                                        Icon(
+                                            imageVector = Icons.Default.Info,
+                                            contentDescription = "About topics"
+                                        )
+                                    }
+                                }
+                                TextButton(onClick = { showSizeSlider = !showSizeSlider }) {
+                                    Text(
+                                        text = "Aa",
+                                        fontFamily = FontFamily.Serif,
+                                        fontWeight = FontWeight.Light,
+                                        fontSize = 18.sp
+                                    )
+                                }
+                                IconButton(onClick = { headerVisible = false }) {
+                                    Icon(
+                                        imageVector = Icons.Default.ExpandLess,
+                                        contentDescription = "Hide header"
+                                    )
+                                }
+                            },
+                            colors = TopAppBarDefaults.topAppBarColors(
+                                containerColor = MaterialTheme.colorScheme.background,
+                                titleContentColor = MaterialTheme.colorScheme.onBackground,
+                                navigationIconContentColor = MaterialTheme.colorScheme.onBackground,
+                                actionIconContentColor = MaterialTheme.colorScheme.onBackground
+                            )
+                        )
+
+                        AnimatedVisibility(visible = showSizeSlider) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 20.dp, vertical = 8.dp)
+                            ) {
+                                Text(
+                                    text = "A",
                                     fontFamily = FontFamily.Serif,
                                     fontWeight = FontWeight.Light,
-                                    fontSize = 18.sp
+                                    fontSize = 12.sp
+                                )
+                                Slider(
+                                    value = fontSize,
+                                    onValueChange = { fontSize = it },
+                                    onValueChangeFinished = { component.saveFontSize(fontSize) },
+                                    valueRange = 12f..32f,
+                                    modifier = Modifier.weight(1f).padding(horizontal = 8.dp)
+                                )
+                                Text(
+                                    text = "A",
+                                    fontFamily = FontFamily.Serif,
+                                    fontWeight = FontWeight.Light,
+                                    fontSize = 28.sp
                                 )
                             }
-                            IconButton(onClick = { headerVisible = false }) {
-                                Icon(
-                                    imageVector = Icons.Default.ExpandLess,
-                                    contentDescription = "Hide header"
-                                )
-                            }
-                        },
-                        colors = TopAppBarDefaults.topAppBarColors(
-                            containerColor = MaterialTheme.colorScheme.background,
-                            titleContentColor = MaterialTheme.colorScheme.onBackground,
-                            navigationIconContentColor = MaterialTheme.colorScheme.onBackground,
-                            actionIconContentColor = MaterialTheme.colorScheme.onBackground
-                        )
-                    )
-
-                    // Size slider
-                    AnimatedVisibility(visible = showSizeSlider) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 20.dp, vertical = 8.dp)
-                        ) {
-                            Text(
-                                text = "A",
-                                fontFamily = FontFamily.Serif,
-                                fontWeight = FontWeight.Light,
-                                fontSize = 12.sp
-                            )
-                            Slider(
-                                value = fontSize,
-                                onValueChange = { fontSize = it },
-                                valueRange = 12f..32f,
-                                modifier = Modifier.weight(1f).padding(horizontal = 8.dp)
-                            )
-                            Text(
-                                text = "A",
-                                fontFamily = FontFamily.Serif,
-                                fontWeight = FontWeight.Light,
-                                fontSize = 28.sp
-                            )
                         }
                     }
                 }
-            }
 
-            LazyColumn(
-                state = listState,
-                modifier = Modifier.fillMaxSize().then(
-                    if (!headerVisible) Modifier.padding(top = 16.dp) else Modifier
-                )
-            ) {
-                items(
-                    items = items,
-                    key = { it.id }
-                ) { item ->
-                    SwipeToDismissItem(
-                        onDismissed = { items.remove(item) },
-                        modifier = Modifier.animateItem()
+                if (items.isEmpty()) {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(start = 20.dp, end = 60.dp, top = 16.dp, bottom = 16.dp)
-                        ) {
-                            TopicLabel(
-                                league = item.league,
-                                category = item.category,
-                                fontSize = fontSize,
-                                modifier = Modifier.padding(bottom = 6.dp)
-                            )
-                            SegmentedTopicText(
-                                segments = item.segments,
-                                fontSize = fontSize,
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                            DataPointsSection(
-                                stats = item.stats,
-                                fontSize = fontSize,
-                                modifier = Modifier.fillMaxWidth().padding(top = 12.dp)
-                            )
+                        Text(
+                            text = "no topics available",
+                            style = MaterialTheme.typography.bodySmall,
+                            fontFamily = FontFamily.Serif,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                } else {
+                    LazyColumn(
+                        state = listState,
+                        modifier = Modifier.fillMaxSize().then(
+                            if (!headerVisible) Modifier.padding(top = 16.dp) else Modifier
+                        )
+                    ) {
+                        items(
+                            items = items,
+                            key = { it.summary.take(40) + ":" + it.league }
+                        ) { item ->
+                            SwipeToDismissItem(
+                                onDismissed = { items.remove(item) },
+                                modifier = Modifier.animateItem()
+                            ) {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(start = 20.dp, end = 60.dp, top = 16.dp, bottom = 16.dp)
+                                ) {
+                                    TopicLabel(
+                                        league = item.league,
+                                        category = item.category,
+                                        fontSize = fontSize,
+                                        modifier = Modifier.padding(bottom = 6.dp)
+                                    )
+                                    SegmentedSummary(
+                                        segments = item.summarySegments,
+                                        fallbackSummary = item.summary,
+                                        fontSize = fontSize,
+                                        modifier = Modifier.fillMaxWidth()
+                                    )
+                                    if (item.dataPoints.isNotEmpty()) {
+                                        DataPointsSection(
+                                            league = item.league,
+                                            points = item.dataPoints,
+                                            onNavigateToChart = component.onNavigateToChart,
+                                            fontSize = fontSize,
+                                            modifier = Modifier.fillMaxWidth().padding(top = 12.dp)
+                                        )
+                                    }
+                                }
+                            }
                         }
                     }
                 }
             }
-        }
 
-            // Small FAB to reopen header
             if (!headerVisible) {
                 SmallFloatingActionButton(
                     onClick = { headerVisible = true },
@@ -681,7 +524,6 @@ fun TopicsV2Screen(
                 }
             }
 
-            // FAB to jump to next list item
             SmallFloatingActionButton(
                 onClick = {
                     val target = listState.firstVisibleItemIndex + 1
@@ -703,6 +545,56 @@ fun TopicsV2Screen(
                     imageVector = Icons.Default.KeyboardArrowDown,
                     contentDescription = "Next item",
                     modifier = Modifier.size(20.dp)
+                )
+            }
+        }
+    }
+
+    if (showInfoSheet && hasInfo && topics != null) {
+        InfoBottomSheet(
+            onDismiss = { showInfoSheet = false },
+            title = "about topics"
+        ) {
+            // Match the styling used by other chart info bottom sheets
+            // (DataVizScreen / FilterBar): bodyMedium typography on onSurfaceVariant.
+            val bodyStyle = MaterialTheme.typography.bodyMedium
+            val bodyColor = MaterialTheme.colorScheme.onSurfaceVariant
+            val linkColor = MaterialTheme.colorScheme.primary
+
+            if (topics.infoSegments.isNotEmpty()) {
+                val annotated = buildAnnotatedString {
+                    topics.infoSegments.forEach { seg ->
+                        when (seg.type) {
+                            "link" -> {
+                                val url = seg.url.orEmpty()
+                                pushStringAnnotation(tag = "URL", annotation = url)
+                                withStyle(
+                                    SpanStyle(
+                                        color = linkColor,
+                                        textDecoration = TextDecoration.Underline
+                                    )
+                                ) { append(seg.value) }
+                                pop()
+                            }
+                            else -> append(seg.value)
+                        }
+                    }
+                }
+                ClickableText(
+                    text = annotated,
+                    style = bodyStyle.copy(color = bodyColor),
+                    onClick = { offset ->
+                        annotated.getStringAnnotations(tag = "URL", start = offset, end = offset)
+                            .firstOrNull()?.let { ann ->
+                                if (ann.item.isNotBlank()) UrlLauncher.openUrl(ann.item)
+                            }
+                    }
+                )
+            } else {
+                Text(
+                    text = topics.info,
+                    style = bodyStyle,
+                    color = bodyColor
                 )
             }
         }

@@ -2058,6 +2058,11 @@ build_nba_comparisons <- function(home_stats, away_stats, home_team, away_team) 
       list(key = "effectiveFgPct", label = "Effective FG %", value_home = home_stats$efg_pct, rank_home = home_stats$efg_pct_rank, rankDisplay_home = home_stats$efg_pct_rankDisplay, value_away = away_stats$efg_pct, rank_away = away_stats$efg_pct_rank, rankDisplay_away = away_stats$efg_pct_rankDisplay)
     ))
   }
+  if (is_valid_value(home_stats$pace) && is_valid_value(away_stats$pace)) {
+    off_stats <- c(off_stats, list(
+      list(key = "pace", label = "Pace", value_home = home_stats$pace, rank_home = home_stats$pace_rank, rankDisplay_home = home_stats$pace_rankDisplay, value_away = away_stats$pace, rank_away = away_stats$pace_rank, rankDisplay_away = away_stats$pace_rankDisplay)
+    ))
+  }
 
   for (stat in off_stats) {
     off_comparison[[stat$key]] <- list(

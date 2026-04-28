@@ -16,7 +16,6 @@ import com.joebad.fastbreak.ui.DataVizScreen
 import com.joebad.fastbreak.ui.DrawerMenu
 import com.joebad.fastbreak.ui.HomeScreen
 import com.joebad.fastbreak.ui.SettingsScreen
-import com.joebad.fastbreak.ui.TopicsScreen
 import com.joebad.fastbreak.ui.TopicsV2Screen
 import com.joebad.fastbreak.ui.theme.AppTheme
 import kotlinx.coroutines.launch
@@ -103,14 +102,9 @@ fun App(rootComponent: RootComponent) {
                             rootComponent.pinnedTeamsContainer.unpinTeam(sport, teamCode)
                         }
                     )
-                    is RootComponent.Child.Topics -> TopicsScreen(
-                        component = child.component,
-                        topics = rootComponent.registryContainer.getCachedTopics(),
-                        topicsUpdatedAt = rootComponent.registryContainer.getTopicsUpdatedAt(),
-                        onMenuClick = { scope.launch { drawerState.open() } }
-                    )
                     is RootComponent.Child.TopicsV2 -> TopicsV2Screen(
-                        component = child.component
+                        component = child.component,
+                        topics = rootComponent.registryContainer.getCachedTopics()
                     )
                 }
             }

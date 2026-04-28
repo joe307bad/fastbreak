@@ -493,6 +493,10 @@ if (length(recent_games) > 0) {
   cat("Computed month trend for", nrow(month_trend_stats), "teams\n")
 }
 
+# Playoff trend is computed after playoff games are fetched (Step 3). Declared
+# here so build_team can safely reference it before the data exists.
+playoff_trend_stats <- NULL
+
 # Build head-to-head lookup from recent games
 h2h_games <- recent_games
 
@@ -638,6 +642,21 @@ build_team <- function(name, abbrev, logo, seed = NULL, record = NULL) {
         goalsPerGame = list(value = round(mt$gpg, 2), rank = as.integer(mt$gpg_rank), rankDisplay = mt$gpg_rankDisplay),
         goalsAgainstPerGame = list(value = round(mt$gapg, 2), rank = as.integer(mt$gapg_rank), rankDisplay = mt$gapg_rankDisplay),
         goalDiffPerGame = list(value = round(mt$goal_diff, 2), rank = as.integer(mt$goal_diff_rank), rankDisplay = mt$goal_diff_rankDisplay)
+      )
+    }
+  }
+
+  # Playoff trend — computed from playoff games only, ranked across playoff teams
+  if (!is.null(playoff_trend_stats)) {
+    pt <- playoff_trend_stats %>% filter(team_abbreviation == abbrev | team_abbreviation == nhl_ab)
+    if (nrow(pt) > 0) {
+      ts$playoffTrend <- list(
+        gamesPlayed = as.integer(pt$games_played),
+        record = list(wins = as.integer(pt$wins), losses = as.integer(pt$losses),
+                      rank = as.integer(pt$record_rank), rankDisplay = pt$record_rankDisplay),
+        goalsPerGame = list(value = round(pt$gpg, 2), rank = as.integer(pt$gpg_rank), rankDisplay = pt$gpg_rankDisplay),
+        goalsAgainstPerGame = list(value = round(pt$gapg, 2), rank = as.integer(pt$gapg_rank), rankDisplay = pt$gapg_rankDisplay),
+        goalDiffPerGame = list(value = round(pt$goal_diff, 2), rank = as.integer(pt$goal_diff_rank), rankDisplay = pt$goal_diff_rankDisplay)
       )
     }
   }
@@ -894,6 +913,61 @@ while (current_date <= fetch_end) {
 # Alias for rest of script
 playoff_events <- series_map
 cat("Fetched", length(playoff_events), "playoff series\n")
+
+# ============================================================================
+# Playoff trend (postseason games only, ranked across playoff teams)
+# Same metric set as monthTrend, but the games used and the ranking pool are
+# limited to the playoffs so we can see how teams stack up across the games
+# that have actually been played in the postseason.
+# ============================================================================
+cat("\nComputing playoff trend (postseason games only)...\n")
+
+po_games <- list()
+for (k in names(playoff_events)) {
+  s <- playoff_events[[k]]
+  for (g in s$games) {
+    if (!isTRUE(g$completed)) next
+    po_games[[length(po_games) + 1]] <- list(
+      team1_abbrev = g$team1_abbrev, team1_score = g$team1_score, team1_winner = g$team1_winner,
+      team2_abbrev = g$team2_abbrev, team2_score = g$team2_score, team2_winner = g$team2_winner
+    )
+  }
+}
+
+if (length(po_games) > 0) {
+  po_df <- bind_rows(po_games)
+  t1_stats <- po_df %>%
+    group_by(team_abbreviation = team1_abbrev) %>%
+    summarise(games = n(), wins = sum(team1_winner, na.rm = TRUE),
+              losses = sum(!team1_winner, na.rm = TRUE),
+              gf = sum(team1_score, na.rm = TRUE), ga = sum(team2_score, na.rm = TRUE), .groups = "drop")
+  t2_stats <- po_df %>%
+    group_by(team_abbreviation = team2_abbrev) %>%
+    summarise(games = n(), wins = sum(team2_winner, na.rm = TRUE),
+              losses = sum(!team2_winner, na.rm = TRUE),
+              gf = sum(team2_score, na.rm = TRUE), ga = sum(team1_score, na.rm = TRUE), .groups = "drop")
+
+  playoff_trend_stats <- bind_rows(t1_stats, t2_stats) %>%
+    group_by(team_abbreviation) %>%
+    summarise(games_played = sum(games), wins = sum(wins), losses = sum(losses),
+              gf = sum(gf), ga = sum(ga), .groups = "drop") %>%
+    mutate(gpg = gf / games_played, gapg = ga / games_played,
+           goal_diff = gpg - gapg,
+           win_pct = ifelse(wins + losses > 0, wins / (wins + losses), NA_real_))
+
+  gpg_r  <- tied_rank(-playoff_trend_stats$gpg)
+  gapg_r <- tied_rank( playoff_trend_stats$gapg)
+  diff_r <- tied_rank(-playoff_trend_stats$goal_diff)
+  rec_r  <- tied_rank(-playoff_trend_stats$win_pct)
+  playoff_trend_stats <- playoff_trend_stats %>%
+    mutate(gpg_rank = gpg_r$rank, gpg_rankDisplay = gpg_r$rankDisplay,
+           gapg_rank = gapg_r$rank, gapg_rankDisplay = gapg_r$rankDisplay,
+           goal_diff_rank = diff_r$rank, goal_diff_rankDisplay = diff_r$rankDisplay,
+           record_rank = rec_r$rank, record_rankDisplay = rec_r$rankDisplay)
+  cat("Computed playoff trend for", nrow(playoff_trend_stats), "teams (", length(po_games), "games)\n")
+} else {
+  cat("No completed playoff games found yet\n")
+}
 
 # ============================================================================
 # STEP 4: Build bracket

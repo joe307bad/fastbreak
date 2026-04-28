@@ -405,6 +405,80 @@ if (!is.null(month_trend_stats)) {
   cat("Computed month trend for", nrow(month_trend_stats), "teams\n")
 }
 
+# ============================================================================
+# Playoff trend (postseason games only, ranked across playoff teams)
+# Same metric set as monthTrend, but the games used and the ranking pool are
+# limited to the postseason so we can see how teams stack up across the games
+# that have actually been played in the playoffs.
+# ============================================================================
+cat("\nComputing playoff trend (postseason games only)...\n")
+
+playoff_game_ids <- if ("season_type" %in% names(team_box)) {
+  unique(team_box$game_id[team_box$season_type == 3])
+} else character(0)
+
+playoff_trend_stats <- tryCatch({
+  if (length(playoff_game_ids) == 0) {
+    cat("No postseason games found yet\n")
+    NULL
+  } else {
+    po_game_ratings <- game_ratings %>%
+      filter(game_id %in% playoff_game_ids) %>%
+      left_join(
+        team_box %>% select(game_id, team_id,
+                            assists_game = assists,
+                            opp_abbrev = opponent_team_abbreviation),
+        by = c("game_id", "team_id")
+      ) %>%
+      filter(!is.na(net_rating_g))
+
+    cat("Playoff trend:", nrow(po_game_ratings), "team-games\n")
+
+    base_stats <- po_game_ratings %>%
+      group_by(team_abbreviation) %>%
+      summarise(
+        games_played = n(),
+        wins = sum(team_score > opponent_team_score, na.rm = TRUE),
+        losses = sum(team_score < opponent_team_score, na.rm = TRUE),
+        avg_net_rating = mean(net_rating_g, na.rm = TRUE),
+        avg_off_rating = mean(off_rating, na.rm = TRUE),
+        avg_def_rating = mean(def_rating, na.rm = TRUE),
+        points_per_game = mean(team_score, na.rm = TRUE),
+        assists_per_game = mean(assists_game, na.rm = TRUE),
+        turnovers_per_game = mean(turnovers, na.rm = TRUE),
+        .groups = "drop"
+      )
+
+    turnovers_forced <- po_game_ratings %>%
+      group_by(defending_team = opp_abbrev) %>%
+      summarise(turnovers_forced_pg = mean(turnovers, na.rm = TRUE), .groups = "drop")
+
+    df <- base_stats %>%
+      left_join(turnovers_forced, by = c("team_abbreviation" = "defending_team")) %>%
+      mutate(
+        turnover_diff = coalesce(turnovers_forced_pg, 0) - turnovers_per_game,
+        win_pct = ifelse(wins + losses > 0, wins / (wins + losses), NA_real_)
+      )
+
+    nr  <- tied_rank(-df$avg_net_rating);    df$net_rating_rank <- nr$rank;  df$net_rating_rankDisplay <- nr$rankDisplay
+    orr <- tied_rank(-df$avg_off_rating);    df$off_rating_rank <- orr$rank; df$off_rating_rankDisplay <- orr$rankDisplay
+    dr  <- tied_rank( df$avg_def_rating);    df$def_rating_rank <- dr$rank;  df$def_rating_rankDisplay <- dr$rankDisplay
+    pp  <- tied_rank(-df$points_per_game);   df$ppg_rank <- pp$rank;         df$ppg_rankDisplay <- pp$rankDisplay
+    ap  <- tied_rank(-df$assists_per_game);  df$apg_rank <- ap$rank;         df$apg_rankDisplay <- ap$rankDisplay
+    tp  <- tied_rank( df$turnovers_per_game);df$tpg_rank <- tp$rank;         df$tpg_rankDisplay <- tp$rankDisplay
+    td  <- tied_rank(-df$turnover_diff);     df$tov_diff_rank <- td$rank;    df$tov_diff_rankDisplay <- td$rankDisplay
+    rr  <- tied_rank(-df$win_pct);           df$record_rank <- rr$rank;      df$record_rankDisplay <- rr$rankDisplay
+    df
+  }
+}, error = function(e) {
+  cat("Playoff trend calc error:", e$message, "\n")
+  NULL
+})
+
+if (!is.null(playoff_trend_stats)) {
+  cat("Computed playoff trend for", nrow(playoff_trend_stats), "teams\n")
+}
+
 # Ranks
 team_stats <- team_stats %>%
   mutate(
@@ -639,6 +713,43 @@ build_team <- function(name, abbrev, logo, seed = NULL, record = NULL) {
       turnoverDiff = list(value = round(team_month$turnover_diff, 1),
                           rank = as.integer(team_month$tov_diff_rank),
                           rankDisplay = team_month$tov_diff_rankDisplay)
+    )
+  } else NULL
+
+  # Playoff trend rankings (postseason games only, ranked vs other playoff teams)
+  team_playoff <- if (!is.null(playoff_trend_stats)) {
+    playoff_trend_stats %>% filter(team_abbreviation == team_abbr)
+  } else data.frame()
+  ts$playoffTrend <- if (nrow(team_playoff) > 0) {
+    list(
+      gamesPlayed = as.integer(team_playoff$games_played),
+      record = list(
+        wins = as.integer(team_playoff$wins),
+        losses = as.integer(team_playoff$losses),
+        rank = as.integer(team_playoff$record_rank),
+        rankDisplay = team_playoff$record_rankDisplay
+      ),
+      netRating = list(value = round(team_playoff$avg_net_rating, 1),
+                       rank = as.integer(team_playoff$net_rating_rank),
+                       rankDisplay = team_playoff$net_rating_rankDisplay),
+      offensiveRating = list(value = round(team_playoff$avg_off_rating, 1),
+                             rank = as.integer(team_playoff$off_rating_rank),
+                             rankDisplay = team_playoff$off_rating_rankDisplay),
+      defensiveRating = list(value = round(team_playoff$avg_def_rating, 1),
+                             rank = as.integer(team_playoff$def_rating_rank),
+                             rankDisplay = team_playoff$def_rating_rankDisplay),
+      pointsPerGame = list(value = round(team_playoff$points_per_game, 1),
+                           rank = as.integer(team_playoff$ppg_rank),
+                           rankDisplay = team_playoff$ppg_rankDisplay),
+      assistsPerGame = list(value = round(team_playoff$assists_per_game, 1),
+                            rank = as.integer(team_playoff$apg_rank),
+                            rankDisplay = team_playoff$apg_rankDisplay),
+      turnoversPerGame = list(value = round(team_playoff$turnovers_per_game, 1),
+                              rank = as.integer(team_playoff$tpg_rank),
+                              rankDisplay = team_playoff$tpg_rankDisplay),
+      turnoverDiff = list(value = round(team_playoff$turnover_diff, 1),
+                          rank = as.integer(team_playoff$tov_diff_rank),
+                          rankDisplay = team_playoff$tov_diff_rankDisplay)
     )
   } else NULL
 

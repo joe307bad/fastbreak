@@ -165,31 +165,19 @@ private fun NHLPlayoffMatchupBottomSheet(
                                     val t2Trend = t2?.teamStats?.let { parseNHLMonthTrend(it) }
                                     if (t1Trend != null || t2Trend != null) {
                                         Spacer(modifier = Modifier.height(16.dp))
-                                        SectionHeader("One Month Trend")
-                                        Spacer(modifier = Modifier.height(4.dp))
-                                        fun trendAdv(a: Int?, b: Int?): Int = if (a != null && b != null) when { a < b -> -1; b < a -> 1; else -> 0 } else 0
-                                        val t1Rec = if (t1Trend != null) "${t1Trend.wins}-${t1Trend.losses}" else "-"
-                                        val t2Rec = if (t2Trend != null) "${t2Trend.wins}-${t2Trend.losses}" else "-"
-                                        FiveColumnRowWithRanks(leftValue = t1Rec, leftRank = t1Trend?.recordRank, leftRankDisplay = t1Trend?.recordRankDisplay,
-                                            centerText = "Record", rightValue = t2Rec, rightRank = t2Trend?.recordRank, rightRankDisplay = t2Trend?.recordRankDisplay,
-                                            advantage = trendAdv(t1Trend?.recordRank, t2Trend?.recordRank), rankColorFn = ::playoffRankColor)
-                                        FiveColumnRowWithRanks(leftValue = t1Trend?.goalsFor?.bracketFormatStat(2) ?: "-",
-                                            leftRank = t1Trend?.goalsForRank, leftRankDisplay = t1Trend?.goalsForRankDisplay,
-                                            centerText = "Goals/Game", rightValue = t2Trend?.goalsFor?.bracketFormatStat(2) ?: "-",
-                                            rightRank = t2Trend?.goalsForRank, rightRankDisplay = t2Trend?.goalsForRankDisplay,
-                                            advantage = trendAdv(t1Trend?.goalsForRank, t2Trend?.goalsForRank), rankColorFn = ::playoffRankColor)
-                                        FiveColumnRowWithRanks(leftValue = t1Trend?.goalsAgainst?.bracketFormatStat(2) ?: "-",
-                                            leftRank = t1Trend?.goalsAgainstRank, leftRankDisplay = t1Trend?.goalsAgainstRankDisplay,
-                                            centerText = "Goals Against/G", rightValue = t2Trend?.goalsAgainst?.bracketFormatStat(2) ?: "-",
-                                            rightRank = t2Trend?.goalsAgainstRank, rightRankDisplay = t2Trend?.goalsAgainstRankDisplay,
-                                            advantage = trendAdv(t1Trend?.goalsAgainstRank, t2Trend?.goalsAgainstRank), rankColorFn = ::playoffRankColor)
-                                        val t1Diff = t1Trend?.goalDiff?.bracketFormatStat(2) ?: "-"
-                                        val t2Diff = t2Trend?.goalDiff?.bracketFormatStat(2) ?: "-"
-                                        FiveColumnRowWithRanks(leftValue = t1Diff,
-                                            leftRank = t1Trend?.goalDiffRank, leftRankDisplay = t1Trend?.goalDiffRankDisplay,
-                                            centerText = "Goal Diff/G", rightValue = t2Diff,
-                                            rightRank = t2Trend?.goalDiffRank, rightRankDisplay = t2Trend?.goalDiffRankDisplay,
-                                            advantage = trendAdv(t1Trend?.goalDiffRank, t2Trend?.goalDiffRank), rankColorFn = ::playoffRankColor)
+                                        NHLPlayoffTrendSection("One Month Trend", t1Trend, t2Trend)
+                                    }
+                                    // Playoff trend (postseason games only)
+                                    val t1Po = t1?.teamStats?.let { parseNHLPlayoffTrend(it) }
+                                    val t2Po = t2?.teamStats?.let { parseNHLPlayoffTrend(it) }
+                                    if (t1Po != null || t2Po != null) {
+                                        val gp = maxOf(
+                                            (t1Po?.wins ?: 0) + (t1Po?.losses ?: 0),
+                                            (t2Po?.wins ?: 0) + (t2Po?.losses ?: 0)
+                                        )
+                                        val header = if (gp > 0) "Playoff Trend (Last $gp Games)" else "Playoff Trend"
+                                        Spacer(modifier = Modifier.height(16.dp))
+                                        NHLPlayoffTrendSection(header, t1Po, t2Po)
                                     }
 
                                     // Regular season h2h
@@ -301,17 +289,19 @@ private fun NHLPlayoffMatchupBottomSheet(
                                     val dv = stat.defense.value?.bracketFormatStat(2) ?: return@mapNotNull null
                                     ShareFiveColStat(ov, stat.offense.rank, stat.offense.rankDisplay, stat.offLabel, dv, stat.defense.rank, stat.defense.rankDisplay, stat.advantage ?: 0)
                                 }.take(9)))
-                            // Trend box
-                            if (t1Trend != null || t2Trend != null) {
-                                fun trendAdv(a: Int?, b: Int?): Int = if (a != null && b != null) when { a < b -> -1; b < a -> 1; else -> 0 } else 0
-                                val trendStats = mutableListOf<ShareFiveColStat>()
-                                val t1Rec = if (t1Trend != null) "${t1Trend.wins}-${t1Trend.losses}" else "-"
-                                val t2Rec = if (t2Trend != null) "${t2Trend.wins}-${t2Trend.losses}" else "-"
-                                trendStats.add(ShareFiveColStat(t1Rec, t1Trend?.recordRank, t1Trend?.recordRankDisplay, "Record", t2Rec, t2Trend?.recordRank, t2Trend?.recordRankDisplay, trendAdv(t1Trend?.recordRank, t2Trend?.recordRank)))
-                                trendStats.add(ShareFiveColStat(t1Trend?.goalsFor?.bracketFormatStat(2) ?: "-", t1Trend?.goalsForRank, t1Trend?.goalsForRankDisplay, "Goals/Game", t2Trend?.goalsFor?.bracketFormatStat(2) ?: "-", t2Trend?.goalsForRank, t2Trend?.goalsForRankDisplay, trendAdv(t1Trend?.goalsForRank, t2Trend?.goalsForRank)))
-                                trendStats.add(ShareFiveColStat(t1Trend?.goalsAgainst?.bracketFormatStat(2) ?: "-", t1Trend?.goalsAgainstRank, t1Trend?.goalsAgainstRankDisplay, "Goals Against/G", t2Trend?.goalsAgainst?.bracketFormatStat(2) ?: "-", t2Trend?.goalsAgainstRank, t2Trend?.goalsAgainstRankDisplay, trendAdv(t1Trend?.goalsAgainstRank, t2Trend?.goalsAgainstRank)))
-                                trendStats.add(ShareFiveColStat(t1Trend?.goalDiff?.bracketFormatStat(2) ?: "-", t1Trend?.goalDiffRank, t1Trend?.goalDiffRankDisplay, "Goal Diff/G", t2Trend?.goalDiff?.bracketFormatStat(2) ?: "-", t2Trend?.goalDiffRank, t2Trend?.goalDiffRankDisplay, trendAdv(t1Trend?.goalDiffRank, t2Trend?.goalDiffRank)))
-                                add(ShareStatBox(title = "One Month Trend", fiveColStats = trendStats))
+                            // Trend box — prefer playoff trend (postseason games only) when available,
+                            // fall back to the regular-season month trend otherwise.
+                            val t1Po = t1?.teamStats?.let { parseNHLPlayoffTrend(it) }
+                            val t2Po = t2?.teamStats?.let { parseNHLPlayoffTrend(it) }
+                            if (t1Po != null || t2Po != null) {
+                                val gp = maxOf(
+                                    (t1Po?.wins ?: 0) + (t1Po?.losses ?: 0),
+                                    (t2Po?.wins ?: 0) + (t2Po?.losses ?: 0)
+                                )
+                                val title = if (gp > 0) "Playoff Trend (Last $gp Games)" else "Playoff Trend"
+                                add(ShareStatBox(title = title, fiveColStats = buildNhlTrendShareRows(t1Po, t2Po)))
+                            } else if (t1Trend != null || t2Trend != null) {
+                                add(ShareStatBox(title = "One Month Trend", fiveColStats = buildNhlTrendShareRows(t1Trend, t2Trend)))
                             }
                             // H2H box
                             if (history != null && history.games.isNotEmpty()) {
@@ -332,6 +322,58 @@ private fun NHLPlayoffMatchupBottomSheet(
             }
         }
     }
+}
+
+// ============================================================================
+// Trend section (shared between Month Trend and Playoff Trend — same shape)
+// ============================================================================
+
+@Composable
+private fun NHLPlayoffTrendSection(header: String, t1Trend: NHLMonthTrend?, t2Trend: NHLMonthTrend?) {
+    SectionHeader(header)
+    Spacer(modifier = Modifier.height(4.dp))
+    fun trendAdv(a: Int?, b: Int?): Int =
+        if (a != null && b != null) when { a < b -> -1; b < a -> 1; else -> 0 } else 0
+    val t1Rec = if (t1Trend != null) "${t1Trend.wins}-${t1Trend.losses}" else "-"
+    val t2Rec = if (t2Trend != null) "${t2Trend.wins}-${t2Trend.losses}" else "-"
+    FiveColumnRowWithRanks(leftValue = t1Rec, leftRank = t1Trend?.recordRank, leftRankDisplay = t1Trend?.recordRankDisplay,
+        centerText = "Record", rightValue = t2Rec, rightRank = t2Trend?.recordRank, rightRankDisplay = t2Trend?.recordRankDisplay,
+        advantage = trendAdv(t1Trend?.recordRank, t2Trend?.recordRank), rankColorFn = ::playoffRankColor)
+    FiveColumnRowWithRanks(leftValue = t1Trend?.goalsFor?.bracketFormatStat(2) ?: "-",
+        leftRank = t1Trend?.goalsForRank, leftRankDisplay = t1Trend?.goalsForRankDisplay,
+        centerText = "Goals/Game", rightValue = t2Trend?.goalsFor?.bracketFormatStat(2) ?: "-",
+        rightRank = t2Trend?.goalsForRank, rightRankDisplay = t2Trend?.goalsForRankDisplay,
+        advantage = trendAdv(t1Trend?.goalsForRank, t2Trend?.goalsForRank), rankColorFn = ::playoffRankColor)
+    FiveColumnRowWithRanks(leftValue = t1Trend?.goalsAgainst?.bracketFormatStat(2) ?: "-",
+        leftRank = t1Trend?.goalsAgainstRank, leftRankDisplay = t1Trend?.goalsAgainstRankDisplay,
+        centerText = "Goals Against/G", rightValue = t2Trend?.goalsAgainst?.bracketFormatStat(2) ?: "-",
+        rightRank = t2Trend?.goalsAgainstRank, rightRankDisplay = t2Trend?.goalsAgainstRankDisplay,
+        advantage = trendAdv(t1Trend?.goalsAgainstRank, t2Trend?.goalsAgainstRank), rankColorFn = ::playoffRankColor)
+    FiveColumnRowWithRanks(leftValue = t1Trend?.goalDiff?.bracketFormatStat(2) ?: "-",
+        leftRank = t1Trend?.goalDiffRank, leftRankDisplay = t1Trend?.goalDiffRankDisplay,
+        centerText = "Goal Diff/G", rightValue = t2Trend?.goalDiff?.bracketFormatStat(2) ?: "-",
+        rightRank = t2Trend?.goalDiffRank, rightRankDisplay = t2Trend?.goalDiffRankDisplay,
+        advantage = trendAdv(t1Trend?.goalDiffRank, t2Trend?.goalDiffRank), rankColorFn = ::playoffRankColor)
+}
+
+private fun buildNhlTrendShareRows(t1Trend: NHLMonthTrend?, t2Trend: NHLMonthTrend?): List<ShareFiveColStat> {
+    fun trendAdv(a: Int?, b: Int?): Int =
+        if (a != null && b != null) when { a < b -> -1; b < a -> 1; else -> 0 } else 0
+    val rows = mutableListOf<ShareFiveColStat>()
+    val t1Rec = if (t1Trend != null) "${t1Trend.wins}-${t1Trend.losses}" else "-"
+    val t2Rec = if (t2Trend != null) "${t2Trend.wins}-${t2Trend.losses}" else "-"
+    rows.add(ShareFiveColStat(t1Rec, t1Trend?.recordRank, t1Trend?.recordRankDisplay, "Record",
+        t2Rec, t2Trend?.recordRank, t2Trend?.recordRankDisplay, trendAdv(t1Trend?.recordRank, t2Trend?.recordRank)))
+    rows.add(ShareFiveColStat(t1Trend?.goalsFor?.bracketFormatStat(2) ?: "-", t1Trend?.goalsForRank, t1Trend?.goalsForRankDisplay,
+        "Goals/Game", t2Trend?.goalsFor?.bracketFormatStat(2) ?: "-", t2Trend?.goalsForRank, t2Trend?.goalsForRankDisplay,
+        trendAdv(t1Trend?.goalsForRank, t2Trend?.goalsForRank)))
+    rows.add(ShareFiveColStat(t1Trend?.goalsAgainst?.bracketFormatStat(2) ?: "-", t1Trend?.goalsAgainstRank, t1Trend?.goalsAgainstRankDisplay,
+        "Goals Against/G", t2Trend?.goalsAgainst?.bracketFormatStat(2) ?: "-", t2Trend?.goalsAgainstRank, t2Trend?.goalsAgainstRankDisplay,
+        trendAdv(t1Trend?.goalsAgainstRank, t2Trend?.goalsAgainstRank)))
+    rows.add(ShareFiveColStat(t1Trend?.goalDiff?.bracketFormatStat(2) ?: "-", t1Trend?.goalDiffRank, t1Trend?.goalDiffRankDisplay,
+        "Goal Diff/G", t2Trend?.goalDiff?.bracketFormatStat(2) ?: "-", t2Trend?.goalDiffRank, t2Trend?.goalDiffRankDisplay,
+        trendAdv(t1Trend?.goalDiffRank, t2Trend?.goalDiffRank)))
+    return rows
 }
 
 // ============================================================================

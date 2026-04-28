@@ -16,7 +16,7 @@ library(lubridate)
 # ============================================================================
 DAYS_AHEAD <- 7
 DAYS_BEHIND <- 4
-MAX_RESULTS_GAMES <- 40  # Max completed games to fetch box scores for
+MAX_RESULTS_GAMES <- 75  # Max completed games to fetch box scores for
 
 # ============================================================================
 # Helpers
@@ -452,9 +452,25 @@ while (current_date <= end_date) {
           o <- comp$odds[[1]]
           home_spread <- safe_num(o$spread)
           over_under <- safe_num(o$overUnder)
-          details <- if (!is.null(o$details)) as.character(o$details) else NA
           home_ml <- if (!is.null(o$homeTeamOdds$moneyLine)) safe_num(o$homeTeamOdds$moneyLine) else NA
           away_ml <- if (!is.null(o$awayTeamOdds$moneyLine)) safe_num(o$awayTeamOdds$moneyLine) else NA
+
+          # Build details as the run-line spread (e.g. "NYY -1.5") rather than
+          # ESPN's default moneyline string. Mirrors the NHL bracket formatting.
+          details <- NA_character_
+          if (is_valid_value(home_spread)) {
+            spread_team <- home$team$abbreviation
+            spread_val <- home_spread
+            if (home_spread > 0) {
+              spread_team <- away$team$abbreviation
+              spread_val <- -home_spread
+            }
+            details <- sprintf(
+              "%s %s",
+              spread_team,
+              ifelse(spread_val >= 0, paste0("+", spread_val), as.character(spread_val))
+            )
+          }
 
           if (is_valid_value(home_spread) || is_valid_value(over_under) || is_valid_value(details)) {
             odds_data <- list(

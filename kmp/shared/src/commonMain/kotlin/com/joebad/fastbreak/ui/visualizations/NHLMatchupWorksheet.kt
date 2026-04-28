@@ -2003,6 +2003,54 @@ internal fun parseNHLMonthTrend(stats: JsonObject): NHLMonthTrend? {
 }
 
 /**
+ * Parse NHL playoff trend (postseason games only) — same JSON shape as monthTrend
+ * so we reuse the NHLMonthTrend container and the same UI/share-image helpers.
+ */
+internal fun parseNHLPlayoffTrend(stats: JsonObject): NHLMonthTrend? {
+    val playoffTrend = stats["playoffTrend"] as? JsonObject ?: return null
+
+    val record = playoffTrend["record"] as? JsonObject
+    val wins = (record?.get("wins") as? JsonPrimitive)?.intOrNull ?: 0
+    val losses = (record?.get("losses") as? JsonPrimitive)?.intOrNull ?: 0
+    val recordRank = (record?.get("rank") as? JsonPrimitive)?.intOrNull
+    val recordRankDisplay = (record?.get("rankDisplay") as? JsonPrimitive)?.content
+
+    val goalsForObj = playoffTrend["goalsPerGame"] as? JsonObject
+    val goalsFor = (goalsForObj?.get("value") as? JsonPrimitive)?.doubleOrNull
+    val goalsForRank = (goalsForObj?.get("rank") as? JsonPrimitive)?.intOrNull
+    val goalsForRankDisplay = (goalsForObj?.get("rankDisplay") as? JsonPrimitive)?.content
+
+    val goalsAgainstObj = playoffTrend["goalsAgainstPerGame"] as? JsonObject
+    val goalsAgainst = (goalsAgainstObj?.get("value") as? JsonPrimitive)?.doubleOrNull
+    val goalsAgainstRank = (goalsAgainstObj?.get("rank") as? JsonPrimitive)?.intOrNull
+    val goalsAgainstRankDisplay = (goalsAgainstObj?.get("rankDisplay") as? JsonPrimitive)?.content
+
+    val goalDiffObj = playoffTrend["goalDiffPerGame"] as? JsonObject
+    val goalDiff = (goalDiffObj?.get("value") as? JsonPrimitive)?.doubleOrNull
+    val goalDiffRank = (goalDiffObj?.get("rank") as? JsonPrimitive)?.intOrNull
+    val goalDiffRankDisplay = (goalDiffObj?.get("rankDisplay") as? JsonPrimitive)?.content
+
+    return NHLMonthTrend(
+        wins = wins,
+        losses = losses,
+        recordRank = recordRank,
+        recordRankDisplay = recordRankDisplay,
+        goalsFor = goalsFor,
+        goalsForRank = goalsForRank,
+        goalsForRankDisplay = goalsForRankDisplay,
+        goalsAgainst = goalsAgainst,
+        goalsAgainstRank = goalsAgainstRank,
+        goalsAgainstRankDisplay = goalsAgainstRankDisplay,
+        goalDiff = goalDiff,
+        goalDiffRank = goalDiffRank,
+        goalDiffRankDisplay = goalDiffRankDisplay,
+        xgfPct = null,
+        xgfPctRank = null,
+        xgfPctRankDisplay = null
+    )
+}
+
+/**
  * NHL Completed game section
  */
 @Composable

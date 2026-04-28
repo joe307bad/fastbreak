@@ -408,6 +408,38 @@ internal fun PlayoffEmptyRow() {
 // Series results view (shared across sports)
 // ============================================================================
 
+/**
+ * Predicts the home-team abbreviation for a given game index in a 7-game series
+ * using the standard 2-2-1-1-1 format (games 1, 2, 5, 7 at higher seed; games
+ * 3, 4, 6 at lower seed). Used to fill in placeholder slots for games beyond
+ * what ESPN has scheduled. Returns null when no game in the series has enough
+ * data to anchor the prediction.
+ */
+internal fun predictedHomeAbbrev(
+    games: List<PlayoffSeriesGameInfo>,
+    gameIndex: Int,
+    t1Abbrev: String,
+    t2Abbrev: String
+): String? {
+    if (t1Abbrev.isBlank() || t2Abbrev.isBlank()) return null
+    val highSeedHomeGames = setOf(1, 2, 5, 7)
+    val lowSeedHomeGames = setOf(3, 4, 6)
+
+    val highSeedHome: String? = games.withIndex().firstNotNullOfOrNull { (i, g) ->
+        val home = g.homeTeamAbbrev?.takeIf { it.isNotBlank() } ?: return@firstNotNullOfOrNull null
+        val n = i + 1
+        when (n) {
+            in highSeedHomeGames -> home
+            in lowSeedHomeGames -> if (home == t1Abbrev) t2Abbrev else if (home == t2Abbrev) t1Abbrev else null
+            else -> null
+        }
+    } ?: return null
+
+    val lowSeedHome = if (highSeedHome == t1Abbrev) t2Abbrev else t1Abbrev
+    val gameNum = gameIndex + 1
+    return if (gameNum in highSeedHomeGames) highSeedHome else lowSeedHome
+}
+
 @Composable
 internal fun PlayoffSeriesResultsView(
     games: List<PlayoffSeriesGameInfo>,
@@ -430,32 +462,39 @@ internal fun PlayoffSeriesResultsView(
             val t2Won = game.team2?.winner == true
             val isCompleted = game.completed
             val dateLabel = game.gameDate?.let { formatBracketGameDate(it) }
-            val homeLabel = game.homeTeamAbbrev?.let { "@ $it" } ?: ""
+            val homeAbbrev = game.homeTeamAbbrev?.takeIf { it.isNotBlank() }
+                ?: predictedHomeAbbrev(games, idx, t1Abbrev, t2Abbrev)
+            val homeLabel = homeAbbrev?.let { "@ $it" }
             val advantage = when { t1Won -> -1; t2Won -> 1; else -> 0 }
-            val centerText = "Game ${idx + 1}" + if (homeLabel.isNotEmpty()) "\n$homeLabel" else ""
 
             FiveColumnRowWithRanks(
                 leftValue = if (isCompleted) "${game.team1?.score ?: "-"}" else "-",
                 leftRank = null, leftRankDisplay = null,
-                centerText = centerText,
+                centerText = "Game ${idx + 1}",
                 rightValue = if (isCompleted) "${game.team2?.score ?: "-"}" else "-",
                 rightRank = null, rightRankDisplay = null,
-                advantage = advantage
+                advantage = if (isCompleted) advantage else 0
             )
             val oddsLabel = if (!isCompleted) game.odds?.let { formatPlayoffGameOddsLine(it) } else null
-            val scheduleLine = listOfNotNull(dateLabel, oddsLabel).joinToString(" · ")
-            if (scheduleLine.isNotEmpty()) {
+            val subLine = listOfNotNull(homeLabel, dateLabel, oddsLabel).joinToString(" · ")
+            if (subLine.isNotEmpty()) {
                 val color = if (isCompleted) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                             else MaterialTheme.colorScheme.primary.copy(alpha = 0.8f)
-                Text(scheduleLine, style = MaterialTheme.typography.labelSmall, color = color,
+                Text(subLine, style = MaterialTheme.typography.labelSmall, color = color,
                     modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center, fontSize = 10.sp)
             }
         } else {
+            val predHome = predictedHomeAbbrev(games, idx, t1Abbrev, t2Abbrev)
             FiveColumnRowWithRanks(
                 leftValue = "-", leftRank = null, leftRankDisplay = null,
                 centerText = "Game ${idx + 1}",
                 rightValue = "-", rightRank = null, rightRankDisplay = null, advantage = 0
             )
+            predHome?.let {
+                Text("@ $it", style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                    modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center, fontSize = 10.sp)
+            }
         }
     }
 }

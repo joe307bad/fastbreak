@@ -148,7 +148,9 @@ private fun NBASeriesResultsView(
             val t2Won = game.team2?.winner == true
             val isCompleted = game.completed
             val dateLabel = game.gameDate?.let { formatBracketGameDate(it) }
-            val homeLabel = game.homeTeamAbbrev?.let { "@ $it" } ?: ""
+            val homeAbbrev = game.homeTeamAbbrev?.takeIf { it.isNotBlank() }
+                ?: predictedHomeAbbrev(games, idx, t1Abbrev, t2Abbrev)
+            val homeLabel = homeAbbrev?.let { "@ $it" }
 
             val advantage = when {
                 t1Won -> -1
@@ -156,42 +158,24 @@ private fun NBASeriesResultsView(
                 else -> 0
             }
 
-            val centerText = "Game ${idx + 1}" + if (homeLabel.isNotEmpty()) "\n$homeLabel" else ""
-
-            if (isCompleted) {
-                FiveColumnRowWithRanks(
-                    leftValue = "${t1Score ?: "-"}",
-                    leftRank = null, leftRankDisplay = null,
-                    centerText = centerText,
-                    rightValue = "${t2Score ?: "-"}",
-                    rightRank = null, rightRankDisplay = null,
-                    advantage = advantage
-                )
-                dateLabel?.let {
-                    Text(it, style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                        modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center,
-                        fontSize = 10.sp)
-                }
-            } else {
-                FiveColumnRowWithRanks(
-                    leftValue = "-",
-                    leftRank = null, leftRankDisplay = null,
-                    centerText = centerText,
-                    rightValue = "-",
-                    rightRank = null, rightRankDisplay = null,
-                    advantage = 0
-                )
-                val oddsLabel = game.odds?.let { formatPlayoffGameOddsLine(it) }
-                val scheduleLine = listOfNotNull(dateLabel, oddsLabel).joinToString(" · ")
-                if (scheduleLine.isNotEmpty()) {
-                    Text(scheduleLine, style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
-                        modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center,
-                        fontSize = 10.sp)
-                }
+            FiveColumnRowWithRanks(
+                leftValue = if (isCompleted) "${t1Score ?: "-"}" else "-",
+                leftRank = null, leftRankDisplay = null,
+                centerText = "Game ${idx + 1}",
+                rightValue = if (isCompleted) "${t2Score ?: "-"}" else "-",
+                rightRank = null, rightRankDisplay = null,
+                advantage = if (isCompleted) advantage else 0
+            )
+            val oddsLabel = if (!isCompleted) game.odds?.let { formatPlayoffGameOddsLine(it) } else null
+            val subLine = listOfNotNull(homeLabel, dateLabel, oddsLabel).joinToString(" · ")
+            if (subLine.isNotEmpty()) {
+                val color = if (isCompleted) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                            else MaterialTheme.colorScheme.primary.copy(alpha = 0.8f)
+                Text(subLine, style = MaterialTheme.typography.labelSmall, color = color,
+                    modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center, fontSize = 10.sp)
             }
         } else {
+            val predHome = predictedHomeAbbrev(games, idx, t1Abbrev, t2Abbrev)
             FiveColumnRowWithRanks(
                 leftValue = "-",
                 leftRank = null, leftRankDisplay = null,
@@ -200,6 +184,11 @@ private fun NBASeriesResultsView(
                 rightRank = null, rightRankDisplay = null,
                 advantage = 0
             )
+            predHome?.let {
+                Text("@ $it", style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                    modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center, fontSize = 10.sp)
+            }
         }
     }
 }
@@ -215,15 +204,61 @@ private fun parseMonthTrend(teamStats: JsonObject?): MonthTrendStats? {
     }
 }
 
+private fun parsePlayoffTrend(teamStats: JsonObject?): MonthTrendStats? {
+    val element = teamStats?.get("playoffTrend") ?: return null
+    return try {
+        monthTrendJson.decodeFromJsonElement<MonthTrendStats>(element)
+    } catch (_: Exception) {
+        null
+    }
+}
+
+private fun buildNbaTrendShareRows(t1: MonthTrendStats, t2: MonthTrendStats): List<ShareFiveColStat> = buildList {
+    val r1 = t1.record
+    val r2 = t2.record
+    if (r1 != null && r2 != null) {
+        val adv = if (r1.rank != null && r2.rank != null) {
+            when { r1.rank < r2.rank -> -1; r1.rank > r2.rank -> 1; else -> 0 }
+        } else 0
+        add(ShareFiveColStat(
+            "${r1.wins}-${r1.losses}", r1.rank, r1.rankDisplay,
+            "Record",
+            "${r2.wins}-${r2.losses}", r2.rank, r2.rankDisplay,
+            adv
+        ))
+    }
+    fun stat(label: String, s1: MonthTrendStat?, s2: MonthTrendStat?) {
+        if (s1 == null && s2 == null) return
+        val adv = if (s1?.rank != null && s2?.rank != null) {
+            when { s1.rank < s2.rank -> -1; s1.rank > s2.rank -> 1; else -> 0 }
+        } else 0
+        add(ShareFiveColStat(
+            s1?.value?.bracketFormatStat(2) ?: "-",
+            s1?.rank, s1?.rankDisplay,
+            label,
+            s2?.value?.bracketFormatStat(2) ?: "-",
+            s2?.rank, s2?.rankDisplay,
+            adv
+        ))
+    }
+    stat("Net Rating", t1.netRating, t2.netRating)
+    stat("Off Rating", t1.offensiveRating, t2.offensiveRating)
+    stat("Def Rating", t1.defensiveRating, t2.defensiveRating)
+    stat("Points/Game", t1.pointsPerGame, t2.pointsPerGame)
+    stat("Assists/Game", t1.assistsPerGame, t2.assistsPerGame)
+    stat("Turnovers/Game", t1.turnoversPerGame, t2.turnoversPerGame)
+    stat("Turnover Diff", t1.turnoverDiff, t2.turnoverDiff)
+}
+
 @Composable
-private fun NBAMonthTrendView(
+private fun NBATrendView(
+    header: String,
     t1Abbrev: String,
     t2Abbrev: String,
     t1Trend: MonthTrendStats,
     t2Trend: MonthTrendStats
 ) {
-    val gp = t1Trend.gamesPlayed.coerceAtLeast(t2Trend.gamesPlayed)
-    SectionHeader("Last Month (Last $gp Games)")
+    SectionHeader(header)
     Spacer(modifier = Modifier.height(4.dp))
 
     // Column headers
@@ -539,8 +574,16 @@ private fun NBAPlayoffMatchupBottomSheet(data: NBAMatchupSheetData, onDismiss: (
                                             val t1Trend = parseMonthTrend(t1?.teamStats)
                                             val t2Trend = parseMonthTrend(t2?.teamStats)
                                             if (t1Trend != null && t2Trend != null) {
+                                                val gp = t1Trend.gamesPlayed.coerceAtLeast(t2Trend.gamesPlayed)
                                                 Spacer(modifier = Modifier.height(12.dp))
-                                                NBAMonthTrendView(t1Abbrev, t2Abbrev, t1Trend, t2Trend)
+                                                NBATrendView("Last Month (Last $gp Games)", t1Abbrev, t2Abbrev, t1Trend, t2Trend)
+                                            }
+                                            val t1Playoff = parsePlayoffTrend(t1?.teamStats)
+                                            val t2Playoff = parsePlayoffTrend(t2?.teamStats)
+                                            if (t1Playoff != null && t2Playoff != null) {
+                                                val gp = t1Playoff.gamesPlayed.coerceAtLeast(t2Playoff.gamesPlayed)
+                                                Spacer(modifier = Modifier.height(12.dp))
+                                                NBATrendView("Playoff Trend (Last $gp Games)", t1Abbrev, t2Abbrev, t1Playoff, t2Playoff)
                                             }
                                         }
                                         1 -> BracketOffenseVsDefenseView(comparisons.homeOffVsAwayDef, t1Name, t2Name, ::nbaPlayoffRankColor)
@@ -760,50 +803,28 @@ private fun NBAPlayoffMatchupBottomSheet(data: NBAMatchupSheetData, onDismiss: (
                             }.take(9)
                         ))
 
-                        // Box 5: 1-month trend
+                        // Box 5: trend — prefer playoff trend (postseason games only) when available,
+                        // fall back to the regular-season month trend otherwise.
+                        val t1Playoff = parsePlayoffTrend(t1?.teamStats)
+                        val t2Playoff = parsePlayoffTrend(t2?.teamStats)
                         val t1Trend = parseMonthTrend(t1?.teamStats)
                         val t2Trend = parseMonthTrend(t2?.teamStats)
-                        if (t1Trend != null && t2Trend != null) {
-                            val gp = maxOf(t1Trend.gamesPlayed, t2Trend.gamesPlayed)
-                            val trendRows = buildList<ShareFiveColStat> {
-                                val r1 = t1Trend.record
-                                val r2 = t2Trend.record
-                                if (r1 != null && r2 != null) {
-                                    val adv = if (r1.rank != null && r2.rank != null) {
-                                        when { r1.rank < r2.rank -> -1; r1.rank > r2.rank -> 1; else -> 0 }
-                                    } else 0
-                                    add(ShareFiveColStat(
-                                        "${r1.wins}-${r1.losses}", r1.rank, r1.rankDisplay,
-                                        "Record",
-                                        "${r2.wins}-${r2.losses}", r2.rank, r2.rankDisplay,
-                                        adv
-                                    ))
-                                }
-                                fun stat(label: String, s1: MonthTrendStat?, s2: MonthTrendStat?) {
-                                    if (s1 == null && s2 == null) return
-                                    val adv = if (s1?.rank != null && s2?.rank != null) {
-                                        when { s1.rank < s2.rank -> -1; s1.rank > s2.rank -> 1; else -> 0 }
-                                    } else 0
-                                    add(ShareFiveColStat(
-                                        s1?.value?.bracketFormatStat(2) ?: "-",
-                                        s1?.rank, s1?.rankDisplay,
-                                        label,
-                                        s2?.value?.bracketFormatStat(2) ?: "-",
-                                        s2?.rank, s2?.rankDisplay,
-                                        adv
-                                    ))
-                                }
-                                stat("Net Rating", t1Trend.netRating, t2Trend.netRating)
-                                stat("Off Rating", t1Trend.offensiveRating, t2Trend.offensiveRating)
-                                stat("Def Rating", t1Trend.defensiveRating, t2Trend.defensiveRating)
-                                stat("Points/Game", t1Trend.pointsPerGame, t2Trend.pointsPerGame)
-                                stat("Assists/Game", t1Trend.assistsPerGame, t2Trend.assistsPerGame)
-                                stat("Turnovers/Game", t1Trend.turnoversPerGame, t2Trend.turnoversPerGame)
-                                stat("Turnover Diff", t1Trend.turnoverDiff, t2Trend.turnoverDiff)
+                        val (trendT1, trendT2, trendTitle) = when {
+                            t1Playoff != null && t2Playoff != null -> {
+                                val gp = maxOf(t1Playoff.gamesPlayed, t2Playoff.gamesPlayed)
+                                Triple(t1Playoff, t2Playoff, "Playoff Trend (Last $gp Games)")
                             }
+                            t1Trend != null && t2Trend != null -> {
+                                val gp = maxOf(t1Trend.gamesPlayed, t2Trend.gamesPlayed)
+                                Triple(t1Trend, t2Trend, "Last $gp Games")
+                            }
+                            else -> Triple(null, null, "")
+                        }
+                        if (trendT1 != null && trendT2 != null) {
+                            val trendRows = buildNbaTrendShareRows(trendT1, trendT2)
                             if (trendRows.isNotEmpty()) {
                                 add(ShareStatBox(
-                                    title = "Last $gp Games",
+                                    title = trendTitle,
                                     fiveColStats = trendRows.take(9)
                                 ))
                             }

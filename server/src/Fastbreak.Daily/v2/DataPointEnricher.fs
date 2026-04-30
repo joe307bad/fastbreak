@@ -174,6 +174,19 @@ let private findTrendCharts (league: string) (charts: ChartData list) =
         && (c.Name.ToLowerInvariant().Contains("trend")
             || (not (isNull c.Title) && c.Title.ToLowerInvariant().Contains("trend"))))
 
+// Every team chart for a league EXCEPT the matchup chart, the player chart,
+// and bracket/playoff charts. Used as the "variety" pool for topic data points
+// once the per-topic matchup cap is hit.
+let private findOtherTeamCharts (league: string) (charts: ChartData list) =
+    charts
+    |> List.filter (fun c ->
+        let n = c.Name.ToLowerInvariant()
+        c.League.Equals(league, StringComparison.OrdinalIgnoreCase)
+        && not (n.Contains("matchup"))
+        && not (n.Contains("player"))
+        && not (n.Contains("bracket"))
+        && not (n.Contains("playoff")))
+
 let private valueToString (node: JsonNode) : string =
     if isNull node then ""
     else
@@ -365,6 +378,118 @@ let private extractTrendStatForTeam (chart: ChartData) (teamAbbrev: string) : Da
         printfn "    [DataPointEnricher] trend extract failed for %s: %s" teamAbbrev ex.Message
         None
 
+// Pull a list of stat data points for a single team from a non-matchup chart.
+// Dispatches by visualization type:
+//   * SCATTER_PLOT (subject=TEAM): emit one DataPoint each for x / y / sum,
+//     using xColumnLabel / yColumnLabel / sumColumnLabel as the stat names.
+//   * BAR_GRAPH: emit one DataPoint with the chart's title as the stat name
+//     and the bar's `value` field as the value.
+//   * LINE_CHART: emit one DataPoint per series whose label matches the team,
+//     reading the latest data point's y value (mirrors the legacy trend extractor).
+let private extractTeamStatsFromOtherChart (chart: ChartData) (teamAbbrev: string) : DataPoint list =
+    try
+        let json = JsonNode.Parse(chart.RawJson)
+        let readString (key: string) : string option =
+            let n = json.[key]
+            if isNull n then None
+            else try Some (n.GetValue<string>()) with _ -> None
+
+        let title =
+            readString "title"
+            |> Option.defaultValue (if isNull chart.Title then "" else chart.Title)
+
+        // For bar / line charts the data points all share the chart's y axis,
+        // so the y axis label is the right stat name. Fall back through more
+        // generic fields if the y label isn't explicit on the chart.
+        let yStatName =
+            readString "yAxisLabel"
+            |> Option.orElseWith (fun () -> readString "yColumnLabel")
+            |> Option.orElseWith (fun () -> readString "subtitle")
+            |> Option.defaultValue title
+
+        let mk name value =
+            { Subject = teamAbbrev
+              SubjectType = "team"
+              Name = name
+              Value = value
+              Rank = null
+              Source = chart.Name
+              VizType = chart.VizType }
+
+        let result = ResizeArray<DataPoint>()
+        let viz =
+            if isNull chart.VizType then ""
+            else chart.VizType.ToUpperInvariant()
+
+        match viz with
+        | "SCATTER_PLOT" ->
+            let labelOf (key: string) (fallback: string) =
+                let n = json.[key]
+                if isNull n then fallback
+                else try n.GetValue<string>() with _ -> fallback
+            let xLabel = labelOf "xColumnLabel" "x"
+            let yLabel = labelOf "yColumnLabel" "y"
+            let sumLabelOpt =
+                let n = json.["sumColumnLabel"]
+                if isNull n then None
+                else try Some (n.GetValue<string>()) with _ -> None
+
+            let dp = json.["dataPoints"]
+            if not (isNull dp) && dp.GetValueKind() = JsonValueKind.Array then
+                for item in dp.AsArray() do
+                    if not (isNull item) then
+                        let labelNode = item.["label"]
+                        if not (isNull labelNode) then
+                            let label = try labelNode.GetValue<string>() with _ -> ""
+                            if String.Equals(label, teamAbbrev, StringComparison.OrdinalIgnoreCase) then
+                                let pushIfPresent (key: string) (name: string) =
+                                    let n = item.[key]
+                                    if not (isNull n) && isScalar n then
+                                        result.Add(mk name (valueToString n))
+                                pushIfPresent "x" xLabel
+                                pushIfPresent "y" yLabel
+                                match sumLabelOpt with
+                                | Some s -> pushIfPresent "sum" s
+                                | None -> ()
+
+        | "BAR_GRAPH" ->
+            let dp = json.["dataPoints"]
+            if not (isNull dp) && dp.GetValueKind() = JsonValueKind.Array then
+                for item in dp.AsArray() do
+                    if not (isNull item) then
+                        let labelNode = item.["label"]
+                        if not (isNull labelNode) then
+                            let label = try labelNode.GetValue<string>() with _ -> ""
+                            if String.Equals(label, teamAbbrev, StringComparison.OrdinalIgnoreCase) then
+                                let v = item.["value"]
+                                if not (isNull v) && isScalar v then
+                                    result.Add(mk yStatName (valueToString v))
+
+        | "LINE_CHART" ->
+            let series = json.["series"]
+            if not (isNull series) && series.GetValueKind() = JsonValueKind.Array then
+                for s in series.AsArray() do
+                    if not (isNull s) then
+                        let labelNode = s.["label"]
+                        if not (isNull labelNode) then
+                            let label = try labelNode.GetValue<string>() with _ -> ""
+                            if String.Equals(label, teamAbbrev, StringComparison.OrdinalIgnoreCase) then
+                                let dps = s.["dataPoints"]
+                                if not (isNull dps) && dps.GetValueKind() = JsonValueKind.Array then
+                                    let arr = dps.AsArray() |> Seq.toList
+                                    if not (List.isEmpty arr) then
+                                        let last = List.last arr
+                                        let y = last.["y"]
+                                        if not (isNull y) && isScalar y then
+                                            result.Add(mk yStatName (valueToString y))
+
+        | _ -> ()
+
+        result |> List.ofSeq
+    with ex ->
+        printfn "    [DataPointEnricher] other-team extract failed for %s in %s: %s" teamAbbrev chart.Name ex.Message
+        []
+
 let private extractAllPlayerStats (chart: ChartData) (playerName: string) : DataPoint list =
     try
         let json = JsonNode.Parse(chart.RawJson)
@@ -439,7 +564,7 @@ let enrichWithDataPointsCore (topics: EnrichedTopic list) = async {
 
             let matchupChart = findMatchupChart t.League charts
             let playerChart = findPlayerChart t.League charts
-            let trendCharts = findTrendCharts t.League charts
+            let otherTeamCharts = findOtherTeamCharts t.League charts
 
             match matchupChart with
             | Some c -> printfn "    matchup chart: %s" c.Name
@@ -447,20 +572,46 @@ let enrichWithDataPointsCore (topics: EnrichedTopic list) = async {
             match playerChart with
             | Some c -> printfn "    player chart:  %s" c.Name
             | None -> printfn "    player chart:  (none for %s)" t.League
-            if not (List.isEmpty trendCharts) then
-                printfn "    trend charts:  %s" (trendCharts |> List.map (fun c -> c.Name) |> String.concat ", ")
+            if not (List.isEmpty otherTeamCharts) then
+                printfn "    other team charts: %s" (otherTeamCharts |> List.map (fun c -> c.Name) |> String.concat ", ")
 
-            // For each team, gather all candidate stats (matchup + trend), then pick one random unused.
-            let teamPoints =
+            // For each team, pull candidate stats from the matchup chart and from
+            // any non-matchup team charts (offensive_rating, team_efficiency,
+            // *_trend, etc.). Within a topic we cap matchup-sourced picks at 2;
+            // after that the fold prefers a non-matchup chart so each subsequent
+            // data point links to a different team chart. Only when those are
+            // exhausted do we fall back to additional matchup picks. This keeps
+            // a topic's data points from all linking to the same matchup screen.
+            let MAX_MATCHUP_PER_TOPIC = 2
+            let isMatchupSource (dp: DataPoint) =
+                not (isNull dp.Source)
+                && dp.Source.ToLowerInvariant().Contains("matchup")
+            let teamPoints, _ =
                 t.Teams
-                |> List.choose (fun team ->
+                |> List.fold (fun (acc, matchupCount) team ->
                     let matchupStats =
                         match matchupChart with
                         | None -> []
                         | Some c -> extractAllTeamStatsFromMatchup c team
-                    let trendStats =
-                        trendCharts |> List.choose (fun c -> extractTrendStatForTeam c team)
-                    pickOneUnused (matchupStats @ trendStats))
+                    let otherStats =
+                        otherTeamCharts
+                        |> List.collect (fun c -> extractTeamStatsFromOtherChart c team)
+                    let preferred, fallback =
+                        if matchupCount < MAX_MATCHUP_PER_TOPIC then matchupStats, otherStats
+                        else otherStats, matchupStats
+                    let pick =
+                        pickOneUnused preferred
+                        |> Option.orElseWith (fun () -> pickOneUnused fallback)
+                    match pick with
+                    | Some p ->
+                        let nextCount =
+                            if isMatchupSource p then matchupCount + 1
+                            else matchupCount
+                        (p :: acc, nextCount)
+                    | None ->
+                        (acc, matchupCount)
+                ) ([], 0)
+            let teamPoints = List.rev teamPoints
 
             // For each player, pick one random unused stat.
             let playerPoints =

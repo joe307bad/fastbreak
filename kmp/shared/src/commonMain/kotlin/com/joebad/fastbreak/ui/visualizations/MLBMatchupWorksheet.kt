@@ -90,16 +90,36 @@ fun MLBMatchupWorksheet(
     }
 
     val dates = matchupsByDate.keys.toList()
-    var selectedDateIndex by remember { mutableIntStateOf(
-        dates.indexOfFirst { date ->
-            try {
-                val today = kotlin.time.Clock.System.now()
-                    .toLocalDateTime(TimeZone.of("America/New_York"))
-                val todayDate = LocalDate(today.year, today.monthNumber, today.dayOfMonth)
-                date >= todayDate
-            } catch (_: Exception) { false }
-        }.coerceAtLeast(0)
-    ) }
+    // Pick the initial date.
+    //   * No deep-link team highlight: earliest date today-or-later (existing behavior).
+    //   * Deep-link highlighted team: prefer the next future game for that team,
+    //     else the most recently completed past game.
+    val initialDateIndex = remember(dates, matchupsByDate, highlightedTeamCodes) {
+        val todayDate = try {
+            val today = kotlin.time.Clock.System.now()
+                .toLocalDateTime(TimeZone.of("America/New_York"))
+            LocalDate(today.year, today.monthNumber, today.dayOfMonth)
+        } catch (_: Exception) { null }
+        if (highlightedTeamCodes.isNotEmpty() && todayDate != null) {
+            val candidateIndices = dates.mapIndexedNotNull { idx, date ->
+                val hasTeam = matchupsByDate[date]?.any { matchup ->
+                    highlightedTeamCodes.any { code ->
+                        matchup.homeTeam.abbreviation.equals(code, ignoreCase = true) ||
+                        matchup.awayTeam.abbreviation.equals(code, ignoreCase = true)
+                    }
+                } == true
+                if (hasTeam) idx else null
+            }
+            val futureIdx = candidateIndices.firstOrNull { dates[it] >= todayDate }
+            val pastIdx = candidateIndices.lastOrNull { dates[it] < todayDate }
+            futureIdx ?: pastIdx ?: 0
+        } else if (todayDate != null) {
+            dates.indexOfFirst { it >= todayDate }.coerceAtLeast(0)
+        } else {
+            0
+        }
+    }
+    var selectedDateIndex by remember { mutableIntStateOf(initialDateIndex) }
 
     val currentDate = dates.getOrNull(selectedDateIndex)
     val currentMatchups = currentDate?.let { matchupsByDate[it] } ?: emptyList()

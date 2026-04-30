@@ -157,6 +157,7 @@ output_data <- list(
   visualizationType = "LINE_CHART",
   title = paste("AP Poll Rankings - Week", most_recent_week),
   subtitle = "Top 15 Teams Ranking Trend",
+  yAxisLabel = "AP Poll Ranking",
   description = "This chart tracks AP Poll rankings for the top 15 college basketball teams over the past 10 weeks. Higher positions indicate better rankings (1 = best). Rising lines show teams climbing in the rankings, while falling lines show teams dropping. Teams that appear and disappear may have moved in or out of the Top 25.",
   lastUpdated = format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC"),
   source = "ESPN API",

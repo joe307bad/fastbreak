@@ -22,8 +22,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
-import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -88,6 +88,19 @@ private fun stringToVizType(vizType: String): VizType? =
     } catch (_: IllegalArgumentException) {
         null
     }
+
+// Returns the playoff bracket deep-link target for a topic, when one exists.
+// Currently NBA and NHL ship a playoff bracket chart; MLB / NFL / CBB do not.
+private data class BracketTarget(val chartId: String, val sport: Sport, val vizType: VizType)
+
+private fun bracketTargetFor(league: String, category: String): BracketTarget? {
+    if (!category.equals("PLAYOFFS", ignoreCase = true)) return null
+    return when (league.uppercase()) {
+        "NBA" -> BracketTarget("nba__playoff_bracket", Sport.NBA, VizType.NBA_PLAYOFF_BRACKET)
+        "NHL" -> BracketTarget("nhl__playoff_bracket", Sport.NHL, VizType.NHL_PLAYOFF_BRACKET)
+        else -> null
+    }
+}
 
 // Truncate a numeric stat string to at most two decimal places without rounding.
 // Non-numeric values (e.g. "true") and integer-formatted values pass through unchanged.
@@ -161,7 +174,8 @@ private fun TopicLabel(
     league: String,
     category: String,
     fontSize: Float,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onBracketClick: (() -> Unit)? = null
 ) {
     val labelColor = MaterialTheme.colorScheme.onSurfaceVariant
     val accentColor = MaterialTheme.colorScheme.primary
@@ -174,22 +188,39 @@ private fun TopicLabel(
             text = league.uppercase(),
             fontSize = size,
             fontWeight = FontWeight.Bold,
-            fontFamily = FontFamily.SansSerif,
+            fontFamily = FontFamily.Monospace,
             color = accentColor
         )
         if (category.isNotBlank()) {
             Text(
                 text = "  •  ",
                 fontSize = size,
-                fontFamily = FontFamily.SansSerif,
+                fontFamily = FontFamily.Monospace,
                 color = labelColor
             )
             Text(
                 text = category.uppercase(),
                 fontSize = size,
                 fontWeight = FontWeight.SemiBold,
-                fontFamily = FontFamily.SansSerif,
+                fontFamily = FontFamily.Monospace,
                 color = labelColor
+            )
+        }
+        if (onBracketClick != null) {
+            Text(
+                text = "  •  ",
+                fontSize = size,
+                fontFamily = FontFamily.Monospace,
+                color = labelColor
+            )
+            Text(
+                text = "BRACKET",
+                fontSize = size,
+                fontWeight = FontWeight.SemiBold,
+                fontFamily = FontFamily.Monospace,
+                color = accentColor,
+                textDecoration = TextDecoration.Underline,
+                modifier = Modifier.clickable(onClick = onBracketClick)
             )
         }
     }
@@ -277,7 +308,7 @@ private fun DataPointsSection(
             text = "DATA POINTS",
             fontSize = headerSize,
             fontWeight = FontWeight.SemiBold,
-            fontFamily = FontFamily.SansSerif,
+            fontFamily = FontFamily.Monospace,
             color = labelColor,
             modifier = Modifier.padding(bottom = 6.dp)
         )
@@ -302,20 +333,24 @@ private fun DataPointsSection(
                 Text(
                     text = dp.subject,
                     fontSize = rowSize,
-                    fontFamily = FontFamily.SansSerif,
+                    fontFamily = FontFamily.Monospace,
                     fontWeight = FontWeight.Medium,
                     color = valueColor,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    // Fixed 20% of the row width so the middle column starts at
+                    // Fixed fraction of the row width so the middle column starts at
                     // the same x-offset on every row, regardless of how wide
-                    // the right-aligned value column is.
-                    modifier = Modifier.fillMaxWidth(0.2f)
+                    // the right-aligned value column is. Player rows get a wider
+                    // subject column than team rows because full player names need
+                    // more room than 3-letter team abbrevs.
+                    modifier = Modifier.fillMaxWidth(
+                        if (dp.subjectType.equals("player", ignoreCase = true)) 0.55f else 0.2f
+                    )
                 )
                 Text(
                     text = dp.name,
                     fontSize = rowSize,
-                    fontFamily = FontFamily.SansSerif,
+                    fontFamily = FontFamily.Monospace,
                     color = labelColor,
                     textAlign = TextAlign.Start,
                     maxLines = 1,
@@ -325,7 +360,7 @@ private fun DataPointsSection(
                 Text(
                     text = truncateToTwoDecimals(dp.value) + (dp.rank?.let { " (#${it})" } ?: ""),
                     fontSize = rowSize,
-                    fontFamily = FontFamily.SansSerif,
+                    fontFamily = FontFamily.Monospace,
                     fontWeight = FontWeight.SemiBold,
                     color = if (isClickable) accentColor else valueColor,
                     textDecoration = if (isClickable) TextDecoration.Underline else TextDecoration.None,
@@ -368,7 +403,7 @@ fun TopicsV2Screen(
                             title = {
                                 Text(
                                     text = "Updated ${formatRelativeTime(updatedAt)}",
-                                    fontFamily = FontFamily.SansSerif,
+                                    fontFamily = FontFamily.Monospace,
                                     fontWeight = FontWeight.Normal,
                                     fontSize = 12.sp,
                                     color = MaterialTheme.colorScheme.onBackground
@@ -386,7 +421,7 @@ fun TopicsV2Screen(
                                 if (hasInfo) {
                                     IconButton(onClick = { showInfoSheet = true }) {
                                         Icon(
-                                            imageVector = Icons.Default.Info,
+                                            imageVector = Icons.Outlined.Info,
                                             contentDescription = "About topics"
                                         )
                                     }
@@ -396,7 +431,8 @@ fun TopicsV2Screen(
                                         text = "Aa",
                                         fontFamily = FontFamily.Serif,
                                         fontWeight = FontWeight.Light,
-                                        fontSize = 18.sp
+                                        fontSize = 18.sp,
+                                        color = MaterialTheme.colorScheme.onBackground
                                     )
                                 }
                                 IconButton(onClick = { headerVisible = false }) {
@@ -477,11 +513,24 @@ fun TopicsV2Screen(
                                         .fillMaxWidth()
                                         .padding(start = 20.dp, end = 60.dp, top = 16.dp, bottom = 16.dp)
                                 ) {
+                                    val bracketTarget = remember(item.league, item.category) {
+                                        bracketTargetFor(item.league, item.category)
+                                    }
                                     TopicLabel(
                                         league = item.league,
                                         category = item.category,
                                         fontSize = fontSize,
-                                        modifier = Modifier.padding(bottom = 6.dp)
+                                        modifier = Modifier.padding(bottom = 6.dp),
+                                        onBracketClick = bracketTarget?.let { target ->
+                                            {
+                                                component.onNavigateToChart(
+                                                    target.chartId,
+                                                    target.sport,
+                                                    target.vizType,
+                                                    null
+                                                )
+                                            }
+                                        }
                                     )
                                     SegmentedSummary(
                                         segments = item.summarySegments,

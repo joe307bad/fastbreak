@@ -51,15 +51,17 @@ fun FilterBar(
         )
     }
 
-    // Reset button - only show if any filters are active
-    if (selectedFilters.isNotEmpty()) {
+    // Reset button - only show when at least one chip-backed filter is active.
+    // We intentionally ignore filter keys that have no matching chip in this
+    // bar (e.g. "player" arriving from a topic deep link), since clicking the
+    // X for an invisible filter would feel like a no-op to the user.
+    val hasVisibleFilter = filters.any { selectedFilters[it.key] != null }
+    if (hasVisibleFilter) {
         IconButton(
             onClick = {
-                // Clear every active filter, not just the ones with a UI chip.
-                // Filters arriving via deep links (e.g. "player" from a topic
-                // data point) are present in `selectedFilters` but have no
-                // matching entry in `filters`, so iterating `filters` would
-                // miss them and the click would silently do nothing.
+                // Clear every active filter, not just the ones with a UI chip,
+                // so legacy deep-link keys are also reset alongside the visible
+                // chips when the user explicitly chooses to clear.
                 selectedFilters.keys.toList().forEach { key ->
                     onFilterChange(key, null)
                 }

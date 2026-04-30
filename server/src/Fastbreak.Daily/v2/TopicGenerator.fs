@@ -55,9 +55,30 @@ let generateTopicsCore (prompts: Prompt list) = async {
         try
             let! response = callGeminiWithSearch client apiKey prompt.Text
             let parsed = tryParseArray response.Text
-            results.AddRange(parsed)
-            printfn "    [TopicGenerator] parsed %d summaries" (List.length parsed)
-            for t in parsed do
+
+            // Restore league/category from the prompt itself: Gemini occasionally
+            // drops the category field even though the prompt asks for it (we've
+            // seen this happen for NBA topics while NHL/MLB on the same call
+            // round came back fine). The bullets in prompt.Text and the parsed
+            // response are in the same order, so we can pair them up by index
+            // and overwrite missing/null values.
+            let categories = prompt.Categories
+            let restored =
+                parsed
+                |> List.mapi (fun idx t ->
+                    let cat =
+                        if isNull t.Category || t.Category.Trim() = "" then
+                            categories |> List.tryItem idx |> Option.defaultValue t.Category
+                        else
+                            t.Category
+                    let lg =
+                        if isNull t.League || t.League.Trim() = "" then prompt.League
+                        else t.League
+                    { t with League = lg; Category = cat })
+
+            results.AddRange(restored)
+            printfn "    [TopicGenerator] parsed %d summaries" (List.length restored)
+            for t in restored do
                 printfn "      - [%s] %s" t.Category t.Summary
         with ex ->
             printfn "    [TopicGenerator] call failed: %s" ex.Message

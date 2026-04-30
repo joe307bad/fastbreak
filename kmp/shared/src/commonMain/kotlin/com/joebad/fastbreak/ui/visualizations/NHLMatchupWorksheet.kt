@@ -157,19 +157,24 @@ fun NHLMatchupWorksheet(
 
     val dates = remember(matchupsByDate) { matchupsByDate.keys.toList() }
 
-    // Calculate initial date index based on highlighted teams or current date
+    // Calculate initial date index based on highlighted teams or current date.
+    // For deep-linked highlighted teams: prefer the next future game, else the
+    // most recently completed past game (see NBAMatchupWorksheet for rationale).
     val initialDateIndex = remember(dates, matchupsByDate, highlightedTeamCodes) {
+        val today = Clock.System.now()
+            .toLocalDateTime(TimeZone.of("America/New_York")).date
         if (highlightedTeamCodes.isNotEmpty()) {
-            dates.indexOfFirst { date ->
-                matchupsByDate[date]?.any { matchup ->
+            val candidateIndices = dates.mapIndexedNotNull { idx, date ->
+                val hasTeam = matchupsByDate[date]?.any { matchup ->
                     highlightedTeamCodes.contains(matchup.awayTeam.abbreviation) ||
                     highlightedTeamCodes.contains(matchup.homeTeam.abbreviation)
                 } == true
-            }.takeIf { it >= 0 } ?: 0
+                if (hasTeam) idx else null
+            }
+            val futureIdx = candidateIndices.firstOrNull { dates[it] >= today }
+            val pastIdx = candidateIndices.lastOrNull { dates[it] < today }
+            futureIdx ?: pastIdx ?: 0
         } else {
-            val now = Clock.System.now()
-            val today = Instant.fromEpochMilliseconds(now.toEpochMilliseconds())
-                .toLocalDateTime(TimeZone.of("America/New_York")).date
             dates.indexOfFirst { it == today }.takeIf { it >= 0 } ?: 0
         }
     }

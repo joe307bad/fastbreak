@@ -138,8 +138,11 @@ fun LineChartComponent(
         val minY = customYMin ?: (yValues.minOrNull() ?: 0f)
         val maxY = customYMax ?: (yValues.maxOrNull() ?: 1f)
 
-        val xPadding = (maxX - minX) * 0.05f
-        val yPadding = (maxY - minY) * 0.05f
+        // Use 5% of the spread as padding, but fall back to an absolute padding
+        // when min == max (e.g. every series has a single point at the same x).
+        // KoalaPlot's FloatLinearAxisModel rejects ranges with equal start/end.
+        val xPadding = if (maxX > minX) (maxX - minX) * 0.05f else 0.5f
+        val yPadding = if (maxY > minY) (maxY - minY) * 0.05f else 0.5f
 
         object {
             val xMin = (minX - xPadding)

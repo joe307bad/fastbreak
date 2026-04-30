@@ -117,7 +117,7 @@ data_points <- top_pitchers %>%
 output_data <- list(
   sport = "MLB",
   visualizationType = "SCATTER_PLOT",
-  title = paste0("MLB Pitching Leaders - ", mlb_season),
+  title = "Pitching Leaders",
   subtitle = "K-BB% vs xFIP",
   description = paste0(
     "Top 50 starting pitchers (min ", min_ip, " IP, ", min_gs,

@@ -7,11 +7,11 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -175,7 +175,7 @@ fun DataVizScreen(
                     if (state is DataVizState.Success && (state as DataVizState.Success).data.description.isNotEmpty()) {
                         IconButton(onClick = { showInfoSheet = true }) {
                             Icon(
-                                imageVector = Icons.Default.Info,
+                                imageVector = Icons.Outlined.Info,
                                 contentDescription = "Chart Info"
                             )
                         }
@@ -313,10 +313,20 @@ private fun SuccessContent(
     onScheduleToggleHandlerChanged: ((ScheduleToggleHandler?) -> Unit)? = null,
     onBracketNavigationToggleHandlerChanged: ((BracketNavigationToggleHandler?) -> Unit)? = null
 ) {
-    // State for filters and team highlighting - initialize from deep link filters if provided
+    // State for filters and team highlighting - initialize from deep link filters if provided.
+    // Pre-populating selectedPlayerLabels with any incoming "player" filter mirrors the
+    // exact same state path the user gets when they click a player from the chart's
+    // data table — that path is known to highlight correctly.
     var selectedFilters by remember { mutableStateOf(initialFilters ?: emptyMap()) }
     var selectedTeamCodes by remember { mutableStateOf<Set<String>>(emptySet()) }
-    var selectedPlayerLabels by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var selectedPlayerLabels by remember {
+        mutableStateOf(
+            initialFilters?.get("player")
+                ?.takeIf { it.isNotBlank() }
+                ?.let { setOf(it) }
+                ?: emptySet()
+        )
+    }
 
     // Get pinned teams for this sport
     val sportPinnedTeams = remember(pinnedTeams, visualization.sport) {
@@ -330,13 +340,6 @@ private fun SuccessContent(
         println("🔍 DataVizScreen - Selected Filters: $selectedFilters")
         println("🔍 DataVizScreen - Filter Highlights: ${result.second}")
         result
-    }
-
-    // Player-label highlights that come from the filter map (e.g. a topic
-    // deep link with {"player": "Connor McDavid"}). The chart screen has no
-    // UI to populate this filter directly — it only arrives via initialFilters.
-    val filterHighlightedPlayerLabels = remember(selectedFilters) {
-        selectedFilters["player"]?.takeIf { it.isNotBlank() }?.let { setOf(it) } ?: emptySet()
     }
 
     // Combine team code highlights with filter highlights
@@ -353,12 +356,6 @@ private fun SuccessContent(
         println("🔍 DataVizScreen - Pinned Team Codes: $pinnedTeamCodes")
         println("🔍 DataVizScreen - All Highlighted Team Codes: $combined")
         combined
-    }
-
-    // Mirror the team-highlight pipeline: union of click-toggled selections
-    // and filter-derived player labels (from topic deep-link initialFilters).
-    val allHighlightedPlayerLabels = remember(selectedPlayerLabels, filterHighlightedPlayerLabels) {
-        selectedPlayerLabels + filterHighlightedPlayerLabels
     }
 
     // For matchups, we still need to apply filtering (not just highlighting)
@@ -437,7 +434,7 @@ private fun SuccessContent(
         RenderVisualization(
             visualization = displayVisualization,
             highlightedTeamCodes = allHighlightedTeamCodes,
-            highlightedPlayerLabels = allHighlightedPlayerLabels,
+            highlightedPlayerLabels = selectedPlayerLabels,
             onChartShareHandlerChanged = onChartShareHandlerChanged,
             pinnedTeams = pinnedTeams,
             onScheduleToggleHandlerChanged = onScheduleToggleHandlerChanged,

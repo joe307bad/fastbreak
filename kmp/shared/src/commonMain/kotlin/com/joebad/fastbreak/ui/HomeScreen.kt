@@ -11,8 +11,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Menu
-import androidx.compose.material.icons.filled.Newspaper
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.outlined.Article
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.DisposableEffect
@@ -141,7 +141,7 @@ fun HomeScreen(
                     IconButton(onClick = onNavigateToTopics) {
                         Box {
                             Icon(
-                                imageVector = Icons.Default.Newspaper,
+                                imageVector = Icons.Outlined.Article,
                                 contentDescription = "Topics",
                                 tint = MaterialTheme.colorScheme.onBackground
                             )

@@ -168,22 +168,30 @@ fun NBAMatchupWorksheet(
 
     val dates = remember(matchupsByDate) { matchupsByDate.keys.toList() }
 
-    // Calculate initial date index based on highlighted teams (from deep links) or current date
-    // Find the first date that contains a matchup with the highlighted team, or default to today
+    // Calculate initial date index based on highlighted teams (from deep links) or current date.
+    // When a team is highlighted (e.g. via topic deep link) we want to land on the
+    // *most relevant* matchup for that team, not just the first one chronologically:
+    //   1) the next future game (earliest date today-or-later with the team),
+    //   2) otherwise the most recently completed past game (latest date before today).
     val initialDateIndex = remember(dates, matchupsByDate, highlightedTeamCodes) {
+        val today = Clock.System.now()
+            .toLocalDateTime(TimeZone.of("America/New_York")).date
         if (highlightedTeamCodes.isNotEmpty()) {
-            // If there are highlighted teams, find the first date with those teams
-            dates.indexOfFirst { date ->
-                matchupsByDate[date]?.any { matchup ->
+            val candidateIndices = dates.mapIndexedNotNull { idx, date ->
+                val hasTeam = matchupsByDate[date]?.any { matchup ->
                     highlightedTeamCodes.contains(matchup.awayTeam.abbreviation) ||
                     highlightedTeamCodes.contains(matchup.homeTeam.abbreviation)
                 } == true
-            }.takeIf { it >= 0 } ?: 0
+                if (hasTeam) idx else null
+            }
+            // dates is sorted ascending, so first candidate with date>=today is the
+            // nearest future game, and last candidate with date<today is the most
+            // recently completed past game.
+            val futureIdx = candidateIndices.firstOrNull { dates[it] >= today }
+            val pastIdx = candidateIndices.lastOrNull { dates[it] < today }
+            futureIdx ?: pastIdx ?: 0
         } else {
             // Default to today's date
-            val now = Clock.System.now()
-            val today = Instant.fromEpochMilliseconds(now.toEpochMilliseconds())
-                .toLocalDateTime(TimeZone.of("America/New_York")).date
             dates.indexOfFirst { it == today }.takeIf { it >= 0 } ?: 0
         }
     }

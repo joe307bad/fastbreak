@@ -55,9 +55,13 @@ fun FilterBar(
     if (selectedFilters.isNotEmpty()) {
         IconButton(
             onClick = {
-                // Clear all filters
-                filters.forEach { filter ->
-                    onFilterChange(filter.key, null)
+                // Clear every active filter, not just the ones with a UI chip.
+                // Filters arriving via deep links (e.g. "player" from a topic
+                // data point) are present in `selectedFilters` but have no
+                // matching entry in `filters`, so iterating `filters` would
+                // miss them and the click would silently do nothing.
+                selectedFilters.keys.toList().forEach { key ->
+                    onFilterChange(key, null)
                 }
             },
             modifier = Modifier.size(28.dp)

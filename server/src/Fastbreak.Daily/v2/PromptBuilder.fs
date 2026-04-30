@@ -9,13 +9,14 @@ type Prompt = {
 }
 
 let private buildTopicLine (executionDate: DateTime) (league: string) (category: string) (description: string) =
-    let cutoff = executionDate.AddDays(-3.0).ToString("yyyy-MM-dd")
-    sprintf "Generate a 3 sentence hard hitting news summary for %s %s involving %s. All information should be factual, grounded in real sources. Aggressively prioritize recent news for today (%s) but make sure any sources are no older than %s. (league: %s, category: %s)"
+    let cutoff = executionDate.ToString("yyyy-MM-dd")
+    let yest = executionDate.AddDays(-1.0).ToString("yyyy-MM-dd")
+    sprintf "Generate a 3 sentence hard hitting news summary for %s %s involving %s. All information should be factual, grounded in real sources. All updates should be from today (%s) or yesterday (%s). (league: %s, category: %s)"
         league
         (category.ToLower())
         (description.ToLower())
-        (executionDate.ToString("yyyy-MM-dd"))
         cutoff
+        yest
         league
         category
 

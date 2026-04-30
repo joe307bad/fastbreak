@@ -332,6 +332,13 @@ private fun SuccessContent(
         result
     }
 
+    // Player-label highlights that come from the filter map (e.g. a topic
+    // deep link with {"player": "Connor McDavid"}). The chart screen has no
+    // UI to populate this filter directly — it only arrives via initialFilters.
+    val filterHighlightedPlayerLabels = remember(selectedFilters) {
+        selectedFilters["player"]?.takeIf { it.isNotBlank() }?.let { setOf(it) } ?: emptySet()
+    }
+
     // Combine team code highlights with filter highlights
     // For MatchupV2Visualization, automatically include pinned teams
     val allHighlightedTeamCodes = remember(selectedTeamCodes, filterHighlightedTeamCodes, selectedPlayerLabels, sportPinnedTeams, visualization) {
@@ -346,6 +353,12 @@ private fun SuccessContent(
         println("🔍 DataVizScreen - Pinned Team Codes: $pinnedTeamCodes")
         println("🔍 DataVizScreen - All Highlighted Team Codes: $combined")
         combined
+    }
+
+    // Mirror the team-highlight pipeline: union of click-toggled selections
+    // and filter-derived player labels (from topic deep-link initialFilters).
+    val allHighlightedPlayerLabels = remember(selectedPlayerLabels, filterHighlightedPlayerLabels) {
+        selectedPlayerLabels + filterHighlightedPlayerLabels
     }
 
     // For matchups, we still need to apply filtering (not just highlighting)
@@ -424,7 +437,7 @@ private fun SuccessContent(
         RenderVisualization(
             visualization = displayVisualization,
             highlightedTeamCodes = allHighlightedTeamCodes,
-            highlightedPlayerLabels = selectedPlayerLabels,
+            highlightedPlayerLabels = allHighlightedPlayerLabels,
             onChartShareHandlerChanged = onChartShareHandlerChanged,
             pinnedTeams = pinnedTeams,
             onScheduleToggleHandlerChanged = onScheduleToggleHandlerChanged,
@@ -904,7 +917,12 @@ private fun calculateScatterPlotHighlights(
                 }
                 "division" -> point.division?.equals(value, ignoreCase = true) == true
                 "conference" -> point.conference?.equals(value, ignoreCase = true) == true
-                else -> true
+                // Unknown filter keys (e.g. "player" arriving from a topic deep
+                // link) must NOT count as a team-highlight match — otherwise
+                // every point would be reported as a team highlight, which the
+                // ScatterPlot then treats as "everything highlighted" and
+                // visually highlights nothing.
+                else -> false
             }
             println("🔍   Point '${point.label}' - Filter $key=$value: teamCode=${point.teamCode}, division=${point.division}, conference=${point.conference} -> $result")
             result

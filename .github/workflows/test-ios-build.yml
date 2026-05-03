@@ -64,16 +64,15 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pods-
 
-      - name: Build KMP Framework
-        run: ./gradlew :shared:linkReleaseFrameworkIosArm64 --build-cache --parallel
-
       - name: Install CocoaPods
         working-directory: kmp/iosApp
         run: bundle exec pod install
 
-      # Compile the iOS app for device with code signing disabled. This
-      # validates that the KMP framework integrates cleanly and the Xcode
-      # build succeeds without needing the TestFlight signing material.
+      # Compiles the iOS app for device with code signing disabled. The
+      # Xcode "Run Script" build phase (see project.pbxproj) invokes
+      # ./gradlew :shared:embedAndSignAppleFrameworkForXcode, so the KMP
+      # shared framework is built as part of this xcodebuild invocation —
+      # no separate gradle step is needed.
       - name: Build iOS app (no signing)
         working-directory: kmp/iosApp
         run: |

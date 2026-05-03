@@ -66,8 +66,11 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pods-
 
-      - name: Build KMP Framework
-        run: ./gradlew :shared:linkReleaseFrameworkIosArm64 --build-cache --parallel
+      # The KMP shared framework is built by the Xcode "Run Script" build
+      # phase that invokes ./gradlew :shared:embedAndSignAppleFrameworkForXcode
+      # (see iosApp.xcodeproj/project.pbxproj). xcodebuild (via fastlane
+      # build_app below) triggers that, so no separate gradle step is needed
+      # here.
 
       - name: Install CocoaPods
         working-directory: kmp/iosApp

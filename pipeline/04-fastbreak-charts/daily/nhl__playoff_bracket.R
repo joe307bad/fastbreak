@@ -1081,26 +1081,71 @@ for (conf in c("East", "West")) {
 
   r1_games <- vector("list", 4); r1_winners <- vector("list", 4)
 
+  # ESPN abbreviation mapping (ESPN uses shorter forms for some teams)
+  espn_to_standings <- c("TB" = "TBL", "LA" = "LAK", "SJ" = "SJS", "NJ" = "NJD", "NY" = "NYR")
+  map_abbrev <- function(a) if (a %in% names(espn_to_standings)) espn_to_standings[[a]] else a
+
+  build_nhl_team <- function(abbrev) {
+    conf_seeds <- seeds[[conf]]
+    if (is.data.frame(conf_seeds) && nrow(conf_seeds) > 0) {
+      sx <- conf_seeds %>% filter(team_abbrev == abbrev | team_abbrev == map_abbrev(abbrev))
+      if (nrow(sx) > 0) {
+        return(build_team(
+          sx$team_name[1], abbrev, sx$team_logo[1], seed = sx$seed[1],
+          record = list(wins = as.integer(sx$wins[1]), losses = as.integer(sx$losses[1]),
+                        conference = conf)
+        ))
+      }
+    }
+    build_team(abbrev, abbrev, NA, seed = NULL, record = list(conference = conf))
+  }
+
+  # Reorder ESPN R1 series to align with the bracket's R2 mapping when possible.
+  # NHL pairs by division (not by seed), so without this the semifinal pairing
+  # below (`semi_pairs`) can pair the wrong R1 winners — e.g. an Atlantic
+  # winner with a Metropolitan winner.
+  espn_r2_series <- Filter(function(s) identical(s$conference, espn_conf) && s$roundNumber == 2, playoff_events)
+  if (length(espn_r1_series) >= 4 && length(espn_r2_series) >= 1) {
+    ordered <- vector("list", 4)
+    used <- c()
+    for (r2_idx in seq_along(espn_r2_series)) {
+      if (r2_idx > 2) break
+      r2_abbrevs <- espn_r2_series[[r2_idx]]$team_abbrevs
+      parents <- c()
+      for (i in seq_along(espn_r1_series)) {
+        if (i %in% used) next
+        r1_abbrevs <- espn_r1_series[[i]]$team_abbrevs
+        if (any(r1_abbrevs %in% r2_abbrevs)) {
+          parents <- c(parents, i)
+          used <- c(used, i)
+          if (length(parents) == 2) break
+        }
+      }
+      if (length(parents) >= 1) {
+        target_slots <- if (r2_idx == 1) c(1, 2) else c(3, 4)
+        for (j in seq_along(parents)) {
+          if (j > length(target_slots)) break
+          ordered[[target_slots[j]]] <- espn_r1_series[[parents[j]]]
+        }
+      }
+    }
+    remaining <- setdiff(seq_along(espn_r1_series), used)
+    empty <- which(vapply(ordered, is.null, logical(1)))
+    for (k in seq_along(remaining)) {
+      if (k > length(empty)) break
+      ordered[[empty[k]]] <- espn_r1_series[[remaining[k]]]
+    }
+    espn_r1_series <- Filter(Negate(is.null), ordered)
+  }
+
   if (length(espn_r1_series) >= 4) {
     # Use actual ESPN matchups (not standings projection)
     for (i in seq_along(espn_r1_series)) {
       if (i > 4) break
       se <- espn_r1_series[[i]]
       abbrevs <- se$team_abbrevs
-      t1 <- build_team(abbrevs[1], abbrevs[1], NA, seed = NULL, record = list(conference = conf))
-      t2 <- build_team(abbrevs[2], abbrevs[2], NA, seed = NULL, record = list(conference = conf))
-      # Try to get seed from standings
-      # ESPN abbreviation mapping (ESPN uses shorter forms for some teams)
-      espn_to_standings <- c("TB" = "TBL", "LA" = "LAK", "SJ" = "SJS", "NJ" = "NJD", "NY" = "NYR")
-      map_abbrev <- function(a) if (a %in% names(espn_to_standings)) espn_to_standings[[a]] else a
-
-      conf_seeds <- seeds[[conf]]
-      if (is.data.frame(conf_seeds) && nrow(conf_seeds) > 0) {
-        s1 <- conf_seeds %>% filter(team_abbrev == abbrevs[1] | team_abbrev == map_abbrev(abbrevs[1]))
-        s2 <- conf_seeds %>% filter(team_abbrev == abbrevs[2] | team_abbrev == map_abbrev(abbrevs[2]))
-        if (nrow(s1) > 0) { t1 <- build_team(s1$team_name[1], abbrevs[1], s1$team_logo[1], seed = s1$seed[1], record = list(wins = as.integer(s1$wins[1]), losses = as.integer(s1$losses[1]), conference = conf)) }
-        if (nrow(s2) > 0) { t2 <- build_team(s2$team_name[1], abbrevs[2], s2$team_logo[1], seed = s2$seed[1], record = list(wins = as.integer(s2$wins[1]), losses = as.integer(s2$losses[1]), conference = conf)) }
-      }
+      t1 <- build_nhl_team(abbrevs[1])
+      t2 <- build_nhl_team(abbrevs[2])
       mu <- build_series_matchup(t1, t2, conf, 1, "First Round", paste0("nhl_", tolower(conf), "_r1_", i), se)
       r1_games[[i]] <- mu
       if (isTRUE(mu$team1$isWinner)) r1_winners[[i]] <- mu$team1
@@ -1122,13 +1167,58 @@ for (conf in c("East", "West")) {
     }
   }
 
+  # Conference Semifinals: prefer ESPN's actual R2 matchups when available.
+  # When R2 has started but R1 isn't fully resolved (or our R1 slotting is
+  # off), pairing R1 winners by `semi_pairs` can produce incorrect series.
   semi_pairs <- list(c(1, 2), c(3, 4))
   r2_games <- vector("list", 2); r2_winners <- vector("list", 2)
+
+  if (length(espn_r2_series) > 0) {
+    for (i in seq_along(espn_r2_series)) {
+      if (i > 2) break
+      se <- espn_r2_series[[i]]
+      abbrevs <- se$team_abbrevs
+      # Reuse R1 winner records (with seriesWins, etc.) when available
+      reuse_winner <- function(abbrev) {
+        for (w in r1_winners) {
+          if (!is.null(w) && !is.null(w$abbreviation) && w$abbreviation == abbrev) return(w)
+        }
+        NULL
+      }
+      # ESPN labels the unresolved competitor with a combined name like
+      # "Lightning/Canadiens" before R1 finishes. Treat that side as TBD
+      # rather than fabricating a team with a null seed (which downstream
+      # consumers reject).
+      is_placeholder <- function(abbrev) is.character(abbrev) && grepl("/", abbrev, fixed = TRUE)
+      t1 <- if (is_placeholder(abbrevs[1])) NULL else (reuse_winner(abbrevs[1]) %||% build_nhl_team(abbrevs[1]))
+      t2 <- if (is_placeholder(abbrevs[2])) NULL else (reuse_winner(abbrevs[2]) %||% build_nhl_team(abbrevs[2]))
+      if (is.null(t1) && is.null(t2)) next
+      if (is.null(t1) || is.null(t2)) {
+        r2_games[[i]] <- list(
+          gameId = paste0("nhl_", tolower(conf), "_r2_", i),
+          conference = conf, roundNumber = 2, roundName = "Conference Semifinals",
+          gameStatus = "TBD", bestOf = 7,
+          team1 = t1, team2 = t2,
+          winner = NULL, games = list(), comparisons = NULL
+        )
+        r2_winners[i] <- list(NULL)
+        next
+      }
+      mu <- build_series_matchup(t1, t2, conf, 2, "Conference Semifinals",
+                                 paste0("nhl_", tolower(conf), "_r2_", i), se)
+      r2_games[[i]] <- mu
+      if (isTRUE(mu$team1$isWinner)) r2_winners[[i]] <- mu$team1
+      else if (isTRUE(mu$team2$isWinner)) r2_winners[[i]] <- mu$team2
+      else r2_winners[i] <- list(NULL)
+    }
+  }
+
   for (i in seq_along(semi_pairs)) {
+    if (!is.null(r2_games[[i]])) next
     idx <- semi_pairs[[i]]
     a <- r1_winners[[idx[1]]]; b <- r1_winners[[idx[2]]]
     if (is.null(a) || is.null(b)) { r2_winners[i] <- list(NULL); next }
-    se <- find_series(if (conf == "East") "Eastern" else "Western", 2, a$abbreviation, b$abbreviation)
+    se <- find_series(espn_conf, 2, a$abbreviation, b$abbreviation)
     mu <- build_series_matchup(a, b, conf, 2, "Conference Semifinals", paste0("nhl_", tolower(conf), "_r2_", i), se)
     r2_games[[i]] <- mu
     if (isTRUE(mu$team1$isWinner)) r2_winners[[i]] <- mu$team1

@@ -125,12 +125,20 @@ internal fun convertPlayoffMatchupToGame(matchup: PlayoffMatchupInfo?): PlayoffB
     val status = matchup.gameStatus?.uppercase() ?: ""
     val isDecided = status == "FINAL"
 
+    fun isTbd(info: BracketTeamInfo?): Boolean =
+        info == null || info.name.equals("TBD", ignoreCase = true) || info.name.isBlank()
+
+    // If either side is TBD the series hasn't started, so any seriesWins
+    // carried over from a prior round (e.g. an R1 winner reused into R2 before
+    // the opponent is known) must not be displayed.
+    val opponentUnknown = isTbd(matchup.team1) || isTbd(matchup.team2)
+
     fun toTeam(info: BracketTeamInfo?, isWinnerByName: Boolean): PlayoffBracketTeam? {
-        if (info == null || info.name.equals("TBD", ignoreCase = true) || info.name.isBlank()) return null
+        if (info == null || isTbd(info)) return null
         return PlayoffBracketTeam(
             seed = info.seed, name = info.name,
             abbreviation = info.abbreviation ?: info.name.take(3).uppercase(),
-            seriesWins = info.seriesWins,
+            seriesWins = if (opponentUnknown) null else info.seriesWins,
             isWinner = isDecided && (isWinnerByName || info.isWinner)
         )
     }
@@ -526,8 +534,14 @@ internal fun playoffSeriesStatus(
     t1: BracketTeamInfo?,
     t2: BracketTeamInfo?
 ): String {
-    val t1Wins = t1?.seriesWins ?: 0
-    val t2Wins = t2?.seriesWins ?: 0
+    fun isTbd(info: BracketTeamInfo?): Boolean =
+        info == null || info.name.equals("TBD", ignoreCase = true) || info.name.isBlank()
+
+    // Until both teams are known, the series hasn't started — ignore any
+    // seriesWins still attached to a team carried over from a prior round.
+    val opponentUnknown = isTbd(t1) || isTbd(t2)
+    val t1Wins = if (opponentUnknown) 0 else t1?.seriesWins ?: 0
+    val t2Wins = if (opponentUnknown) 0 else t2?.seriesWins ?: 0
     val bestOf = matchup.bestOf ?: 7
     val needed = bestOf / 2 + 1
     val t1Abbrev = t1?.abbreviation ?: t1?.name?.take(3)?.uppercase() ?: "T1"

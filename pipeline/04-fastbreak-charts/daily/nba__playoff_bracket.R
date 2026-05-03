@@ -558,12 +558,27 @@ if (!is.null(standings_resp) && status_code(standings_resp) == 200) {
             entry$team$logos[[1]]$href else NA,
           wins = get_stat(entry$stats, "wins"),
           losses = get_stat(entry$stats, "losses"),
-          win_pct = get_stat(entry$stats, "winPercent")
+          win_pct = get_stat(entry$stats, "winPercent"),
+          # ESPN's playoffSeed already accounts for tiebreakers (head-to-head,
+          # division titles, play-in results). Prefer it over a naive sort by
+          # wins/losses, which can produce the wrong first-round matchups when
+          # teams are tied.
+          playoff_seed = get_stat(entry$stats, "playoffSeed")
         )
       })
-      df <- bind_rows(rows) %>%
-        arrange(desc(wins), losses) %>%
-        mutate(seed = row_number())
+      df <- bind_rows(rows)
+      if (any(!is.na(df$playoff_seed) & df$playoff_seed > 0)) {
+        df <- df %>%
+          arrange(ifelse(is.na(playoff_seed) | playoff_seed <= 0, 999, playoff_seed),
+                  desc(wins), losses) %>%
+          mutate(seed = if_else(!is.na(playoff_seed) & playoff_seed > 0,
+                                as.integer(playoff_seed),
+                                row_number()))
+      } else {
+        df <- df %>%
+          arrange(desc(wins), losses) %>%
+          mutate(seed = row_number())
+      }
       seeds[[bucket]] <- df
     }
   }
@@ -1227,13 +1242,23 @@ for (conf in c("East", "West")) {
   r1_winners <- vector("list", 4)
 
   if (length(espn_r1_series) >= 4) {
-    # Use actual ESPN matchups
-    for (i in seq_along(espn_r1_series)) {
-      if (i > 4) break
-      se <- espn_r1_series[[i]]
+    # Use actual ESPN matchups, slotted into bracket position by seed pair so
+    # the semifinal pairing logic below (1v8 winner vs 4v5 winner, 3v6 winner
+    # vs 2v7 winner) lines up. ESPN returns R1 series in arbitrary order based
+    # on game scheduling, so without this slotting the semis pair the wrong
+    # winners.
+    conf_seeds <- seeds[[conf]]
+    seed_pair_to_slot <- function(seed_a, seed_b) {
+      if (is.na(seed_a) || is.na(seed_b)) return(NA_integer_)
+      pair <- sort(as.integer(c(seed_a, seed_b)))
+      for (idx in seq_along(FIRST_ROUND_SEEDS)) {
+        if (identical(sort(as.integer(FIRST_ROUND_SEEDS[[idx]])), pair)) return(idx)
+      }
+      NA_integer_
+    }
+
+    build_r1_matchup <- function(se, slot_idx) {
       abbrevs <- se$team_abbrevs
-      # Look up full team info from standings
-      conf_seeds <- seeds[[conf]]
       t1 <- NULL; t2 <- NULL
       if (is.data.frame(conf_seeds) && nrow(conf_seeds) > 0) {
         s1 <- conf_seeds %>% filter(team_abbrev == abbrevs[1])
@@ -1246,11 +1271,39 @@ for (conf in c("East", "West")) {
       if (is.null(t2)) t2 <- build_team(abbrevs[2], abbrevs[2], NA, seed = NULL, record = list(conference = conf))
 
       mu <- build_series_matchup(t1, t2, conf, 1, "First Round",
-                                 paste0("nba_", tolower(conf), "_r1_", i), se)
-      r1_games[[i]] <- mu
-      if (isTRUE(mu$team1$isWinner)) r1_winners[[i]] <- mu$team1
-      else if (isTRUE(mu$team2$isWinner)) r1_winners[[i]] <- mu$team2
-      else r1_winners[i] <- list(NULL)
+                                 paste0("nba_", tolower(conf), "_r1_", slot_idx), se)
+      r1_games[[slot_idx]] <<- mu
+      if (isTRUE(mu$team1$isWinner)) r1_winners[[slot_idx]] <<- mu$team1
+      else if (isTRUE(mu$team2$isWinner)) r1_winners[[slot_idx]] <<- mu$team2
+      else r1_winners[slot_idx] <<- list(NULL)
+    }
+
+    unslotted <- list()
+    for (se in espn_r1_series) {
+      abbrevs <- se$team_abbrevs
+      seed_a <- NA_integer_; seed_b <- NA_integer_
+      if (is.data.frame(conf_seeds) && nrow(conf_seeds) > 0) {
+        s1 <- conf_seeds %>% filter(team_abbrev == abbrevs[1])
+        s2 <- conf_seeds %>% filter(team_abbrev == abbrevs[2])
+        if (nrow(s1) > 0) seed_a <- as.integer(s1$seed[1])
+        if (nrow(s2) > 0) seed_b <- as.integer(s2$seed[1])
+      }
+      slot <- seed_pair_to_slot(seed_a, seed_b)
+      if (!is.na(slot) && is.null(r1_games[[slot]])) {
+        build_r1_matchup(se, slot)
+      } else {
+        unslotted[[length(unslotted) + 1]] <- se
+      }
+    }
+
+    # Anything we couldn't slot by seed (missing standings, play-in surprise,
+    # etc.) falls into the first available slot so the bracket still renders.
+    if (length(unslotted) > 0) {
+      empty_slots <- which(vapply(r1_games, is.null, logical(1)))
+      for (i in seq_along(unslotted)) {
+        if (i > length(empty_slots)) break
+        build_r1_matchup(unslotted[[i]], empty_slots[i])
+      }
     }
   } else {
     # Fall back to standings projection

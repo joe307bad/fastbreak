@@ -31,6 +31,24 @@ jobs:
           distribution: 'zulu'
           java-version: '17'
 
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: false
+          gradle-home-cache-cleanup: true
+
+      # Cache the Kotlin/Native toolchain (compiler, LLVM, libffi, etc.) which
+      # is downloaded into ~/.konan on first run and weighs ~1.5GB. Keyed on
+      # the Kotlin version from the version catalog so it invalidates on
+      # upgrades.
+      - name: Cache Kotlin/Native (~/.konan)
+        uses: actions/cache@v4
+        with:
+          path: ~/.konan
+          key: ${{ runner.os }}-${{ runner.arch }}-konan-${{ hashFiles('kmp/gradle/libs.versions.toml', 'kmp/gradle/wrapper/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ runner.arch }}-konan-
+
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1
         with:
@@ -38,8 +56,18 @@ jobs:
           bundler-cache: true
           working-directory: kmp/iosApp
 
+      - name: Cache CocoaPods
+        uses: actions/cache@v4
+        with:
+          path: |
+            kmp/iosApp/Pods
+            ~/Library/Caches/CocoaPods
+          key: ${{ runner.os }}-pods-${{ hashFiles('kmp/iosApp/Podfile.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-pods-
+
       - name: Build KMP Framework
-        run: ./gradlew :shared:linkReleaseFrameworkIosArm64
+        run: ./gradlew :shared:linkReleaseFrameworkIosArm64 --build-cache --parallel
 
       - name: Install CocoaPods
         working-directory: kmp/iosApp

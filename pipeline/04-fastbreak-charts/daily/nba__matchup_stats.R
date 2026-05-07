@@ -357,6 +357,38 @@ scrape_playoff_probabilities <- function() {
   })
 }
 
+# Detect NBA season type from ESPN API
+# Returns: list(type = integer, isPostseason = boolean)
+# seasonType: 1=preseason, 2=regular, 3=playoffs, 4=offseason
+detect_nba_season_type <- function() {
+  tryCatch({
+    url <- "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard"
+    add_api_delay()
+    resp <- GET(url)
+
+    if (status_code(resp) == 200) {
+      data <- content(resp, as = "parsed")
+      season_type <- data$season$type
+      is_postseason <- !is.null(season_type) && season_type == 3
+      cat(sprintf("ESPN NBA season type: %d (%s)\n",
+                  season_type,
+                  switch(as.character(season_type),
+                         "1" = "Preseason",
+                         "2" = "Regular Season",
+                         "3" = "Playoffs",
+                         "4" = "Offseason",
+                         "Unknown")))
+      return(list(type = season_type, isPostseason = is_postseason))
+    } else {
+      cat("Warning: Could not fetch ESPN scoreboard for season type detection\n")
+      return(list(type = 2, isPostseason = FALSE))
+    }
+  }, error = function(e) {
+    cat("Error detecting NBA season type:", e$message, "\n")
+    return(list(type = 2, isPostseason = FALSE))
+  })
+}
+
 # Helper function to build results data for a completed game
 build_game_results <- function(game, home_season_stats, away_season_stats, team_stats) {
   game_id <- game$game_id
@@ -1180,6 +1212,11 @@ if (!is.null(playoff_probabilities)) {
 } else {
   cat("Warning: Could not load playoff probabilities - will continue without them\n")
 }
+
+# Detect if we're in postseason
+season_info <- detect_nba_season_type()
+IS_POSTSEASON <- season_info$isPostseason
+cat(sprintf("Postseason mode: %s\n", if (IS_POSTSEASON) "YES" else "NO"))
 
 end_timer()
 
@@ -3088,7 +3125,10 @@ if (!is.null(playoff_probabilities) && length(playoff_probabilities) > 0) {
 
   po_df <- po_df[order(-po_df$win_pct, -po_df$champProb, -po_df$playoffProb), ]
   playoff_chances_list <- lapply(seq_len(nrow(po_df)), function(i) {
-    list(team = po_df$team[i], playoffProb = po_df$playoffProb[i], champProb = po_df$champProb[i],
+    list(team = po_df$team[i],
+         # During postseason, playoffProb is meaningless (teams either made it or didn't)
+         playoffProb = if (IS_POSTSEASON) NULL else po_df$playoffProb[i],
+         champProb = po_df$champProb[i],
          conference = po_df$conference[i],
          winPct = po_df$win_pct[i],
          netRating = po_df$net_rating[i])
@@ -3109,6 +3149,7 @@ output_data <- list(
     list(label = "regular season", layout = "right", color = "#9C27B0")
   ),
   sortOrder = 0,
+  isPostseason = IS_POSTSEASON,
   # Scatter plot quadrant configuration for Off vs Def Rating chart
   # With inverted Y axis: top = good defense (low rating), bottom = poor defense
   # X axis: right = good offense (high rating), left = poor offense

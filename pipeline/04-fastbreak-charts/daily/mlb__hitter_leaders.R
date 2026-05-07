@@ -3,15 +3,18 @@ library(dplyr)
 library(jsonlite)
 
 # ============================================================================
-# MLB Pitching Leaders — scatter of K-BB% vs xFIP for qualified starters
+# MLB Hitting Leaders — scatter of wRC+ vs xwOBA for qualified hitters
 #
 # Why these two stats:
-#  - K-BB%  = strikeout-rate minus walk-rate. Among the simplest rate stats and
-#             also the most predictive of future run prevention. Captures
-#             "stuff + command" in a single number.
-#  - xFIP   = Expected Fielding Independent Pitching. Strips out luck on
-#             balls in play AND normalizes HR/FB to league average, so it
-#             isolates a pitcher's true talent better than ERA or even FIP.
+#  - wRC+   = Weighted Runs Created Plus. The single best "all in one"
+#             offensive stat: it combines every batting event (BB, HBP,
+#             1B, 2B, 3B, HR) weighted by run value, then adjusts for
+#             park and league. 100 = league average, 150 = elite.
+#  - xwOBA  = Expected Weighted On-Base Average. Statcast-derived
+#             expected wOBA based on quality of contact (exit velocity
+#             and launch angle), so it strips out luck on balls in play
+#             and isolates a hitter's true contact-quality skill — the
+#             hitting analogue of xFIP for pitchers.
 #
 # Output is a SCATTER_PLOT visualization; the existing KMP renderer reads it
 # without any client changes.
@@ -24,22 +27,22 @@ current_month <- as.numeric(format(Sys.Date(), "%m"))
 # the prior season so we never produce an empty chart.
 mlb_season <- if (current_month >= 3) current_year else current_year - 1
 
-cat("Processing MLB Pitching Leaders for", mlb_season, "season\n")
+cat("Processing MLB Hitting Leaders for", mlb_season, "season\n")
 
-# Pull pitcher leaderboard from FanGraphs (qual="0" so we filter ourselves)
-pitcher_stats <- tryCatch({
+# Pull batter leaderboard from FanGraphs (qual="0" so we filter ourselves)
+batter_stats <- tryCatch({
   suppressWarnings(suppressMessages(
-    fg_pitcher_leaders(
+    fg_batter_leaders(
       startseason = as.character(mlb_season),
       endseason = as.character(mlb_season),
       qual = "0"
     )
   ))
 }, error = function(e) {
-  cat("Error loading pitcher stats:", e$message, "\n"); stop(e)
+  cat("Error loading batter stats:", e$message, "\n"); stop(e)
 })
 
-cat("Loaded", nrow(pitcher_stats), "pitcher rows from FanGraphs\n")
+cat("Loaded", nrow(batter_stats), "batter rows from FanGraphs\n")
 
 # MLB league/division mapping (FanGraphs abbreviations).
 team_divisions <- c(
@@ -60,41 +63,42 @@ team_leagues <- c(
   "ARI" = "National", "COL" = "National", "LAD" = "National", "SDP" = "National", "SFG" = "National"
 )
 
-# Filter to starters with enough work to be meaningfully ranked. Thresholds
+# Filter to hitters with enough work to be meaningfully ranked. Thresholds
 # are deliberately permissive early in the season so the chart populates
-# in April.
-min_ip <- 20
-min_gs <- 4
+# in April. ~100 PA roughly equals a few weeks of regular play.
+min_pa <- 100
+min_g <- 25
 
-qualified_pitchers <- pitcher_stats %>%
+qualified_hitters <- batter_stats %>%
   mutate(
     player = PlayerName,
     team = team_name_abb,
-    IP = as.numeric(IP),
-    GS = as.integer(GS),
-    K_BB_pct = as.numeric(`K-BB_pct`),
-    xFIP = as.numeric(xFIP)
+    PA = as.integer(PA),
+    G = as.integer(G),
+    wRC_plus = as.numeric(wRC_plus),
+    xwOBA = as.numeric(xwOBA)
   ) %>%
   filter(
-    !is.na(IP), !is.na(GS), !is.na(K_BB_pct), !is.na(xFIP),
-    IP >= min_ip,
-    GS >= min_gs
+    !is.na(PA), !is.na(G), !is.na(wRC_plus), !is.na(xwOBA),
+    PA >= min_pa,
+    G >= min_g
   )
 
-cat("Qualified starters (IP >=", min_ip, ", GS >=", min_gs, "):",
-    nrow(qualified_pitchers), "\n")
+cat("Qualified hitters (PA >=", min_pa, ", G >=", min_g, "):",
+    nrow(qualified_hitters), "\n")
 
-# Top 50 by K-BB% keeps the chart readable while still surfacing the leaderboard
-top_pitchers <- qualified_pitchers %>%
-  arrange(desc(K_BB_pct)) %>%
+# Top 50 by wRC+ keeps the chart readable while still surfacing the leaderboard
+top_hitters <- qualified_hitters %>%
+  arrange(desc(wRC_plus)) %>%
   head(50) %>%
-  select(player, team, IP, GS, K_BB_pct, xFIP)
+  select(player, team, PA, G, wRC_plus, xwOBA)
 
-cat("\nTop 10 by K-BB%:\n")
-print(head(top_pitchers, 10))
+cat("\nTop 10 by wRC+:\n")
+print(head(top_hitters, 10))
 
-# Convert K-BB% to a percent (0.278 -> 27.8) so the axis renders naturally
-data_points <- top_pitchers %>%
+# wRC+ is already an integer-style index (100 = avg). xwOBA is a rate around
+# .300-.400; round to 3 decimals so the axis renders cleanly.
+data_points <- top_hitters %>%
   rowwise() %>%
   mutate(
     primary_team = strsplit(team, ",")[[1]][1],
@@ -102,9 +106,9 @@ data_points <- top_pitchers %>%
     league = team_leagues[primary_team],
     data_point = list(list(
       label = player,
-      x = round(K_BB_pct * 100, 1),
-      y = round(xFIP, 2),
-      sum = round(K_BB_pct * 100, 1),
+      x = round(wRC_plus, 0),
+      y = round(xwOBA, 3),
+      sum = round(wRC_plus, 0),
       teamCode = team,
       division = if (!is.na(division) && !is.null(division)) as.character(division) else NULL,
       conference = if (!is.na(league) && !is.null(league)) as.character(league) else NULL
@@ -112,32 +116,33 @@ data_points <- top_pitchers %>%
   ) %>%
   pull(data_point)
 
-# Build the visualization payload. invertYAxis = TRUE so lower xFIP renders at
-# the top, i.e. "up + right = better".
+# Build the visualization payload. Both axes "higher is better" so no
+# inversion needed — up and to the right = elite.
 output_data <- list(
   sport = "MLB",
   visualizationType = "SCATTER_PLOT",
-  title = paste0("MLB Pitching Leaders - ", mlb_season, "-", substr(mlb_season + 1, 3, 4)),
-  subtitle = "K-BB% vs xFIP",
+  title = paste0("MLB Hitting Leaders - ", mlb_season, "-", substr(mlb_season + 1, 3, 4)),
+  subtitle = "wRC+ vs xwOBA",
   description = paste0(
-    "Top 50 starting pitchers (min ", min_ip, " IP, ", min_gs,
-    " GS) plotted by K-BB% (strikeout rate minus walk rate) and xFIP ",
-    "(expected Fielding Independent Pitching, which normalizes HR/FB rate ",
-    "to league average). Up and to the right is elite: high K-BB% means ",
-    "missing bats with command, low xFIP means a pitcher's true skill ",
-    "profile is suppressing runs regardless of luck on balls in play."
+    "Top 50 hitters (min ", min_pa, " PA, ", min_g,
+    " G) plotted by wRC+ (park- and league-adjusted runs created, ",
+    "where 100 is league average) and xwOBA (expected weighted on-base ",
+    "average from Statcast quality of contact, which strips out luck ",
+    "on balls in play). Up and to the right is elite: high wRC+ means ",
+    "actual run production, high xwOBA means the underlying contact ",
+    "quality is real and sustainable."
   ),
   lastUpdated = format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC"),
   source = "FanGraphs",
-  xAxisLabel = "K-BB%",
-  yAxisLabel = "xFIP",
-  xColumnLabel = "K-BB%",
-  yColumnLabel = "xFIP",
-  invertYAxis = TRUE,
-  quadrantTopRight    = list(color = "#4CAF50", label = "Elite Stuff + Command"),
-  quadrantTopLeft     = list(color = "#2196F3", label = "Contact Managers"),
+  xAxisLabel = "wRC+",
+  yAxisLabel = "xwOBA",
+  xColumnLabel = "wRC+",
+  yColumnLabel = "xwOBA",
+  invertYAxis = FALSE,
+  quadrantTopRight    = list(color = "#4CAF50", label = "Elite, Sustainable"),
+  quadrantTopLeft     = list(color = "#2196F3", label = "Unlucky, Due to Improve"),
   quadrantBottomLeft  = list(color = "#9E9E9E", label = "Struggling"),
-  quadrantBottomRight = list(color = "#FF9800", label = "K Artists, HR-Prone"),
+  quadrantBottomRight = list(color = "#FF9800", label = "Outperforming Contact"),
   subject = "PLAYER",
   tags = list(
     list(label = "player", layout = "left", color = "#2196F3"),
@@ -153,7 +158,7 @@ s3_bucket <- Sys.getenv("AWS_S3_BUCKET")
 if (!nzchar(s3_bucket)) stop("AWS_S3_BUCKET environment variable is not set")
 
 is_prod <- tolower(Sys.getenv("PROD")) == "true"
-s3_key <- if (is_prod) "mlb__pitcher_leaders.json" else "dev/mlb__pitcher_leaders.json"
+s3_key <- if (is_prod) "mlb__hitter_leaders.json" else "dev/mlb__hitter_leaders.json"
 
 tmp_file <- tempfile(fileext = ".json")
 write_json(output_data, tmp_file, pretty = TRUE, auto_unbox = TRUE)
@@ -181,9 +186,9 @@ if (system(ddb_cmd) != 0) {
   cat("Updated DynamoDB:", dynamodb_table, "key:", s3_key, "\n")
 }
 
-cat("\n=== MLB Pitching Leaders generation complete ===\n")
-cat("Pitchers shown:", length(data_points), "\n")
-cat("\nTop 5 by xFIP (best):\n")
-print(head(top_pitchers %>% arrange(xFIP), 5))
-cat("\nTop 5 by K-BB%:\n")
-print(head(top_pitchers %>% arrange(desc(K_BB_pct)), 5))
+cat("\n=== MLB Hitting Leaders generation complete ===\n")
+cat("Hitters shown:", length(data_points), "\n")
+cat("\nTop 5 by xwOBA (best):\n")
+print(head(top_hitters %>% arrange(desc(xwOBA)), 5))
+cat("\nTop 5 by wRC+:\n")
+print(head(top_hitters %>% arrange(desc(wRC_plus)), 5))

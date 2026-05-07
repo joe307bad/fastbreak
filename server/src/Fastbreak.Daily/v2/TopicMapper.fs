@@ -43,10 +43,9 @@ let private topicsForState (state: string) : int * Topic list =
             { Category = "PRESEASON"; Description = "Preason power rankings" }
         ]
     | "POST-SEASON" ->
-        3, [
+        2, [
             { Category = "PLAYOFFS"; Description = "Playoff matchups with statistics" }
             { Category = "PLAYOFFS"; Description = "Series predictions" }
-            { Category = "PLAYOFFS"; Description = "Game highlights with statistics" }
         ]
     | "CHAMPIONSHIP" ->
         2, [

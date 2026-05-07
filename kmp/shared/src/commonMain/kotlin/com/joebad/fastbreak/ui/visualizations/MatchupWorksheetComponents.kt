@@ -1099,6 +1099,7 @@ private fun PlayoffChancesShareImage(
     highlightedTeams: Set<String> = emptySet(),
     playoffCutoff: Int = 0,
     playInCutoff: Int = 0,
+    showPlayoffColumn: Boolean = true,
     extraColumns: List<PlayoffExtraColumn> = emptyList()
 ) {
     val bg = MaterialTheme.colorScheme.background
@@ -1112,7 +1113,7 @@ private fun PlayoffChancesShareImage(
             .entries
             .sortedBy { it.key }
             .map { (conf, teams) ->
-                conf to teams.sortedByDescending { it.champProb }
+                conf to teams.sortedByDescending { it.champProb ?: 0.0 }
             }
     } else null
 
@@ -1147,18 +1148,20 @@ private fun PlayoffChancesShareImage(
                         Text(col.label, style = MaterialTheme.typography.labelSmall, fontSize = 9.sp, fontWeight = FontWeight.Bold, color = dimColor, textAlign = TextAlign.End, modifier = Modifier.width(36.dp), maxLines = 1)
                         Spacer(modifier = Modifier.width(2.dp))
                     }
-                    Text("PLAYOFF", style = MaterialTheme.typography.labelSmall, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = dimColor, textAlign = TextAlign.Center, modifier = Modifier.width(52.dp), maxLines = 1)
+                    if (showPlayoffColumn) {
+                        Text("PLAYOFF", style = MaterialTheme.typography.labelSmall, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = dimColor, textAlign = TextAlign.Center, modifier = Modifier.width(52.dp), maxLines = 1)
+                    }
                     Text(champLabel.uppercase(), style = MaterialTheme.typography.labelSmall, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = dimColor, textAlign = TextAlign.Center, modifier = Modifier.width(52.dp), maxLines = 1)
                 }
                 confEntries.forEachIndexed { index, entry ->
                     val seed = index + 1
-                    if (playoffCutoff > 0 && seed == playoffCutoff + 1) {
+                    if (showPlayoffColumn && playoffCutoff > 0 && seed == playoffCutoff + 1) {
                         ShareImageCutoffDivider("PLAYOFF CUTOFF", dimColor)
                     }
-                    if (playInCutoff > 0 && seed == playInCutoff + 1) {
+                    if (showPlayoffColumn && playInCutoff > 0 && seed == playInCutoff + 1) {
                         ShareImageCutoffDivider("PLAY-IN CUTOFF", dimColor)
                     }
-                    ShareImageTeamRow(entry, seed, highlightedTeams, probColorFn, champProbColorFn, highlightColor, onBg, dimColor, extraColumns)
+                    ShareImageTeamRow(entry, seed, highlightedTeams, probColorFn, champProbColorFn, highlightColor, onBg, dimColor, extraColumns, showPlayoffColumn)
                 }
             }
         } else {
@@ -1172,18 +1175,20 @@ private fun PlayoffChancesShareImage(
                     Text(col.label, style = MaterialTheme.typography.labelSmall, fontSize = 9.sp, fontWeight = FontWeight.Bold, color = dimColor, textAlign = TextAlign.End, modifier = Modifier.width(36.dp), maxLines = 1)
                     Spacer(modifier = Modifier.width(2.dp))
                 }
-                Text("PLAYOFF", style = MaterialTheme.typography.labelSmall, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = dimColor, textAlign = TextAlign.Center, modifier = Modifier.width(52.dp), maxLines = 1)
+                if (showPlayoffColumn) {
+                    Text("PLAYOFF", style = MaterialTheme.typography.labelSmall, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = dimColor, textAlign = TextAlign.Center, modifier = Modifier.width(52.dp), maxLines = 1)
+                }
                 Text(champLabel.uppercase(), style = MaterialTheme.typography.labelSmall, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = dimColor, textAlign = TextAlign.Center, modifier = Modifier.width(52.dp), maxLines = 1)
             }
             entries.forEachIndexed { index, entry ->
                 val seed = index + 1
-                if (playoffCutoff > 0 && seed == playoffCutoff + 1) {
+                if (showPlayoffColumn && playoffCutoff > 0 && seed == playoffCutoff + 1) {
                     ShareImageCutoffDivider("PLAYOFF CUTOFF", dimColor)
                 }
-                if (playInCutoff > 0 && seed == playInCutoff + 1) {
+                if (showPlayoffColumn && playInCutoff > 0 && seed == playInCutoff + 1) {
                     ShareImageCutoffDivider("PLAY-IN CUTOFF", dimColor)
                 }
-                ShareImageTeamRow(entry, seed, highlightedTeams, probColorFn, champProbColorFn, highlightColor, onBg, dimColor, extraColumns)
+                ShareImageTeamRow(entry, seed, highlightedTeams, probColorFn, champProbColorFn, highlightColor, onBg, dimColor, extraColumns, showPlayoffColumn)
             }
         }
 
@@ -1205,7 +1210,8 @@ private fun ShareImageTeamRow(
     highlightColor: Color,
     onBg: Color,
     dimColor: Color,
-    extraColumns: List<PlayoffExtraColumn> = emptyList()
+    extraColumns: List<PlayoffExtraColumn> = emptyList(),
+    showPlayoffColumn: Boolean = true
 ) {
     val playoffColor = probColorFn(entry.playoffProb)
     val isHighlighted = entry.team in highlightedTeams
@@ -1235,10 +1241,12 @@ private fun ShareImageTeamRow(
             Text(col.format(entry), fontSize = 10.sp, fontWeight = FontWeight.Medium, fontFamily = FontFamily.Monospace, color = dimColor, textAlign = TextAlign.End, modifier = Modifier.width(36.dp), maxLines = 1)
             Spacer(modifier = Modifier.width(2.dp))
         }
-        Box(modifier = Modifier.width(50.dp).background(playoffColor, RoundedCornerShape(3.dp)).padding(horizontal = 4.dp, vertical = 2.dp), contentAlignment = Alignment.Center) {
-            Text(formatProb(entry.playoffProb), fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color.White, maxLines = 1)
+        if (showPlayoffColumn) {
+            Box(modifier = Modifier.width(50.dp).background(playoffColor, RoundedCornerShape(3.dp)).padding(horizontal = 4.dp, vertical = 2.dp), contentAlignment = Alignment.Center) {
+                Text(formatProb(entry.playoffProb), fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color.White, maxLines = 1)
+            }
+            Spacer(modifier = Modifier.width(4.dp))
         }
-        Spacer(modifier = Modifier.width(4.dp))
         Box(modifier = Modifier.width(50.dp).background(champProbColorFn(entry.champProb), RoundedCornerShape(3.dp)).padding(horizontal = 4.dp, vertical = 2.dp), contentAlignment = Alignment.Center) {
             Text(formatProb(entry.champProb), fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color.White, maxLines = 1)
         }
@@ -1536,7 +1544,8 @@ private fun formatPctValue(value: Double): String {
     } else "$str.0%"
 }
 
-private fun formatProb(prob: Double): String {
+private fun formatProb(prob: Double?): String {
+    if (prob == null) return "-"
     return when {
         prob >= 99.5 -> ">99%"
         prob in 0.0001..0.9999 -> "<1%"
@@ -1561,6 +1570,7 @@ fun PlayoffChancesBottomSheet(
     source: String = "",
     playoffCutoff: Int = 0,
     playInCutoff: Int = 0,
+    showPlayoffColumn: Boolean = true,
     extraColumns: List<PlayoffExtraColumn> = emptyList()
 ) {
     var isReversed by remember { mutableStateOf(false) }
@@ -1569,11 +1579,14 @@ fun PlayoffChancesBottomSheet(
 
     val hasConferenceData = entries.any { it.conference != null }
 
-    // Sort by first extra column if available, otherwise by champProb
-    val sortSelector: (PlayoffChanceEntry) -> Double = if (extraColumns.isNotEmpty()) {
+    // Sort by champProb during postseason (when showPlayoffColumn is false),
+    // otherwise by first extra column if available, otherwise by champProb
+    val sortSelector: (PlayoffChanceEntry) -> Double = if (!showPlayoffColumn) {
+        { it.champProb ?: 0.0 }
+    } else if (extraColumns.isNotEmpty()) {
         extraColumns.first().sortValue
     } else {
-        { it.champProb }
+        { it.champProb ?: 0.0 }
     }
 
     // Build conference groups: list of (conference name, sorted teams)
@@ -1658,6 +1671,7 @@ fun PlayoffChancesBottomSheet(
                     highlightedTeams = selectedTeams,
                     playoffCutoff = playoffCutoff,
                     playInCutoff = playInCutoff,
+                    showPlayoffColumn = showPlayoffColumn,
                     extraColumns = extraColumns
                 )
             }
@@ -1723,16 +1737,16 @@ fun PlayoffChancesBottomSheet(
                             )
 
                             // Column headers
-                            PlayoffChancesHeaderRow(champLabel, extraColumns)
+                            PlayoffChancesHeaderRow(champLabel, extraColumns, showPlayoffColumn)
 
                             confEntries.forEachIndexed { index, entry ->
                                 val seed = index + 1
-                                // Playoff cutoff divider
-                                if (playoffCutoff > 0 && seed == playoffCutoff + 1) {
+                                // Playoff cutoff divider (only show during regular season)
+                                if (showPlayoffColumn && playoffCutoff > 0 && seed == playoffCutoff + 1) {
                                     PlayoffCutoffDivider()
                                 }
-                                // Play-in cutoff divider
-                                if (playInCutoff > 0 && seed == playInCutoff + 1) {
+                                // Play-in cutoff divider (only show during regular season)
+                                if (showPlayoffColumn && playInCutoff > 0 && seed == playInCutoff + 1) {
                                     PlayoffCutoffDivider("PLAY-IN CUTOFF")
                                 }
                                 PlayoffChanceTeamRow(
@@ -1742,6 +1756,7 @@ fun PlayoffChancesBottomSheet(
                                     probColorFn = probColorFn,
                                     champProbColorFn = champProbColorFn,
                                     extraColumns = extraColumns,
+                                    showPlayoffColumn = showPlayoffColumn,
                                     onToggle = {
                                         selectedTeams = if (entry.team in selectedTeams) selectedTeams - entry.team else selectedTeams + entry.team
                                     }
@@ -1750,13 +1765,13 @@ fun PlayoffChancesBottomSheet(
                         }
                     } else {
                         // Flat list fallback (no conference data)
-                        PlayoffChancesHeaderRow(champLabel, extraColumns)
+                        PlayoffChancesHeaderRow(champLabel, extraColumns, showPlayoffColumn)
                         displayEntries.forEachIndexed { index, entry ->
                             val seed = index + 1
-                            if (playoffCutoff > 0 && seed == playoffCutoff + 1) {
+                            if (showPlayoffColumn && playoffCutoff > 0 && seed == playoffCutoff + 1) {
                                 PlayoffCutoffDivider()
                             }
-                            if (playInCutoff > 0 && seed == playInCutoff + 1) {
+                            if (showPlayoffColumn && playInCutoff > 0 && seed == playInCutoff + 1) {
                                 PlayoffCutoffDivider("PLAY-IN CUTOFF")
                             }
                             PlayoffChanceTeamRow(
@@ -1766,6 +1781,7 @@ fun PlayoffChancesBottomSheet(
                                 probColorFn = probColorFn,
                                 champProbColorFn = champProbColorFn,
                                 extraColumns = extraColumns,
+                                showPlayoffColumn = showPlayoffColumn,
                                 onToggle = {
                                     selectedTeams = if (entry.team in selectedTeams) selectedTeams - entry.team else selectedTeams + entry.team
                                 }
@@ -1799,7 +1815,7 @@ fun PlayoffChancesBottomSheet(
 }
 
 @Composable
-private fun PlayoffChancesHeaderRow(champLabel: String, extraColumns: List<PlayoffExtraColumn> = emptyList()) {
+private fun PlayoffChancesHeaderRow(champLabel: String, extraColumns: List<PlayoffExtraColumn> = emptyList(), showPlayoffColumn: Boolean = true) {
     Row(
         modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -1836,16 +1852,18 @@ private fun PlayoffChancesHeaderRow(champLabel: String, extraColumns: List<Playo
             )
         }
         Spacer(modifier = Modifier.width(12.dp))
-        Text(
-            text = "PLAYOFF",
-            style = MaterialTheme.typography.labelSmall,
-            fontSize = 9.sp,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
-            textAlign = TextAlign.Center,
-            modifier = Modifier.width(52.dp)
-        )
-        Spacer(modifier = Modifier.width(4.dp))
+        if (showPlayoffColumn) {
+            Text(
+                text = "PLAYOFF",
+                style = MaterialTheme.typography.labelSmall,
+                fontSize = 9.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                textAlign = TextAlign.Center,
+                modifier = Modifier.width(52.dp)
+            )
+            Spacer(modifier = Modifier.width(4.dp))
+        }
         Text(
             text = champLabel.uppercase(),
             style = MaterialTheme.typography.labelSmall,
@@ -1913,6 +1931,7 @@ private fun PlayoffChanceTeamRow(
     probColorFn: (Double?) -> Color,
     champProbColorFn: (Double?) -> Color,
     extraColumns: List<PlayoffExtraColumn> = emptyList(),
+    showPlayoffColumn: Boolean = true,
     onToggle: () -> Unit
 ) {
     val playoffColor = probColorFn(entry.playoffProb)
@@ -1928,17 +1947,19 @@ private fun PlayoffChanceTeamRow(
             )
             .clickable { onToggle() }
             .drawBehind {
-                val y = size.height / 2
-                val startX = 66.dp.toPx() + extraColumnsWidth.toPx()
-                val endX = startX + 12.dp.toPx()
-                if (endX > startX) {
-                    drawLine(
-                        color = playoffColor.copy(alpha = if (isSelected) 0.3f else 0.12f),
-                        start = androidx.compose.ui.geometry.Offset(startX, y),
-                        end = androidx.compose.ui.geometry.Offset(endX, y),
-                        strokeWidth = 1.dp.toPx(),
-                        pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(3.dp.toPx(), 3.dp.toPx()))
-                    )
+                if (showPlayoffColumn) {
+                    val y = size.height / 2
+                    val startX = 66.dp.toPx() + extraColumnsWidth.toPx()
+                    val endX = startX + 12.dp.toPx()
+                    if (endX > startX) {
+                        drawLine(
+                            color = playoffColor.copy(alpha = if (isSelected) 0.3f else 0.12f),
+                            start = androidx.compose.ui.geometry.Offset(startX, y),
+                            end = androidx.compose.ui.geometry.Offset(endX, y),
+                            strokeWidth = 1.dp.toPx(),
+                            pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(3.dp.toPx(), 3.dp.toPx()))
+                        )
+                    }
                 }
             }
             .padding(horizontal = 4.dp, vertical = 3.dp),
@@ -1986,25 +2007,27 @@ private fun PlayoffChanceTeamRow(
 
         Spacer(modifier = Modifier.width(12.dp))
 
-        // Playoff prob badge
-        Box(
-            modifier = Modifier
-                .width(52.dp)
-                .background(playoffColor, RoundedCornerShape(4.dp))
-                .padding(horizontal = 4.dp, vertical = 3.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = formatProb(entry.playoffProb),
-                style = MaterialTheme.typography.bodySmall,
-                fontSize = 10.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color.White,
-                maxLines = 1
-            )
-        }
+        // Playoff prob badge (only show during regular season)
+        if (showPlayoffColumn) {
+            Box(
+                modifier = Modifier
+                    .width(52.dp)
+                    .background(playoffColor, RoundedCornerShape(4.dp))
+                    .padding(horizontal = 4.dp, vertical = 3.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = formatProb(entry.playoffProb),
+                    style = MaterialTheme.typography.bodySmall,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White,
+                    maxLines = 1
+                )
+            }
 
-        Spacer(modifier = Modifier.width(4.dp))
+            Spacer(modifier = Modifier.width(4.dp))
+        }
 
         // Champ prob badge
         Box(

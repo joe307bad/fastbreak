@@ -340,8 +340,8 @@ data class RankingEntry(
 @Serializable
 data class PlayoffChanceEntry(
     val team: String,
-    val playoffProb: Double,
-    val champProb: Double,
+    val playoffProb: Double? = null,
+    val champProb: Double? = null,
     val conference: String? = null,
     val winPct: Double? = null,
     val netRating: Double? = null,
@@ -768,6 +768,7 @@ data class NBAMatchupVisualization(
     val scatterPlotQuadrants: ScatterPlotQuadrants? = null,
     val rankings: Map<String, List<RankingEntry>> = emptyMap(),
     val playoffChances: List<PlayoffChanceEntry> = emptyList(),
+    val isPostseason: Boolean = false,
     val dataPoints: List<NBAMatchup>
 ) : VisualizationType
 
@@ -998,6 +999,7 @@ data class NHLMatchupVisualization(
     override val sortOrder: Int? = null,
     val rankings: Map<String, List<RankingEntry>> = emptyMap(),
     val playoffChances: List<PlayoffChanceEntry> = emptyList(),
+    val isPostseason: Boolean = false,
     val dataPoints: List<NHLMatchup>
 ) : VisualizationType
 

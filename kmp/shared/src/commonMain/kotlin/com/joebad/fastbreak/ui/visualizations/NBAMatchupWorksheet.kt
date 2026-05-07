@@ -420,6 +420,7 @@ fun NBAMatchupWorksheet(
                                 homeTeam = selectedMatchup.homeTeam.abbreviation,
                                 awayProb = selectedMatchup.awayTeam.playoffProbability,
                                 homeProb = selectedMatchup.homeTeam.playoffProbability,
+                                isPostseason = visualization.isPostseason,
                                 onClick = if (visualization.playoffChances.isNotEmpty()) {
                                     { showPlayoffChances = true }
                                 } else null
@@ -427,7 +428,7 @@ fun NBAMatchupWorksheet(
 
                             if (showPlayoffChances) {
                                 PlayoffChancesBottomSheet(
-                                    title = "$seasonLabel / Playoff Chances",
+                                    title = "$seasonLabel / ${if (visualization.isPostseason) "Championship Chances" else "Playoff Chances"}",
                                     champLabel = "CHAMP",
                                     entries = visualization.playoffChances,
                                     onDismiss = { showPlayoffChances = false },
@@ -437,8 +438,9 @@ fun NBAMatchupWorksheet(
                                         selectedMatchup.homeTeam.abbreviation
                                     ),
                                     source = "PlayoffStatus.com",
-                                    playoffCutoff = 6,
-                                    playInCutoff = 10,
+                                    playoffCutoff = if (visualization.isPostseason) 0 else 6,
+                                    playInCutoff = if (visualization.isPostseason) 0 else 10,
+                                    showPlayoffColumn = !visualization.isPostseason,
                                     extraColumns = listOf(
                                         PlayoffExtraColumn(
                                             label = "WIN%",
@@ -1901,6 +1903,7 @@ private fun PlayoffProbabilitySection(
     homeTeam: String,
     awayProb: PlayoffProbability?,
     homeProb: PlayoffProbability?,
+    isPostseason: Boolean = false,
     onClick: (() -> Unit)? = null
 ) {
     // Only show if at least one team has probability data
@@ -1917,14 +1920,16 @@ private fun PlayoffProbabilitySection(
             PlayoffProbabilityText(
                 playoffProb = awayProb?.playoffProb,
                 champProb = awayProb?.champProb,
-                alignment = TextAlign.Start
+                alignment = TextAlign.Start,
+                isPostseason = isPostseason
             )
 
             // Home team probabilities
             PlayoffProbabilityText(
                 playoffProb = homeProb?.playoffProb,
                 champProb = homeProb?.champProb,
-                alignment = TextAlign.End
+                alignment = TextAlign.End,
+                isPostseason = isPostseason
             )
         }
     }
@@ -1972,7 +1977,8 @@ private fun formatProbability(prob: Double?): String {
 private fun PlayoffProbabilityText(
     playoffProb: Double?,
     champProb: Double?,
-    alignment: TextAlign
+    alignment: TextAlign,
+    isPostseason: Boolean = false
 ) {
     val textColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
 
@@ -1981,30 +1987,33 @@ private fun PlayoffProbabilityText(
         horizontalArrangement = if (alignment == TextAlign.End) Arrangement.End else Arrangement.Start,
         modifier = Modifier.widthIn(min = 80.dp)
     ) {
-        Text(
-            text = "PO ",
-            style = MaterialTheme.typography.labelSmall,
-            fontSize = 10.sp,
-            color = textColor
-        )
-        Box(
-            modifier = Modifier
-                .background(getProbabilityColor(playoffProb), RoundedCornerShape(4.dp))
-                .padding(horizontal = 4.dp, vertical = 2.dp),
-            contentAlignment = Alignment.Center
-        ) {
+        // During postseason, only show championship probability
+        if (!isPostseason) {
             Text(
-                text = formatProbability(playoffProb),
+                text = "PO ",
                 style = MaterialTheme.typography.labelSmall,
-                fontSize = 9.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color.White,
-                maxLines = 1
+                fontSize = 10.sp,
+                color = textColor
             )
+            Box(
+                modifier = Modifier
+                    .background(getProbabilityColor(playoffProb), RoundedCornerShape(4.dp))
+                    .padding(horizontal = 4.dp, vertical = 2.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = formatProbability(playoffProb),
+                    style = MaterialTheme.typography.labelSmall,
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White,
+                    maxLines = 1
+                )
+            }
+            Spacer(modifier = Modifier.width(4.dp))
         }
-        Spacer(modifier = Modifier.width(4.dp))
         Text(
-            text = "Ch ",
+            text = if (isPostseason) "Champ " else "Ch ",
             style = MaterialTheme.typography.labelSmall,
             fontSize = 10.sp,
             color = textColor

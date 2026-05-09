@@ -2658,7 +2658,7 @@ output_data <- list(
   tags = list(
     list(label = "team", layout = "left", color = "#4CAF50"),
     list(label = "player", layout = "left", color = "#2196F3"),
-    list(label = "regular season", layout = "right", color = "#9C27B0")
+    list(label = if (IS_POSTSEASON) "playoffs" else "regular season", layout = "right", color = if (IS_POSTSEASON) "#E91E63" else "#9C27B0")
   ),
   sortOrder = 0,
   isPostseason = IS_POSTSEASON,

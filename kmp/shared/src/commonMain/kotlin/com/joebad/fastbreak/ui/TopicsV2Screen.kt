@@ -377,8 +377,14 @@ private fun DataPointsSection(
 @Composable
 fun TopicsV2Screen(
     component: TopicsV2Component,
-    topics: TopicsResponse?
+    topics: TopicsResponse?,
+    onMarkTopicsAsViewed: () -> Unit = {}
 ) {
+    // Mark topics as viewed when the screen is displayed
+    LaunchedEffect(Unit) {
+        onMarkTopicsAsViewed()
+    }
+
     val initial = remember(topics) { topics?.topics ?: emptyList() }
     val items = remember(initial) { mutableStateListOf<Topic>().apply { addAll(initial) } }
     var headerVisible by remember { mutableStateOf(true) }

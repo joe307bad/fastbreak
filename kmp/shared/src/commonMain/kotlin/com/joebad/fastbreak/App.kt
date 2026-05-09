@@ -93,6 +93,7 @@ fun App(rootComponent: RootComponent) {
                         },
                         diagnostics = registryState.diagnostics,
                         onRefreshRegistry = { rootComponent.refreshRegistry() },
+                        onMarkAllAsRead = { rootComponent.markAllAsRead() },
                         teamRosters = pinnedTeamsState.teamRosters,
                         pinnedTeams = pinnedTeamsState.pinnedTeams,
                         onPinTeam = { sport, teamCode, teamLabel ->
@@ -104,7 +105,8 @@ fun App(rootComponent: RootComponent) {
                     )
                     is RootComponent.Child.TopicsV2 -> TopicsV2Screen(
                         component = child.component,
-                        topics = rootComponent.registryContainer.getCachedTopics()
+                        topics = rootComponent.registryContainer.getCachedTopics(),
+                        onMarkTopicsAsViewed = { rootComponent.registryContainer.markTopicsAsViewed() }
                     )
                 }
             }

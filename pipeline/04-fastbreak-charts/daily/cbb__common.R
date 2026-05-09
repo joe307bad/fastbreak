@@ -510,7 +510,7 @@ build_comparisons <- function(team1_data, team2_data) {
   # Side by side offensive comparison
   off_comparison <- list(
     pointsPerGame = list(label = "Points/Game", home = get_stat_or_null(t1_stats, "pointsPerGame"), away = get_stat_or_null(t2_stats, "pointsPerGame")),
-    offensiveRating = list(label = "Offensive Rating", home = get_stat_or_null(t1_stats, "offensiveRating"), away = get_stat_or_null(t2_stats, "offensiveRating")),
+    offensiveRating = list(label = "ORtg", home = get_stat_or_null(t1_stats, "offensiveRating"), away = get_stat_or_null(t2_stats, "offensiveRating")),
     offensiveSRS = list(label = "Offensive SRS", home = get_stat_or_null(t1_stats, "offensiveSRS"), away = get_stat_or_null(t2_stats, "offensiveSRS")),
     fieldGoalPct = list(label = "FG%", home = get_stat_or_null(t1_stats, "fieldGoalPct"), away = get_stat_or_null(t2_stats, "fieldGoalPct")),
     effectiveFGPct = list(label = "eFG%", home = get_stat_or_null(t1_stats, "effectiveFGPct"), away = get_stat_or_null(t2_stats, "effectiveFGPct")),
@@ -528,7 +528,7 @@ build_comparisons <- function(team1_data, team2_data) {
   # Side by side defensive comparison
   def_comparison <- list(
     oppPointsPerGame = list(label = "Opp Points/Game", home = get_stat_or_null(t1_stats, "oppPointsPerGame"), away = get_stat_or_null(t2_stats, "oppPointsPerGame")),
-    defensiveRating = list(label = "Defensive Rating", home = get_stat_or_null(t1_stats, "defensiveRating"), away = get_stat_or_null(t2_stats, "defensiveRating")),
+    defensiveRating = list(label = "DRtg", home = get_stat_or_null(t1_stats, "defensiveRating"), away = get_stat_or_null(t2_stats, "defensiveRating")),
     defensiveSRS = list(label = "Defensive SRS", home = get_stat_or_null(t1_stats, "defensiveSRS"), away = get_stat_or_null(t2_stats, "defensiveSRS")),
     oppFieldGoalPct = list(label = "Opp FG%", home = get_stat_or_null(t1_stats, "oppFieldGoalPct"), away = get_stat_or_null(t2_stats, "oppFieldGoalPct")),
     oppThreePointPct = list(label = "Opp 3P%", home = get_stat_or_null(t1_stats, "oppThreePointPct"), away = get_stat_or_null(t2_stats, "oppThreePointPct")),
@@ -594,7 +594,7 @@ build_comparisons <- function(team1_data, team2_data) {
       advantage = calc_advantage(t1_ppg$rank, t2_opp_ppg$rank)
     ),
     rating = list(
-      statKey = "rating", offLabel = "Offensive Rating", defLabel = "Defensive Rating",
+      statKey = "rating", offLabel = "ORtg", defLabel = "DRtg",
       offense = list(team = team1_data$abbreviation, value = t1_ortg$value, rank = t1_ortg$rank, rankDisplay = t1_ortg$rankDisplay),
       defense = list(team = team2_data$abbreviation, value = t2_drtg$value, rank = t2_drtg$rank, rankDisplay = t2_drtg$rankDisplay),
       advantage = calc_advantage(t1_ortg$rank, t2_drtg$rank)
@@ -645,7 +645,7 @@ build_comparisons <- function(team1_data, team2_data) {
       advantage = calc_advantage(t2_ppg$rank, t1_opp_ppg$rank)
     ),
     rating = list(
-      statKey = "rating", offLabel = "Offensive Rating", defLabel = "Defensive Rating",
+      statKey = "rating", offLabel = "ORtg", defLabel = "DRtg",
       offense = list(team = team2_data$abbreviation, value = t2_ortg$value, rank = t2_ortg$rank, rankDisplay = t2_ortg$rankDisplay),
       defense = list(team = team1_data$abbreviation, value = t1_drtg$value, rank = t1_drtg$rank, rankDisplay = t1_drtg$rankDisplay),
       advantage = calc_advantage(t2_ortg$rank, t1_drtg$rank)

@@ -2082,7 +2082,7 @@ build_nba_comparisons <- function(home_stats, away_stats, home_team, away_team) 
   # Add advanced offensive stats if available
   if (is_valid_value(home_stats$offensive_rating) && is_valid_value(away_stats$offensive_rating)) {
     off_stats <- c(off_stats, list(
-      list(key = "offensiveRating", label = "Offensive Rating", value_home = home_stats$offensive_rating, rank_home = home_stats$offensive_rating_rank, rankDisplay_home = home_stats$offensive_rating_rankDisplay, value_away = away_stats$offensive_rating, rank_away = away_stats$offensive_rating_rank, rankDisplay_away = away_stats$offensive_rating_rankDisplay)
+      list(key = "offensiveRating", label = "ORtg", value_home = home_stats$offensive_rating, rank_home = home_stats$offensive_rating_rank, rankDisplay_home = home_stats$offensive_rating_rankDisplay, value_away = away_stats$offensive_rating, rank_away = away_stats$offensive_rating_rank, rankDisplay_away = away_stats$offensive_rating_rankDisplay)
     ))
   }
   if (is_valid_value(home_stats$ts_pct) && is_valid_value(away_stats$ts_pct)) {
@@ -2132,7 +2132,7 @@ build_nba_comparisons <- function(home_stats, away_stats, home_team, away_team) 
   # Add advanced defensive stats if available
   if (is_valid_value(home_stats$defensive_rating) && is_valid_value(away_stats$defensive_rating)) {
     def_stats <- c(def_stats, list(
-      list(key = "defensiveRating", label = "Defensive Rating", value_home = home_stats$defensive_rating, rank_home = home_stats$defensive_rating_rank, rankDisplay_home = home_stats$defensive_rating_rankDisplay, value_away = away_stats$defensive_rating, rank_away = away_stats$defensive_rating_rank, rankDisplay_away = away_stats$defensive_rating_rankDisplay)
+      list(key = "defensiveRating", label = "DRtg", value_home = home_stats$defensive_rating, rank_home = home_stats$defensive_rating_rank, rankDisplay_home = home_stats$defensive_rating_rankDisplay, value_away = away_stats$defensive_rating, rank_away = away_stats$defensive_rating_rank, rankDisplay_away = away_stats$defensive_rating_rankDisplay)
     ))
   }
 
@@ -2234,8 +2234,8 @@ build_nba_comparisons <- function(home_stats, away_stats, home_team, away_team) 
     ),
     list(
       key = "rating",
-      off_label = "Rating",
-      def_label = "Defensive Rating",
+      off_label = "ORtg",
+      def_label = "DRtg",
       off_stat = "offensive_rating",
       def_stat = "defensive_rating",
       off_rank = "offensive_rating_rank",
@@ -3146,7 +3146,7 @@ output_data <- list(
   tags = list(
     list(label = "team", layout = "left", color = "#4CAF50"),
     list(label = "player", layout = "left", color = "#2196F3"),
-    list(label = "regular season", layout = "right", color = "#9C27B0")
+    list(label = if (IS_POSTSEASON) "playoffs" else "regular season", layout = "right", color = if (IS_POSTSEASON) "#E91E63" else "#9C27B0")
   ),
   sortOrder = 0,
   isPostseason = IS_POSTSEASON,

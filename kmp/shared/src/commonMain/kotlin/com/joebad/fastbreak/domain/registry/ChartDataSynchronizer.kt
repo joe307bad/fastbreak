@@ -479,6 +479,19 @@ class ChartDataSynchronizer(
     }
 
     /**
+     * Marks all cached charts as viewed.
+     * Also marks topics as viewed.
+     *
+     * @return The number of charts that were marked as viewed
+     */
+    suspend fun markAllAsRead(): Int {
+        val chartsMarked = chartDataRepository.markAllChartsAsViewed()
+        topicsRepository.markAsViewed()
+        println("✅ Marked $chartsMarked chart(s) and topics as read")
+        return chartsMarked
+    }
+
+    /**
      * Removes cached charts that are no longer present in the registry.
      * This cleanup ensures we don't keep stale chart data that's been removed from the server.
      *

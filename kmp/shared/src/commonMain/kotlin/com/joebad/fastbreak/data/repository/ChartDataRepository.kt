@@ -208,4 +208,23 @@ class ChartDataRepository(
         saveChartData(chartId, updatedData)
         return true
     }
+
+    /**
+     * Marks all cached charts as viewed.
+     * Used to clear all "new" indicators at once.
+     *
+     * @return The number of charts that were marked as viewed
+     */
+    suspend fun markAllChartsAsViewed(): Int {
+        var count = 0
+        getAllChartIds().forEach { chartId ->
+            val cachedData = getChartData(chartId)
+            if (cachedData != null && !cachedData.viewed) {
+                val updatedData = cachedData.copy(viewed = true)
+                saveChartData(chartId, updatedData)
+                count++
+            }
+        }
+        return count
+    }
 }

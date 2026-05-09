@@ -861,7 +861,7 @@ build_comparisons <- function(team1, team2) {
 
   offense_side <- list(
     pointsPerGame    = stat_pair("pointsPerGame",    "Points/Game",    t1, t2),
-    offensiveRating  = stat_pair("offensiveRating",  "Offensive Rating", t1, t2),
+    offensiveRating  = stat_pair("offensiveRating",  "ORtg", t1, t2),
     fieldGoalPct     = stat_pair("fieldGoalPct",     "FG%",            t1, t2),
     threePointPct    = stat_pair("threePointPct",    "3P%",            t1, t2),
     assistsPerGame   = stat_pair("assistsPerGame",   "Assists/Game",   t1, t2),
@@ -870,7 +870,7 @@ build_comparisons <- function(team1, team2) {
   )
   defense_side <- list(
     oppPointsPerGame      = stat_pair("oppPointsPerGame",      "Opp Points/Game", t1, t2),
-    defensiveRating       = stat_pair("defensiveRating",       "Defensive Rating", t1, t2),
+    defensiveRating       = stat_pair("defensiveRating",       "DRtg", t1, t2),
     oppFieldGoalPct       = stat_pair("oppFieldGoalPct",       "Opp FG%", t1, t2),
     oppThreePointPct      = stat_pair("oppThreePointPct",      "Opp 3P%", t1, t2),
     stealsPerGame         = stat_pair("stealsPerGame",         "Steals/Game", t1, t2),
@@ -886,7 +886,7 @@ build_comparisons <- function(team1, team2) {
 
   home_off_vs_away_def <- list(
     pointsPerGame   = off_vs_def(a, b, t1, t2, "pointsPerGame",   "pointsPerGame",   "oppPointsPerGame",      "Points/Game", "Opp Points Allowed"),
-    rating          = off_vs_def(a, b, t1, t2, "rating",          "offensiveRating", "defensiveRating",       "Offensive Rating", "Defensive Rating"),
+    rating          = off_vs_def(a, b, t1, t2, "rating",          "offensiveRating", "defensiveRating",       "ORtg", "DRtg"),
     fieldGoalPct    = off_vs_def(a, b, t1, t2, "fieldGoalPct",    "fieldGoalPct",    "oppFieldGoalPct",       "FG%", "Opp FG% Allowed"),
     threePointPct   = off_vs_def(a, b, t1, t2, "threePointPct",   "threePointPct",   "oppThreePointPct",      "3P%", "Opp 3P% Allowed"),
     assists         = off_vs_def(a, b, t1, t2, "assists",         "assistsPerGame",  "oppAssistsPerGame",     "Assists/Game", "Assists Allowed"),
@@ -895,7 +895,7 @@ build_comparisons <- function(team1, team2) {
 
   away_off_vs_home_def <- list(
     pointsPerGame   = off_vs_def(b, a, t2, t1, "pointsPerGame",   "pointsPerGame",   "oppPointsPerGame",      "Points/Game", "Opp Points Allowed"),
-    rating          = off_vs_def(b, a, t2, t1, "rating",          "offensiveRating", "defensiveRating",       "Offensive Rating", "Defensive Rating"),
+    rating          = off_vs_def(b, a, t2, t1, "rating",          "offensiveRating", "defensiveRating",       "ORtg", "DRtg"),
     fieldGoalPct    = off_vs_def(b, a, t2, t1, "fieldGoalPct",    "fieldGoalPct",    "oppFieldGoalPct",       "FG%", "Opp FG% Allowed"),
     threePointPct   = off_vs_def(b, a, t2, t1, "threePointPct",   "threePointPct",   "oppThreePointPct",      "3P%", "Opp 3P% Allowed"),
     assists         = off_vs_def(b, a, t2, t1, "assists",         "assistsPerGame",  "oppAssistsPerGame",     "Assists/Game", "Assists Allowed"),

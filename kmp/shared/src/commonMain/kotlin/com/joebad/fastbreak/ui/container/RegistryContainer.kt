@@ -757,4 +757,30 @@ class RegistryContainer(
      * Retrieves the persisted font size, or null if the user hasn't picked one.
      */
     fun getTopicsFontSize(): Float? = chartDataSynchronizer.getTopicsFontSize()
+
+    /**
+     * Marks all charts and topics as read, clearing notification indicators.
+     * Updates the UI state to reflect the change immediately.
+     *
+     * @return The number of charts that were marked as read
+     */
+    fun markAllAsRead() = intent {
+        val chartsMarked = chartDataSynchronizer.markAllAsRead()
+
+        // Update all charts in the registry to viewed = true
+        val currentRegistry = state.registry ?: return@intent
+        val updatedCharts = currentRegistry.charts.map { chart ->
+            chart.copy(viewed = true)
+        }
+        val updatedRegistry = currentRegistry.copy(charts = updatedCharts)
+
+        reduce {
+            state.copy(
+                registry = updatedRegistry,
+                topicsViewed = true
+            )
+        }
+
+        println("✅ Marked $chartsMarked chart(s) and topics as read via RegistryContainer")
+    }
 }

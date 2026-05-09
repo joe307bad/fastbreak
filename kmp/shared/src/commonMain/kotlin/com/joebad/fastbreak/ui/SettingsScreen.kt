@@ -30,6 +30,7 @@ fun SettingsScreen(
     onThemeChange: (ThemeMode) -> Unit,
     diagnostics: DiagnosticsInfo,
     onRefreshRegistry: () -> Unit,
+    onMarkAllAsRead: () -> Unit = {},
     teamRosters: Map<String, TeamRoster> = emptyMap(),
     pinnedTeams: List<PinnedTeam> = emptyList(),
     onPinTeam: (sport: String, teamCode: String, teamLabel: String) -> Unit = { _, _, _ -> },
@@ -176,10 +177,10 @@ fun SettingsScreen(
 
             HorizontalDivider(color = MaterialTheme.colorScheme.outline)
 
-            // Prototype section
+            // Mark all as read section
             Column {
                 Text(
-                    text = "prototype",
+                    text = "notifications",
                     style = MaterialTheme.typography.titleMedium,
                     fontFamily = FontFamily.Monospace
                 )
@@ -187,11 +188,11 @@ fun SettingsScreen(
                 Spacer(modifier = Modifier.height(12.dp))
 
                 OutlinedButton(
-                    onClick = component.onNavigateToTopicsV2,
+                    onClick = onMarkAllAsRead,
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text(
-                        text = "Topics V2",
+                        text = "mark all as read",
                         fontFamily = FontFamily.Monospace
                     )
                 }

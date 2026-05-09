@@ -89,6 +89,14 @@ class RootComponent(
         registryContainer.markChartAsViewed(chartId)
     }
 
+    /**
+     * Marks all charts and topics as read, clearing notification indicators.
+     * Delegates to RegistryContainer (Orbit MVI).
+     */
+    fun markAllAsRead() {
+        registryContainer.markAllAsRead()
+    }
+
     val stack: Value<ChildStack<*, Child>> = childStack(
         source = navigation,
         serializer = Config.serializer(),

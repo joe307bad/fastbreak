@@ -1141,6 +1141,22 @@ data class MLBMatchup(
 )
 
 @Serializable
+data class LeagueCumRunDiffStats(
+    val minCumRunDiff: Double? = null,
+    val maxCumRunDiff: Double? = null
+)
+
+@Serializable
+data class LeagueWeeklyStats(
+    val avgRunsScored: Double? = null,
+    val avgRunsAllowed: Double? = null,
+    val minRunsScored: Double? = null,
+    val maxRunsScored: Double? = null,
+    val minRunsAllowed: Double? = null,
+    val maxRunsAllowed: Double? = null
+)
+
+@Serializable
 data class MLBMatchupVisualization(
     override val sport: String,
     override val visualizationType: String,
@@ -1152,6 +1168,8 @@ data class MLBMatchupVisualization(
     @Serializable(with = TagListSerializer::class)
     override val tags: List<Tag>? = null,
     override val sortOrder: Int? = null,
+    val leagueCumRunDiffStats: LeagueCumRunDiffStats? = null,
+    val leagueWeeklyStats: LeagueWeeklyStats? = null,
     val dataPoints: List<MLBMatchup>
 ) : VisualizationType
 

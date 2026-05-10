@@ -25,6 +25,8 @@ import com.joebad.fastbreak.platform.getImageExporter
 import com.joebad.fastbreak.ui.components.FabOption
 import com.joebad.fastbreak.ui.components.MultiOptionFab
 import com.joebad.fastbreak.ui.components.ShareFab
+import com.joebad.fastbreak.ui.QuadrantScatterPlot
+import com.joebad.fastbreak.ui.TeamLegendEntry
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.PlayArrow
@@ -143,6 +145,10 @@ fun MLBMatchupWorksheet(
     val graphicsLayer = rememberGraphicsLayer()
     val imageExporter = remember { getImageExporter() }
 
+    // Chart share callbacks (for Charts tab MultiOptionFab)
+    var cumRunDiffShareCallback by remember { mutableStateOf<(() -> Unit)?>(null) }
+    var weeklyPerfShareCallback by remember { mutableStateOf<(() -> Unit)?>(null) }
+
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
         val screenWidth = maxWidth
         Box(modifier = Modifier.fillMaxSize()) {
@@ -218,11 +224,16 @@ fun MLBMatchupWorksheet(
                         when (selectedTab) {
                             0 -> MLBMatchupContent(matchup = selectedMatchup, modifier = Modifier.fillMaxSize())
                             1 -> {
-                                // Charts tab — placeholder for now
-                                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                    Text("Charts coming soon", style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                }
+                                // Charts tab
+                                MLBChartsTab(
+                                    awayTeam = selectedMatchup.awayTeam.abbreviation,
+                                    homeTeam = selectedMatchup.homeTeam.abbreviation,
+                                    matchup = selectedMatchup,
+                                    leagueCumRunDiffStats = visualization.leagueCumRunDiffStats,
+                                    leagueWeeklyStats = visualization.leagueWeeklyStats,
+                                    onCumRunDiffShareClick = { callback -> cumRunDiffShareCallback = callback },
+                                    onWeeklyPerfShareClick = { callback -> weeklyPerfShareCallback = callback }
+                                )
                             }
                         }
 
@@ -245,25 +256,48 @@ fun MLBMatchupWorksheet(
                 }
             }
 
-            // Share FAB - multi-option if game completed, single if not
-            if (selectedMatchup?.comparisons != null) {
-                val hasResults = selectedMatchup.gameCompleted && selectedMatchup.results?.teamBoxScore != null
-                if (hasResults) {
-                    val shareTitle = "${selectedMatchup.awayTeam.abbreviation} @ ${selectedMatchup.homeTeam.abbreviation}"
-                    MultiOptionFab(
-                        options = listOf(
-                            FabOption(icon = Icons.Filled.PlayArrow, label = "Pre Game",
-                                onClick = { captureTarget = MlbCaptureTarget.PRE_GAME }),
-                            FabOption(icon = Icons.Filled.Check, label = "Post Game",
-                                onClick = { captureTarget = MlbCaptureTarget.POST_GAME })
-                        ),
-                        modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp)
-                    )
-                } else {
-                    ShareFab(
-                        onClick = { captureTarget = MlbCaptureTarget.PRE_GAME },
-                        modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp)
-                    )
+            // Share FAB
+            if (selectedMatchup != null) {
+                when {
+                    // Charts tab: show chart share options
+                    selectedTab == 1 -> {
+                        val chartOptions = listOf(
+                            FabOption(
+                                icon = Icons.Filled.Star,
+                                label = "Cumulative Run Diff",
+                                onClick = { cumRunDiffShareCallback?.invoke() }
+                            ),
+                            FabOption(
+                                icon = Icons.Filled.PlayArrow,
+                                label = "Weekly Performance",
+                                onClick = { weeklyPerfShareCallback?.invoke() }
+                            )
+                        )
+                        MultiOptionFab(
+                            options = chartOptions,
+                            modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp)
+                        )
+                    }
+                    // Stats tab with results: show Pre Game and Post Game options
+                    selectedTab == 0 && selectedMatchup.comparisons != null -> {
+                        val hasResults = selectedMatchup.gameCompleted && selectedMatchup.results?.teamBoxScore != null
+                        if (hasResults) {
+                            MultiOptionFab(
+                                options = listOf(
+                                    FabOption(icon = Icons.Filled.PlayArrow, label = "Pre Game",
+                                        onClick = { captureTarget = MlbCaptureTarget.PRE_GAME }),
+                                    FabOption(icon = Icons.Filled.Check, label = "Post Game",
+                                        onClick = { captureTarget = MlbCaptureTarget.POST_GAME })
+                                ),
+                                modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp)
+                            )
+                        } else {
+                            ShareFab(
+                                onClick = { captureTarget = MlbCaptureTarget.PRE_GAME },
+                                modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp)
+                            )
+                        }
+                    }
                 }
             }
 
@@ -608,6 +642,56 @@ private fun parseMLBMonthTrend(stats: JsonObject?): MLBMonthTrendData? {
     )
 }
 
+// ============================================================================
+// Chart Data Parsing Helpers
+// ============================================================================
+
+// Weekly performance data for scatter plot
+private data class MLBWeeklyPerformance(
+    val weekNum: Int,
+    val runsScored: Double,
+    val runsAllowed: Double
+)
+
+// Helper to parse cumulative run differential by week (for line chart)
+private fun parseCumRunDiffByWeek(stats: JsonObject?): List<LineChartDataPoint> {
+    val dataPoints = mutableListOf<LineChartDataPoint>()
+    if (stats == null) return dataPoints
+
+    val cumRunDiff = stats["cumRunDiffByWeek"]
+    if (cumRunDiff is JsonObject) {
+        cumRunDiff.forEach { (weekKey, value) ->
+            val weekNum = weekKey.removePrefix("week-").toIntOrNull()
+            val runDiff = (value as? JsonPrimitive)?.doubleOrNull
+            if (weekNum != null && runDiff != null) {
+                dataPoints.add(LineChartDataPoint(x = weekNum.toDouble(), y = runDiff))
+            }
+        }
+    }
+    return dataPoints.sortedBy { it.x }
+}
+
+// Helper to parse weekly performance data (for scatter plot)
+private fun parsePerformanceByWeek(stats: JsonObject?): List<MLBWeeklyPerformance> {
+    val perfList = mutableListOf<MLBWeeklyPerformance>()
+    if (stats == null) return perfList
+
+    val perf = stats["performanceByWeek"]
+    if (perf is JsonObject) {
+        perf.forEach { (weekKey, value) ->
+            val weekNum = weekKey.removePrefix("week-").toIntOrNull()
+            if (weekNum != null && value is JsonObject) {
+                val runsScored = (value["runsScored"] as? JsonPrimitive)?.doubleOrNull
+                val runsAllowed = (value["runsAllowed"] as? JsonPrimitive)?.doubleOrNull
+                if (runsScored != null && runsAllowed != null) {
+                    perfList.add(MLBWeeklyPerformance(weekNum, runsScored, runsAllowed))
+                }
+            }
+        }
+    }
+    return perfList.sortedBy { it.weekNum }
+}
+
 @Composable
 private fun MLBOneMonthTrendSection(awayTeam: MLBTeamInfo, homeTeam: MLBTeamInfo) {
     val awayTrend = parseMLBMonthTrend(awayTeam.stats)
@@ -689,6 +773,278 @@ private fun MLBOneMonthTrendSection(awayTeam: MLBTeamInfo, homeTeam: MLBTeamInfo
         advantage = rankAdv(awayTrend?.hrsPerGameRank, homeTrend?.hrsPerGameRank),
         rankColorFn = ::mlbRankColor
     )
+}
+
+// ============================================================================
+// Charts Tab
+// ============================================================================
+
+@Composable
+private fun MLBChartsTab(
+    awayTeam: String,
+    homeTeam: String,
+    matchup: MLBMatchup,
+    leagueCumRunDiffStats: LeagueCumRunDiffStats? = null,
+    leagueWeeklyStats: LeagueWeeklyStats? = null,
+    onCumRunDiffShareClick: ((() -> Unit)?) -> Unit = {},
+    onWeeklyPerfShareClick: ((() -> Unit)?) -> Unit = {}
+) {
+    val awayStats = matchup.awayTeam.stats
+    val homeStats = matchup.homeTeam.stats
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(top = 36.dp)
+    ) {
+        // Chart 1: Cumulative Run Differential
+        MLBCumRunDiffChart(
+            awayTeam = awayTeam,
+            homeTeam = homeTeam,
+            awayStats = awayStats,
+            homeStats = homeStats,
+            leagueCumRunDiffStats = leagueCumRunDiffStats,
+            onShareClick = onCumRunDiffShareClick
+        )
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        // Chart 2: Weekly Performance (Runs Scored vs Runs Allowed)
+        MLBWeeklyPerformanceChart(
+            awayTeam = awayTeam,
+            homeTeam = homeTeam,
+            awayStats = awayStats,
+            homeStats = homeStats,
+            leagueWeeklyStats = leagueWeeklyStats,
+            onShareClick = onWeeklyPerfShareClick
+        )
+
+        Spacer(modifier = Modifier.height(80.dp))
+    }
+}
+
+@Composable
+private fun MLBCumRunDiffChart(
+    awayTeam: String,
+    homeTeam: String,
+    awayStats: JsonObject?,
+    homeStats: JsonObject?,
+    leagueCumRunDiffStats: LeagueCumRunDiffStats? = null,
+    onShareClick: ((() -> Unit)?) -> Unit = {}
+) {
+    Text(
+        text = "Cumulative Run Differential Over Season",
+        style = MaterialTheme.typography.titleSmall,
+        fontWeight = FontWeight.Bold,
+        modifier = Modifier.padding(bottom = 4.dp)
+    )
+
+    val awayDataPoints = parseCumRunDiffByWeek(awayStats)
+    val homeDataPoints = parseCumRunDiffByWeek(homeStats)
+
+    if (awayDataPoints.isEmpty() && homeDataPoints.isEmpty()) {
+        Text(
+            text = "Cumulative run differential data not available",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        return
+    }
+
+    val title = "$awayTeam vs $homeTeam - Cumulative Run Diff"
+
+    ShareableChartContainer(
+        title = title,
+        source = "ESPN",
+        showShareButton = false,
+        onShareClick = onShareClick,
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(280.dp)
+            .padding(8.dp)
+    ) {
+        LineChartComponent(
+            series = listOf(
+                LineChartSeries(
+                    label = awayTeam,
+                    dataPoints = awayDataPoints,
+                    color = "#2196F3"
+                ),
+                LineChartSeries(
+                    label = homeTeam,
+                    dataPoints = homeDataPoints,
+                    color = "#FF5722"
+                )
+            ),
+            yAxisTitle = "Run Diff",
+            title = title,
+            source = "ESPN",
+            // Use league-wide stats for consistent Y-axis scaling across all matchups
+            customYMin = leagueCumRunDiffStats?.minCumRunDiff?.toFloat(),
+            customYMax = leagueCumRunDiffStats?.maxCumRunDiff?.toFloat(),
+            modifier = Modifier.fillMaxSize()
+        )
+    }
+}
+
+@Composable
+private fun MLBWeeklyPerformanceChart(
+    awayTeam: String,
+    homeTeam: String,
+    awayStats: JsonObject?,
+    homeStats: JsonObject?,
+    leagueWeeklyStats: LeagueWeeklyStats? = null,
+    onShareClick: ((() -> Unit)?) -> Unit = {}
+) {
+    // State for week filter: 0 = Last 10 weeks (all), 1 = Last 5 weeks, 2 = Prior 5 weeks
+    var weekFilter by remember { mutableStateOf(0) }
+
+    // Parse all weekly performance data
+    val awayPerf = parsePerformanceByWeek(awayStats)
+    val homePerf = parsePerformanceByWeek(homeStats)
+
+    if (awayPerf.isEmpty() && homePerf.isEmpty()) {
+        Text(
+            text = "Weekly performance data not available",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        return
+    }
+
+    // Get the max week number to determine week ranges
+    val maxWeek = maxOf(
+        awayPerf.maxOfOrNull { it.weekNum } ?: 0,
+        homePerf.maxOfOrNull { it.weekNum } ?: 0
+    )
+
+    // Filter data based on selection
+    val filteredAwayPerf = when (weekFilter) {
+        0 -> awayPerf.filter { it.weekNum > maxWeek - 10 } // Last 10 weeks (all)
+        1 -> awayPerf.filter { it.weekNum > maxWeek - 5 } // Last 5 weeks
+        2 -> awayPerf.filter { it.weekNum <= maxWeek - 5 && it.weekNum > maxWeek - 10 } // Prior 5 weeks
+        else -> awayPerf
+    }
+
+    val filteredHomePerf = when (weekFilter) {
+        0 -> homePerf.filter { it.weekNum > maxWeek - 10 } // Last 10 weeks (all)
+        1 -> homePerf.filter { it.weekNum > maxWeek - 5 } // Last 5 weeks
+        2 -> homePerf.filter { it.weekNum <= maxWeek - 5 && it.weekNum > maxWeek - 10 } // Prior 5 weeks
+        else -> homePerf
+    }
+
+    Column {
+        // Title
+        Text(
+            text = "Weekly Performance (Runs Scored vs Allowed)",
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(bottom = 4.dp)
+        )
+
+        // Week filter badges
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                TeamStatsNavBadge(
+                    text = "Last 10 Wks",
+                    isSelected = weekFilter == 0,
+                    onClick = { weekFilter = 0 }
+                )
+                TeamStatsNavBadge(
+                    text = "Last 5 Wks",
+                    isSelected = weekFilter == 1,
+                    onClick = { weekFilter = 1 }
+                )
+                TeamStatsNavBadge(
+                    text = "Prior 5 Wks",
+                    isSelected = weekFilter == 2,
+                    onClick = { weekFilter = 2 }
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        val title = "$awayTeam vs $homeTeam - Weekly Performance"
+
+        // Convert to scatter plot data points
+        // X = Runs Scored, Y = Runs Allowed
+        // Better teams: high X (more runs), low Y (fewer runs allowed) -> bottom-right quadrant
+        val scatterData = mutableListOf<ScatterPlotDataPoint>()
+
+        filteredAwayPerf.forEach { perf ->
+            scatterData.add(
+                ScatterPlotDataPoint(
+                    label = "$awayTeam W${perf.weekNum}",
+                    x = perf.runsScored,
+                    y = perf.runsAllowed,
+                    sum = perf.runsScored - perf.runsAllowed, // Run differential
+                    teamCode = awayTeam,
+                    color = "#2196F3"
+                )
+            )
+        }
+
+        filteredHomePerf.forEach { perf ->
+            scatterData.add(
+                ScatterPlotDataPoint(
+                    label = "$homeTeam W${perf.weekNum}",
+                    x = perf.runsScored,
+                    y = perf.runsAllowed,
+                    sum = perf.runsScored - perf.runsAllowed, // Run differential
+                    teamCode = homeTeam,
+                    color = "#FF5722"
+                )
+            )
+        }
+
+        if (scatterData.isEmpty()) {
+            Text(
+                text = "No data for selected week range",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        } else {
+            QuadrantScatterPlot(
+                data = scatterData,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(420.dp)
+                    .padding(8.dp),
+                title = title,
+                xAxisLabel = "Runs Scored / Game",
+                yAxisLabel = "Runs Allowed / Game",
+                invertYAxis = true, // Lower runs allowed is better, so invert
+                highlightedTeamCodes = setOf(awayTeam, homeTeam),
+                showShareButton = false,
+                onShareClick = onShareClick,
+                // Quadrant labels for MLB (with inverted Y)
+                // Top = good defense (low runs allowed), Bottom = poor defense (high runs allowed)
+                quadrantTopRight = QuadrantConfig(label = "Dominant", color = "#4CAF50", lightModeColor = "#4CAF50"),
+                quadrantTopLeft = QuadrantConfig(label = "Defensive", color = "#2196F3", lightModeColor = "#2196F3"),
+                quadrantBottomLeft = QuadrantConfig(label = "Struggling", color = "#F44336", lightModeColor = "#F44336"),
+                quadrantBottomRight = QuadrantConfig(label = "Offensive", color = "#FF9800", lightModeColor = "#FF9800"),
+                // Use league-wide stats for consistent scaling across all matchups
+                customCenterX = leagueWeeklyStats?.avgRunsScored,
+                customCenterY = leagueWeeklyStats?.avgRunsAllowed,
+                customXMin = leagueWeeklyStats?.minRunsScored,
+                customXMax = leagueWeeklyStats?.maxRunsScored,
+                customYMin = leagueWeeklyStats?.minRunsAllowed,
+                customYMax = leagueWeeklyStats?.maxRunsAllowed,
+                regressionData = scatterData,
+                source = "ESPN",
+                teamLegendItems = listOf(
+                    TeamLegendEntry(awayTeam, Color(0xFF2196F3)),
+                    TeamLegendEntry(homeTeam, Color(0xFFFF5722))
+                )
+            )
+        }
+    }
 }
 
 // ============================================================================

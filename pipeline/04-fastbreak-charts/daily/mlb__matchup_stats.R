@@ -315,6 +315,87 @@ if (length(trend_games) > 0) {
 }
 
 # ============================================================================
+# STEP 1c: Calculate weekly performance data for charts
+# ============================================================================
+cat("\n1c. Calculating weekly performance data for charts...\n")
+
+# Calculate week number from season start
+get_week_num <- function(date) {
+  as.integer(floor(difftime(as.Date(date), SEASON_START, units = "weeks"))) + 1
+}
+
+# Initialize chart data structures
+cum_run_diff_by_team <- data.frame(team = character(), week_num = integer(), cum_run_diff = numeric())
+weekly_performance <- data.frame(team = character(), week_num = integer(), runs_scored_avg = numeric(), runs_allowed_avg = numeric())
+league_cum_run_diff_stats <- list(minCumRunDiff = NA, maxCumRunDiff = NA)
+league_weekly_stats <- list()
+
+if (nrow(season_games_df) > 0) {
+  # Full season data for cumulative chart
+  all_team_games <- bind_rows(
+    season_games_df %>% transmute(
+      team = home_team,
+      runs_scored = home_score,
+      runs_allowed = away_score,
+      date = date
+    ),
+    season_games_df %>% transmute(
+      team = away_team,
+      runs_scored = away_score,
+      runs_allowed = home_score,
+      date = date
+    )
+  ) %>%
+    mutate(
+      run_diff = runs_scored - runs_allowed,
+      week_num = sapply(date, get_week_num)
+    ) %>%
+    filter(week_num > 0, week_num <= 30) %>%
+    arrange(date)
+
+  # Cumulative run differential by week (for line chart)
+  cum_run_diff_by_team <- all_team_games %>%
+    group_by(team) %>%
+    arrange(date) %>%
+    mutate(cum_run_diff = cumsum(run_diff)) %>%
+    group_by(team, week_num) %>%
+    summarise(cum_run_diff = last(cum_run_diff), .groups = "drop")
+
+  # Weekly performance (for scatter plot) - last 10 weeks
+  current_week <- get_week_num(Sys.Date())
+  weekly_performance <- all_team_games %>%
+    filter(week_num >= current_week - 10) %>%
+    group_by(team, week_num) %>%
+    summarise(
+      runs_scored_avg = mean(runs_scored, na.rm = TRUE),
+      runs_allowed_avg = mean(runs_allowed, na.rm = TRUE),
+      .groups = "drop"
+    ) %>%
+    arrange(week_num)
+
+  # League-wide stats for consistent chart scaling
+  if (nrow(cum_run_diff_by_team) > 0) {
+    league_cum_run_diff_stats <- list(
+      minCumRunDiff = min(cum_run_diff_by_team$cum_run_diff, na.rm = TRUE),
+      maxCumRunDiff = max(cum_run_diff_by_team$cum_run_diff, na.rm = TRUE)
+    )
+  }
+
+  if (nrow(weekly_performance) > 0) {
+    league_weekly_stats <- list(
+      avgRunsScored = round(mean(weekly_performance$runs_scored_avg, na.rm = TRUE), 2),
+      avgRunsAllowed = round(mean(weekly_performance$runs_allowed_avg, na.rm = TRUE), 2),
+      minRunsScored = round(min(weekly_performance$runs_scored_avg, na.rm = TRUE), 2),
+      maxRunsScored = round(max(weekly_performance$runs_scored_avg, na.rm = TRUE), 2),
+      minRunsAllowed = round(min(weekly_performance$runs_allowed_avg, na.rm = TRUE), 2),
+      maxRunsAllowed = round(max(weekly_performance$runs_allowed_avg, na.rm = TRUE), 2)
+    )
+  }
+
+  cat("Calculated weekly data for", length(unique(cum_run_diff_by_team$team)), "teams\n")
+}
+
+# ============================================================================
 # H2H builder: find all season games between two teams, group into series
 # ============================================================================
 build_h2h <- function(team_a, team_b) {
@@ -933,9 +1014,75 @@ for (game in all_games) {
 
   if (!is.null(home_team_data$stats)) {
     home_team_data$stats$monthTrend <- build_month_trend(game$home_team_abbrev)
+
+    # Add cumulative run differential by week (for line chart)
+    team_cum_run_diff <- cum_run_diff_by_team %>%
+      filter(team == game$home_team_abbrev) %>%
+      select(week_num, cum_run_diff)
+
+    home_team_data$stats$cumRunDiffByWeek <- if (nrow(team_cum_run_diff) > 0) {
+      setNames(
+        as.list(round(team_cum_run_diff$cum_run_diff, 0)),
+        paste0("week-", team_cum_run_diff$week_num)
+      )
+    } else {
+      setNames(list(), character(0))
+    }
+
+    # Add weekly performance (for scatter plot)
+    team_weekly_perf <- weekly_performance %>%
+      filter(team == game$home_team_abbrev) %>%
+      select(week_num, runs_scored_avg, runs_allowed_avg)
+
+    home_team_data$stats$performanceByWeek <- if (nrow(team_weekly_perf) > 0) {
+      setNames(
+        lapply(1:nrow(team_weekly_perf), function(i) {
+          list(
+            runsScored = round(team_weekly_perf$runs_scored_avg[i], 2),
+            runsAllowed = round(team_weekly_perf$runs_allowed_avg[i], 2)
+          )
+        }),
+        paste0("week-", team_weekly_perf$week_num)
+      )
+    } else {
+      setNames(list(), character(0))
+    }
   }
   if (!is.null(away_team_data$stats)) {
     away_team_data$stats$monthTrend <- build_month_trend(game$away_team_abbrev)
+
+    # Add cumulative run differential by week (for line chart)
+    team_cum_run_diff <- cum_run_diff_by_team %>%
+      filter(team == game$away_team_abbrev) %>%
+      select(week_num, cum_run_diff)
+
+    away_team_data$stats$cumRunDiffByWeek <- if (nrow(team_cum_run_diff) > 0) {
+      setNames(
+        as.list(round(team_cum_run_diff$cum_run_diff, 0)),
+        paste0("week-", team_cum_run_diff$week_num)
+      )
+    } else {
+      setNames(list(), character(0))
+    }
+
+    # Add weekly performance (for scatter plot)
+    team_weekly_perf <- weekly_performance %>%
+      filter(team == game$away_team_abbrev) %>%
+      select(week_num, runs_scored_avg, runs_allowed_avg)
+
+    away_team_data$stats$performanceByWeek <- if (nrow(team_weekly_perf) > 0) {
+      setNames(
+        lapply(1:nrow(team_weekly_perf), function(i) {
+          list(
+            runsScored = round(team_weekly_perf$runs_scored_avg[i], 2),
+            runsAllowed = round(team_weekly_perf$runs_allowed_avg[i], 2)
+          )
+        }),
+        paste0("week-", team_weekly_perf$week_num)
+      )
+    } else {
+      setNames(list(), character(0))
+    }
   }
 
   comparisons <- build_comparisons(home_s, away_s, game$home_team_abbrev, game$away_team_abbrev)
@@ -1010,6 +1157,8 @@ output_data <- list(
     list(label = "regular season", layout = "right", color = "#9C27B0")
   ),
   sortOrder = 0,
+  leagueCumRunDiffStats = league_cum_run_diff_stats,
+  leagueWeeklyStats = league_weekly_stats,
   dataPoints = matchups_json
 )
 

@@ -16,10 +16,11 @@ RUN apt-get update && \
 # hockeyR must be installed from GitHub for latest NHL API compatibility
 RUN R -e "options(repos = c(CRAN = 'https://packagemanager.posit.co/cran/__linux__/jammy/latest')); \
     install.packages(c('rlang', 'vctrs', 'lifecycle')); \
-    install.packages(c('nflreadr', 'hoopR', 'devtools', 'remotes')); \
+    install.packages(c('nflreadr', 'hoopR', 'baseballr', 'devtools', 'remotes')); \
     devtools::install_github('danmorse314/hockeyR'); \
     if (!require('nflreadr')) stop('nflreadr installation failed'); \
     if (!require('hoopR')) stop('hoopR installation failed'); \
+    if (!require('baseballr')) stop('baseballr installation failed'); \
     if (!require('hockeyR')) stop('hockeyR installation failed')"
 
 # Create app directory

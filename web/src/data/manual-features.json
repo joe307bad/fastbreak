@@ -137,7 +137,7 @@
     "title": "Daily Topics",
     "sortOrder": 8,
     "demoGif": "/02-manual-screenshots/08-topics-walkthrough.gif",
-    "demoAlt": "Topics screen walkthrough showing data point navigation and mark as read",
+    "demoAlt": "Topics screen walkthrough showing data point navigation",
     "platforms": {
       "ios": true,
       "android": true,
@@ -146,13 +146,13 @@
     "dateReleased": "2026-02-20",
     "version": "1.6.0",
     "sections": {
-      "howToUse": "Navigate to the Topics screen from the main menu. Scroll through the daily topics to see statistically grounded insights about your favorite sports. Each topic contains data points that link directly to relevant charts - tap any data point with an arrow to jump to that visualization. Use the '[mark as read]' button to track which topics you've reviewed.",
+      "howToUse": "Navigate to the Topics screen from the main menu. Scroll through the daily topics to see statistically grounded insights about your favorite sports. Each topic contains data points that link directly to relevant charts - tap any underlined data point to jump to that visualization.",
       "whatItDoes": [
-        { "type": "text", "value": "Topics provides summaries and insights about what's happening across different sports. The content is generated everyday at 7am ET using " },
+        { "type": "text", "value": "Topics provides summaries and insights about what's happening across different sports. The content is generated everyday at 6am ET using " },
         { "type": "link", "value": "Google's Gemini with Grounded Search", "url": "https://docs.cloud.google.com/vertex-ai/generative-ai/docs/grounding/overview" },
-        { "type": "text", "value": ", which ensures factual accuracy by verifying information against Google Search results. Each topic highlights key statistics and trends, with direct links to the underlying charts and visualizations. The system tracks which topics you've read, helping you stay on top of the latest developments." }
+        { "type": "text", "value": ", which ensures factual accuracy by verifying information against Google Search results. Each topic highlights key statistics and trends, with direct links to the underlying charts and visualizations." }
       ],
-      "whyUseful": "Topics gives you a daily sports briefing without ads, clickbait, or fluff. Every insight is grounded in actual statistics from the app's charts and verified against Google Search results for factual accuracy. Instead of manually searching through dozens of charts, Topics surfaces the most interesting and relevant insights each day. The linked data points let you quickly dive deeper into any statistic that catches your attention, while the read tracking ensures you never miss important updates."
+      "whyUseful": "Topics gives you a daily sports briefing without ads, clickbait, or fluff. Every insight is grounded in actual statistics from the app's charts and verified against Google Search results for factual accuracy. Instead of manually searching through dozens of charts, Topics surfaces the most interesting and relevant insights each day. The linked data points let you quickly dive deeper into any statistic that catches your attention."
     }
   },
   {

@@ -74,10 +74,10 @@ run_scripts "/app/startup" "startup"
 run_scripts "/app/daily" "daily"
 run_scripts "/app/weekly" "weekly"
 
-# Run Fastbreak.Daily to generate topics
-echo -e "${BOLD}${CYAN}▶ Running Fastbreak.Daily...${NC}"
+# Run Fastbreak.Daily to generate topics (v2 pipeline)
+echo -e "${BOLD}${CYAN}▶ Running Fastbreak.Daily (generate-and-enrich-topics)...${NC}"
 echo -e "${CYAN}────────────────────────────────────────${NC}"
-if /app/Fastbreak.Daily; then
+if /app/Fastbreak.Daily generate-and-enrich-topics; then
   echo -e "${GREEN}  ✓ Fastbreak.Daily completed successfully${NC}"
 else
   echo -e "${RED}  ✗ Fastbreak.Daily failed${NC}"

@@ -1,10 +1,10 @@
-# Run daily scripts every day at 7am Eastern Time
-0 7 * * * . /app/env.sh && /usr/bin/find /app/daily -name "*.R" -exec /usr/local/bin/Rscript {} \; >> /var/log/cron.log 2>&1
+# Run daily scripts every day at 6am Eastern Time
+0 6 * * * . /app/env.sh && /usr/bin/find /app/daily -name "*.R" -exec /usr/local/bin/Rscript {} \; >> /var/log/cron.log 2>&1
 
-# Run Fastbreak.Daily v2 (generate + enrich + upload to S3 + update DynamoDB) every day at 7am Eastern Time
+# Run Fastbreak.Daily v2 (generate + enrich + upload to S3 + update DynamoDB) every day at 6am Eastern Time
 # v1 is disabled — the v2 pipeline writes to the same S3 key so it replaces v1's output.
-# 0 7 * * * . /app/env.sh && /app/Fastbreak.Daily >> /var/log/cron.log 2>&1
-0 7 * * * . /app/env.sh && /app/Fastbreak.Daily generate-and-enrich-topics >> /var/log/cron.log 2>&1
+# 0 6 * * * . /app/env.sh && /app/Fastbreak.Daily >> /var/log/cron.log 2>&1
+0 6 * * * . /app/env.sh && /app/Fastbreak.Daily generate-and-enrich-topics >> /var/log/cron.log 2>&1
 
 # Run weekly scripts every Sunday at 7am Eastern Time
 0 7 * * 0 . /app/env.sh && /usr/bin/find /app/weekly -name "*.R" -exec /usr/local/bin/Rscript {} \; >> /var/log/cron.log 2>&1

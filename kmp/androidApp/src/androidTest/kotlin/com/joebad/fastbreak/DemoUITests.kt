@@ -982,55 +982,43 @@ class DemoUITests {
         )
         Thread.sleep(1500)
 
-        // 3) Look for the "data points" section and select a data point
-        println("🔍 Looking for 'data points' section...")
-        val dataPointsSection = device.wait(
-            Until.findObject(By.text("data points")),
+        // 3) Look for the "DATA POINTS" section and select a data point
+        println("🔍 Looking for 'DATA POINTS' section...")
+        var dataPointsSection = device.wait(
+            Until.findObject(By.text("DATA POINTS")),
             3000
         )
 
+        // Try case-insensitive if exact match fails
+        if (dataPointsSection == null) {
+            dataPointsSection = device.wait(
+                Until.findObject(By.textContains("DATA POINT")),
+                1000
+            )
+        }
+
         if (dataPointsSection != null) {
-            println("✓ Found 'data points' section")
+            println("✓ Found 'DATA POINTS' section")
             Thread.sleep(500)
 
-            // The data points are listed below the badge - find one with an arrow (clickable)
-            println("🔍 Looking for clickable data point with arrow...")
-            val arrowElement = device.wait(
-                Until.findObject(By.text("→")),
-                2000
-            )
+            // Data point rows are below the header - click on a row below the header
+            // Each row has: subject (team/player), stat name, value (underlined if clickable)
+            println("🔍 Tapping on data point row below header...")
+            val bounds = dataPointsSection.visibleBounds
+            // Click on the first data point row (about 40px below the header)
+            device.click(screenWidth / 2, bounds.bottom + 40)
+            Thread.sleep(2000)
 
-            if (arrowElement != null) {
-                // Click on the same row as the arrow (to the left of it)
-                println("✓ Found clickable data point, tapping...")
-                val bounds = arrowElement.visibleBounds
-                device.click(screenWidth / 2, bounds.centerY())
-                Thread.sleep(2000)
+            // 4) We should now be on a chart/detail screen - show it
+            println("📊 Showing linked chart content...")
+            Thread.sleep(2000)
 
-                // 4) We should now be on a chart/detail screen - show it
-                println("📊 Showing linked chart content...")
-                Thread.sleep(2000)
-
-                // Press back to return to topics
-                println("🔙 Pressing back to return to topics...")
-                device.pressBack()
-                Thread.sleep(1500)
-            } else {
-                // No arrow found, try clicking below the data points badge
-                println("  → No arrow found, tapping below data points section...")
-                val bounds = dataPointsSection.visibleBounds
-                device.click(screenWidth / 2, bounds.bottom + 30)
-                Thread.sleep(2000)
-
-                println("📊 Showing linked chart content...")
-                Thread.sleep(2000)
-
-                println("🔙 Pressing back to return to topics...")
-                device.pressBack()
-                Thread.sleep(1500)
-            }
+            // Press back to return to topics
+            println("🔙 Pressing back to return to topics...")
+            device.pressBack()
+            Thread.sleep(1500)
         } else {
-            println("⚠ 'data points' section not found, trying to scroll more...")
+            println("⚠ 'DATA POINTS' section not found, trying to scroll more...")
             // Scroll down more to find data points
             device.swipe(
                 screenWidth / 2,
@@ -1041,16 +1029,22 @@ class DemoUITests {
             )
             Thread.sleep(1000)
 
-            // Try again
-            val dataPointsRetry = device.wait(
-                Until.findObject(By.text("data points")),
+            // Try again with both case variants
+            var dataPointsRetry = device.wait(
+                Until.findObject(By.text("DATA POINTS")),
                 2000
             )
+            if (dataPointsRetry == null) {
+                dataPointsRetry = device.wait(
+                    Until.findObject(By.textContains("DATA POINT")),
+                    1000
+                )
+            }
 
             if (dataPointsRetry != null) {
-                println("✓ Found 'data points' section on retry")
+                println("✓ Found 'DATA POINTS' section on retry")
                 val bounds = dataPointsRetry.visibleBounds
-                device.click(screenWidth / 2, bounds.bottom + 30)
+                device.click(screenWidth / 2, bounds.bottom + 40)
                 Thread.sleep(2000)
 
                 println("📊 Showing linked chart content...")
@@ -1060,7 +1054,7 @@ class DemoUITests {
                 device.pressBack()
                 Thread.sleep(1500)
             } else {
-                println("⚠ Still no data points section found, continuing...")
+                println("⚠ Still no DATA POINTS section found, continuing...")
             }
         }
 
@@ -1075,30 +1069,7 @@ class DemoUITests {
         )
         Thread.sleep(1000)
 
-        // 6) Select "Mark as read" button (text is "[mark as read]" with brackets)
-        println("🔍 Looking for '[mark as read]' button...")
-        var markAsRead = device.wait(
-            Until.findObject(By.text("[mark as read]")),
-            2000
-        )
-
-        if (markAsRead == null) {
-            // Try partial match
-            markAsRead = device.wait(
-                Until.findObject(By.textContains("mark as read")),
-                1000
-            )
-        }
-
-        if (markAsRead != null) {
-            println("✓ Found 'mark as read', tapping...")
-            markAsRead.click()
-            Thread.sleep(1500)
-        } else {
-            println("⚠ 'mark as read' not found, continuing...")
-        }
-
-        // 7) Scroll more to show additional content
+        // 6) Scroll more to show additional content
         println("📜 Final scroll through topics...")
         device.swipe(
             screenWidth / 2,

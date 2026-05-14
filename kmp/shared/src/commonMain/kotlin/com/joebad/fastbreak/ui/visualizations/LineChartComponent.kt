@@ -275,7 +275,8 @@ fun LineChartComponent(
                     data = points,
                     lineStyle = LineStyle(
                         brush = SolidColor(color),
-                        strokeWidth = 2.dp
+                        strokeWidth = 2.dp,
+                        pathEffect = if (lineSeries.dashed) PathEffect.dashPathEffect(floatArrayOf(10f, 5f), 0f) else null
                     )
                 )
             }

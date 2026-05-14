@@ -655,7 +655,7 @@ fun TeamStatsNavBadge(
     val backgroundColor = if (isSelected) {
         MaterialTheme.colorScheme.primary
     } else {
-        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+        MaterialTheme.colorScheme.surfaceVariant
     }
 
     val textColor = if (isSelected) {
@@ -664,9 +664,16 @@ fun TeamStatsNavBadge(
         MaterialTheme.colorScheme.onSurfaceVariant
     }
 
+    val borderColor = if (isSelected) {
+        Color.Transparent
+    } else {
+        MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
+    }
+
     Box(
         modifier = Modifier
             .background(backgroundColor, RoundedCornerShape(8.dp))
+            .border(1.dp, borderColor, RoundedCornerShape(8.dp))
             .clickable(onClick = onClick)
             .padding(horizontal = 10.dp, vertical = 6.dp)
     ) {

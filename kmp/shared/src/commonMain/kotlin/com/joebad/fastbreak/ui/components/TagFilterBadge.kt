@@ -57,8 +57,22 @@ private fun parseHexColor(hexString: String): Color? {
 }
 
 /**
+ * Darken a color by reducing its RGB values by a factor.
+ * @param factor Amount to darken (0.0 = no change, 1.0 = black)
+ */
+private fun Color.darken(factor: Float): Color {
+    return Color(
+        red = (red * (1 - factor)).coerceIn(0f, 1f),
+        green = (green * (1 - factor)).coerceIn(0f, 1f),
+        blue = (blue * (1 - factor)).coerceIn(0f, 1f),
+        alpha = alpha
+    )
+}
+
+/**
  * A single tag filter badge that can be selected/unselected.
- * Uses the tag's color with light background and darker text/border.
+ * In + modes (light+/dark+), uses a darkened version of the tag's color as background.
+ * In normal modes, uses transparent/surface background.
  */
 @Composable
 fun TagFilterBadge(
@@ -69,26 +83,24 @@ fun TagFilterBadge(
 ) {
     val baseColor = parseHexColor(tag.color) ?: MaterialTheme.colorScheme.primary
 
-    // Create light background version (20% opacity)
-    val lightBackgroundColor = baseColor.copy(alpha = 0.2f)
+    // Detect + mode: surfaceVariant equals background in + modes
+    val isSecondaryBgMode = MaterialTheme.colorScheme.surfaceVariant == MaterialTheme.colorScheme.background
 
-    // Use the base color for text and border (it's already a vibrant color)
-    val darkColor = baseColor
-
+    // In + mode, use darkened tag color as background; in normal mode, use surface/transparent
     val backgroundColor = if (isSelected) {
-        lightBackgroundColor
+        if (isSecondaryBgMode) baseColor.darken(0.7f) else MaterialTheme.colorScheme.surfaceVariant
     } else {
         MaterialTheme.colorScheme.surface
     }
 
     val borderColor = if (isSelected) {
-        darkColor
+        baseColor
     } else {
-        MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f)
+        MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
     }
 
     val textColor = if (isSelected) {
-        darkColor
+        baseColor
     } else {
         MaterialTheme.colorScheme.onSurface
     }
@@ -111,7 +123,8 @@ fun TagFilterBadge(
 
 /**
  * A non-interactive tag badge for displaying tags in list items.
- * Uses light background and darker text from tag color.
+ * In + modes (light+/dark+), uses a darkened version of the tag's color as background.
+ * In normal modes, uses transparent background with colored text.
  */
 @Composable
 fun TagBadge(
@@ -120,15 +133,20 @@ fun TagBadge(
 ) {
     val baseColor = parseHexColor(tag.color) ?: MaterialTheme.colorScheme.secondary
 
-    // Light background (15% opacity for subtle appearance in lists)
-    val lightBackgroundColor = baseColor.copy(alpha = 0.15f)
+    // Detect + mode: surfaceVariant equals background in + modes
+    val isSecondaryBgMode = MaterialTheme.colorScheme.surfaceVariant == MaterialTheme.colorScheme.background
+
+    // In + mode, use darkened tag color as background; in normal mode, use light transparent
+    val backgroundColor = if (isSecondaryBgMode) {
+        baseColor.darken(0.7f)
+    } else {
+        baseColor.copy(alpha = 0.15f)
+    }
 
     Box(
         modifier = modifier
-            .background(
-                lightBackgroundColor,
-                RoundedCornerShape(6.dp)
-            )
+            .background(backgroundColor, RoundedCornerShape(6.dp))
+            .border(1.dp, if (isSecondaryBgMode) baseColor else Color.Transparent, RoundedCornerShape(6.dp))
             .padding(horizontal = 6.dp, vertical = 2.dp)
     ) {
         Text(

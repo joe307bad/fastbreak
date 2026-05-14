@@ -15,7 +15,12 @@ data class Team(
     val code: String,           // Team abbreviation (e.g., "PHI", "LAL", "BOS")
     val longLabel: String,      // Searchable label (e.g., "NFL - Philadelphia Eagles")
     val conference: String,     // Conference name (e.g., "NFC", "Eastern", "American League")
-    val division: String        // Division name (e.g., "NFC East", "Atlantic", "AL East")
+    val division: String,       // Division name (e.g., "NFC East", "Atlantic", "AL East")
+    // Theme colors (hex strings, e.g., "#FF5722")
+    val lightPrimary: String? = null,
+    val lightSecondary: String? = null,
+    val darkPrimary: String? = null,
+    val darkSecondary: String? = null
 )
 
 /**

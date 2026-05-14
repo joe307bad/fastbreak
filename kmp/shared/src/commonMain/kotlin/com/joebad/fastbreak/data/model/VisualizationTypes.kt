@@ -132,7 +132,9 @@ data class LineChartSeries(
      */
     val color: String? = null,
     val division: String? = null,
-    val conference: String? = null
+    val conference: String? = null,
+    /** If true, render as a dashed/dotted line */
+    val dashed: Boolean = false
 )
 
 @Serializable
@@ -1143,7 +1145,8 @@ data class MLBMatchup(
 @Serializable
 data class LeagueCumRunDiffStats(
     val minCumRunDiff: Double? = null,
-    val maxCumRunDiff: Double? = null
+    val maxCumRunDiff: Double? = null,
+    val top10ByWeek: JsonObject? = null
 )
 
 @Serializable

@@ -1037,8 +1037,8 @@ private fun ScatterPlotFab(
 ) {
     FloatingActionButton(
         onClick = { onShareClick?.invoke() },
-        containerColor = androidx.compose.ui.graphics.Color(0xFFFF6B6B),
-        contentColor = androidx.compose.ui.graphics.Color.White,
+        containerColor = MaterialTheme.colorScheme.primaryContainer,
+        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
         shape = CircleShape
     ) {
         Icon(

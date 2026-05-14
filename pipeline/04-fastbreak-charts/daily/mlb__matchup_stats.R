@@ -375,9 +375,32 @@ if (nrow(season_games_df) > 0) {
 
   # League-wide stats for consistent chart scaling
   if (nrow(cum_run_diff_by_team) > 0) {
+    # Calculate top 10 threshold for each week (historical)
+    # Sort descending within each week and get the 10th best value
+    top10_by_week <- cum_run_diff_by_team %>%
+      group_by(week_num) %>%
+      summarise(
+        top10_threshold = if (n() >= 10) {
+          sort(cum_run_diff, decreasing = TRUE)[10]
+        } else NA_real_,
+        .groups = "drop"
+      ) %>%
+      filter(!is.na(top10_threshold))
+
+    # Convert to named list for JSON output
+    top10_by_week_list <- if (nrow(top10_by_week) > 0) {
+      setNames(
+        as.list(round(top10_by_week$top10_threshold, 0)),
+        paste0("week-", top10_by_week$week_num)
+      )
+    } else {
+      setNames(list(), character(0))
+    }
+
     league_cum_run_diff_stats <- list(
       minCumRunDiff = min(cum_run_diff_by_team$cum_run_diff, na.rm = TRUE),
-      maxCumRunDiff = max(cum_run_diff_by_team$cum_run_diff, na.rm = TRUE)
+      maxCumRunDiff = max(cum_run_diff_by_team$cum_run_diff, na.rm = TRUE),
+      top10ByWeek = top10_by_week_list
     )
   }
 

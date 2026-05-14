@@ -907,7 +907,8 @@ private fun NBAGameScoresRow(games: List<PlayoffSeriesGameInfo>) {
     ) {
         for ((idx, game) in completedGames.withIndex()) {
             Surface(shape = RoundedCornerShape(6.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)) {
+                color = MaterialTheme.colorScheme.surfaceVariant,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))) {
                 Column(modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                     horizontalAlignment = Alignment.CenterHorizontally) {
                     Text("G${idx + 1}", style = MaterialTheme.typography.labelSmall,

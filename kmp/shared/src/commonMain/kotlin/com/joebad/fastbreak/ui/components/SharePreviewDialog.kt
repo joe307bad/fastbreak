@@ -117,8 +117,8 @@ fun SharePreviewDialog(
                     },
                     modifier = Modifier.weight(1f),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFFFF6B6B), // Match ShareFab color
-                        contentColor = Color.White
+                        containerColor = MaterialTheme.colorScheme.primaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer
                     )
                 ) {
                     Icon(

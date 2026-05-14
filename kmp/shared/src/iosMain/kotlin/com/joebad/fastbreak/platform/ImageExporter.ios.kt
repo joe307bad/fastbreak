@@ -109,7 +109,7 @@ actual fun getImageExporter(): ImageExporter {
     return IOSImageExporter()
 }
 
-actual fun addTitleToBitmap(bitmap: ImageBitmap, title: String, isDarkTheme: Boolean, textColor: Int, source: String): ImageBitmap {
+actual fun addTitleToBitmap(bitmap: ImageBitmap, title: String, backgroundColor: Int, textColor: Int, source: String): ImageBitmap {
     val skiaBitmap = bitmap.asSkiaBitmap()
 
     // Calculate title dimensions
@@ -137,7 +137,7 @@ actual fun addTitleToBitmap(bitmap: ImageBitmap, title: String, isDarkTheme: Boo
     val footerHeight = (footerTextSize + footerPadding * 2).toInt()
 
     println("📸 ========================================")
-    println("📸 addTitleToBitmap - title: '$title', isDarkTheme: $isDarkTheme")
+    println("📸 addTitleToBitmap - title: '$title'")
     println("📸 Original bitmap size: ${skiaBitmap.width}x${skiaBitmap.height}")
     println("📸 Title height: $titleHeight, Footer height: $footerHeight")
     println("📸 ========================================")
@@ -148,9 +148,7 @@ actual fun addTitleToBitmap(bitmap: ImageBitmap, title: String, isDarkTheme: Boo
     val surface = Surface.makeRasterN32Premul(newWidth, newHeight)
     val canvas = surface.canvas
 
-    // Use theme colors: dark background with white text, or white background with black text
-    val backgroundColor = if (isDarkTheme) 0xFF000000.toInt() else 0xFFFFFFFF.toInt()
-
+    // Use the passed theme colors for background and text
     println("📸 Background color: ${backgroundColor.toUInt().toString(16)}, Text color: ${textColor.toUInt().toString(16)}")
 
     // Step 1: Draw full background first

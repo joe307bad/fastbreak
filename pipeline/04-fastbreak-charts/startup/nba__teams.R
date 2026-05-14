@@ -4,7 +4,7 @@ library(jsonlite)
 
 cat("Generating NBA team roster\n")
 
-# NBA division and conference mapping
+# NBA division, conference mapping, and theme colors
 team_data <- data.frame(
   code = c(
     "ATL", "BOS", "BKN", "CHA", "CHI", "CLE", "DAL", "DEN", "DET",
@@ -36,15 +36,45 @@ team_data <- data.frame(
     "Western", "Eastern", "Western", "Eastern", "Eastern", "Western",
     "Western", "Western", "Western", "Eastern", "Western", "Eastern"
   ),
+  # Theme colors: primary and secondary for light and dark modes
+  lightPrimary = c(
+    "#E03A3E", "#007A33", "#000000", "#1D1160", "#CE1141", "#860038",
+    "#00538C", "#0E2240", "#C8102E", "#1D428A", "#CE1141", "#002D62",
+    "#C8102E", "#552583", "#5D76A9", "#98002E", "#00471B", "#0C2340",
+    "#0C2340", "#006BB6", "#007AC1", "#0077C0", "#006BB6", "#1D1160",
+    "#E03A3E", "#5A2D81", "#C4CED4", "#CE1141", "#002B5C", "#002B5C"
+  ),
+  lightSecondary = c(
+    "#C1D32F", "#BA9653", "#FFFFFF", "#00788C", "#000000", "#FFB81C",
+    "#002B5E", "#FEC524", "#1D42BA", "#FFC72C", "#000000", "#FDBA21",
+    "#1D428A", "#FDB927", "#12173F", "#F9A01B", "#EEE1C6", "#236192",
+    "#C8102E", "#F58426", "#EF3B24", "#C4CED4", "#ED174C", "#E56020",
+    "#000000", "#63727A", "#000000", "#000000", "#F9A01B", "#E31837"
+  ),
+  darkPrimary = c(
+    "#E03A3E", "#007A33", "#FFFFFF", "#00788C", "#CE1141", "#FFB81C",
+    "#00538C", "#FEC524", "#1D42BA", "#FFC72C", "#CE1141", "#FDBA21",
+    "#1D428A", "#FDB927", "#5D76A9", "#F9A01B", "#EEE1C6", "#78BE20",
+    "#B4975A", "#F58426", "#EF3B24", "#000000", "#ED174C", "#E56020",
+    "#E03A3E", "#5A2D81", "#C4CED4", "#CE1141", "#F9A01B", "#E31837"
+  ),
+  darkSecondary = c(
+    "#C1D32F", "#BA9653", "#707070", "#A1A1A4", "#FFFFFF", "#041E42",
+    "#B8C4CA", "#8B2131", "#C8102E", "#1D428A", "#C4CED4", "#002D62",
+    "#C8102E", "#552583", "#F5B112", "#000000", "#00471B", "#0C2340",
+    "#0C2340", "#006BB6", "#002D62", "#0077C0", "#002B5C", "#1D1160",
+    "#FFFFFF", "#63727A", "#000000", "#A1A1A4", "#00471B", "#002B5C"
+  ),
   stringsAsFactors = FALSE
 )
 
 cat("Loaded", nrow(team_data), "NBA teams\n")
 
-# Create team roster with searchable labels
+# Create team roster with searchable labels and colors
 team_roster <- team_data %>%
   mutate(longLabel = paste0("NBA - ", team_name)) %>%
-  select(code, longLabel, conference, division) %>%
+  select(code, longLabel, conference, division,
+         lightPrimary, lightSecondary, darkPrimary, darkSecondary) %>%
   arrange(code)
 
 cat("\nTeam Roster Preview:\n")

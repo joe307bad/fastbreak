@@ -12,15 +12,60 @@ teams <- nflreadr::load_teams() %>%
 
 cat("Loaded", nrow(teams), "NFL teams\n")
 
-# Create team roster with searchable labels
+# Theme colors for NFL teams
+team_colors <- data.frame(
+  team_abbr = c(
+    "ARI", "ATL", "BAL", "BUF", "CAR", "CHI", "CIN", "CLE", "DAL", "DEN",
+    "DET", "GB", "HOU", "IND", "JAX", "KC", "LAC", "LAR", "LV", "MIA",
+    "MIN", "NE", "NO", "NYG", "NYJ", "PHI", "PIT", "SEA", "SF", "TB",
+    "TEN", "WAS"
+  ),
+  lightPrimary = c(
+    "#97233F", "#A71930", "#241773", "#00338D", "#0085CA", "#0B162A",
+    "#FB4F14", "#311D00", "#003594", "#FB4F14", "#0076B6", "#203731",
+    "#03202F", "#002C5F", "#101820", "#E31837", "#0080C6", "#003594",
+    "#000000", "#008E97", "#4F2683", "#002244", "#101820", "#0B2265",
+    "#125740", "#004C54", "#FFB612", "#002244", "#AA0000", "#D50A0A",
+    "#0C2340", "#5A1414"
+  ),
+  lightSecondary = c(
+    "#000000", "#000000", "#000000", "#C60C30", "#101820", "#C83803",
+    "#000000", "#FF3C00", "#041E42", "#002244", "#B0B7BC", "#FFB612",
+    "#A71930", "#A2AAAD", "#D7A22A", "#FFB81C", "#FFC20E", "#FFA300",
+    "#A5ACAF", "#F58220", "#FFC62F", "#C60C30", "#D3BC8D", "#A71930",
+    "#000000", "#A5ACAF", "#101820", "#69BE28", "#B3995D", "#34302B",
+    "#4B92DB", "#FFB612"
+  ),
+  darkPrimary = c(
+    "#97233F", "#A71930", "#9E7C0C", "#C60C30", "#0085CA", "#C83803",
+    "#FB4F14", "#FF3C00", "#869397", "#FB4F14", "#0076B6", "#FFB612",
+    "#A71930", "#002C5F", "#006778", "#E31837", "#FFC20E", "#FFA300",
+    "#A5ACAF", "#008E97", "#FFC62F", "#C60C30", "#D3BC8D", "#A71930",
+    "#125740", "#004C54", "#FFB612", "#69BE28", "#B3995D", "#FF7900",
+    "#4B92DB", "#FFB612"
+  ),
+  darkSecondary = c(
+    "#FFB612", "#A5ACAF", "#241773", "#00338D", "#BFC0BF", "#0B162A",
+    "#FFFFFF", "#311D00", "#003594", "#002244", "#B0B7BC", "#203731",
+    "#03202F", "#A2AAAD", "#D7A22A", "#FFB81C", "#002A5E", "#003594",
+    "#000000", "#F58220", "#4F2683", "#002244", "#101820", "#0B2265",
+    "#FFFFFF", "#A5ACAF", "#101820", "#002244", "#AA0000", "#D50A0A",
+    "#C8102E", "#5A1414"
+  ),
+  stringsAsFactors = FALSE
+)
+
+# Create team roster with searchable labels and colors
 team_roster <- teams %>%
+  left_join(team_colors, by = "team_abbr") %>%
   mutate(
     code = team_abbr,
     longLabel = paste0("NFL - ", team_name),
     conference = team_conf,
     division = team_division
   ) %>%
-  select(code, longLabel, conference, division) %>%
+  select(code, longLabel, conference, division,
+         lightPrimary, lightSecondary, darkPrimary, darkSecondary) %>%
   arrange(code)
 
 cat("\nTeam Roster Preview:\n")

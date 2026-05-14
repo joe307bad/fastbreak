@@ -405,7 +405,7 @@ private fun MiniRegionBox(
     val backgroundColor = if (isSelected) {
         region.color.copy(alpha = 0.3f)
     } else {
-        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+        MaterialTheme.colorScheme.surfaceVariant
     }
 
     val borderColor = if (isSelected) {
@@ -1893,7 +1893,7 @@ internal fun TbdMatchupRow() {
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(8.dp))
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+            .background(MaterialTheme.colorScheme.surfaceVariant)
             .border(
                 width = 1.dp,
                 color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),

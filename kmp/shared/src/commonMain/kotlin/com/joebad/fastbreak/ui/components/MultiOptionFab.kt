@@ -35,7 +35,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.scale
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -112,8 +111,8 @@ fun MultiOptionFab(
                     option.onClick()
                     isExpanded = false
                 },
-                color = Color(0xFFFF6B6B),  // Red matching main FAB
-                contentColor = Color.White,
+                color = MaterialTheme.colorScheme.primaryContainer,
+                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
                 shadowElevation = 4.dp,
                 shape = RoundedCornerShape(16.dp),
                 modifier = Modifier
@@ -137,8 +136,8 @@ fun MultiOptionFab(
         // Main FAB
         FloatingActionButton(
             onClick = { isExpanded = !isExpanded },
-            containerColor = Color(0xFFFF6B6B),  // Red
-            contentColor = Color.White,
+            containerColor = MaterialTheme.colorScheme.primaryContainer,
+            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
             shape = CircleShape
         ) {
             Icon(

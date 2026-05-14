@@ -854,6 +854,44 @@ private fun MLBCumRunDiffChart(
 
     val title = "$awayTeam vs $homeTeam - Cumulative Run Diff"
 
+    // Parse top 10 threshold by week (historical series)
+    val top10DataPoints = mutableListOf<LineChartDataPoint>()
+    val top10ByWeek = leagueCumRunDiffStats?.top10ByWeek
+    if (top10ByWeek != null) {
+        for ((weekKey, value) in top10ByWeek) {
+            val weekNum = weekKey.removePrefix("week-").toIntOrNull()
+            val threshold = (value as? JsonPrimitive)?.doubleOrNull
+            if (weekNum != null && threshold != null) {
+                top10DataPoints.add(LineChartDataPoint(x = weekNum.toDouble(), y = threshold))
+            }
+        }
+    }
+    val sortedTop10 = top10DataPoints.sortedBy { it.x }
+
+    // Build series list - include top 10 if we have data
+    val seriesList = mutableListOf(
+        LineChartSeries(
+            label = awayTeam,
+            dataPoints = awayDataPoints,
+            color = "#2196F3"
+        ),
+        LineChartSeries(
+            label = homeTeam,
+            dataPoints = homeDataPoints,
+            color = "#FF5722"
+        )
+    )
+    if (sortedTop10.isNotEmpty()) {
+        seriesList.add(
+            LineChartSeries(
+                label = "Top 10",
+                dataPoints = sortedTop10,
+                color = "#4CAF50", // Green
+                dashed = true
+            )
+        )
+    }
+
     ShareableChartContainer(
         title = title,
         source = "ESPN",
@@ -861,22 +899,11 @@ private fun MLBCumRunDiffChart(
         onShareClick = onShareClick,
         modifier = Modifier
             .fillMaxWidth()
-            .height(280.dp)
+            .height(310.dp)
             .padding(8.dp)
     ) {
         LineChartComponent(
-            series = listOf(
-                LineChartSeries(
-                    label = awayTeam,
-                    dataPoints = awayDataPoints,
-                    color = "#2196F3"
-                ),
-                LineChartSeries(
-                    label = homeTeam,
-                    dataPoints = homeDataPoints,
-                    color = "#FF5722"
-                )
-            ),
+            series = seriesList,
             yAxisTitle = "Run Diff",
             title = title,
             source = "ESPN",
@@ -1014,7 +1041,7 @@ private fun MLBWeeklyPerformanceChart(
                 data = scatterData,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(420.dp)
+                    .height(540.dp)
                     .padding(8.dp),
                 title = title,
                 xAxisLabel = "Runs Scored / Game",

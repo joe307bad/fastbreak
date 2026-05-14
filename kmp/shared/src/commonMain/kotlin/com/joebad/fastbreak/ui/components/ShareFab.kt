@@ -6,14 +6,14 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 
 /**
  * Reusable share floating action button with consistent styling across the app.
- * Uses a red background (#FF6B6B) with white icon to match existing share buttons.
+ * Uses theme colors: primaryContainer background with primary (first color) icon.
  */
 @Composable
 fun ShareFab(
@@ -22,8 +22,8 @@ fun ShareFab(
 ) {
     FloatingActionButton(
         onClick = onClick,
-        containerColor = Color(0xFFFF6B6B),  // Red
-        contentColor = Color.White,
+        containerColor = MaterialTheme.colorScheme.primaryContainer,
+        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
         shape = CircleShape,
         modifier = modifier
     ) {

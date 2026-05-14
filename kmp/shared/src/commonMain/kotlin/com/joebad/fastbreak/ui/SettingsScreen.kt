@@ -21,7 +21,12 @@ import com.joebad.fastbreak.ui.container.RegistryState
 import com.joebad.fastbreak.ui.diagnostics.SyncStatusRow
 import com.joebad.fastbreak.ui.diagnostics.DiagnosticsInfo
 import com.joebad.fastbreak.ui.teams.TeamSelectorBottomSheet
+import com.joebad.fastbreak.ui.teams.ThemeSelectorBottomSheet
+import com.joebad.fastbreak.ui.theme.ColorSlot
+import com.joebad.fastbreak.ui.theme.SelectedTeamTheme
+import com.joebad.fastbreak.ui.theme.ThemeBrightness
 import com.joebad.fastbreak.ui.theme.ThemeMode
+import com.joebad.fastbreak.ui.theme.UseSecondaryBackground
 
 @Composable
 fun SettingsScreen(
@@ -34,9 +39,16 @@ fun SettingsScreen(
     teamRosters: Map<String, TeamRoster> = emptyMap(),
     pinnedTeams: List<PinnedTeam> = emptyList(),
     onPinTeam: (sport: String, teamCode: String, teamLabel: String) -> Unit = { _, _, _ -> },
-    onUnpinTeam: (sport: String, teamCode: String) -> Unit = { _, _ -> }
+    onUnpinTeam: (sport: String, teamCode: String) -> Unit = { _, _ -> },
+    selectedTeamTheme: SelectedTeamTheme? = null,
+    onTeamThemeChange: (SelectedTeamTheme?) -> Unit = {},
+    themeBrightness: ThemeBrightness = ThemeBrightness(),
+    onBrightnessChange: (ColorSlot, Float) -> Unit = { _, _ -> },
+    useSecondaryBackground: UseSecondaryBackground = UseSecondaryBackground(),
+    onToggleSecondaryBackground: (ThemeMode) -> Unit = {}
 ) {
     var showTeamSelector by remember { mutableStateOf(false) }
+    var showThemeSelector by remember { mutableStateOf(false) }
 
     // Convert pinned teams to a set of "SPORT:CODE" keys for quick lookup
     val pinnedTeamCodes = remember(pinnedTeams) {
@@ -97,6 +109,44 @@ fun SettingsScreen(
                         shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
                     ) {
                         Text(text = "dark")
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                OutlinedButton(
+                    onClick = { showThemeSelector = true },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = "team colors",
+                        fontFamily = FontFamily.Monospace
+                    )
+                }
+
+                // Show selected team and reset button (only when a team theme is selected)
+                if (selectedTeamTheme != null) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = selectedTeamTheme.teamCode,
+                            fontFamily = FontFamily.Monospace,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        TextButton(
+                            onClick = { onTeamThemeChange(null) }
+                        ) {
+                            Text(
+                                text = "reset theme",
+                                fontFamily = FontFamily.Monospace,
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
                     }
                 }
             }
@@ -243,6 +293,34 @@ fun SettingsScreen(
                 }
             },
             onDismiss = { showTeamSelector = false }
+        )
+    }
+
+    // Theme selector bottom sheet
+    if (showThemeSelector) {
+        val selectedTeamKey = selectedTeamTheme?.let { "${it.sport}:${it.teamCode}" }
+        // Find selected team's colors for brightness adjustment UI
+        val selectedTeamColors = selectedTeamTheme?.let { theme ->
+            teamRosters[theme.sport]?.teams?.find { it.code == theme.teamCode }
+        }
+        ThemeSelectorBottomSheet(
+            teamRosters = teamRosters,
+            selectedTeamKey = selectedTeamKey,
+            selectedTeamColors = selectedTeamColors,
+            themeBrightness = themeBrightness,
+            onBrightnessChange = onBrightnessChange,
+            onTeamSelect = { sport, teamCode ->
+                if (sport != null && teamCode != null) {
+                    onTeamThemeChange(SelectedTeamTheme(sport, teamCode))
+                } else {
+                    onTeamThemeChange(null)
+                }
+            },
+            onDismiss = { showThemeSelector = false },
+            currentTheme = currentTheme,
+            useSecondaryBackground = useSecondaryBackground,
+            onThemeChange = onThemeChange,
+            onToggleSecondaryBackground = onToggleSecondaryBackground
         )
     }
 }

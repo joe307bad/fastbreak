@@ -575,12 +575,16 @@ fun QuadrantScatterPlot(
             kotlinx.coroutines.delay(50)
             try {
                 val chartBitmap = graphicsLayer.toImageBitmap()
-                // Add title programmatically to the bitmap with theme info
+                // Add title programmatically to the bitmap with theme colors
+                val backgroundColorInt = (backgroundColor.alpha * 255).toInt() shl 24 or
+                                        ((backgroundColor.red * 255).toInt() shl 16) or
+                                        ((backgroundColor.green * 255).toInt() shl 8) or
+                                        (backgroundColor.blue * 255).toInt()
                 val textColorInt = (textColor.alpha * 255).toInt() shl 24 or
                                   ((textColor.red * 255).toInt() shl 16) or
                                   ((textColor.green * 255).toInt() shl 8) or
                                   (textColor.blue * 255).toInt()
-                val bitmapWithTitle = addTitleToBitmap(chartBitmap, title, isDark, textColorInt, source)
+                val bitmapWithTitle = addTitleToBitmap(chartBitmap, title, backgroundColorInt, textColorInt, source)
                 imageExporter.shareImage(bitmapWithTitle, title)
             } catch (e: Exception) {
                 e.printStackTrace()
@@ -756,7 +760,8 @@ fun QuadrantScatterPlot(
                     label = labelPos.label,
                     color = labelPos.color,
                     offsetY = labelPos.offsetY,
-                    backgroundColor = backgroundColor
+                    backgroundColor = backgroundColor,
+                    textColor = textColor
                 )
             }
 
@@ -935,21 +940,24 @@ private fun XYGraphScope<Float, Float>.PointLabel(
     label: String,
     color: Color,
     offsetY: Float = -14f,
-    backgroundColor: Color = Color.White
+    backgroundColor: Color = Color.White,
+    textColor: Color = Color.Black
 ) {
     // Determine if we're in dark mode by checking background
-    val isDarkMode = backgroundColor == Color.Black || backgroundColor == Color(0xFF0A0A0A)
+    // For team themes with secondary background, this won't be black/white, so use luminance
+    val bgLuminance = 0.2126f * backgroundColor.red + 0.7152f * backgroundColor.green + 0.0722f * backgroundColor.blue
+    val isDarkMode = bgLuminance < 0.5f
 
     // Calculate label color
-    // In dark mode: always use the quadrant color
-    // In light mode: use black for light colors, quadrant color for dark colors
+    // Use the theme textColor for light colors (provides contrast with background)
+    // For dark colors, use the quadrant color itself
     val labelColor = if (isDarkMode) {
-        // Dark mode: always use quadrant color
+        // Dark mode: always use quadrant color (it's designed for dark backgrounds)
         color.copy(alpha = if (color.alpha < 0.5f) color.alpha else 0.9f)
     } else {
-        // Light mode: use black for light colors
+        // Light mode: use theme textColor for light colors, quadrant color for dark colors
         if (isColorTooLight(color)) {
-            Color.Black.copy(alpha = if (color.alpha < 0.5f) color.alpha else 1f)
+            textColor.copy(alpha = if (color.alpha < 0.5f) color.alpha else 1f)
         } else {
             color.copy(alpha = if (color.alpha < 0.5f) color.alpha else 0.9f)
         }

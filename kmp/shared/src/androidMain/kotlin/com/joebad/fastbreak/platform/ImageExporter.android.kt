@@ -135,7 +135,7 @@ actual fun getImageExporter(): ImageExporter {
     return AndroidImageExporter(context)
 }
 
-actual fun addTitleToBitmap(bitmap: ImageBitmap, title: String, isDarkTheme: Boolean, textColor: Int, source: String): ImageBitmap {
+actual fun addTitleToBitmap(bitmap: ImageBitmap, title: String, backgroundColor: Int, textColor: Int, source: String): ImageBitmap {
     val sourceBitmap = bitmap.asAndroidBitmap()
     // Copy to software bitmap if it's a hardware bitmap (hardware bitmaps can't be used with Canvas)
     val androidBitmap = if (sourceBitmap.config == Bitmap.Config.HARDWARE) {
@@ -174,7 +174,7 @@ actual fun addTitleToBitmap(bitmap: ImageBitmap, title: String, isDarkTheme: Boo
     val footerTextSize = 18f
     val footerHeight = (footerTextSize + footerPadding * 2).toInt()
 
-    println("📸 addTitleToBitmap - title: '$title', isDarkTheme: $isDarkTheme")
+    println("📸 addTitleToBitmap - title: '$title'")
     println("📸 Original bitmap size: ${androidBitmap.width}x${androidBitmap.height}")
     println("📸 New bitmap size: ${androidBitmap.width}x${androidBitmap.height + titleHeight + footerHeight}")
     println("📸 Title height: $titleHeight, Footer height: $footerHeight")
@@ -188,9 +188,7 @@ actual fun addTitleToBitmap(bitmap: ImageBitmap, title: String, isDarkTheme: Boo
 
     val canvas = Canvas(newBitmap)
 
-    // Use theme colors: dark background with white text, or white background with black text
-    val backgroundColor = if (isDarkTheme) android.graphics.Color.BLACK else android.graphics.Color.WHITE
-
+    // Use the passed theme colors for background and text
     println("📸 Background color: $backgroundColor, Text color: $textColor")
 
     // Step 1: Draw full background first

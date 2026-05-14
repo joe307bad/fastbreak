@@ -12,8 +12,13 @@ import com.joebad.fastbreak.data.model.Sport
 import com.joebad.fastbreak.data.model.VizType
 import com.joebad.fastbreak.ui.container.PinnedTeamsContainer
 import com.joebad.fastbreak.ui.container.RegistryContainer
+import com.joebad.fastbreak.ui.theme.ColorSlot
+import com.joebad.fastbreak.ui.theme.OptionalTeamTheme
+import com.joebad.fastbreak.ui.theme.SelectedTeamTheme
+import com.joebad.fastbreak.ui.theme.ThemeBrightness
 import com.joebad.fastbreak.ui.theme.ThemeMode
 import com.joebad.fastbreak.ui.theme.ThemeRepository
+import com.joebad.fastbreak.ui.theme.UseSecondaryBackground
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -35,9 +40,45 @@ class RootComponent(
     private val _themeMode = MutableValue(themeRepository.getInitialTheme())
     val themeMode: Value<ThemeMode> = _themeMode
 
+    private val _selectedTeamTheme = MutableValue(OptionalTeamTheme(themeRepository.getSelectedTeamTheme()))
+    val selectedTeamTheme: Value<OptionalTeamTheme> = _selectedTeamTheme
+
+    private val _themeBrightness = MutableValue(themeRepository.getThemeBrightness())
+    val themeBrightness: Value<ThemeBrightness> = _themeBrightness
+
+    private val _useSecondaryBackground = MutableValue(themeRepository.getUseSecondaryBackground())
+    val useSecondaryBackground: Value<UseSecondaryBackground> = _useSecondaryBackground
+
     fun toggleTheme(mode: ThemeMode) {
         _themeMode.value = mode
         themeRepository.saveTheme(mode)
+    }
+
+    fun setTeamTheme(theme: SelectedTeamTheme?) {
+        _selectedTeamTheme.value = OptionalTeamTheme(theme)
+        themeRepository.saveTeamTheme(theme)
+        // Clear brightness when selecting a new team
+        _themeBrightness.value = ThemeBrightness()
+        themeRepository.clearBrightness()
+        // Clear secondary background when selecting a new team
+        _useSecondaryBackground.value = UseSecondaryBackground()
+        themeRepository.clearSecondaryBackground()
+    }
+
+    fun toggleSecondaryBackground(mode: ThemeMode) {
+        themeRepository.toggleSecondaryBackground(mode)
+        _useSecondaryBackground.value = themeRepository.getUseSecondaryBackground()
+    }
+
+    fun setBrightness(slot: ColorSlot, value: Float) {
+        val current = _themeBrightness.value
+        _themeBrightness.value = when (slot) {
+            ColorSlot.LIGHT_PRIMARY -> current.copy(lightPrimary = value)
+            ColorSlot.LIGHT_SECONDARY -> current.copy(lightSecondary = value)
+            ColorSlot.DARK_PRIMARY -> current.copy(darkPrimary = value)
+            ColorSlot.DARK_SECONDARY -> current.copy(darkSecondary = value)
+        }
+        themeRepository.saveBrightness(slot, value)
     }
 
     /**

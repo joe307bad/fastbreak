@@ -53,10 +53,6 @@ fun ShareableChartContainer(
     modifier: Modifier = Modifier,
     content: @Composable BoxScope.() -> Unit
 ) {
-    // Detect theme mode
-    val isDark = MaterialTheme.colorScheme.background == Color.Black ||
-                 MaterialTheme.colorScheme.background == Color(0xFF0A0A0A)
-
     val backgroundColor = MaterialTheme.colorScheme.background
     val textColor = MaterialTheme.colorScheme.onBackground
 
@@ -73,13 +69,17 @@ fun ShareableChartContainer(
             try {
                 val chartBitmap = graphicsLayer.toImageBitmap()
 
-                // Convert Compose Color to ARGB Int
+                // Convert Compose Colors to ARGB Int
+                val backgroundColorInt = (backgroundColor.alpha * 255).toInt() shl 24 or
+                                        ((backgroundColor.red * 255).toInt() shl 16) or
+                                        ((backgroundColor.green * 255).toInt() shl 8) or
+                                        (backgroundColor.blue * 255).toInt()
                 val textColorInt = (textColor.alpha * 255).toInt() shl 24 or
                                   ((textColor.red * 255).toInt() shl 16) or
                                   ((textColor.green * 255).toInt() shl 8) or
                                   (textColor.blue * 255).toInt()
 
-                val bitmapWithTitle = addTitleToBitmap(chartBitmap, title, isDark, textColorInt, source)
+                val bitmapWithTitle = addTitleToBitmap(chartBitmap, title, backgroundColorInt, textColorInt, source)
                 imageExporter.shareImage(bitmapWithTitle, title)
             } catch (e: Exception) {
                 e.printStackTrace()
@@ -128,6 +128,8 @@ fun ShareableChartContainer(
         if (showShareButton) {
             FloatingActionButton(
                 onClick = onShare,
+                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
                     .padding(16.dp)

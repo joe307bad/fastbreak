@@ -78,8 +78,11 @@ output_data <- list(
   yAxisLabel = "Strikeouts",
   description = paste0(
     "Total strikeouts recorded by each team's pitching staff in the ",
-    mlb_season, " MLB season, sorted from most to fewest. The simplest ",
-    "measure of swing-and-miss stuff at the team level."
+    mlb_season, " MLB season, sorted from most to fewest.\n\n",
+    "STATS:\n\n",
+    " • Strikeouts: Raw count of batters struck out by the team's pitching ",
+    "staff this season — the simplest measure of swing-and-miss stuff. ",
+    "Higher is better."
   ),
   lastUpdated = format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC"),
   source = "FanGraphs",

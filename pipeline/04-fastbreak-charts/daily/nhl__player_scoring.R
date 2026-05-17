@@ -133,7 +133,16 @@ output_data <- list(
   visualizationType = "SCATTER_PLOT",
   title = paste0("NHL Scoring Leaders - ", nhl_season_start, "-", substr(nhl_season_end, 3, 4)),
   subtitle = "Goals vs Assists",
-  description = "This chart shows the top 50 NHL scorers plotted by their goals and assists. Players in the top-right are complete offensive players who both score and create. Top-left are elite playmakers who primarily set up teammates. Bottom-right are pure goal scorers. The sum represents total points.",
+  description = paste0(
+    "Top 50 NHL scorers plotted by goals against assists. Top-right players ",
+    "both score and create; top-left are pure playmakers; bottom-right are ",
+    "pure goal scorers.\n\n",
+    "STATS:\n\n",
+    " • Goals: Total goals scored this season. Higher is better.\n\n",
+    " • Assists: Total assists (passes leading directly to a goal) this season. ",
+    "Higher is better.\n\n",
+    " • Points: Goals plus assists — total offensive production. Higher is better."
+  ),
   lastUpdated = format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC"),
   source = "NHL Stats API",
   xAxisLabel = "Goals",

@@ -125,12 +125,14 @@ output_data <- list(
   subtitle = "wRC+ vs xwOBA",
   description = paste0(
     "Top 50 hitters (min ", min_pa, " PA, ", min_g,
-    " G) plotted by wRC+ (park- and league-adjusted runs created, ",
-    "where 100 is league average) and xwOBA (expected weighted on-base ",
-    "average from Statcast quality of contact, which strips out luck ",
-    "on balls in play). Up and to the right is elite: high wRC+ means ",
-    "actual run production, high xwOBA means the underlying contact ",
-    "quality is real and sustainable."
+    " G) plotted by run production against contact quality. Up and to ",
+    "the right is elite: real production backed by sustainable contact.\n\n",
+    "STATS:\n\n",
+    " • wRC+: Weighted Runs Created Plus — park- and league-adjusted total ",
+    "offensive value, where 100 is league average. Higher is better.\n\n",
+    " • xwOBA: Expected Weighted On-Base Average — expected offensive value ",
+    "from Statcast quality of contact, stripping out luck on balls in play. ",
+    "Higher is better."
   ),
   lastUpdated = format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC"),
   source = "FanGraphs",

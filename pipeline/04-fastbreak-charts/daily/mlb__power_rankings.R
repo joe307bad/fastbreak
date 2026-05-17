@@ -114,12 +114,14 @@ output_data <- list(
   title = paste0("MLB Power Rankings - ", mlb_season, "-", substr(mlb_season + 1, 3, 4)),
   subtitle = "Team wRC+ vs Team FIP-",
   description = paste0(
-    "All 30 MLB teams plotted by offensive wRC+ (park- and league-adjusted ",
-    "runs created, where 100 is league average) and pitching FIP- (Fielding ",
-    "Independent Pitching normalized to league average, lower is better). ",
-    "Up and to the right is elite: a team with high wRC+ and low FIP- is ",
-    "powerful on both sides of the ball after stripping out park, league, ",
-    "and luck-on-balls-in-play noise."
+    "All 30 MLB teams plotted by offense against pitching. Up and to the ",
+    "right is elite: a team strong on both sides of the ball after stripping ",
+    "out park, league, and luck-on-balls-in-play noise.\n\n",
+    "STATS:\n\n",
+    " • wRC+: Weighted Runs Created Plus — park- and league-adjusted team ",
+    "offensive value, where 100 is league average. Higher is better.\n\n",
+    " • FIP-: Fielding Independent Pitching, normalized to league average ",
+    "where 100 is average. Lower is better."
   ),
   lastUpdated = format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC"),
   source = "FanGraphs",

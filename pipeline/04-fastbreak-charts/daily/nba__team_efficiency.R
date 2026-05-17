@@ -208,7 +208,15 @@ output_data <- list(
   visualizationType = "SCATTER_PLOT",
   title = paste0("NBA Team Efficiency - ", nba_season - 1, "-", substr(nba_season, 3, 4)),
   subtitle = "ORtg vs DRtg",
-  description = "ORtg (Offensive Rating) measures points scored per 100 possessions, while DRtg (Defensive Rating) measures points allowed per 100 possessions (lower is better). Teams in the top-right quadrant have elite offenses and defenses, making them championship contenders. Net Rating (the difference) is the best single measure of team quality.",
+  description = paste0(
+    "All teams plotted by offensive efficiency against defensive efficiency. ",
+    "The top-right quadrant holds title contenders elite on both ends.\n\n",
+    "STATS:\n\n",
+    " • Offensive Rating (ORtg): Points scored per 100 possessions. Higher is better.\n\n",
+    " • Defensive Rating (DRtg): Points allowed per 100 possessions. Lower is better.\n\n",
+    " • Net Rating: Offensive Rating minus Defensive Rating — the best single ",
+    "measure of team quality. Higher is better."
+  ),
   lastUpdated = format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC"),
   source = "hoopR / NBA Stats",
   xAxisLabel = "ORtg",

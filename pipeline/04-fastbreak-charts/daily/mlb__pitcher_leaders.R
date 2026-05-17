@@ -121,11 +121,14 @@ output_data <- list(
   subtitle = "K-BB% vs xFIP",
   description = paste0(
     "Top 50 starting pitchers (min ", min_ip, " IP, ", min_gs,
-    " GS) plotted by K-BB% (strikeout rate minus walk rate) and xFIP ",
-    "(expected Fielding Independent Pitching, which normalizes HR/FB rate ",
-    "to league average). Up and to the right is elite: high K-BB% means ",
-    "missing bats with command, low xFIP means a pitcher's true skill ",
-    "profile is suppressing runs regardless of luck on balls in play."
+    " GS) plotted by swing-and-miss command against luck-independent run ",
+    "prevention. Up and to the right is elite.\n\n",
+    "STATS:\n\n",
+    " • K-BB%: Strikeout rate minus walk rate — the simplest, most predictive ",
+    "measure of missing bats with command. Higher is better.\n\n",
+    " • xFIP: Expected Fielding Independent Pitching — run prevention from a ",
+    "pitcher's true skill profile, normalizing home-run rate to league ",
+    "average. Lower is better."
   ),
   lastUpdated = format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC"),
   source = "FanGraphs",

@@ -174,7 +174,14 @@ output_data <- list(
   title = paste0("NBA Offensive Rating - ", nba_season - 1, "-", substr(nba_season, 3, 4)),
   subtitle = "Points Per 100 Possessions",
   yAxisLabel = "ORtg",
-  description = "Offensive Rating measures a team's points scored per 100 possessions. This advanced metric accounts for pace of play, making it a better indicator of offensive efficiency than raw points per game. Higher values indicate more efficient offenses that generate more points per possession. Elite offenses typically rate above 115, while struggling offenses fall below 110.",
+  description = paste0(
+    "Each team's offensive efficiency, sorted from best to worst. This ",
+    "advanced metric accounts for pace of play, making it a better measure ",
+    "than raw points per game.\n\n",
+    "STATS:\n\n",
+    " • Offensive Rating (ORtg): Points scored per 100 possessions. Elite ",
+    "offenses rate above 115, struggling offenses below 110. Higher is better."
+  ),
   lastUpdated = format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC"),
   source = "hoopR / NBA Stats",
   tags = list(

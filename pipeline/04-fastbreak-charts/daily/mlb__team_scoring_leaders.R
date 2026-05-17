@@ -105,11 +105,13 @@ output_data <- list(
   title = paste0("MLB Team Scoring Leaders - ", mlb_season, "-", substr(mlb_season + 1, 3, 4)),
   subtitle = "Runs Scored vs Runs Allowed",
   description = paste0(
-    "All 30 MLB teams plotted by total runs scored on offense and total ",
-    "runs allowed on defense. Up and to the right is dominant: lots of ",
-    "runs scored, few runs allowed. The diagonal from bottom-left to ",
-    "top-right is roughly average run differential; teams above that line ",
-    "are scoring more than they allow."
+    "All 30 MLB teams plotted by runs scored against runs allowed. Up and ",
+    "to the right is dominant; teams above the diagonal score more than ",
+    "they allow.\n\n",
+    "STATS:\n\n",
+    " • Runs Scored: Total runs scored on offense this season. Higher is better.\n\n",
+    " • Runs Allowed: Total runs allowed on defense this season. Lower is better.\n\n",
+    " • Run Differential: Runs scored minus runs allowed. Higher is better."
   ),
   lastUpdated = format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC"),
   source = "FanGraphs",

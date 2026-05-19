@@ -29,10 +29,16 @@ type ChartData = {
 
 let private baseUrl = "https://d2jyizt5xogu23.cloudfront.net"
 
+let private getEnvPrefix () =
+    let env = Environment.GetEnvironmentVariable("ENV") |> Option.ofObj |> Option.defaultValue ""
+    match env.ToUpperInvariant() with
+    | "PROD" -> "prod/"
+    | "DEV" -> "dev/"
+    | _ -> failwith "ENV environment variable must be set to 'PROD' or 'DEV'"
+
 let private extractLeague (chartPath: string) =
-    // Pattern: dev/nfl__chart_name.json -> nfl
-    // Also handle: dev/nfl-chart-name.json -> nfl
-    let fileName = chartPath.Replace("dev/", "").Replace(".json", "")
+    // Pattern: dev/nfl__chart_name.json or prod/nfl__chart_name.json -> nfl
+    let fileName = chartPath.Replace("dev/", "").Replace("prod/", "").Replace(".json", "")
     // Try double underscore first
     let parts = fileName.Split("__")
     if parts.Length >= 2 then
@@ -53,25 +59,29 @@ let downloadCharts () = async {
     use client = new HttpClient()
     client.Timeout <- TimeSpan.FromMinutes(2.0)
 
+    // Get environment prefix
+    let envPrefix = getEnvPrefix ()
+    printfn "Environment: %s" (envPrefix.TrimEnd('/').ToUpperInvariant())
+
     // Download registry
     printfn "Downloading chart registry..."
     let! registryJson = client.GetStringAsync($"{baseUrl}/registry") |> Async.AwaitTask
     let registry = JsonSerializer.Deserialize<Map<string, RegistryEntry>>(registryJson)
 
-    printfn "Found %d charts in registry" (Map.count registry)
+    printfn "Found %d total charts in registry" (Map.count registry)
 
-    // Download each chart
+    // Download each chart matching our environment prefix
     let! charts =
         registry
         |> Map.toArray
-        |> Array.filter (fun (path, _) -> not (path.Contains("topics"))) // Skip topics
+        |> Array.filter (fun (path, _) -> path.StartsWith(envPrefix) && not (path.Contains("topics")))
         |> Array.map (fun (path, entry) -> async {
             try
                 let url = $"{baseUrl}/{path}"
                 let! json = client.GetStringAsync(url) |> Async.AwaitTask
                 let league = extractLeague path
-                // Remove dev/ prefix and .json suffix (dev/nba__foo.json -> nba__foo)
-                let name = path.Replace("dev/", "").Replace(".json", "")
+                // Remove env prefix and .json suffix (dev/nba__foo.json -> nba__foo)
+                let name = path.Replace("dev/", "").Replace("prod/", "").Replace(".json", "")
                 printfn "  Downloaded: %s (%s)" name league
                 let vizType = extractVizType json
                 return Some {

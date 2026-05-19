@@ -11,6 +11,7 @@ data class DiagnosticsInfo(
     val lastCacheUpdate: Instant? = null,
     val cachedChartsCount: Int = 0,
     val registryVersion: String? = null,
+    val registryPrefix: String = "dev/", // "dev/" or "prod/" based on DEV_MODE
     val totalCacheSize: Long = 0, // in bytes (estimated)
     val failedSyncs: Int = 0,
     val lastError: String? = null,

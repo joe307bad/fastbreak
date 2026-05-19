@@ -1,4 +1,4 @@
-FROM rocker/tidyverse:latest
+FROM --platform=linux/amd64 rocker/tidyverse:latest
 
 # Set timezone to Eastern Time
 ENV TZ=America/New_York
@@ -27,6 +27,7 @@ RUN R -e "options(repos = c(CRAN = 'https://packagemanager.posit.co/cran/__linux
 WORKDIR /app
 
 # Copy R scripts and data
+COPY startup /app/startup
 COPY weekly /app/weekly
 COPY daily /app/daily
 COPY utils /app/utils

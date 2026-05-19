@@ -30,8 +30,12 @@ NBA_SEASON_STRING <- paste0(NBA_SEASON - 1, "-", substr(NBA_SEASON, 3, 4))
 PLAYOFFS_START <- as.Date(paste0(NBA_SEASON, "-04-15"))
 PLAYOFFS_END   <- as.Date(paste0(NBA_SEASON, "-06-30"))
 
+# Environment and S3 prefix
+ENV <- toupper(Sys.getenv("ENV", "DEV"))
+S3_PREFIX <- if (ENV == "PROD") "prod" else "dev"
+
 # S3 key for persisting bracket history (so completed series/games survive restarts)
-HISTORY_S3_KEY <- "dev/nba__bracket_history.json"
+HISTORY_S3_KEY <- paste0(S3_PREFIX, "/nba__bracket_history.json")
 
 CONFERENCE_COLORS <- list(
   East = "#1565C0",
@@ -1322,11 +1326,53 @@ for (conf in c("East", "West")) {
     }
   }
 
-  # Conference Semifinals: pairings (1v8 winner vs 4v5 winner), (3v6 winner vs 2v7 winner)
+  # Conference Semifinals: prefer ESPN's actual R2 series when available
+  espn_r2_series <- Filter(function(s) identical(s$conference, conf) && s$roundNumber == 2, series_map)
+
   semi_pairs <- list(c(1, 2), c(3, 4))
   r2_games <- vector("list", length(semi_pairs))
   r2_winners <- vector("list", length(semi_pairs))
+
+  # Helper to build a team from standings or R1 winners
+  build_r2_team <- function(abbrev) {
+    # Try to reuse R1 winner with full stats
+    for (w in r1_winners) {
+      if (!is.null(w) && !is.null(w$abbreviation) && w$abbreviation == abbrev) return(w)
+    }
+    # Fall back to building from standings/stats
+    conf_seeds <- seeds[[conf]]
+    if (is.data.frame(conf_seeds) && nrow(conf_seeds) > 0) {
+      sx <- conf_seeds %>% filter(team_abbrev == abbrev)
+      if (nrow(sx) > 0) {
+        rec <- list(wins = as.integer(sx$wins[1]), losses = as.integer(sx$losses[1]), conference = conf)
+        return(build_team(sx$team_name[1], abbrev, sx$team_logo[1], seed = sx$seed[1], record = rec))
+      }
+    }
+    build_team(abbrev, abbrev, NA, seed = NULL, record = list(conference = conf))
+  }
+
+  # First, use ESPN R2 series directly when available
+  if (length(espn_r2_series) > 0) {
+    for (i in seq_along(espn_r2_series)) {
+      if (i > 2) break
+      se <- espn_r2_series[[i]]
+      abbrevs <- se$team_abbrevs
+
+      t1 <- build_r2_team(abbrevs[1])
+      t2 <- build_r2_team(abbrevs[2])
+
+      mu <- build_series_matchup(t1, t2, conf, 2, "Conference Semifinals",
+                                 paste0("nba_", tolower(conf), "_r2_", i), se)
+      r2_games[[i]] <- mu
+      if (isTRUE(mu$team1$isWinner)) r2_winners[[i]] <- mu$team1
+      else if (isTRUE(mu$team2$isWinner)) r2_winners[[i]] <- mu$team2
+      else r2_winners[i] <- list(NULL)
+    }
+  }
+
+  # Fill in any remaining R2 slots from R1 winners (fallback)
   for (i in seq_along(semi_pairs)) {
+    if (!is.null(r2_games[[i]])) next
     idx <- semi_pairs[[i]]
     a <- r1_winners[[idx[1]]]
     b <- r1_winners[[idx[2]]]
@@ -1349,19 +1395,53 @@ for (conf in c("East", "West")) {
     else r2_winners[i] <- list(NULL)
   }
 
-  # Conference Finals
-  a <- r2_winners[[1]]; b <- r2_winners[[2]]
-  if (!is.null(a) && !is.null(b)) {
-    series_entry <- find_series_by_abbrevs(conf, 3, a$abbreviation, b$abbreviation)
-    cf_game <- build_series_matchup(a, b, conf, 3, "Conference Finals",
-                                    paste0("nba_", tolower(conf), "_r3"), series_entry)
-  } else {
-    cf_game <- list(
-      gameId = paste0("nba_", tolower(conf), "_r3"),
-      conference = conf, roundNumber = 3, roundName = "Conference Finals",
-      gameStatus = "TBD", bestOf = 7,
-      team1 = NULL, team2 = NULL, winner = NULL, games = list(), comparisons = NULL
-    )
+  # Conference Finals: prefer ESPN's actual R3 series when available
+  espn_r3_series <- Filter(function(s) identical(s$conference, conf) && s$roundNumber == 3, series_map)
+
+  cf_game <- NULL
+  if (length(espn_r3_series) > 0) {
+    # Use ESPN's actual Conference Finals matchup
+    se <- espn_r3_series[[1]]
+    abbrevs <- se$team_abbrevs
+    conf_seeds <- seeds[[conf]]
+
+    build_cf_team <- function(abbrev) {
+      # Try to reuse R2 winner with full stats
+      for (w in r2_winners) {
+        if (!is.null(w) && !is.null(w$abbreviation) && w$abbreviation == abbrev) return(w)
+      }
+      # Fall back to building from standings/stats
+      if (is.data.frame(conf_seeds) && nrow(conf_seeds) > 0) {
+        sx <- conf_seeds %>% filter(team_abbrev == abbrev)
+        if (nrow(sx) > 0) {
+          rec <- list(wins = as.integer(sx$wins[1]), losses = as.integer(sx$losses[1]), conference = conf)
+          return(build_team(sx$team_name[1], abbrev, sx$team_logo[1], seed = sx$seed[1], record = rec))
+        }
+      }
+      build_team(abbrev, abbrev, NA, seed = NULL, record = list(conference = conf))
+    }
+
+    t1 <- build_cf_team(abbrevs[1])
+    t2 <- build_cf_team(abbrevs[2])
+    cf_game <- build_series_matchup(t1, t2, conf, 3, "Conference Finals",
+                                    paste0("nba_", tolower(conf), "_r3"), se)
+  }
+
+  # Fall back to R2 winners if no ESPN R3 data
+  if (is.null(cf_game)) {
+    a <- r2_winners[[1]]; b <- r2_winners[[2]]
+    if (!is.null(a) && !is.null(b)) {
+      series_entry <- find_series_by_abbrevs(conf, 3, a$abbreviation, b$abbreviation)
+      cf_game <- build_series_matchup(a, b, conf, 3, "Conference Finals",
+                                      paste0("nba_", tolower(conf), "_r3"), series_entry)
+    } else {
+      cf_game <- list(
+        gameId = paste0("nba_", tolower(conf), "_r3"),
+        conference = conf, roundNumber = 3, roundName = "Conference Finals",
+        gameStatus = "TBD", bestOf = 7,
+        team1 = NULL, team2 = NULL, winner = NULL, games = list(), comparisons = NULL
+      )
+    }
   }
 
   conferences_out[[length(conferences_out) + 1]] <- list(
@@ -1462,7 +1542,7 @@ save_bracket_history(history)
 
 s3_bucket <- Sys.getenv("AWS_S3_BUCKET")
 if (nzchar(s3_bucket)) {
-  s3_key <- "dev/nba__playoff_bracket.json"
+  s3_key <- paste0(S3_PREFIX, "/nba__playoff_bracket.json")
   s3_path <- paste0("s3://", s3_bucket, "/", s3_key)
   cmd <- paste("aws s3 cp", shQuote(tmp_file), shQuote(s3_path),
                "--content-type application/json")

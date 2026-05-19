@@ -2677,10 +2677,10 @@ cat("Generated stats for", length(matchups_json), "matchup(s)\n")
 s3_bucket <- Sys.getenv("AWS_S3_BUCKET")
 
 if (nzchar(s3_bucket)) {
-  is_prod <- tolower(Sys.getenv("PROD")) == "true"
+  env <- toupper(Sys.getenv("ENV", "DEV"))
 
-  s3_key <- if (is_prod) {
-    "nhl__matchup_stats.json"
+  s3_key <- if (env == "PROD") {
+    "prod/nhl__matchup_stats.json"
   } else {
     "dev/nhl__matchup_stats.json"
   }

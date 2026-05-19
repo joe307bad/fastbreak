@@ -160,10 +160,10 @@ if (!nzchar(s3_bucket)) {
   stop("AWS_S3_BUCKET environment variable is not set")
 }
 
-is_prod <- tolower(Sys.getenv("PROD")) == "true"
+env <- toupper(Sys.getenv("ENV", "DEV"))
 
-s3_key <- if (is_prod) {
-  "nhl__player_scoring.json"
+s3_key <- if (env == "PROD") {
+  "prod/nhl__player_scoring.json"
 } else {
   "dev/nhl__player_scoring.json"
 }

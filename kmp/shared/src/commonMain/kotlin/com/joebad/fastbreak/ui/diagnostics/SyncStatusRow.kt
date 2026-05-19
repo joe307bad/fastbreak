@@ -83,6 +83,15 @@ fun SyncStatusRow(
             )
         }
 
+        // Registry prefix indicator (dev/ or prod/)
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = "registry: ${diagnostics.registryPrefix}",
+            style = MaterialTheme.typography.bodySmall,
+            fontFamily = FontFamily.Monospace,
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+        )
+
         // Show failed charts list if any
         if (diagnostics.failedCharts.isNotEmpty()) {
             Spacer(modifier = Modifier.height(8.dp))

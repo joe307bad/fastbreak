@@ -81,8 +81,8 @@ class ChartDataSynchronizer(
         println("📊 ChartDataSynchronizer.synchronizeCharts() - Starting")
         println("   Total entries in registry: ${registryEntries.size}")
 
-        // Filter to only chart entries (exclude topics and other non-chart types)
-        val chartEntries = registryEntries.filter { (_, entry) -> entry.isChart }
+        // Filter to only chart entries (exclude topics, system entries, and other non-chart types)
+        val chartEntries = registryEntries.filter { (_, entry) -> entry.isChart && !entry.isSystem }
         println("   Chart entries (excluding topics): ${chartEntries.size}")
 
         val chartsNeedingUpdate = chartEntries.filter { (fileKey, entry) ->
@@ -235,12 +235,14 @@ class ChartDataSynchronizer(
     /**
      * Converts a file key to a chart ID.
      * e.g., "dev/nfl__team_tier_list.json" -> "nfl__team_tier_list"
-     * Note: We remove the dev/ prefix to match the F# server's chart ID format,
+     * e.g., "prod/nfl__team_tier_list.json" -> "nfl__team_tier_list"
+     * Note: We remove the dev/ or prod/ prefix to match the F# server's chart ID format,
      * which is used in Topics data points.
      */
     private fun fileKeyToChartId(fileKey: String): String {
         return fileKey
             .removePrefix("dev/")
+            .removePrefix("prod/")
             .removeSuffix(".json")
             .replace("/", "_")
     }

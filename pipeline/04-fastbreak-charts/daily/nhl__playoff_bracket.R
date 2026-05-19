@@ -24,7 +24,11 @@ NHL_SEASON_STRING <- paste0(NHL_SEASON_START, "-", substr(NHL_SEASON_END, 3, 4))
 PLAYOFFS_START <- as.Date(paste0(NHL_SEASON_END, "-04-12"))
 PLAYOFFS_END   <- as.Date(paste0(NHL_SEASON_END, "-06-30"))
 
-HISTORY_S3_KEY <- "dev/nhl__bracket_history.json"
+# Environment and S3 prefix
+ENV <- toupper(Sys.getenv("ENV", "DEV"))
+S3_PREFIX <- if (ENV == "PROD") "prod" else "dev"
+
+HISTORY_S3_KEY <- paste0(S3_PREFIX, "/nhl__bracket_history.json")
 
 CONFERENCE_COLORS <- list(East = "#1565C0", West = "#C62828")
 FIRST_ROUND_SEEDS <- list(c(1, 8), c(4, 5), c(3, 6), c(2, 7))
@@ -1226,14 +1230,41 @@ for (conf in c("East", "West")) {
     else r2_winners[i] <- list(NULL)
   }
 
-  a <- r2_winners[[1]]; b <- r2_winners[[2]]
-  if (!is.null(a) && !is.null(b)) {
-    se <- find_series(if (conf == "East") "Eastern" else "Western", 3, a$abbreviation, b$abbreviation)
-    cf_game <- build_series_matchup(a, b, conf, 3, "Conference Finals", paste0("nhl_", tolower(conf), "_r3"), se)
-  } else {
-    cf_game <- list(gameId = paste0("nhl_", tolower(conf), "_r3"), conference = conf, roundNumber = 3,
-                    roundName = "Conference Finals", gameStatus = "TBD", bestOf = 7,
-                    team1 = NULL, team2 = NULL, winner = NULL, games = list(), comparisons = NULL)
+  # Conference Finals: prefer ESPN's actual R3 series when available
+  espn_r3_series <- Filter(function(s) identical(s$conference, espn_conf) && s$roundNumber == 3, playoff_events)
+
+  cf_game <- NULL
+  if (length(espn_r3_series) > 0) {
+    # Use ESPN's actual Conference Finals matchup
+    se <- espn_r3_series[[1]]
+    abbrevs <- se$team_abbrevs
+
+    build_cf_team <- function(abbrev) {
+      # Try to reuse R2 winner with full stats
+      for (w in r2_winners) {
+        if (!is.null(w) && !is.null(w$abbreviation) && w$abbreviation == abbrev) return(w)
+      }
+      # Fall back to building from standings/stats
+      build_nhl_team(abbrev)
+    }
+
+    t1 <- build_cf_team(abbrevs[1])
+    t2 <- build_cf_team(abbrevs[2])
+    cf_game <- build_series_matchup(t1, t2, conf, 3, "Conference Finals",
+                                    paste0("nhl_", tolower(conf), "_r3"), se)
+  }
+
+  # Fall back to R2 winners if no ESPN R3 data
+  if (is.null(cf_game)) {
+    a <- r2_winners[[1]]; b <- r2_winners[[2]]
+    if (!is.null(a) && !is.null(b)) {
+      se <- find_series(espn_conf, 3, a$abbreviation, b$abbreviation)
+      cf_game <- build_series_matchup(a, b, conf, 3, "Conference Finals", paste0("nhl_", tolower(conf), "_r3"), se)
+    } else {
+      cf_game <- list(gameId = paste0("nhl_", tolower(conf), "_r3"), conference = conf, roundNumber = 3,
+                      roundName = "Conference Finals", gameStatus = "TBD", bestOf = 7,
+                      team1 = NULL, team2 = NULL, winner = NULL, games = list(), comparisons = NULL)
+    }
   }
 
   conferences_out[[length(conferences_out) + 1]] <- list(
@@ -1302,7 +1333,7 @@ save_bracket_history(history)
 
 s3_bucket <- Sys.getenv("AWS_S3_BUCKET")
 if (nzchar(s3_bucket)) {
-  s3_key <- "dev/nhl__playoff_bracket.json"
+  s3_key <- paste0(S3_PREFIX, "/nhl__playoff_bracket.json")
   s3_path <- paste0("s3://", s3_bucket, "/", s3_key)
   result <- system(paste("aws s3 cp", shQuote(tmp_file), shQuote(s3_path), "--content-type application/json"))
   if (result != 0) stop("Failed to upload to S3")

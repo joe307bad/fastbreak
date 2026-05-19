@@ -293,10 +293,10 @@ if (!nzchar(s3_bucket)) {
   write_json(output_data, tmp_file, pretty = TRUE, auto_unbox = TRUE)
   cat("\nLocal development mode - JSON written to:", tmp_file, "\n")
 } else {
-  is_prod <- tolower(Sys.getenv("PROD")) == "true"
+  env <- toupper(Sys.getenv("ENV", "DEV"))
 
-  s3_key <- if (is_prod) {
-    "nba__playoff_player_impact.json"
+  s3_key <- if (env == "PROD") {
+    "prod/nba__playoff_player_impact.json"
   } else {
     "dev/nba__playoff_player_impact.json"
   }

@@ -139,10 +139,10 @@ if (!nzchar(s3_bucket)) {
   cat("\nDevelopment mode - output written to:", dev_output, "\n")
   cat("To upload to S3, set AWS_S3_BUCKET environment variable\n")
 } else {
-  is_prod <- tolower(Sys.getenv("PROD")) == "true"
+  env <- toupper(Sys.getenv("ENV", "DEV"))
 
-  s3_key <- if (is_prod) {
-    "cbb__team_efficiency.json"
+  s3_key <- if (env == "PROD") {
+    "prod/cbb__team_efficiency.json"
   } else {
     "dev/cbb__team_efficiency.json"
   }

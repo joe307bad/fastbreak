@@ -10,6 +10,7 @@ plugins {
 
 // Generate AppConfig from gradle.properties
 val devMode = project.findProperty("dev_mode")?.toString()?.toBoolean() ?: true
+val builtInReleaseId = project.findProperty("built_in_release_id")?.toString() ?: "fb-dev"
 
 val generateAppConfig = tasks.register("generateAppConfig") {
     val outputDir = layout.buildDirectory.dir("generated/appconfig")
@@ -22,6 +23,7 @@ val generateAppConfig = tasks.register("generateAppConfig") {
 
             object AppConfig {
                 const val DEV_MODE: Boolean = $devMode
+                const val BUILT_IN_RELEASE_ID: String = "$builtInReleaseId"
             }
         """.trimIndent())
     }

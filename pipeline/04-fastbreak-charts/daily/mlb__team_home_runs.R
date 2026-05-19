@@ -97,8 +97,8 @@ output_data <- list(
 s3_bucket <- Sys.getenv("AWS_S3_BUCKET")
 if (!nzchar(s3_bucket)) stop("AWS_S3_BUCKET environment variable is not set")
 
-is_prod <- tolower(Sys.getenv("PROD")) == "true"
-s3_key <- if (is_prod) "mlb__team_home_runs.json" else "dev/mlb__team_home_runs.json"
+env <- toupper(Sys.getenv("ENV", "DEV"))
+s3_key <- if (env == "PROD") "prod/mlb__team_home_runs.json" else "dev/mlb__team_home_runs.json"
 
 tmp_file <- tempfile(fileext = ".json")
 write_json(output_data, tmp_file, pretty = TRUE, auto_unbox = TRUE, null = "null")

@@ -63,7 +63,18 @@ data class RegistryState(
      * Whether topics have been viewed by the user.
      * Used to show "new" indicator on topics icon.
      */
-    val topicsViewed: Boolean = true
+    val topicsViewed: Boolean = true,
+
+    /**
+     * Whether an app update is required to download new charts.
+     * Set when the server's releaseId is newer than the client's built-in releaseId.
+     */
+    val updateRequired: Boolean = false,
+
+    /**
+     * The server's release ID when an update is required (for display purposes)
+     */
+    val serverReleaseId: String? = null
 )
 
 /**
@@ -85,4 +96,13 @@ sealed interface RegistrySideEffect {
      * Navigate to a specific chart
      */
     data class NavigateToChart(val chartId: String) : RegistrySideEffect
+
+    /**
+     * App update is required to download new charts.
+     * User should be prompted to update the app.
+     */
+    data class UpdateRequired(
+        val serverReleaseId: String,
+        val clientReleaseId: String
+    ) : RegistrySideEffect
 }

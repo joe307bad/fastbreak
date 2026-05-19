@@ -184,7 +184,9 @@ let main args =
             if String.IsNullOrEmpty(bucket) then
                 failwith "AWS_S3_BUCKET environment variable is not set"
 
-            let s3Key = $"dev/{fileName}"
+            let env = Environment.GetEnvironmentVariable("ENV") |> Option.ofObj |> Option.defaultValue "DEV"
+            let prefix = if env.ToUpperInvariant() = "PROD" then "prod" else "dev"
+            let s3Key = $"{prefix}/{fileName}"
             let tableName = Environment.GetEnvironmentVariable("AWS_DYNAMODB_TABLE") |> Option.ofObj |> Option.defaultValue "fastbreak-file-timestamps"
 
             async {

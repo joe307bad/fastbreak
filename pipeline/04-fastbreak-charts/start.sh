@@ -10,18 +10,85 @@ CYAN='\033[0;36m'
 BOLD='\033[1m'
 NC='\033[0m' # No Color
 
+# RUN_MODE options:
+#   all (default) - Run startup, daily, weekly scripts + Fastbreak.Daily + cron
+#   daily-only    - Run only Fastbreak.Daily (topics generation)
+#   scripts-only  - Run only R scripts (no Fastbreak.Daily)
+#   cron-only     - Skip startup, just start cron daemon
+RUN_MODE="${RUN_MODE:-all}"
+
+# Parse command-line arguments
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    --only-fastbreak-daily|--daily-only)
+      RUN_MODE="daily-only"
+      shift
+      ;;
+    --scripts-only)
+      RUN_MODE="scripts-only"
+      shift
+      ;;
+    --cron-only)
+      RUN_MODE="cron-only"
+      shift
+      ;;
+    --help|-h)
+      echo "Usage: $0 [OPTIONS]"
+      echo ""
+      echo "Options:"
+      echo "  --only-fastbreak-daily  Run only Fastbreak.Daily and exit"
+      echo "  --scripts-only          Run only R scripts, skip Fastbreak.Daily"
+      echo "  --cron-only             Skip startup scripts, just run cron"
+      echo "  --help, -h              Show this help message"
+      echo ""
+      echo "Environment variables:"
+      echo "  RUN_MODE=all|daily-only|scripts-only|cron-only"
+      exit 0
+      ;;
+    *)
+      echo "Unknown option: $1"
+      echo "Use --help for usage information"
+      exit 1
+      ;;
+  esac
+done
+
 echo ""
 echo -e "${BOLD}${BLUE}════════════════════════════════════════════════════════════${NC}"
 echo -e "${BOLD}${BLUE}                  R Cron Scheduler Starting                  ${NC}"
 echo -e "${BOLD}${BLUE}════════════════════════════════════════════════════════════${NC}"
+echo -e "  ${CYAN}Run mode: ${BOLD}$RUN_MODE${NC}"
 echo ""
 
 # Export environment variables for cron jobs (restricted permissions)
 # Include PATH so cron can find aws cli and other tools
 echo "export PATH=\"$PATH\"" > /app/env.sh
-printenv | grep -E "^(AWS_|PROD|GEMINI_)" >> /app/env.sh
-sed -i '/^AWS_\|^PROD\|^GEMINI_/s/^/export /' /app/env.sh
+printenv | grep -E "^(AWS_|ENV|GEMINI_)" >> /app/env.sh
+sed -i '/^AWS_\|^ENV\|^GEMINI_/s/^/export /' /app/env.sh
 chmod 600 /app/env.sh
+
+# Handle daily-only mode - just run Fastbreak.Daily and exit
+if [ "$RUN_MODE" = "daily-only" ]; then
+  echo -e "${BOLD}${CYAN}▶ Running Fastbreak.Daily (generate-and-enrich-topics)...${NC}"
+  echo -e "${CYAN}────────────────────────────────────────${NC}"
+  if /app/Fastbreak.Daily generate-and-enrich-topics; then
+    echo -e "${GREEN}  ✓ Fastbreak.Daily completed successfully${NC}"
+    exit 0
+  else
+    echo -e "${RED}  ✗ Fastbreak.Daily failed${NC}"
+    exit 1
+  fi
+fi
+
+# Handle cron-only mode - skip startup scripts
+if [ "$RUN_MODE" = "cron-only" ]; then
+  echo -e "${YELLOW}Skipping startup scripts (cron-only mode)${NC}"
+  echo ""
+  cron
+  echo -e "${GREEN}Container is running. Watching for cron activity...${NC}"
+  tail -f /var/log/cron.log 2>/dev/null || while true; do sleep 3600; done
+  exit 0
+fi
 
 run_scripts() {
   local dir=$1
@@ -74,15 +141,20 @@ run_scripts "/app/startup" "startup"
 run_scripts "/app/daily" "daily"
 run_scripts "/app/weekly" "weekly"
 
-# Run Fastbreak.Daily to generate topics (v2 pipeline)
-echo -e "${BOLD}${CYAN}▶ Running Fastbreak.Daily (generate-and-enrich-topics)...${NC}"
-echo -e "${CYAN}────────────────────────────────────────${NC}"
-if /app/Fastbreak.Daily generate-and-enrich-topics; then
-  echo -e "${GREEN}  ✓ Fastbreak.Daily completed successfully${NC}"
+# Run Fastbreak.Daily to generate topics (v2 pipeline) - skip in scripts-only mode
+if [ "$RUN_MODE" != "scripts-only" ]; then
+  echo -e "${BOLD}${CYAN}▶ Running Fastbreak.Daily (generate-and-enrich-topics)...${NC}"
+  echo -e "${CYAN}────────────────────────────────────────${NC}"
+  if /app/Fastbreak.Daily generate-and-enrich-topics; then
+    echo -e "${GREEN}  ✓ Fastbreak.Daily completed successfully${NC}"
+  else
+    echo -e "${RED}  ✗ Fastbreak.Daily failed${NC}"
+  fi
+  echo ""
 else
-  echo -e "${RED}  ✗ Fastbreak.Daily failed${NC}"
+  echo -e "${YELLOW}Skipping Fastbreak.Daily (scripts-only mode)${NC}"
+  echo ""
 fi
-echo ""
 
 echo -e "${BOLD}${BLUE}════════════════════════════════════════════════════════════${NC}"
 echo -e "${BOLD}${BLUE}                    Startup Complete                         ${NC}"

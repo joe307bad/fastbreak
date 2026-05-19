@@ -1,11 +1,14 @@
 app = 'fastbreak-chart-generator'
 primary_region = 'iad'
 
+[env]
+  ENV = "PROD"
+
 [build]
 
 [processes]
   app = '/app/start.sh'
 
 [[vm]]
+  size = 'shared-cpu-1x'
   memory = '1gb'
-  cpus = 1

@@ -1,0 +1,258 @@
+name: Deploy
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - 'kmp/**'
+      - 'pipeline/04-fastbreak-charts/**'
+      - 'server/src/Fastbreak.Daily/**'
+
+jobs:
+  detect-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      kmp: ${{ steps.changes.outputs.kmp }}
+      charts: ${{ steps.changes.outputs.charts }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: changes
+        with:
+          filters: |
+            kmp:
+              - 'kmp/**'
+            charts:
+              - 'pipeline/04-fastbreak-charts/**'
+              - 'server/src/Fastbreak.Daily/**'
+
+  deploy-charts:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.charts == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: pipeline/04-fastbreak-charts
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Build Fastbreak.Daily executable
+        run: |
+          dotnet publish -c Release -r linux-x64 --self-contained true -p:PublishSingleFile=true -o ../../../pipeline/04-fastbreak-charts
+        working-directory: server/src/Fastbreak.Daily
+
+      - name: Update Release ID in DynamoDB
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: us-east-1
+        run: |
+          RELEASE_ID="fb-${{ github.run_number }}"
+          TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+          echo "Updating prod release ID to: $RELEASE_ID"
+
+          aws dynamodb put-item \
+            --table-name fastbreak-file-timestamps \
+            --item '{
+              "file_key": {"S": "prod/system/releaseId"},
+              "releaseId": {"S": "'"$RELEASE_ID"'"},
+              "updatedAt": {"S": "'"$TIMESTAMP"'"},
+              "title": {"S": "System Release ID"},
+              "type": {"S": "system"}
+            }'
+
+          echo "Successfully updated prod release ID to: $RELEASE_ID"
+
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - name: Verify Fastbreak.Daily exists
+        run: ls -la Fastbreak.Daily
+
+      - run: flyctl deploy --remote-only
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+
+  deploy-android:
+    needs: [detect-changes, deploy-charts]
+    if: |
+      always() &&
+      needs.detect-changes.outputs.kmp == 'true' &&
+      (needs.deploy-charts.result == 'success' || needs.deploy-charts.result == 'skipped')
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: kmp
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Setup Gradle
+        uses: gradle/gradle-build-action@v3
+
+      - name: Generate build info
+        id: build_info
+        run: |
+          echo "build_number=${{ github.run_number }}" >> $GITHUB_OUTPUT
+          VERSION_NAME=$(grep "VERSION_NAME=" gradle.properties | cut -d'=' -f2)
+          echo "version_name=${VERSION_NAME}" >> $GITHUB_OUTPUT
+
+      - name: Fetch current release ID
+        id: release_id
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: us-east-1
+        run: |
+          RELEASE_ID=$(aws dynamodb get-item \
+            --table-name fastbreak-file-timestamps \
+            --key '{"file_key": {"S": "prod/system/releaseId"}}' \
+            --query 'Item.releaseId.S' \
+            --output text 2>/dev/null || echo "fb-1")
+
+          # Handle case where releaseId doesn't exist yet
+          if [ "$RELEASE_ID" = "None" ] || [ -z "$RELEASE_ID" ]; then
+            RELEASE_ID="fb-1"
+          fi
+
+          echo "release_id=${RELEASE_ID}" >> $GITHUB_OUTPUT
+          echo "Using release ID: $RELEASE_ID"
+
+      - name: Write local.properties
+        run: |
+          cat > local.properties << EOF
+          GOOGLE_AUTH_SERVER_ID=${{ secrets.GOOGLE_AUTH_SERVER_ID }}
+          API_BASE_URL=https://d2jyizt5xogu23.cloudfront.net
+          RELEASE_STORE_FILE=../release-keystore.jks
+          RELEASE_KEY_ALIAS=${{ secrets.RELEASE_KEY_ALIAS }}
+          RELEASE_KEY_PASSWORD=${{ secrets.RELEASE_KEY_PASSWORD }}
+          RELEASE_STORE_PASSWORD=${{ secrets.RELEASE_STORE_PASSWORD }}
+          EOF
+
+      - name: Create keystore
+        run: |
+          echo "${{ secrets.RELEASE_KEYSTORE }}" | base64 -d > release-keystore.jks
+
+      - name: Build Android App Bundle
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+        run: |
+          ./gradlew :androidApp:bundleRelease --no-daemon \
+            -PVERSION_NAME="${{ steps.build_info.outputs.version_name }}" \
+            -PVERSION_CODE="${{ steps.build_info.outputs.build_number }}" \
+            -Pbuilt_in_release_id="${{ steps.release_id.outputs.release_id }}" \
+            -Pdev_mode=false
+
+      - name: Upload to Google Play Alpha
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: com.joebad.fastbreak
+          releaseFiles: kmp/androidApp/build/outputs/bundle/release/*.aab
+          track: alpha
+          status: draft
+
+  deploy-ios:
+    needs: [detect-changes, deploy-charts]
+    if: |
+      always() &&
+      needs.detect-changes.outputs.kmp == 'true' &&
+      (needs.deploy-charts.result == 'success' || needs.deploy-charts.result == 'skipped')
+    runs-on: macos-26
+    defaults:
+      run:
+        working-directory: kmp
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Apple requires apps to be built with the iOS 26 SDK / Xcode 26 or later
+      # for App Store Connect submissions starting April 2026. On the macos-26
+      # arm64 runner image Xcode 26.2 is the default install, located at
+      # /Applications/Xcode_26.2.app (verified against actions/runner-images
+      # macos-26-arm64-Readme.md).
+      - name: Select Xcode 26.2
+        run: sudo xcode-select -s /Applications/Xcode_26.2.app/Contents/Developer
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Get version from gradle.properties
+        id: build_info
+        run: |
+          VERSION_NAME=$(grep "VERSION_NAME=" gradle.properties | cut -d'=' -f2)
+          echo "version_name=${VERSION_NAME}" >> $GITHUB_OUTPUT
+          echo "Using version: $VERSION_NAME"
+
+      - name: Fetch current release ID
+        id: release_id
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: us-east-1
+        run: |
+          RELEASE_ID=$(aws dynamodb get-item \
+            --table-name fastbreak-file-timestamps \
+            --key '{"file_key": {"S": "prod/system/releaseId"}}' \
+            --query 'Item.releaseId.S' \
+            --output text 2>/dev/null || echo "fb-1")
+
+          # Handle case where releaseId doesn't exist yet
+          if [ "$RELEASE_ID" = "None" ] || [ -z "$RELEASE_ID" ]; then
+            RELEASE_ID="fb-1"
+          fi
+
+          echo "release_id=${RELEASE_ID}" >> $GITHUB_OUTPUT
+          echo "Using release ID: $RELEASE_ID"
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.1'
+          bundler-cache: true
+          working-directory: kmp/iosApp
+
+      - name: Build KMP Framework
+        run: |
+          ./gradlew :shared:linkReleaseFrameworkIosArm64 \
+            -Pbuilt_in_release_id="${{ steps.release_id.outputs.release_id }}" \
+            -Pdev_mode=false
+
+      - name: Install CocoaPods
+        working-directory: kmp/iosApp
+        run: bundle exec pod install
+
+      - name: Setup SSH for Match
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.MATCH_SSH_PRIVATE_KEY }}
+
+      - name: Deploy to TestFlight
+        working-directory: kmp/iosApp
+        env:
+          MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
+          APP_STORE_CONNECT_API_KEY_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          APP_STORE_CONNECT_API_KEY_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          APP_STORE_CONNECT_API_KEY_KEY: ${{ secrets.ASC_PRIVATE_KEY }}
+          VERSION_NAME: ${{ steps.build_info.outputs.version_name }}
+          BUILD_NUMBER: ${{ github.run_number }}
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+        run: bundle exec fastlane ios beta

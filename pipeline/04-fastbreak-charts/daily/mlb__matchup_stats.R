@@ -1189,9 +1189,10 @@ tmp_file <- tempfile(fileext = ".json")
 write_json(output_data, tmp_file, pretty = TRUE, auto_unbox = TRUE, null = "null", na = "null")
 
 s3_bucket <- Sys.getenv("AWS_S3_BUCKET")
+env <- toupper(Sys.getenv("ENV", "DEV"))
 
 if (nzchar(s3_bucket)) {
-  s3_key <- "dev/mlb__matchup_stats.json"
+  s3_key <- if (env == "PROD") "prod/mlb__matchup_stats.json" else "dev/mlb__matchup_stats.json"
   s3_path <- paste0("s3://", s3_bucket, "/", s3_key)
   cmd <- paste("aws s3 cp", shQuote(tmp_file), shQuote(s3_path), "--content-type application/json")
   result <- system(cmd)

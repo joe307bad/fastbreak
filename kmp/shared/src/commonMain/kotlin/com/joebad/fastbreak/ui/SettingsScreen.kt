@@ -28,6 +28,7 @@ import com.joebad.fastbreak.ui.theme.ThemeBrightness
 import com.joebad.fastbreak.ui.theme.ThemeMode
 import com.joebad.fastbreak.ui.theme.UseSecondaryBackground
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
     component: SettingsComponent,
@@ -35,6 +36,7 @@ fun SettingsScreen(
     onThemeChange: (ThemeMode) -> Unit,
     diagnostics: DiagnosticsInfo,
     onRefreshRegistry: () -> Unit,
+    onResetData: () -> Unit = {},
     onMarkAllAsRead: () -> Unit = {},
     teamRosters: Map<String, TeamRoster> = emptyMap(),
     pinnedTeams: List<PinnedTeam> = emptyList(),
@@ -49,6 +51,7 @@ fun SettingsScreen(
 ) {
     var showTeamSelector by remember { mutableStateOf(false) }
     var showThemeSelector by remember { mutableStateOf(false) }
+    var showResetConfirmation by remember { mutableStateOf(false) }
 
     // Convert pinned teams to a set of "SPORT:CODE" keys for quick lookup
     val pinnedTeamCodes = remember(pinnedTeams) {
@@ -223,6 +226,22 @@ fun SettingsScreen(
                         fontFamily = FontFamily.Monospace
                     )
                 }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                OutlinedButton(
+                    onClick = { showResetConfirmation = true },
+                    enabled = !diagnostics.isSyncing,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = MaterialTheme.colorScheme.error
+                    )
+                ) {
+                    Text(
+                        text = "reset chart registry",
+                        fontFamily = FontFamily.Monospace
+                    )
+                }
             }
 
             HorizontalDivider(color = MaterialTheme.colorScheme.outline)
@@ -322,6 +341,67 @@ fun SettingsScreen(
             onThemeChange = onThemeChange,
             onToggleSecondaryBackground = onToggleSecondaryBackground
         )
+    }
+
+    // Reset confirmation bottom sheet
+    if (showResetConfirmation) {
+        ModalBottomSheet(
+            onDismissRequest = { showResetConfirmation = false },
+            containerColor = MaterialTheme.colorScheme.surface
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp)
+                    .padding(bottom = 32.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Text(
+                    text = "reset all data?",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontFamily = FontFamily.Monospace,
+                    color = MaterialTheme.colorScheme.error
+                )
+
+                Text(
+                    text = "this will delete all cached charts, topics, team rosters, and pinned teams. you will need to sync again to restore data.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontFamily = FontFamily.Monospace,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 8.dp)
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Button(
+                    onClick = {
+                        onResetData()
+                        showResetConfirmation = false
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error,
+                        contentColor = MaterialTheme.colorScheme.onError
+                    )
+                ) {
+                    Text(
+                        text = "reset all data",
+                        fontFamily = FontFamily.Monospace
+                    )
+                }
+
+                OutlinedButton(
+                    onClick = { showResetConfirmation = false },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = "cancel",
+                        fontFamily = FontFamily.Monospace
+                    )
+                }
+            }
+        }
     }
 }
 

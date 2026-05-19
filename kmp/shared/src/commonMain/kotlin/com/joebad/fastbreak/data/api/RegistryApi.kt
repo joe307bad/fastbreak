@@ -23,6 +23,7 @@ class RegistryApi(
         const val BASE_URL = "https://d2jyizt5xogu23.cloudfront.net"
         private const val REGISTRY_ENDPOINT = "/registry"
         private const val DEV_PREFIX = "dev/"
+        private const val PROD_PREFIX = "prod/"
     }
 
     /**
@@ -85,7 +86,8 @@ class RegistryApi(
                         title = titleStr,
                         updatedAt = updatedAtInstant,
                         interval = entryObject["interval"]?.jsonPrimitive?.contentOrNull,
-                        type = entryObject["type"]?.jsonPrimitive?.contentOrNull
+                        type = entryObject["type"]?.jsonPrimitive?.contentOrNull,
+                        releaseId = entryObject["releaseId"]?.jsonPrimitive?.contentOrNull
                     )
                     key to entry
                 } catch (e: Exception) {
@@ -104,10 +106,10 @@ class RegistryApi(
             println("   Total entries: ${jsonObject.size}")
             println("   Valid entries: ${registryMap.size}")
 
-            // Filter based on dev_mode
+            // Filter based on dev_mode: dev/ prefix for dev mode, prod/ prefix for production
+            val targetPrefix = if (devMode) DEV_PREFIX else PROD_PREFIX
             val filteredEntries = registryMap.filter { (key, _) ->
-                val isDevEntry = key.startsWith(DEV_PREFIX)
-                if (devMode) isDevEntry else !isDevEntry
+                key.startsWith(targetPrefix)
             }
             println("   Filtered entries (dev_mode=$devMode): ${filteredEntries.size}")
             filteredEntries.forEach { (key, entry) ->

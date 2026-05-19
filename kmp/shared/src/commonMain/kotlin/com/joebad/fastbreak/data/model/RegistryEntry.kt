@@ -31,10 +31,16 @@ data class RegistryEntry(
     val interval: String? = null,
 
     /**
-     * Type of entry: null or "chart" for charts, "topics" for topics data
-     * Used to distinguish between chart data and topics data
+     * Type of entry: null or "chart" for charts, "topics" for topics data, "system" for system entries
+     * Used to distinguish between chart data, topics data, and system metadata
      */
-    val type: String? = null
+    val type: String? = null,
+
+    /**
+     * Release ID for system entries. Only present when type is "system".
+     * Used to check if the app needs to be updated to download new charts.
+     */
+    val releaseId: String? = null
 ) {
     /**
      * Returns true if this is a chart entry (type is null or "chart")
@@ -47,4 +53,10 @@ data class RegistryEntry(
      */
     val isTopics: Boolean
         get() = type == "topics"
+
+    /**
+     * Returns true if this is a system entry (used for releaseId metadata)
+     */
+    val isSystem: Boolean
+        get() = type == "system"
 }

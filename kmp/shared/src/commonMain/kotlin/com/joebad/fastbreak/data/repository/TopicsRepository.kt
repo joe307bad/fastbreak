@@ -120,7 +120,10 @@ class TopicsRepository(
      * @return true if topics have been viewed, false otherwise
      */
     fun hasBeenViewed(): Boolean {
-        return settings.getBoolean(KEY_TOPICS_VIEWED, false)
+        // Default to true so the "unread" indicator does not appear on a fresh
+        // install before any topics have been downloaded. resetViewed() is
+        // called whenever new topics arrive, which flips this to false.
+        return settings.getBoolean(KEY_TOPICS_VIEWED, true)
     }
 
     /**

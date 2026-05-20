@@ -1,0 +1,48 @@
+# Fly.io configuration for OpenTelemetry Collector
+# Receives telemetry from Fastbreak mobile apps
+
+app = "fastbreak-otel"
+primary_region = "iad"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  ENVIRONMENT = "production"
+  # SIGNOZ_ENDPOINT and SIGNOZ_INGESTION_KEY set via `fly secrets`
+
+# HTTP service for OTLP (port 4318)
+[[services]]
+  internal_port = 4318
+  protocol = "tcp"
+
+  [[services.ports]]
+    port = 443
+    handlers = ["tls", "http"]
+
+  [[services.http_checks]]
+    interval = "30s"
+    timeout = "5s"
+    grace_period = "15s"
+    method = "GET"
+    path = "/health"
+    port = 13133
+
+# gRPC service for OTLP (port 4317)
+[[services]]
+  internal_port = 4317
+  protocol = "tcp"
+
+  [[services.ports]]
+    port = 4317
+    handlers = ["tls"]
+
+  [[services.tcp_checks]]
+    interval = "15s"
+    timeout = "5s"
+    grace_period = "10s"
+
+[[vm]]
+  memory = "512mb"
+  cpu_kind = "shared"
+  cpus = 1

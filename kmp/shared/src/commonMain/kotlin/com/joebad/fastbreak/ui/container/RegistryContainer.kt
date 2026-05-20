@@ -10,6 +10,7 @@ import com.joebad.fastbreak.domain.registry.ReleaseIdCheckResult
 import com.joebad.fastbreak.domain.registry.ReleaseIdChecker
 import com.joebad.fastbreak.domain.registry.RegistryManager
 import com.joebad.fastbreak.platform.NetworkPermissionChecker
+import com.joebad.fastbreak.telemetry.TelemetryService
 import com.joebad.fastbreak.ui.diagnostics.DiagnosticsInfo
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -388,6 +389,9 @@ class RegistryContainer(
             return@intent
         }
 
+        // Track sync started
+        val syncStartTime = Clock.System.now()
+
         // Set initial sync state - syncProgress with total=1 keeps charts disabled
         // until sync completes (isChartReady returns false when chart not in syncedChartIds)
         reduce {
@@ -408,6 +412,8 @@ class RegistryContainer(
         }
 
         val refreshResult = registryManager.forceRefreshRegistry()
+        val chartCount = refreshResult.getOrNull()?.filter { (_, entry) -> entry.isChart && !entry.isSystem }?.size ?: 0
+        TelemetryService.trackSyncStarted(reason = "manual_refresh", chartCount = chartCount)
 
         when {
             refreshResult.isSuccess -> {
@@ -483,6 +489,14 @@ class RegistryContainer(
                     }
 
                     // All done - clear sync state and update topicsViewed
+                    val failedCount = state.diagnostics.failedCharts.size
+                    val successCount = chartCount - failedCount
+                    TelemetryService.trackSyncCompleted(
+                        duration = (Clock.System.now() - syncStartTime).inWholeMilliseconds,
+                        successCount = successCount,
+                        failedCount = failedCount
+                    )
+
                     reduce {
                         state.copy(
                             syncProgress = null,
@@ -493,10 +507,9 @@ class RegistryContainer(
                     }
 
                     // Show toast if any charts failed to sync
-                    if (state.diagnostics.failedCharts.isNotEmpty()) {
-                        val count = state.diagnostics.failedCharts.size
+                    if (failedCount > 0) {
                         postSideEffect(RegistrySideEffect.ShowError(
-                            "Failed to sync $count chart${if (count > 1) "s" else ""}"
+                            "Failed to sync $failedCount chart${if (failedCount > 1) "s" else ""}"
                         ))
                     }
 

@@ -159,7 +159,9 @@ jobs:
             -PVERSION_NAME="${{ steps.build_info.outputs.version_name }}" \
             -PVERSION_CODE="${{ steps.build_info.outputs.build_number }}" \
             -Pbuilt_in_release_id="${{ steps.release_id.outputs.release_id }}" \
-            -Pdev_mode=false
+            -Pdev_mode=false \
+            -Potel_endpoint="${{ secrets.OTEL_ENDPOINT }}" \
+            -Potel_auth_token="${{ secrets.OTEL_AUTH_TOKEN }}"
 
       - name: Upload to Google Play Alpha
         uses: r0adkll/upload-google-play@v1
@@ -239,7 +241,9 @@ jobs:
         run: |
           ./gradlew :shared:linkReleaseFrameworkIosArm64 \
             -Pbuilt_in_release_id="${{ steps.release_id.outputs.release_id }}" \
-            -Pdev_mode=false
+            -Pdev_mode=false \
+            -Potel_endpoint="${{ secrets.OTEL_ENDPOINT }}" \
+            -Potel_auth_token="${{ secrets.OTEL_AUTH_TOKEN }}"
 
       - name: Install CocoaPods
         working-directory: kmp/iosApp

@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.joebad.fastbreak.data.model.*
 import com.joebad.fastbreak.navigation.DataVizComponent
+import com.joebad.fastbreak.telemetry.TelemetryService
 import com.joebad.fastbreak.ui.components.InfoBottomSheet
 import com.joebad.fastbreak.ui.visualizations.*
 import kotlinx.coroutines.flow.first
@@ -95,6 +96,14 @@ fun DataVizScreen(
                 println("📊 [DataVizScreen] Deserializing cached data (vizType: ${cachedData.visualizationType})")
                 val visualization = cachedData.deserialize()
                 state = DataVizState.Success(visualization)
+
+                // Track chart opened event
+                TelemetryService.trackChartOpened(
+                    chartId = component.chartId,
+                    chartTitle = visualization.title,
+                    sport = component.sport.name,
+                    vizType = component.vizType.name
+                )
             } else {
                 // No cached data available - check if there's a dev_ prefix issue
                 val hasDevPrefix = allChartIds.any { it == "dev_$requestedId" }
@@ -199,7 +208,17 @@ fun DataVizScreen(
             // Show FAB for all shareable charts
             if (isShareableChart) {
                 ScatterPlotFab(
-                    onShareClick = chartShareHandler
+                    onShareClick = {
+                        // Track share click event
+                        val chartTitle = (state as? DataVizState.Success)?.data?.title ?: ""
+                        TelemetryService.trackShareClicked(
+                            chartId = component.chartId,
+                            chartTitle = chartTitle,
+                            shareType = "image"
+                        )
+                        // Call the actual share handler
+                        chartShareHandler?.invoke()
+                    }
                 )
             }
         }

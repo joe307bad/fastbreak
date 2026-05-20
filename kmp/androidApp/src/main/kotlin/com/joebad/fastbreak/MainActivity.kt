@@ -25,6 +25,7 @@ import com.joebad.fastbreak.ui.theme.ThemeRepository
 import com.joebad.fastbreak.platform.AppVersion
 import com.joebad.fastbreak.platform.initializeImageExporter
 import com.joebad.fastbreak.platform.initializeUrlLauncher
+import com.joebad.fastbreak.telemetry.TelemetryService
 import com.russhwolf.settings.Settings
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
@@ -47,6 +48,10 @@ class MainActivity : ComponentActivity() {
 
         // Initialize URL launcher for opening external links
         initializeUrlLauncher(this)
+
+        // Initialize telemetry service and track app boot
+        TelemetryService.initialize()
+        TelemetryService.trackAppBoot()
 
         val settings = Settings()
         val themeRepository = ThemeRepository(

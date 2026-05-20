@@ -18,6 +18,7 @@ import com.joebad.fastbreak.ui.container.PinnedTeamsContainer
 import com.joebad.fastbreak.ui.container.RegistryContainer
 import com.joebad.fastbreak.ui.theme.SystemThemeDetector
 import com.joebad.fastbreak.ui.theme.ThemeRepository
+import com.joebad.fastbreak.telemetry.TelemetryService
 import com.russhwolf.settings.Settings
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
@@ -26,6 +27,10 @@ import kotlinx.coroutines.SupervisorJob
 import platform.UIKit.UIViewController
 
 fun MainViewController(): UIViewController {
+    // Initialize telemetry service and track app boot
+    TelemetryService.initialize()
+    TelemetryService.trackAppBoot()
+
     val settings = Settings()
     val themeRepository = ThemeRepository(
         settings = settings,

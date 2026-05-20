@@ -55,7 +55,8 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_DEFAULT_REGION: us-east-1
         run: |
-          RELEASE_ID="fb-${{ github.run_number }}"
+          BUILD_NUMBER=$((1000 + ${{ github.run_number }}))
+          RELEASE_ID="fb-${BUILD_NUMBER}"
           TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
           echo "Updating prod release ID to: $RELEASE_ID"
@@ -108,7 +109,8 @@ jobs:
       - name: Generate build info
         id: build_info
         run: |
-          echo "build_number=${{ github.run_number }}" >> $GITHUB_OUTPUT
+          BUILD_NUMBER=$((1000 + ${{ github.run_number }}))
+          echo "build_number=${BUILD_NUMBER}" >> $GITHUB_OUTPUT
           VERSION_NAME=$(grep "VERSION_NAME=" gradle.properties | cut -d'=' -f2)
           echo "version_name=${VERSION_NAME}" >> $GITHUB_OUTPUT
 
@@ -198,9 +200,11 @@ jobs:
       - name: Get version from gradle.properties
         id: build_info
         run: |
+          BUILD_NUMBER=$((1000 + ${{ github.run_number }}))
+          echo "build_number=${BUILD_NUMBER}" >> $GITHUB_OUTPUT
           VERSION_NAME=$(grep "VERSION_NAME=" gradle.properties | cut -d'=' -f2)
           echo "version_name=${VERSION_NAME}" >> $GITHUB_OUTPUT
-          echo "Using version: $VERSION_NAME"
+          echo "Using version: $VERSION_NAME, build: $BUILD_NUMBER"
 
       - name: Fetch current release ID
         id: release_id
@@ -253,6 +257,6 @@ jobs:
           APP_STORE_CONNECT_API_KEY_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
           APP_STORE_CONNECT_API_KEY_KEY: ${{ secrets.ASC_PRIVATE_KEY }}
           VERSION_NAME: ${{ steps.build_info.outputs.version_name }}
-          BUILD_NUMBER: ${{ github.run_number }}
+          BUILD_NUMBER: ${{ steps.build_info.outputs.build_number }}
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
         run: bundle exec fastlane ios beta

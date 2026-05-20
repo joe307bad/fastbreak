@@ -1,3 +1,4 @@
+# Deploy trigger: 2026-05-19-v3 - Debug AWS credentials
 library(hoopR)
 library(dplyr)
 library(jsonlite)

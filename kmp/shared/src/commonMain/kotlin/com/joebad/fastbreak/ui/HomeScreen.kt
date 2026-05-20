@@ -107,6 +107,9 @@ fun HomeScreen(
                 is com.joebad.fastbreak.ui.container.RegistrySideEffect.NavigateToChart -> {
                     // Handle navigation if needed
                 }
+                is com.joebad.fastbreak.ui.container.RegistrySideEffect.UpdateRequired -> {
+                    // Handled by App.kt via state - dialog shown there
+                }
             }
         }
     }

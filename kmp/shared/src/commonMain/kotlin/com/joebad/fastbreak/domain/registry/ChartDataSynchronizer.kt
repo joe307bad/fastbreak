@@ -34,9 +34,9 @@ import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.channelFlow
+import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withLock
@@ -159,8 +159,16 @@ class ChartDataSynchronizer(
             send(snapshot)
         }
 
-        // Launch all downloads in parallel with concurrency limit
-        coroutineScope {
+        // Launch all downloads in parallel with concurrency limit.
+        // Why supervisorScope: with coroutineScope, a single child completing
+        // exceptionally (including via CancellationException — e.g. a spurious
+        // cancel) makes `jobs.forEach { it.await() }` rethrow, which then
+        // cancels every other still-running child as cleanup. That cascade
+        // produces "different subset of charts each time" without anything
+        // ending up in failedCharts. supervisorScope isolates each child;
+        // wrapping each await in try-catch keeps the loop alive so we wait
+        // for every chart to settle regardless of how individual ones end.
+        supervisorScope {
             val jobs = chartsNeedingUpdate.map { (fileKey, entry) ->
                 async {
                     val chartId = fileKeyToChartId(fileKey)
@@ -185,6 +193,7 @@ class ChartDataSynchronizer(
                         }
                     } catch (e: CancellationException) {
                         // Propagate cancellation so structured concurrency works
+                        println("⚠️ Chart $chartId cancelled during sync: ${e.message}")
                         throw e
                     } catch (e: Exception) {
                         // Log error but continue with other charts
@@ -209,8 +218,46 @@ class ChartDataSynchronizer(
                 }
             }
 
-            // Wait for all downloads to complete
-            jobs.forEach { it.await() }
+            // Wait for every download to settle. Each await is guarded so a
+            // single chart completing exceptionally (including a stray
+            // CancellationException) can't short-circuit the loop and leave
+            // the other charts unawaited — see the supervisorScope comment
+            // above for why this matters.
+            jobs.forEach { job ->
+                try {
+                    job.await()
+                } catch (e: CancellationException) {
+                    // The per-chart catch already logged this. We just need
+                    // to keep iterating so the remaining charts can settle.
+                    println("⚠️ Job await caught CancellationException (continuing): ${e.message}")
+                } catch (e: Exception) {
+                    // Shouldn't happen — the inner catch (e: Exception) above
+                    // already absorbs non-cancellation exceptions. Log
+                    // defensively in case something slips through.
+                    println("⚠️ Job await caught unexpected exception: ${e::class.simpleName}: ${e.message}")
+                }
+            }
+        }
+
+        // Post-hoc accounting: any chart that was supposed to sync but is in
+        // neither syncedCharts nor failedCharts was silently dropped (e.g.
+        // cancelled before its catch block could record the failure). Record
+        // it so the user sees a toast instead of a stuck gray placeholder,
+        // and the next refresh will re-download it (needsUpdate already keys
+        // off the data key being absent).
+        val expectedChartIds = chartsNeedingUpdate.keys.map { fileKeyToChartId(it) }.toSet()
+        val accountedChartIds = stateMutex.withLock {
+            syncedCharts + failedCharts.map { it.first }
+        }
+        val droppedChartIds = expectedChartIds - accountedChartIds
+        if (droppedChartIds.isNotEmpty()) {
+            println("⚠️ ${droppedChartIds.size} chart(s) silently dropped (no save, no error):")
+            droppedChartIds.forEach { println("   - $it") }
+            stateMutex.withLock {
+                droppedChartIds.forEach { chartId ->
+                    failedCharts.add(chartId to "Silently dropped — coroutine ended without saving")
+                }
+            }
         }
 
         println("✅ All chart downloads complete")

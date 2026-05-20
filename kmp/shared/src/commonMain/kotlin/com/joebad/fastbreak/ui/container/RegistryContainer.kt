@@ -3,16 +3,17 @@ package com.joebad.fastbreak.ui.container
 import com.joebad.fastbreak.config.AppConfig
 import com.joebad.fastbreak.data.model.Registry
 import com.joebad.fastbreak.data.model.RegistryEntry
-import com.joebad.fastbreak.data.repository.ChartDataRepository
-import com.joebad.fastbreak.domain.registry.ChartDataSynchronizer
+import com.joebad.fastbreak.data.repository.ChartCache
+import com.joebad.fastbreak.domain.registry.ChartSyncManager
+import com.joebad.fastbreak.domain.registry.ChartSyncProgress
 import com.joebad.fastbreak.domain.registry.ReleaseIdCheckResult
 import com.joebad.fastbreak.domain.registry.ReleaseIdChecker
 import com.joebad.fastbreak.domain.registry.RegistryManager
 import com.joebad.fastbreak.platform.NetworkPermissionChecker
 import com.joebad.fastbreak.ui.diagnostics.DiagnosticsInfo
-import com.mohamedrejeb.calf.permissions.PermissionStatus
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
 import kotlin.time.Clock
 import org.orbitmvi.orbit.Container
 import org.orbitmvi.orbit.ContainerHost
@@ -24,8 +25,8 @@ import org.orbitmvi.orbit.container
  */
 class RegistryContainer(
     private val registryManager: RegistryManager,
-    private val chartDataSynchronizer: ChartDataSynchronizer,
-    private val chartDataRepository: ChartDataRepository,
+    private val chartSyncManager: ChartSyncManager,
+    private val chartCache: ChartCache,
     private val scope: CoroutineScope,
     private val networkPermissionChecker: NetworkPermissionChecker = NetworkPermissionChecker(),
     private val releaseIdChecker: ReleaseIdChecker = ReleaseIdChecker(),
@@ -49,7 +50,7 @@ class RegistryContainer(
             println("   - registryEntries: ${cachedEntries?.size ?: 0} entries")
             println("   - registry: ${registry?.charts?.size ?: 0} charts")
             // Also load topics viewed state
-            val topicsViewed = chartDataSynchronizer.hasTopicsBeenViewed()
+            val topicsViewed = chartSyncManager.hasTopicsBeenViewed()
             println("   - topicsViewed: $topicsViewed")
             reduce {
                 state.copy(
@@ -82,15 +83,15 @@ class RegistryContainer(
      */
     private fun buildRegistry(entries: Map<String, RegistryEntry>?): Registry? {
         if (entries != null) {
-            return chartDataSynchronizer.buildRegistryFromEntries(entries)
+            return chartSyncManager.buildRegistryFromEntries(entries)
         }
 
-        val chartIds = chartDataSynchronizer.getCachedChartIds()
+        val chartIds = chartSyncManager.getCachedChartIds()
         if (chartIds.isEmpty()) return null
 
         val charts = chartIds.mapNotNull { chartId ->
-            val cached = chartDataSynchronizer.getCachedChartData(chartId) ?: return@mapNotNull null
-            chartDataSynchronizer.buildChartDefinition(chartId, cached)
+            val cached = chartSyncManager.getCachedChartData(chartId) ?: return@mapNotNull null
+            chartSyncManager.buildChartDefinition(chartId, cached)
         }
 
         if (charts.isEmpty()) return null
@@ -146,7 +147,7 @@ class RegistryContainer(
      */
     fun markChartAsViewed(chartId: String) = intent {
         // Mark as viewed in the cache
-        chartDataSynchronizer.markChartAsViewed(chartId)
+        chartSyncManager.markChartAsViewed(chartId)
 
         // Update the state to reflect the change immediately
         val currentRegistry = state.registry ?: return@intent
@@ -167,8 +168,27 @@ class RegistryContainer(
     /**
      * Loads the registry with 12-hour automatic update check.
      * Also triggers chart data synchronization and team roster download after loading.
+     * Auto-syncs if: 1) no cache present, or 2) cache is > 24 hours old.
      */
     fun loadRegistry() = intent {
+        // Check if auto-sync is needed
+        val chartCount = chartCache.getCachedChartCount()
+        val latestCacheTime = chartSyncManager.getCachedChartIds()
+            .mapNotNull { chartSyncManager.getChartCacheTime(it) }
+            .maxOrNull()
+        val cacheAgeHours = latestCacheTime?.let {
+            (Clock.System.now() - it).inWholeHours
+        }
+
+        val shouldAutoSync = chartCount == 0 || (cacheAgeHours != null && cacheAgeHours > 24)
+
+        if (shouldAutoSync) {
+            val reason = if (chartCount == 0) "no cache" else "cache ${cacheAgeHours}h old"
+            println("🔄 Auto-sync triggered: $reason")
+            refreshRegistry()
+            return@intent
+        }
+
         reduce {
             state.copy(
                 isLoading = true,
@@ -235,7 +255,7 @@ class RegistryContainer(
                 try {
                     syncChartData(entries)
                     // Also sync topics data
-                    chartDataSynchronizer.synchronizeTopics(entries)
+                    chartSyncManager.synchronizeTopics(entries)
 
                     // Update progress to show topics synced and clear sync state
                     // Also update topicsViewed state (may have been reset if new topics were downloaded)
@@ -243,7 +263,7 @@ class RegistryContainer(
                         state.copy(
                             syncProgress = null,
                             isSyncing = false,
-                            topicsViewed = chartDataSynchronizer.hasTopicsBeenViewed(),
+                            topicsViewed = chartSyncManager.hasTopicsBeenViewed(),
                             diagnostics = state.diagnostics.copy(isSyncing = false)
                         )
                     }
@@ -301,14 +321,14 @@ class RegistryContainer(
                     try {
                         syncChartData(cachedEntries)
                         // Also sync topics data
-                        chartDataSynchronizer.synchronizeTopics(cachedEntries)
+                        chartSyncManager.synchronizeTopics(cachedEntries)
 
                         // Clear sync state and update topicsViewed
                         reduce {
                             state.copy(
                                 syncProgress = null,
                                 isSyncing = false,
-                                topicsViewed = chartDataSynchronizer.hasTopicsBeenViewed(),
+                                topicsViewed = chartSyncManager.hasTopicsBeenViewed(),
                                 diagnostics = state.diagnostics.copy(isSyncing = false)
                             )
                         }
@@ -374,13 +394,10 @@ class RegistryContainer(
             state.copy(
                 isSyncing = true,
                 error = null,
-                syncProgress = com.joebad.fastbreak.ui.diagnostics.SyncProgress(
-                    current = 0,
-                    total = 1,  // Non-zero so charts stay disabled
-                    currentChart = "Syncing...",
-                    syncedChartIds = emptySet(),
-                    syncingChartIds = emptySet(),
-                    failedCharts = emptyList()
+                syncProgress = ChartSyncProgress(
+                    chartStates = emptyMap(),
+                    totalToSync = 1,  // Non-zero so charts stay disabled
+                    currentChartName = ""  // Empty - "Syncing charts..." is already shown above
                 ),
                 diagnostics = state.diagnostics.copy(
                     lastError = null,
@@ -445,22 +462,19 @@ class RegistryContainer(
 
                     // Sync topics - only downloads if server has newer data
                     // (synchronizeTopics compares timestamps internally)
-                    val topicsUpdatedAtBefore = chartDataSynchronizer.getTopicsUpdatedAt()
-                    chartDataSynchronizer.synchronizeTopics(entries)
-                    val topicsUpdatedAtAfter = chartDataSynchronizer.getTopicsUpdatedAt()
+                    val topicsUpdatedAtBefore = chartSyncManager.getTopicsUpdatedAt()
+                    chartSyncManager.synchronizeTopics(entries)
+                    val topicsUpdatedAtAfter = chartSyncManager.getTopicsUpdatedAt()
                     val topicsWereUpdated = topicsUpdatedAtAfter != topicsUpdatedAtBefore
 
                     // Show topics sync result briefly if topics were updated
                     if (topicsWereUpdated) {
                         reduce {
                             state.copy(
-                                syncProgress = com.joebad.fastbreak.ui.diagnostics.SyncProgress(
-                                    current = 0,
-                                    total = 0,
-                                    currentChart = "",
-                                    syncedChartIds = emptySet(),
-                                    syncingChartIds = emptySet(),
-                                    failedCharts = emptyList(),
+                                syncProgress = ChartSyncProgress(
+                                    chartStates = emptyMap(),
+                                    totalToSync = 0,
+                                    currentChartName = "",
                                     topicsSynced = true
                                 ),
                                 isSyncing = true
@@ -473,7 +487,7 @@ class RegistryContainer(
                         state.copy(
                             syncProgress = null,
                             isSyncing = false,
-                            topicsViewed = chartDataSynchronizer.hasTopicsBeenViewed(),
+                            topicsViewed = chartSyncManager.hasTopicsBeenViewed(),
                             diagnostics = state.diagnostics.copy(isSyncing = false)
                         )
                     }
@@ -535,21 +549,18 @@ class RegistryContainer(
                     try {
                         syncChartData(cachedEntries)
 
-                        val topicsUpdatedAtBefore = chartDataSynchronizer.getTopicsUpdatedAt()
-                        chartDataSynchronizer.synchronizeTopics(cachedEntries)
-                        val topicsUpdatedAtAfter = chartDataSynchronizer.getTopicsUpdatedAt()
+                        val topicsUpdatedAtBefore = chartSyncManager.getTopicsUpdatedAt()
+                        chartSyncManager.synchronizeTopics(cachedEntries)
+                        val topicsUpdatedAtAfter = chartSyncManager.getTopicsUpdatedAt()
                         val topicsWereUpdated = topicsUpdatedAtAfter != topicsUpdatedAtBefore
 
                         if (topicsWereUpdated) {
                             reduce {
                                 state.copy(
-                                    syncProgress = com.joebad.fastbreak.ui.diagnostics.SyncProgress(
-                                        current = 0,
-                                        total = 0,
-                                        currentChart = "",
-                                        syncedChartIds = emptySet(),
-                                        syncingChartIds = emptySet(),
-                                        failedCharts = emptyList(),
+                                    syncProgress = ChartSyncProgress(
+                                        chartStates = emptyMap(),
+                                        totalToSync = 0,
+                                        currentChartName = "",
                                         topicsSynced = true
                                     ),
                                     isSyncing = true
@@ -562,7 +573,7 @@ class RegistryContainer(
                             state.copy(
                                 syncProgress = null,
                                 isSyncing = false,
-                                topicsViewed = chartDataSynchronizer.hasTopicsBeenViewed(),
+                                topicsViewed = chartSyncManager.hasTopicsBeenViewed(),
                                 diagnostics = state.diagnostics.copy(isSyncing = false)
                             )
                         }
@@ -616,78 +627,108 @@ class RegistryContainer(
      * Keeps isSyncing = true - caller is responsible for clearing sync state.
      */
     private suspend fun syncChartData(entries: Map<String, RegistryEntry>) {
+        var progressCollectorJob: Job? = null
         try {
-            chartDataSynchronizer.synchronizeCharts(entries).collect { progress ->
-            // Skip showing progress if nothing needs syncing (everything cached)
-            if (progress.total == 0) {
-                // Everything is already cached, build registry from server entries
-                // Keep isSyncing = true - caller will clear after topics sync
-                val registry = buildRegistry(entries)
-                intent {
-                    reduce {
-                        state.copy(
-                            registry = registry,
-                            isSyncing = true,  // Keep true - caller handles final state
-                            lastSyncTime = Clock.System.now(),
-                            syncProgress = null
-                        )
+            // Launch a coroutine to collect sync progress updates from StateFlow
+            progressCollectorJob = scope.launch {
+                chartSyncManager.syncProgress.collect { progress ->
+                    if (progress == null) return@collect
+
+                    // Skip showing progress if nothing needs syncing (everything cached)
+                    // Don't launch an intent here - let the main flow handle state updates
+                    // after synchronizeCharts() returns. Launching intents from the collector
+                    // creates a race condition when the collector is cancelled.
+                    if (progress.totalToSync == 0) {
+                        return@collect
                     }
-                }.join()
-                return@collect
+
+                    // Rebuild registry on every emit so each chart's completion
+                    // immediately propagates to the UI (placeholder → real data)
+                    val registry = buildRegistry(entries)
+
+                    if (progress.isComplete) {
+                        // Capture failed charts before clearing syncProgress
+                        val completedFailedCharts = progress.failedCharts
+
+                        // Update state with registry - keep isSyncing true for caller
+                        intent {
+                            reduce {
+                                state.copy(
+                                    registry = registry,
+                                    syncProgress = null,
+                                    isSyncing = true,  // Caller clears this after topics sync
+                                    lastSyncTime = Clock.System.now(),
+                                    diagnostics = loadDiagnostics().copy(
+                                        isSyncing = true,
+                                        lastError = if (progress.hasFailures) {
+                                            "Failed to sync ${progress.failedCount} charts"
+                                        } else null,
+                                        failedSyncs = if (progress.hasFailures) {
+                                            container.stateFlow.value.diagnostics.failedSyncs + progress.failedCount
+                                        } else container.stateFlow.value.diagnostics.failedSyncs,
+                                        failedCharts = completedFailedCharts
+                                    )
+                                )
+                            }
+                            postSideEffect(RegistrySideEffect.SyncCompleted)
+                        }.join()
+                    } else {
+                        // Normal progress update — also fold in the freshly-rebuilt
+                        // registry so newly-cached charts become clickable without
+                        // waiting for the final emit.
+                        intent {
+                            reduce {
+                                state.copy(
+                                    registry = registry,
+                                    syncProgress = progress,
+                                    isSyncing = true
+                                )
+                            }
+                        }.join()
+                    }
+                }
             }
 
-            // Rebuild registry on every emit so each chart's completion
-            // immediately propagates to the UI (placeholder → real data),
-            // instead of waiting for the final isComplete to surface the
-            // batch. buildRegistry just iterates entries with a per-chart
-            // cache lookup — cheap enough to do per-emit, and keeps the UI
-            // in sync with whatever's actually landed on disk.
-            val registry = buildRegistry(entries)
+            // Call synchronizeCharts - this suspends until all downloads complete
+            // While running, it updates the StateFlow which the collector above observes
+            chartSyncManager.synchronizeCharts(entries)
 
-            if (progress.isComplete) {
-                // Capture failed charts before clearing syncProgress
-                val completedFailedCharts = progress.failedCharts
+            // Sync complete - cancel the collector
+            progressCollectorJob.cancel()
 
-                // Update state with registry - keep isSyncing true for caller
-                intent {
-                    reduce {
-                        state.copy(
-                            registry = registry,
-                            syncProgress = null,
-                            isSyncing = true,  // Caller clears this after topics sync
-                            lastSyncTime = Clock.System.now(),
-                            diagnostics = loadDiagnostics().copy(
-                                isSyncing = true,
-                                lastError = if (progress.hasFailures) {
-                                    "Failed to sync ${progress.failedCharts.size} charts"
-                                } else null,
-                                failedSyncs = if (progress.hasFailures) {
-                                    container.stateFlow.value.diagnostics.failedSyncs + progress.failedCharts.size
-                                } else container.stateFlow.value.diagnostics.failedSyncs,
-                                failedCharts = completedFailedCharts
-                            )
+            // Build final registry and update state
+            val finalRegistry = buildRegistry(entries)
+            val finalProgress = chartSyncManager.syncProgress.value
+
+            intent {
+                reduce {
+                    state.copy(
+                        registry = finalRegistry,
+                        syncProgress = null,
+                        isSyncing = true,  // Caller clears this after topics sync
+                        lastSyncTime = Clock.System.now(),
+                        diagnostics = loadDiagnostics().copy(
+                            isSyncing = true,
+                            lastError = if (finalProgress?.hasFailures == true) {
+                                "Failed to sync ${finalProgress.failedCount} charts"
+                            } else null,
+                            failedSyncs = if (finalProgress?.hasFailures == true) {
+                                container.stateFlow.value.diagnostics.failedSyncs + finalProgress.failedCount
+                            } else container.stateFlow.value.diagnostics.failedSyncs,
+                            failedCharts = finalProgress?.failedCharts ?: emptyList()
                         )
-                    }
-                    postSideEffect(RegistrySideEffect.SyncCompleted)
-                }.join()
-            } else {
-                // Normal progress update — also fold in the freshly-rebuilt
-                // registry so newly-cached charts become clickable without
-                // waiting for the final emit.
-                intent {
-                    reduce {
-                        state.copy(
-                            registry = registry,
-                            syncProgress = progress,
-                            isSyncing = true
-                        )
-                    }
-                }.join()
-            }
-        }
+                    )
+                }
+                postSideEffect(RegistrySideEffect.SyncCompleted)
+            }.join()
+
+            // Clear sync progress in manager
+            chartSyncManager.clearSyncProgress()
+
         } catch (e: Exception) {
-            println("❌ syncChartData() - Exception during flow collection: ${e.message}")
+            println("❌ syncChartData() - Exception during sync: ${e.message}")
             e.printStackTrace()
+            progressCollectorJob?.cancel()
             // Ensure isSyncing is cleared even on exception
             intent {
                 reduce {
@@ -717,14 +758,14 @@ class RegistryContainer(
             ?: 0
 
         // If no charts, show 0 bytes (cached data is orphaned/stale)
-        val cacheSize = if (chartCount == 0) 0L else chartDataRepository.estimateTotalCacheSize()
+        val cacheSize = if (chartCount == 0) 0L else chartCache.estimateTotalCacheSize()
 
         // Get the most recent cache update time from all cached charts
         val lastCacheUpdate = if (chartCount == 0) {
             null  // No valid cache if registry is empty
         } else {
-            chartDataSynchronizer.getCachedChartIds()
-                .mapNotNull { chartDataSynchronizer.getChartCacheTime(it) }
+            chartSyncManager.getCachedChartIds()
+                .mapNotNull { chartSyncManager.getChartCacheTime(it) }
                 .maxOrNull()
         }
 
@@ -748,26 +789,26 @@ class RegistryContainer(
      *
      * @return The cached topics, or null if not found
      */
-    fun getCachedTopics() = chartDataSynchronizer.getCachedTopics()
+    fun getCachedTopics() = chartSyncManager.getCachedTopics()
 
     /**
      * Gets the timestamp when topics were last updated.
      *
      * @return The last update timestamp, or null if not found
      */
-    fun getTopicsUpdatedAt() = chartDataSynchronizer.getTopicsUpdatedAt()
+    fun getTopicsUpdatedAt() = chartSyncManager.getTopicsUpdatedAt()
 
     /**
      * Clears cached topics data to force a re-download on next sync.
      */
-    fun clearTopicsCache() = chartDataSynchronizer.clearTopicsCache()
+    fun clearTopicsCache() = chartSyncManager.clearTopicsCache()
 
     /**
      * Marks topics as viewed by the user.
      * Updates both the cache and the UI state.
      */
     fun markTopicsAsViewed() = intent {
-        chartDataSynchronizer.markTopicsAsViewed()
+        chartSyncManager.markTopicsAsViewed()
         reduce {
             state.copy(topicsViewed = true)
         }
@@ -778,32 +819,32 @@ class RegistryContainer(
      *
      * @return true if topics have been viewed
      */
-    fun hasTopicsBeenViewed(): Boolean = chartDataSynchronizer.hasTopicsBeenViewed()
+    fun hasTopicsBeenViewed(): Boolean = chartSyncManager.hasTopicsBeenViewed()
 
     /**
      * Gets the collapsed narrative indices for the current topics.
      */
-    fun getCollapsedIndices(): Set<Int> = chartDataSynchronizer.getCollapsedIndices()
+    fun getCollapsedIndices(): Set<Int> = chartSyncManager.getCollapsedIndices()
 
     /**
      * Saves the collapsed narrative indices for the current topics.
      */
-    fun saveCollapsedIndices(indices: Set<Int>) = chartDataSynchronizer.saveCollapsedIndices(indices)
+    fun saveCollapsedIndices(indices: Set<Int>) = chartSyncManager.saveCollapsedIndices(indices)
 
     /**
      * Gets the set of narratives that have been read (collapsed at least once).
      */
-    fun getReadIndices(): Set<Int> = chartDataSynchronizer.getReadIndices()
+    fun getReadIndices(): Set<Int> = chartSyncManager.getReadIndices()
 
     /**
      * Saves the set of narratives that have been read (collapsed at least once).
      * Also checks if all narratives have been read and updates topicsViewed state.
      */
     fun saveReadIndices(indices: Set<Int>) = intent {
-        chartDataSynchronizer.saveReadIndices(indices)
+        chartSyncManager.saveReadIndices(indices)
         // Check if all narratives have been read and update topicsViewed state
-        if (chartDataSynchronizer.areAllNarrativesRead() && !state.topicsViewed) {
-            chartDataSynchronizer.markTopicsAsViewed()
+        if (chartSyncManager.areAllNarrativesRead() && !state.topicsViewed) {
+            chartSyncManager.markTopicsAsViewed()
             reduce {
                 state.copy(topicsViewed = true)
             }
@@ -813,17 +854,17 @@ class RegistryContainer(
     /**
      * Checks if all narratives have been read.
      */
-    fun areAllNarrativesRead(): Boolean = chartDataSynchronizer.areAllNarrativesRead()
+    fun areAllNarrativesRead(): Boolean = chartSyncManager.areAllNarrativesRead()
 
     /**
      * Persists the user's preferred font size for the topics screen.
      */
-    fun saveTopicsFontSize(size: Float) = chartDataSynchronizer.saveTopicsFontSize(size)
+    fun saveTopicsFontSize(size: Float) = chartSyncManager.saveTopicsFontSize(size)
 
     /**
      * Retrieves the persisted font size, or null if the user hasn't picked one.
      */
-    fun getTopicsFontSize(): Float? = chartDataSynchronizer.getTopicsFontSize()
+    fun getTopicsFontSize(): Float? = chartSyncManager.getTopicsFontSize()
 
     /**
      * Marks all charts and topics as read, clearing notification indicators.
@@ -832,7 +873,7 @@ class RegistryContainer(
      * @return The number of charts that were marked as read
      */
     fun markAllAsRead() = intent {
-        val chartsMarked = chartDataSynchronizer.markAllAsRead()
+        val chartsMarked = chartSyncManager.markAllAsRead()
 
         // Update all charts in the registry to viewed = true
         val currentRegistry = state.registry ?: return@intent
@@ -860,11 +901,11 @@ class RegistryContainer(
         println("🗑️ RegistryContainer.resetAllData() - Clearing all cached data")
 
         // Clear chart data cache
-        chartDataSynchronizer.clearAllCache()
+        chartSyncManager.clearAllCache()
         println("   ✅ Chart data cache cleared")
 
         // Clear topics cache
-        chartDataSynchronizer.clearTopicsCache()
+        chartSyncManager.clearTopicsCache()
         println("   ✅ Topics cache cleared")
 
         // Clear registry metadata

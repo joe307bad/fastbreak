@@ -14,7 +14,7 @@ import com.joebad.fastbreak.data.model.NCAABracketVisualization
 import com.joebad.fastbreak.data.model.NHLMatchupVisualization
 import com.joebad.fastbreak.data.model.ScatterPlotVisualization
 import com.joebad.fastbreak.data.model.TableVisualization
-import com.joebad.fastbreak.domain.registry.ChartDataSynchronizer
+import com.joebad.fastbreak.domain.registry.ChartSyncManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.serialization.json.Json
 import org.orbitmvi.orbit.Container
@@ -27,7 +27,7 @@ import org.orbitmvi.orbit.container
  */
 class ChartDataContainer(
     private val chartId: String,
-    private val chartDataSynchronizer: ChartDataSynchronizer,
+    private val chartSyncManager: ChartSyncManager,
     private val registryContainer: RegistryContainer,
     private val scope: CoroutineScope
 ) : ContainerHost<ChartDataState, ChartDataSideEffect> {
@@ -83,7 +83,7 @@ class ChartDataContainer(
         }
 
         // Try to load from cache
-        val cached = chartDataSynchronizer.getCachedChartData(chartId)
+        val cached = chartSyncManager.getCachedChartData(chartId)
         if (cached != null) {
             try {
                 // Deserialize based on visualization type

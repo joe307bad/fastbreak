@@ -79,7 +79,7 @@ fun DataVizScreen(
             }
 
             // Log available chart IDs for debugging
-            val allChartIds = component.chartDataRepository.getAllChartIds()
+            val allChartIds = component.chartCache.getAllChartIds()
             val requestedId = component.chartId
             val isInList = allChartIds.contains(requestedId)
             println("📊 [DataVizScreen] Requested chartId: '$requestedId'")
@@ -87,7 +87,7 @@ fun DataVizScreen(
             println("📊 [DataVizScreen] Available chart IDs (${allChartIds.size}): $allChartIds")
 
             // Load from cache using chartId
-            val cachedData = component.chartDataRepository.getChartData(component.chartId)
+            val cachedData = component.chartCache.getChartData(component.chartId)
             println("📊 [DataVizScreen] Cache lookup result: ${if (cachedData != null) "FOUND" else "NOT FOUND"}")
 
             if (cachedData != null) {
@@ -255,7 +255,7 @@ fun DataVizScreen(
                                     return@launch
                                 }
 
-                                val cachedData = component.chartDataRepository.getChartData(component.chartId)
+                                val cachedData = component.chartCache.getChartData(component.chartId)
                                 if (cachedData != null) {
                                     val visualization = cachedData.deserialize()
                                     state = DataVizState.Success(visualization)

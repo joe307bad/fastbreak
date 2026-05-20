@@ -29,7 +29,7 @@ class RootComponent(
     private val themeRepository: ThemeRepository,
     val registryContainer: RegistryContainer,
     val pinnedTeamsContainer: PinnedTeamsContainer,
-    private val chartDataRepository: com.joebad.fastbreak.data.repository.ChartDataRepository
+    private val chartCache: com.joebad.fastbreak.data.repository.ChartCache
 ) : ComponentContext by componentContext {
 
     private val navigation = StackNavigation<Config>()
@@ -211,7 +211,7 @@ class RootComponent(
                     chartId = config.chartId,
                     sport = config.sport,
                     vizType = config.vizType,
-                    chartDataRepository = chartDataRepository,
+                    chartCache = chartCache,
                     registryContainer = registryContainer,
                     onNavigateBack = {
                         if (config.fromTopics) {

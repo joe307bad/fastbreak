@@ -152,6 +152,7 @@ fun App(rootComponent: RootComponent) {
                         registryState = registryState,
                         registryContainer = rootComponent.registryContainer,
                         onRefresh = { rootComponent.refreshRegistry() },
+                        onLoadRegistry = { rootComponent.loadRegistry() },
                         onMenuClick = { scope.launch { drawerState.open() } },
                         onNavigateToTopics = { rootComponent.navigateToTopics() },
                         onRequestPermission = { rootComponent.requestNetworkPermission() },

@@ -1,0 +1,56 @@
+-- Chart cache table using simple key-value storage for large JSON objects
+-- Replaces the Settings-based approach with ACID-compliant SQLite storage
+CREATE TABLE chart_cache (
+    id TEXT NOT NULL PRIMARY KEY,
+    data_json TEXT NOT NULL,
+    visualization_type TEXT NOT NULL,
+    last_updated INTEGER NOT NULL,
+    cached_at INTEGER NOT NULL,
+    interval TEXT,
+    viewed INTEGER NOT NULL DEFAULT 0
+);
+
+-- Get a single chart by ID
+getChart:
+SELECT * FROM chart_cache WHERE id = ?;
+
+-- Get all chart IDs (for diagnostics and iteration)
+getAllChartIds:
+SELECT id FROM chart_cache;
+
+-- Get all charts (for building registry from cache)
+getAllCharts:
+SELECT * FROM chart_cache;
+
+-- Check if chart exists
+hasChart:
+SELECT EXISTS(SELECT 1 FROM chart_cache WHERE id = ?);
+
+-- Insert or replace a chart (atomic upsert)
+upsertChart:
+INSERT OR REPLACE INTO chart_cache(id, data_json, visualization_type, last_updated, cached_at, interval, viewed)
+VALUES (?, ?, ?, ?, ?, ?, ?);
+
+-- Delete a specific chart
+deleteChart:
+DELETE FROM chart_cache WHERE id = ?;
+
+-- Delete all charts
+deleteAllCharts:
+DELETE FROM chart_cache;
+
+-- Mark chart as viewed
+markAsViewed:
+UPDATE chart_cache SET viewed = 1 WHERE id = ?;
+
+-- Mark all charts as viewed
+markAllAsViewed:
+UPDATE chart_cache SET viewed = 1;
+
+-- Get total cache size estimate (sum of JSON lengths)
+getTotalCacheSize:
+SELECT COALESCE(SUM(LENGTH(data_json)), 0) FROM chart_cache;
+
+-- Get chart count
+getChartCount:
+SELECT COUNT(*) FROM chart_cache;

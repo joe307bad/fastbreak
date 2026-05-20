@@ -7,6 +7,7 @@ plugins {
     alias(libs.plugins.composeMultiplatform)
     alias(libs.plugins.composeCompiler)
     alias(libs.plugins.kotlinSerialization)
+    alias(libs.plugins.sqldelight)
 }
 
 // Generate AppConfig from gradle.properties
@@ -55,6 +56,8 @@ kotlin {
         it.binaries.framework {
             baseName = "shared"
             isStatic = true
+            // Link SQLite for SQLDelight native driver
+            linkerOpts("-lsqlite3")
         }
     }
 
@@ -99,16 +102,22 @@ kotlin {
 
             // Calf Permissions
             implementation(libs.calf.permissions)
+
+            // SQLDelight
+            implementation(libs.sqldelight.runtime)
+            implementation(libs.sqldelight.coroutines)
         }
 
         androidMain.dependencies {
             implementation(libs.androidx.activity.compose)
             implementation(libs.ktor.client.okhttp)
             implementation(libs.sentry.android)
+            implementation(libs.sqldelight.driver.android)
         }
 
         iosMain.dependencies {
             implementation(libs.ktor.client.darwin)
+            implementation(libs.sqldelight.driver.native)
         }
     }
 }
@@ -124,5 +133,13 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+    }
+}
+
+sqldelight {
+    databases {
+        create("FastbreakDatabase") {
+            packageName.set("com.joebad.fastbreak.db")
+        }
     }
 }

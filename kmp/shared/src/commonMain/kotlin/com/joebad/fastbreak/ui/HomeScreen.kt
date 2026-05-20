@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.sp
 import com.arkivanov.decompose.extensions.compose.subscribeAsState
 import com.joebad.fastbreak.data.model.ChartDefinition
 import com.joebad.fastbreak.data.model.Sport
+import com.joebad.fastbreak.domain.registry.ChartSyncProgress
 import com.joebad.fastbreak.navigation.HomeComponent
 import com.joebad.fastbreak.ui.components.TagBadge
 import com.joebad.fastbreak.ui.components.TagFilterBar
@@ -49,6 +50,7 @@ fun HomeScreen(
     registryState: RegistryState,
     registryContainer: com.joebad.fastbreak.ui.container.RegistryContainer,
     onRefresh: () -> Unit,
+    onLoadRegistry: () -> Unit,
     onMenuClick: () -> Unit = {},
     onNavigateToTopics: () -> Unit = {},
     onRequestPermission: () -> Unit,
@@ -58,6 +60,11 @@ fun HomeScreen(
 ) {
     val selectedSport by component.selectedSport.subscribeAsState()
     val selectedTags by component.selectedTags.subscribeAsState()
+
+    // Load registry on first appear (triggers auto-sync if needed)
+    LaunchedEffect(Unit) {
+        onLoadRegistry()
+    }
 
     // Clear any stale completed sync progress when screen first appears
     LaunchedEffect(Unit) {
@@ -400,8 +407,8 @@ fun HomeScreen(
                     ) {
                         // Sync progress indicator at the top
                         // Show during sync OR when complete (until cleared after 3 seconds)
-                        // Don't show if total = 0 (nothing to sync, everything is cached)
-                        if (registryState.syncProgress != null && registryState.syncProgress.total > 0) {
+                        // Don't show if totalToSync = 0 (nothing to sync, everything is cached)
+                        if (registryState.syncProgress != null && registryState.syncProgress.totalToSync > 0) {
                             item {
                                 SyncProgressIndicator(
                                     progress = registryState.syncProgress
@@ -610,7 +617,7 @@ private fun formatRelativeTime(instant: Instant): String {
 
 @Composable
 private fun SyncProgressIndicator(
-    progress: com.joebad.fastbreak.ui.diagnostics.SyncProgress
+    progress: ChartSyncProgress
 ) {
     val isComplete = progress.isComplete
     val hasFailures = progress.hasFailures
@@ -685,11 +692,11 @@ private fun SyncProgressIndicator(
                     )
                 }
 
-                // Only show counter if there are charts to sync (total > 0)
+                // Only show counter if there are charts to sync (totalToSync > 0)
                 // Don't show counter in initial "preparing" state
-                if (progress.total > 0 && !(progress.current == 0 && progress.total == 1)) {
+                if (progress.totalToSync > 0 && !(progress.completedCount == 0 && progress.totalToSync == 1)) {
                     Text(
-                        text = "${progress.current}/${progress.total}",
+                        text = "${progress.completedCount}/${progress.totalToSync}",
                         style = MaterialTheme.typography.labelSmall,
                         color = contentColor,
                         fontFamily = FontFamily.Monospace
@@ -708,10 +715,10 @@ private fun SyncProgressIndicator(
 
             // Show current chart name when syncing, or failure details when complete
             when {
-                !isComplete && progress.currentChart.isNotEmpty() -> {
+                !isComplete && progress.currentChartName.isNotEmpty() -> {
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = progress.currentChart,
+                        text = progress.currentChartName,
                         style = MaterialTheme.typography.bodySmall,
                         color = contentColor.copy(alpha = 0.7f),
                         fontFamily = FontFamily.Monospace,
@@ -721,7 +728,7 @@ private fun SyncProgressIndicator(
                 isComplete && hasFailures -> {
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "${progress.failedCharts.size} chart${if (progress.failedCharts.size > 1) "s" else ""} failed to sync",
+                        text = "${progress.failedCount} chart${if (progress.failedCount > 1) "s" else ""} failed to sync",
                         style = MaterialTheme.typography.bodySmall,
                         color = contentColor.copy(alpha = 0.7f),
                         fontFamily = FontFamily.Monospace

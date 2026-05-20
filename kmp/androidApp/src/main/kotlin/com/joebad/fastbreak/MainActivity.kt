@@ -8,11 +8,13 @@ import androidx.core.view.WindowCompat
 import com.arkivanov.decompose.defaultComponentContext
 import com.joebad.fastbreak.App
 import com.joebad.fastbreak.data.api.RegistryApi
-import com.joebad.fastbreak.data.repository.ChartDataRepository
 import com.joebad.fastbreak.data.repository.RegistryRepository
+import com.joebad.fastbreak.data.repository.SqlDelightChartCache
 import com.joebad.fastbreak.data.repository.TeamRosterRepository
 import com.joebad.fastbreak.data.repository.TopicsRepository
-import com.joebad.fastbreak.domain.registry.ChartDataSynchronizer
+import com.joebad.fastbreak.db.DatabaseDriverFactory
+import com.joebad.fastbreak.db.FastbreakDatabase
+import com.joebad.fastbreak.domain.registry.ChartSyncManager
 import com.joebad.fastbreak.domain.registry.RegistryManager
 import com.joebad.fastbreak.domain.teams.TeamRosterSynchronizer
 import com.joebad.fastbreak.navigation.RootComponent
@@ -59,14 +61,18 @@ class MainActivity : ComponentActivity() {
         }
         val scope = CoroutineScope(Dispatchers.Main + SupervisorJob() + exceptionHandler)
 
+        // Create SQLDelight database and chart cache
+        val databaseDriverFactory = DatabaseDriverFactory(this)
+        val database = FastbreakDatabase(databaseDriverFactory.createDriver())
+        val chartCache = SqlDelightChartCache(database)
+
         // Create repositories
         val registryRepository = RegistryRepository(settings)
-        val chartDataRepository = ChartDataRepository(settings)
 
         // Create API services
         val registryApi = RegistryApi()
 
-        // Create RegistryManager (Phase 4)
+        // Create RegistryManager
         val registryManager = RegistryManager(
             registryApi = registryApi,
             registryRepository = registryRepository
@@ -75,9 +81,9 @@ class MainActivity : ComponentActivity() {
         // Create TopicsRepository
         val topicsRepository = TopicsRepository(settings)
 
-        // Create ChartDataSynchronizer (Phase 5)
-        val chartDataSynchronizer = ChartDataSynchronizer(
-            chartDataRepository = chartDataRepository,
+        // Create ChartSyncManager (replaces ChartDataSynchronizer)
+        val chartSyncManager = ChartSyncManager(
+            chartCache = chartCache,
             topicsRepository = topicsRepository
         )
 
@@ -94,11 +100,11 @@ class MainActivity : ComponentActivity() {
             scope = scope
         )
 
-        // Create RegistryContainer (Phase 6 - Orbit MVI)
+        // Create RegistryContainer (Orbit MVI)
         val registryContainer = RegistryContainer(
             registryManager = registryManager,
-            chartDataSynchronizer = chartDataSynchronizer,
-            chartDataRepository = chartDataRepository,
+            chartSyncManager = chartSyncManager,
+            chartCache = chartCache,
             scope = scope,
             pinnedTeamsContainer = pinnedTeamsContainer
         )
@@ -108,7 +114,7 @@ class MainActivity : ComponentActivity() {
             themeRepository = themeRepository,
             registryContainer = registryContainer,
             pinnedTeamsContainer = pinnedTeamsContainer,
-            chartDataRepository = chartDataRepository
+            chartCache = chartCache
         )
 
         setContent {

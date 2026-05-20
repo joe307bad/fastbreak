@@ -2,6 +2,7 @@ package com.joebad.fastbreak.ui.container
 
 import com.joebad.fastbreak.data.model.Registry
 import com.joebad.fastbreak.data.model.RegistryEntry
+import com.joebad.fastbreak.domain.registry.ChartSyncProgress
 import com.joebad.fastbreak.ui.diagnostics.DiagnosticsInfo
 import com.mohamedrejeb.calf.permissions.PermissionStatus
 import kotlin.time.Instant
@@ -41,7 +42,7 @@ data class RegistryState(
     /**
      * Current sync progress (null if not syncing)
      */
-    val syncProgress: com.joebad.fastbreak.ui.diagnostics.SyncProgress? = null,
+    val syncProgress: ChartSyncProgress? = null,
 
     /**
      * Current error message (null if no error)

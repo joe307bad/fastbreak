@@ -16,6 +16,7 @@ import com.joebad.fastbreak.data.model.MLBMatchupVisualization
 import com.joebad.fastbreak.data.model.NHLPlayoffBracketVisualization
 import com.joebad.fastbreak.data.model.NCAABracketVisualization
 import com.joebad.fastbreak.data.model.NHLMatchupVisualization
+import com.joebad.fastbreak.data.model.Registry
 import com.joebad.fastbreak.data.model.RegistryEntry
 import com.joebad.fastbreak.data.model.ScatterPlotVisualization
 import com.joebad.fastbreak.data.model.Sport
@@ -426,6 +427,80 @@ class ChartDataSynchronizer(
             tags = vizData.tags,
             sortOrder = vizData.sortOrder
         )
+    }
+
+    /**
+     * Builds a Registry directly from server-supplied [entries], using cached
+     * chart data per entry where available and a placeholder otherwise.
+     *
+     * This bypasses the chart_ids index entirely — the registry shape is
+     * derived from the server's authoritative entry list, so a partial or
+     * inconsistent on-disk index can't make charts disappear from the UI.
+     * Charts whose data hasn't been downloaded yet appear as placeholders;
+     * the UI gates clickability on [SyncProgress.isChartReady], so they show
+     * up disabled with a spinner during sync and become interactive when
+     * their data lands.
+     *
+     * @return Registry with one entry per chart in [entries] (placeholders
+     * included), or null if there are no chart entries.
+     */
+    fun buildRegistryFromEntries(entries: Map<String, RegistryEntry>): Registry? {
+        val chartEntries = entries.filter { (_, entry) -> entry.isChart && !entry.isSystem }
+        if (chartEntries.isEmpty()) return null
+
+        val charts = chartEntries.mapNotNull { (fileKey, entry) ->
+            val chartId = fileKeyToChartId(fileKey)
+            val cached = chartDataRepository.getChartData(chartId)
+            if (cached != null) {
+                buildChartDefinition(chartId, cached)
+            } else {
+                buildPlaceholderChartDefinition(chartId, entry)
+            }
+        }
+
+        if (charts.isEmpty()) return null
+
+        return Registry(
+            version = "2.0",
+            lastUpdated = Clock.System.now(),
+            charts = charts
+        )
+    }
+
+    /**
+     * Builds a minimal ChartDefinition for a chart that's known from the
+     * registry but hasn't been downloaded yet. Returns null if the sport
+     * can't be inferred from the chart id (we won't know which tab to
+     * render it under).
+     *
+     * Sport is inferred from the chart id convention `{sport}__{name}` —
+     * the same convention used by the build pipeline. The placeholder uses
+     * defaults for fields that come from chart data (subtitle, tags,
+     * visualizationType, sortOrder); the UI shows these in a disabled state
+     * via [SyncProgress.isChartReady] until the real data lands.
+     */
+    private fun buildPlaceholderChartDefinition(chartId: String, entry: RegistryEntry): ChartDefinition? {
+        val sport = extractSportFromChartId(chartId) ?: return null
+        return ChartDefinition(
+            id = chartId,
+            sport = sport,
+            title = entry.title,
+            subtitle = "",
+            lastUpdated = entry.updatedAt,
+            visualizationType = VizType.HELLO_WORLD,
+            url = "",
+            interval = entry.interval,
+            cachedAt = null,
+            viewed = true, // suppress unread indicator until real data arrives
+            tags = null,
+            sortOrder = null
+        )
+    }
+
+    private fun extractSportFromChartId(chartId: String): Sport? {
+        val prefix = chartId.substringBefore("__", missingDelimiterValue = "")
+        if (prefix.isEmpty()) return null
+        return Sport.entries.firstOrNull { it.name.equals(prefix, ignoreCase = true) }
     }
 
     /**

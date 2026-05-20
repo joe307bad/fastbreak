@@ -70,24 +70,33 @@ fun RegistryOverviewList(
 
 /**
  * Single line chart item showing title and last updated time.
+ *
+ * Placeholders (charts that exist in the registry but whose data hasn't
+ * landed in cache yet — cachedAt == null) render disabled so clicking
+ * doesn't open DataVizScreen to a missing-data error.
  */
 @Composable
 private fun ChartOverviewItem(
     chart: ChartDefinition,
     onClick: () -> Unit
 ) {
+    val isReady = chart.cachedAt != null
+    val alpha = if (isReady) 1f else 0.5f
+    val rowModifier = Modifier
+        .fillMaxWidth()
+        .clip(RoundedCornerShape(4.dp))
+        .let { if (isReady) it.clickable(onClick = onClick) else it }
+        .padding(vertical = 4.dp, horizontal = 4.dp)
+
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(4.dp))
-            .clickable(onClick = onClick)
-            .padding(vertical = 4.dp, horizontal = 4.dp)
+        modifier = rowModifier
     ) {
         Text(
             text = chart.title,
             style = MaterialTheme.typography.bodySmall,
             fontFamily = FontFamily.Monospace,
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = alpha),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f)
@@ -99,7 +108,7 @@ private fun ChartOverviewItem(
             text = formatTimeAgo(chart.lastUpdated),
             style = MaterialTheme.typography.bodySmall,
             fontFamily = FontFamily.Monospace,
-            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f * alpha),
             maxLines = 1
         )
     }

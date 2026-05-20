@@ -636,10 +636,15 @@ class RegistryContainer(
                 return@collect
             }
 
-            if (progress.isComplete) {
-                // Build registry from server entries (cache folded in per entry)
-                val registry = buildRegistry(entries)
+            // Rebuild registry on every emit so each chart's completion
+            // immediately propagates to the UI (placeholder → real data),
+            // instead of waiting for the final isComplete to surface the
+            // batch. buildRegistry just iterates entries with a per-chart
+            // cache lookup — cheap enough to do per-emit, and keeps the UI
+            // in sync with whatever's actually landed on disk.
+            val registry = buildRegistry(entries)
 
+            if (progress.isComplete) {
                 // Capture failed charts before clearing syncProgress
                 val completedFailedCharts = progress.failedCharts
 
@@ -666,10 +671,13 @@ class RegistryContainer(
                     postSideEffect(RegistrySideEffect.SyncCompleted)
                 }.join()
             } else {
-                // Normal progress update
+                // Normal progress update — also fold in the freshly-rebuilt
+                // registry so newly-cached charts become clickable without
+                // waiting for the final emit.
                 intent {
                     reduce {
                         state.copy(
+                            registry = registry,
                             syncProgress = progress,
                             isSyncing = true
                         )

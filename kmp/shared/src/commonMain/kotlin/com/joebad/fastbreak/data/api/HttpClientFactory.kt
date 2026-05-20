@@ -31,9 +31,13 @@ object HttpClientFactory {
                 socketTimeoutMillis = 30_000 // 30 seconds
             }
 
-            // Add default request configuration
+            // Retry on transient failures. Cold-start on a fresh install often
+            // hits DNS/connect timeouts on the first few requests; without
+            // retryOnException those charts fail silently and only get
+            // downloaded on the next refresh tap.
             install(HttpRequestRetry) {
                 retryOnServerErrors(maxRetries = 2)
+                retryOnException(maxRetries = 3, retryOnTimeout = true)
                 exponentialDelay()
             }
         }

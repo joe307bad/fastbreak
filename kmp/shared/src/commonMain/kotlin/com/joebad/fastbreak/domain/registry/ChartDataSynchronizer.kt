@@ -31,6 +31,7 @@ import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
@@ -181,6 +182,9 @@ class ChartDataSynchronizer(
                         stateMutex.withLock {
                             syncedCharts.add(chartId)
                         }
+                    } catch (e: CancellationException) {
+                        // Propagate cancellation so structured concurrency works
+                        throw e
                     } catch (e: Exception) {
                         // Log error but continue with other charts
                         println("❌ Failed to sync chart '${entry.title}': ${e.message}")

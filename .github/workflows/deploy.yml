@@ -50,6 +50,7 @@ jobs:
         working-directory: server/src/Fastbreak.Daily
 
       - name: Update Release ID in DynamoDB
+        if: needs.detect-changes.outputs.kmp == 'true'
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}

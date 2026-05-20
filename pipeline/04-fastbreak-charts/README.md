@@ -27,3 +27,5 @@ docker run -d --env-file .env --name fastbreak-charts fastbreak-charts
 - All R scripts in respective folders execute automatically
 - Scripts run immediately on container startup
 - JSON output saved to `/app/output` (mounted to `/Users/joebad/Source/fastbreak/server/nginx/static`)
+
+<!-- release id sync -->

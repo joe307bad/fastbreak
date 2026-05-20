@@ -43,17 +43,24 @@ class ChartDataRepository(
         indexMutex.withLock { saveChartDataLocked(chartId, data) }
     }
 
+    // Why: the previous version caught SerializationException silently AND called
+    // getAllChartIds() which itself swallows decode failures by returning emptyList().
+    // Combined, a decode failure on the index produced a destructive
+    // "wipe the index, persist only this chart" overwrite — the data keys stayed
+    // but every previously-saved chart became invisible to buildRegistryFromCache.
+    // Now we serialize everything up front and read the index via the throwing
+    // variant; a decode failure aborts the write instead of corrupting the index,
+    // and the exception surfaces in failedCharts.
     private fun saveChartDataLocked(chartId: String, data: CachedChartData) {
-        try {
-            val jsonString = json.encodeToString(data)
-            settings.putString("$PREFIX_CHART$chartId", jsonString)
+        val dataJson = json.encodeToString(data)
+        val currentIds = readChartIdsIndexOrThrow().toMutableSet()
+        val updatedIndexJson = if (currentIds.add(chartId)) {
+            json.encodeToString(currentIds.toList())
+        } else null
 
-            val currentIds = getAllChartIds().toMutableSet()
-            if (currentIds.add(chartId)) {
-                saveChartIds(currentIds.toList())
-            }
-        } catch (e: SerializationException) {
-            println("Error saving chart data for $chartId: ${e.message}")
+        settings.putString("$PREFIX_CHART$chartId", dataJson)
+        if (updatedIndexJson != null) {
+            settings.putString(KEY_CHART_IDS, updatedIndexJson)
         }
     }
 
@@ -95,12 +102,16 @@ class ChartDataRepository(
      * Gets the list of all cached chart IDs.
      * This list is stored separately to avoid iterating through all keys.
      *
+     * Returns an empty list if the index can't be decoded — safe for diagnostic
+     * and read-only callers. Code paths that MODIFY the index must use
+     * [readChartIdsIndexOrThrow] instead, since treating a decode failure as
+     * "empty" during a read-modify-write would silently wipe the index.
+     *
      * @return List of chart IDs that have cached data
      */
     fun getAllChartIds(): List<String> {
         return try {
-            val jsonString = settings.getStringOrNull(KEY_CHART_IDS) ?: return emptyList()
-            json.decodeFromString<List<String>>(jsonString)
+            readChartIdsIndexOrThrow()
         } catch (e: SerializationException) {
             println("Error reading chart IDs: ${e.message}")
             emptyList()
@@ -108,18 +119,16 @@ class ChartDataRepository(
     }
 
     /**
-     * Saves the list of chart IDs to storage.
-     * This is called internally when charts are added or removed.
+     * Reads the chart IDs index from storage, propagating decode failures.
      *
-     * @param ids List of chart IDs to save
+     * Used inside [saveChartDataLocked] and [deleteChartDataLocked] to protect
+     * the index from being overwritten with partial data if the stored JSON is
+     * unreadable. Callers that just want a best-effort read should use
+     * [getAllChartIds] instead.
      */
-    private fun saveChartIds(ids: List<String>) {
-        try {
-            val jsonString = json.encodeToString(ids)
-            settings.putString(KEY_CHART_IDS, jsonString)
-        } catch (e: SerializationException) {
-            println("Error saving chart IDs: ${e.message}")
-        }
+    private fun readChartIdsIndexOrThrow(): List<String> {
+        val jsonString = settings.getStringOrNull(KEY_CHART_IDS) ?: return emptyList()
+        return json.decodeFromString<List<String>>(jsonString)
     }
 
     /**
@@ -133,11 +142,14 @@ class ChartDataRepository(
     }
 
     private fun deleteChartDataLocked(chartId: String) {
-        settings.remove("$PREFIX_CHART$chartId")
+        val currentIds = readChartIdsIndexOrThrow().toMutableSet()
+        val updatedIndexJson = if (currentIds.remove(chartId)) {
+            json.encodeToString(currentIds.toList())
+        } else null
 
-        val currentIds = getAllChartIds().toMutableSet()
-        if (currentIds.remove(chartId)) {
-            saveChartIds(currentIds.toList())
+        settings.remove("$PREFIX_CHART$chartId")
+        if (updatedIndexJson != null) {
+            settings.putString(KEY_CHART_IDS, updatedIndexJson)
         }
     }
 

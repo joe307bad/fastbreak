@@ -360,6 +360,19 @@ class ChartDataSynchronizer(
             chartDataRepository.saveChartData(chartId, cachedData)
             println("✅ Chart $chartId saved to cache")
 
+            // Verify the save actually landed in both the data store AND the index.
+            // Without this, a silent storage failure or index inconsistency leaves the
+            // chart visible to syncedCharts but invisible to buildRegistryFromCache,
+            // which is exactly the "downloads succeed but charts don't show" symptom.
+            // Throwing here routes the failure into the per-chart catch block and onto
+            // failedCharts, so the user sees a toast and Sentry gets the exception.
+            check(chartDataRepository.hasChartData(chartId)) {
+                "Chart data missing from cache after save: $chartId"
+            }
+            check(chartDataRepository.getAllChartIds().contains(chartId)) {
+                "Chart $chartId missing from index after save (index size=${chartDataRepository.getAllChartIds().size})"
+            }
+
             SentryLogger.finishSpan(spanId, SpanStatus.OK)
 
             SentryLogger.addBreadcrumb(

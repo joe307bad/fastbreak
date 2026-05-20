@@ -36,14 +36,15 @@ class RegistryRepository(
         entries.forEach { (key, entry) ->
             println("   - $key: ${entry.title} (updatedAt: ${entry.updatedAt})")
         }
-        try {
-            val jsonString = json.encodeToString(entries)
-            println("   JSON size: ${jsonString.length} chars")
-            settings.putString(KEY_REGISTRY_ENTRIES, jsonString)
-            println("   ✅ Saved successfully")
-        } catch (e: SerializationException) {
-            println("   ❌ Error saving registry entries: ${e.message}")
-        }
+        // Why: previously caught SerializationException silently here, which let a
+        // failed save look identical to a successful one. The caller (RegistryManager)
+        // already wraps this in runCatching, so propagating the exception lets it
+        // surface as a refresh failure instead of producing a "succeeded but cache
+        // is empty" state.
+        val jsonString = json.encodeToString(entries)
+        println("   JSON size: ${jsonString.length} chars")
+        settings.putString(KEY_REGISTRY_ENTRIES, jsonString)
+        println("   ✅ Saved successfully")
     }
 
     /**
@@ -81,13 +82,13 @@ class RegistryRepository(
         println("💾 RegistryRepository.saveMetadata()")
         println("   lastDownloadTime: ${metadata.lastDownloadTime}")
         println("   registryVersion: ${metadata.registryVersion}")
-        try {
-            val jsonString = json.encodeToString(metadata)
-            settings.putString(KEY_METADATA, jsonString)
-            println("   ✅ Metadata saved successfully")
-        } catch (e: SerializationException) {
-            println("   ❌ Error saving registry metadata: ${e.message}")
-        }
+        // Why: silent failure here was the most likely explanation for the "Stale"
+        // indicator persisting after a refresh — metadata never lands, so
+        // isRegistryStale() returns true even though entries were just fetched.
+        // Propagate so it surfaces as a refresh failure.
+        val jsonString = json.encodeToString(metadata)
+        settings.putString(KEY_METADATA, jsonString)
+        println("   ✅ Metadata saved successfully")
     }
 
     /**

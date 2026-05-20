@@ -431,9 +431,15 @@ fun HomeScreen(
                         items(filteredCharts) { chart ->
                             // Determine chart sync state
                             val isSyncing = registryState.syncProgress?.isChartSyncing(chart.id) == true
-                            // If syncProgress is null, all charts are ready (sync complete)
-                            // If syncProgress exists, check if this specific chart is ready
-                            val isReady = registryState.syncProgress?.isChartReady(chart.id) ?: true
+                            // During sync, defer to per-chart progress.
+                            // Outside sync, "ready" means the chart actually has cached data — a
+                            // placeholder whose data never downloaded keeps cachedAt=null and
+                            // stays disabled instead of opening to an empty DataVizScreen.
+                            val isReady = if (registryState.syncProgress != null) {
+                                registryState.syncProgress.isChartReady(chart.id)
+                            } else {
+                                chart.cachedAt != null
+                            }
 
                             VisualizationItem(
                                 title = chart.title,

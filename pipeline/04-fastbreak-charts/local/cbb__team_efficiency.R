@@ -105,7 +105,15 @@ output_data <- list(
   visualizationType = "SCATTER_PLOT",
   title = paste0("College Basketball Team Efficiency - ", year - 1, "-", substr(year, 3, 4)),
   subtitle = "Offensive vs Defensive Rating (Top 64 Teams)",
-  description = "Offensive Rating measures points scored per 100 possessions, while Defensive Rating measures points allowed per 100 possessions (lower is better). Teams in the top-right quadrant have elite offenses and defenses. Only showing top 64 teams by net rating.",
+  description = paste0(
+    "Top 64 college basketball teams by net rating, plotted by offensive ",
+    "efficiency against defensive efficiency. The top-right quadrant holds ",
+    "teams elite on both ends.\n\n",
+    "STATS:\n\n",
+    " • Offensive Rating (ORtg): Points scored per 100 possessions. Higher is better.\n\n",
+    " • Defensive Rating (DRtg): Points allowed per 100 possessions. Lower is better.\n\n",
+    " • Net Rating: Offensive Rating minus Defensive Rating. Higher is better."
+  ),
   lastUpdated = format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC"),
   source = "Sports Reference",
   xAxisLabel = "Offensive Rating",

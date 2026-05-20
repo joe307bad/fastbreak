@@ -123,7 +123,15 @@ output_data <- list(
   visualizationType = "SCATTER_PLOT",
   title = paste0("NHL Team Efficiency - ", nhl_season_start, "-", substr(nhl_season_end, 3, 4)),
   subtitle = "Goals For vs Goals Against per Game",
-  description = "Goals For per Game measures offensive output while Goals Against per Game measures defensive performance (lower is better). Teams in the top-right quadrant have elite offenses and defenses, making them Stanley Cup contenders. Goal differential per game is the best single measure of team quality.",
+  description = paste0(
+    "All teams plotted by goals scored against goals allowed per game. The ",
+    "top-right quadrant holds Stanley Cup contenders elite on both ends.\n\n",
+    "STATS:\n\n",
+    " • Goals For/Game: Average goals scored per game. Higher is better.\n\n",
+    " • Goals Against/Game: Average goals allowed per game. Lower is better.\n\n",
+    " • Goal Differential/Game: Goals For/Game minus Goals Against/Game — the ",
+    "best single measure of team quality. Higher is better."
+  ),
   lastUpdated = format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC"),
   source = "NHL Stats API",
   xAxisLabel = "Goals For / Game",

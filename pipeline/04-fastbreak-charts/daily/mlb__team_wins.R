@@ -80,7 +80,9 @@ output_data <- list(
   description = paste0(
     "Total games won by each team in the ", mlb_season,
     " MLB season, sorted from most to fewest. The bottom-line scoreboard ",
-    "view of the standings."
+    "view of the standings.\n\n",
+    "STATS:\n\n",
+    " • Wins: Raw count of games won by the team this season. Higher is better."
   ),
   lastUpdated = format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC"),
   source = "FanGraphs",

@@ -77,9 +77,10 @@ output_data <- list(
   yAxisLabel = "Home Runs",
   description = paste0(
     "Total home runs hit by each team in the ", mlb_season,
-    " MLB season, sorted from most to fewest. A pure power leaderboard ",
-    "— no rate adjustments, no park factors, just the raw count of balls ",
-    "hit over the fence."
+    " MLB season, sorted from most to fewest. A pure power leaderboard.\n\n",
+    "STATS:\n\n",
+    " • Home Runs: Raw count of home runs hit by the team this season — no ",
+    "rate adjustments or park factors. Higher is better."
   ),
   lastUpdated = format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC"),
   source = "FanGraphs",

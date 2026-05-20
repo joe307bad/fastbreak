@@ -90,16 +90,25 @@ parse_playoff_round <- function(headline) {
 
   round_num <- NA
   round_name <- NA
-  if (grepl("finals", hl) && !grepl("conf", hl) && is.na(conference)) {
-    round_num <- 4; round_name <- "NBA Finals"; conference <- "Finals"
-  } else if (grepl("conf(\\.|erence)? finals", hl)) {
-    round_num <- 3; round_name <- "Conference Finals"
-  } else if (grepl("conf(\\.|erence)? semifinals|semifinals", hl)) {
-    round_num <- 2; round_name <- "Conference Semifinals"
+  if (grepl("play-in|play in", hl)) {
+    round_num <- 0; round_name <- "Play-In"
   } else if (grepl("first round|1st round|round 1", hl)) {
     round_num <- 1; round_name <- "First Round"
-  } else if (grepl("play-in|play in", hl)) {
-    round_num <- 0; round_name <- "Play-In"
+  } else if (grepl("semifinal", hl)) {
+    # Match semifinals BEFORE the "final" branch below so that
+    # "Conference Semifinals" headlines aren't picked up as Conference Finals
+    # via a loose substring match.
+    round_num <- 2; round_name <- "Conference Semifinals"
+  } else if (grepl("finals?", hl)) {
+    # Any other "final"/"finals" mention. If a conference (East/West) was
+    # detected in the headline this is a Conference Finals series; otherwise
+    # it's the league-level NBA Finals. Accepts headlines that abbreviate or
+    # drop the word "Conference" (e.g. "Eastern Finals").
+    if (is.na(conference)) {
+      round_num <- 4; round_name <- "NBA Finals"; conference <- "Finals"
+    } else {
+      round_num <- 3; round_name <- "Conference Finals"
+    }
   }
 
   list(conference = conference, roundNumber = round_num, roundName = round_name)

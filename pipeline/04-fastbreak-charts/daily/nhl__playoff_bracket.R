@@ -793,12 +793,16 @@ parse_nhl_playoff_round <- function(headline) {
   round_num <- NA; round_name <- NA
   if (grepl("stanley cup final", hl)) {
     round_num <- 4; round_name <- "Stanley Cup Final"; conference <- "Finals"
-  } else if (grepl("conf.*final", hl)) {
-    round_num <- 3; round_name <- "Conference Finals"
-  } else if (grepl("2nd round|second round|semifinals", hl)) {
-    round_num <- 2; round_name <- "Conference Semifinals"
   } else if (grepl("1st round|first round", hl)) {
     round_num <- 1; round_name <- "First Round"
+  } else if (grepl("2nd round|second round|semifinal", hl)) {
+    # Check semifinals BEFORE the "final" branch below — otherwise a loose
+    # "conf.*final" match consumes "conference semifinals" (the "final" inside
+    # "semifinals") and classifies R2 games as R3, leaving the Conference
+    # Finals filter contaminated with stale semifinal series.
+    round_num <- 2; round_name <- "Conference Semifinals"
+  } else if (grepl("final", hl)) {
+    round_num <- 3; round_name <- "Conference Finals"
   }
   list(conference = conference, roundNumber = round_num, roundName = round_name)
 }

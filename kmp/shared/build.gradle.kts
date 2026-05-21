@@ -19,6 +19,12 @@ val otelServiceName = project.findProperty("otel_service_name")?.toString() ?: "
 
 val generateAppConfig = tasks.register("generateAppConfig") {
     val outputDir = layout.buildDirectory.dir("generated/appconfig")
+    // Declare inputs so Gradle re-runs task when properties change
+    inputs.property("devMode", devMode)
+    inputs.property("builtInReleaseId", builtInReleaseId)
+    inputs.property("otelEndpoint", otelEndpoint)
+    inputs.property("otelAuthToken", otelAuthToken)
+    inputs.property("otelServiceName", otelServiceName)
     outputs.dir(outputDir)
     doLast {
         val dir = outputDir.get().asFile.resolve("com/joebad/fastbreak/config")

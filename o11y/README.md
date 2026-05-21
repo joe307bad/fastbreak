@@ -1,73 +1,126 @@
 # Fastbreak Observability (o11y)
 
-OpenTelemetry Collector for receiving telemetry from the Fastbreak mobile app.
+QuestDB + Caddy on Fly.io for mobile app telemetry.
 
 ## Architecture
 
 ```
 Mobile App (iOS/Android)
         │
-        ▼
-  OTEL Collector (Fly.io)
+        ▼ POST /write (X-API-Key header)
+   Caddy (TLS + Auth + Rate Limiting)
         │
         ▼
-   SigNoz Cloud
+   QuestDB (localhost:9000)
+        │
+        ▼
+   Web Console (basic auth protected)
 ```
 
-## Setup
+## Security
 
-### 1. Create SigNoz Cloud Account
+| Endpoint | Access | Auth |
+|----------|--------|------|
+| `/write` | Public | `X-API-Key` header |
+| Web Console | Protected | Basic auth |
+| `/exec` | Protected | Basic auth |
 
-1. Sign up at [SigNoz Cloud](https://signoz.io/teams/)
-2. Get your ingestion key from Settings > Ingestion Key
-3. Note your region endpoint (e.g., `ingest.us.signoz.cloud:443`)
+- QuestDB HTTP auth enabled as defense-in-depth
+- TLS automatic via Caddy/Fly.io
+- Expect mobile API key to leak (can be extracted from app binary)
 
-### 2. Deploy to Fly.io
+## Deploy
+
+### 1. Create Fly app and volume
 
 ```bash
 cd o11y
 
 # Create the app
-fly apps create fastbreak-otel
+fly apps create fastbreak-o11y
 
-# Generate a secure auth token (use any secure random string)
-export OTEL_AUTH_TOKEN=$(openssl rand -hex 32)
-echo "Save this token for gradle.properties: $OTEL_AUTH_TOKEN"
+# Create persistent volume for QuestDB data
+fly volumes create questdb_data --size 10 --region iad
+```
 
-# Set secrets
-fly secrets set SIGNOZ_INGESTION_KEY="your-signoz-ingestion-key"
-fly secrets set SIGNOZ_ENDPOINT="ingest.us.signoz.cloud:443"
-fly secrets set OTEL_AUTH_TOKEN="$OTEL_AUTH_TOKEN"
+### 2. Generate credentials
 
-# Deploy
+```bash
+# API key for mobile app
+API_KEY=$(openssl rand -hex 32)
+echo "Save this for GitHub secrets: $API_KEY"
+
+# Caddy password hash (enter your password when prompted)
+docker run --rm -it caddy:2-alpine caddy hash-password
+
+# QuestDB password
+QUESTDB_PASS=$(openssl rand -base64 24)
+echo "QuestDB password: $QUESTDB_PASS"
+```
+
+### 3. Set Fly secrets
+
+```bash
+fly secrets set \
+  API_KEY="<your-api-key>" \
+  CADDY_ADMIN_USER="admin" \
+  CADDY_ADMIN_PASS_HASH="<bcrypt-hash-from-step-2>" \
+  QUESTDB_USER="admin" \
+  QUESTDB_PASSWORD="<questdb-password>"
+```
+
+### 4. Deploy
+
+```bash
 fly deploy
 ```
 
-### 3. Configure Mobile App
+## Configure Mobile App
 
-Update `kmp/gradle.properties`:
+GitHub secrets:
+- `OTEL_ENDPOINT`: `https://fastbreak-o11y.fly.dev`
+- `OTEL_AUTH_TOKEN`: The `API_KEY` from step 2
 
-```properties
-otel_endpoint=https://fastbreak-otel.fly.dev
-otel_auth_token=<the-token-from-step-2>
+## Access Web Console
+
+1. Open `https://fastbreak-o11y.fly.dev`
+2. Enter basic auth credentials (admin / your password)
+3. Use SQL console to query telemetry data
+
+## Example Queries
+
+```sql
+-- Recent events
+SELECT * FROM app_events ORDER BY timestamp DESC LIMIT 100;
+
+-- Events by type
+SELECT event_type, count() FROM app_events GROUP BY event_type;
+
+-- Daily active users
+SELECT toStartOfDay(timestamp) as day, count(DISTINCT device_id)
+FROM app_events
+GROUP BY day
+ORDER BY day DESC;
 ```
 
-**Security Note**: The `otel_auth_token` is compiled into the app binary. While this prevents casual abuse, a determined attacker could extract it. For a mobile app sending anonymized telemetry, this is acceptable. For sensitive data, consider additional measures like certificate pinning.
-
-## Local Development
-
-Run the collector locally:
+## Troubleshooting
 
 ```bash
-docker build -t fastbreak-otel .
-docker run -p 4317:4317 -p 4318:4318 \
-  -e SIGNOZ_INGESTION_KEY="your-key" \
-  -e SIGNOZ_ENDPOINT="ingest.us.signoz.cloud:443" \
-  fastbreak-otel
+# View logs
+fly logs
+
+# SSH into machine
+fly ssh console
+
+# Check QuestDB health
+fly ssh console -C "curl -s http://localhost:9000/"
+
+# Check Caddy logs
+fly logs --process caddy
 ```
 
-## Endpoints
+## Cost
 
-- **OTLP HTTP**: `https://fastbreak-otel.fly.dev/v1/traces`
-- **OTLP gRPC**: `fastbreak-otel.fly.dev:4317`
-- **Health Check**: `https://fastbreak-otel.fly.dev:13133/health`
+~$7/month total:
+- Fly.io VM (1GB RAM): ~$5/month
+- Fly.io Volume (10GB): ~$2/month

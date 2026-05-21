@@ -1,48 +1,42 @@
-# Fly.io configuration for OpenTelemetry Collector
-# Receives telemetry from Fastbreak mobile apps
-
-app = "fastbreak-otel"
+# Fly.io configuration for QuestDB + Caddy multi-container
+app = "fastbreak-o11y"
 primary_region = "iad"
 
+# Using pre-built image instead of Dockerfile for multi-container
 [build]
-  dockerfile = "Dockerfile"
+image = "registry.fly.io/fastbreak-o11y:caddy-v6"
 
-[env]
-  ENVIRONMENT = "production"
-  # SIGNOZ_ENDPOINT and SIGNOZ_INGESTION_KEY set via `fly secrets`
+[experimental]
+machine_config = "machine-config.json"
+container = "caddy"
 
-# HTTP service for OTLP (port 4318)
-[[services]]
-  internal_port = 4318
-  protocol = "tcp"
+[http_service]
+internal_port = 80
+force_https = true
+auto_stop_machines = "stop"
+auto_start_machines = true
+min_machines_running = 1
 
-  [[services.ports]]
-    port = 443
-    handlers = ["tls", "http"]
+[http_service.concurrency]
+type = "connections"
+hard_limit = 100
+soft_limit = 80
 
-  [[services.http_checks]]
-    interval = "30s"
-    timeout = "5s"
-    grace_period = "15s"
-    method = "GET"
-    path = "/health"
-    port = 13133
+[[http_service.checks]]
+interval = "30s"
+timeout = "5s"
+grace_period = "30s"
+method = "GET"
+path = "/health"
+port = 80
 
-# gRPC service for OTLP (port 4317)
-[[services]]
-  internal_port = 4317
-  protocol = "tcp"
-
-  [[services.ports]]
-    port = 4317
-    handlers = ["tls"]
-
-  [[services.tcp_checks]]
-    interval = "15s"
-    timeout = "5s"
-    grace_period = "10s"
+# Persistent storage for QuestDB data
+[mounts]
+source = "questdb_data"
+destination = "/var/lib/questdb"
+processes = ["questdb"]
 
 [[vm]]
-  memory = "512mb"
-  cpu_kind = "shared"
-  cpus = 1
+memory = "1gb"
+cpu_kind = "shared"
+cpus = 1

@@ -37,3 +37,6 @@ pipeline/04-fastbreak-charts/Fastbreak.Daily
 pipeline/02-nfl-fantasy-sleeper-breakout/output/weekly_player_stats/*.csv
 pipeline/02-nfl-fantasy-sleeper-breakout/output/defensive_power_rankings/*.csv
 server/src/Fastbreak.Daily/topics-out
+
+# O11y - generated Caddyfile with secrets (template is tracked)
+o11y/Caddyfile

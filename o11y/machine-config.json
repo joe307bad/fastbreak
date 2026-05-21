@@ -1,0 +1,18 @@
+{
+  "containers": [
+    {
+      "name": "caddy",
+      "image": "registry.fly.io/fastbreak-o11y:caddy-v6"
+    },
+    {
+      "name": "questdb",
+      "image": "questdb/questdb:8.2.3",
+      "env": {
+        "QDB_TELEMETRY_ENABLED": "false",
+        "QDB_SHARED_WORKER_COUNT": "2",
+        "QDB_HTTP_WORKER_COUNT": "2",
+        "QDB_LINE_TCP_WORKER_COUNT": "1"
+      }
+    }
+  ]
+}

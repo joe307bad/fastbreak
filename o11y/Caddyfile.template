@@ -1,0 +1,39 @@
+# Caddy reverse proxy for QuestDB
+# - /health: Health check (no auth)
+# - /write: Mobile app ingestion (API key required)
+# - Everything else: Basic auth protected (web console, /exec)
+#
+# NOTE: This is a template. Run `./build.sh` to generate Caddyfile with secrets.
+
+{
+	admin off
+}
+
+:80 {
+	# Health check endpoint for Fly.io (no auth) - must come first
+	handle /health {
+		respond 200
+	}
+
+	# Mobile app ingestion endpoint - requires API key header
+	handle /write {
+		@valid_key header X-API-Key ${API_KEY}
+		@invalid_key not header X-API-Key ${API_KEY}
+		respond @invalid_key "Unauthorized" 401
+		reverse_proxy @valid_key localhost:9000
+	}
+
+	# Web console and all other endpoints - basic auth
+	handle {
+		basic_auth {
+			${CADDY_ADMIN_USER} ${CADDY_ADMIN_PASS_HASH}
+		}
+		reverse_proxy localhost:9000
+	}
+
+	# Logging
+	log {
+		output stdout
+		format json
+	}
+}

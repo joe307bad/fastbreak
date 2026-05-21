@@ -355,10 +355,11 @@ fun CBBMatchupWorksheet(
                     ShareOdds(
                         awayMoneyline = it.awayMoneyline,
                         homeMoneyline = it.homeMoneyline,
-                        awaySpread = it.spread?.let { spread ->
+                        // spread from API is home team's spread (negative = home favored)
+                        homeSpread = it.spread?.let { spread ->
                             if (spread > 0) "+$spread" else spread.toString()
                         },
-                        homeSpread = it.spread?.let { spread ->
+                        awaySpread = it.spread?.let { spread ->
                             if (spread < 0) "+${-spread}" else (-spread).toString()
                         },
                         overUnder = it.overUnder?.toString()

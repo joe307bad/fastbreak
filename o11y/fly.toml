@@ -4,7 +4,7 @@ primary_region = "iad"
 
 # Using pre-built image instead of Dockerfile for multi-container
 [build]
-image = "registry.fly.io/fastbreak-o11y:caddy-v6"
+image = "registry.fly.io/fastbreak-o11y:caddy-v19"
 
 [experimental]
 machine_config = "machine-config.json"
@@ -30,13 +30,13 @@ method = "GET"
 path = "/health"
 port = 80
 
-# Persistent storage for QuestDB data
-[mounts]
-source = "questdb_data"
-destination = "/var/lib/questdb"
-processes = ["questdb"]
+# Persistent storage - single volume for all data
+# Subdirectories: /data/questdb and /data/grafana
+[[mounts]]
+source = "o11y_data"
+destination = "/data"
 
 [[vm]]
-memory = "1gb"
+memory = "2gb"
 cpu_kind = "shared"
 cpus = 1

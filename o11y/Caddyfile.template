@@ -1,7 +1,9 @@
-# Caddy reverse proxy for QuestDB
+# Caddy reverse proxy for QuestDB and Grafana
 # - /health: Health check (no auth)
 # - /write: Mobile app ingestion (API key required)
-# - Everything else: Basic auth protected (web console, /exec)
+# - /grafana/*: Grafana dashboards (Grafana's built-in auth)
+# - /exec: QuestDB SQL API (basic auth)
+# - Web console disabled (index.html, assets blocked)
 #
 # NOTE: This is a template. Run `./build.sh` to generate Caddyfile with secrets.
 
@@ -10,30 +12,51 @@
 }
 
 :80 {
-	# Health check endpoint for Fly.io (no auth) - must come first
-	handle /health {
-		respond 200
-	}
-
-	# Mobile app ingestion endpoint - requires API key header
-	handle /write {
-		@valid_key header X-API-Key ${API_KEY}
-		@invalid_key not header X-API-Key ${API_KEY}
-		respond @invalid_key "Unauthorized" 401
-		reverse_proxy @valid_key localhost:9000
-	}
-
-	# Web console and all other endpoints - basic auth
-	handle {
-		basic_auth {
-			${CADDY_ADMIN_USER} ${CADDY_ADMIN_PASS_HASH}
-		}
-		reverse_proxy localhost:9000
-	}
-
-	# Logging
 	log {
 		output stdout
 		format json
+	}
+
+	route {
+		# Health check endpoint for Fly.io (no auth)
+		@health path /health
+		handle @health {
+			respond 200
+		}
+
+		# Block QuestDB web console - return 404
+		@webconsole path / /index.html /assets/*
+		handle @webconsole {
+			respond "Not Found" 404
+		}
+
+		# Grafana dashboards - uses Grafana's built-in auth
+		@grafana path_regexp ^/grafana($|/.*)
+		handle @grafana {
+			reverse_proxy localhost:3000
+		}
+
+		# Mobile app ingestion endpoint - requires API key header
+		@write path /write
+		handle @write {
+			@valid_key header X-API-Key "${API_KEY}"
+			@invalid_key not header X-API-Key "${API_KEY}"
+			respond @invalid_key "Unauthorized" 401
+			reverse_proxy @valid_key localhost:9000
+		}
+
+		# QuestDB SQL API - basic auth protected
+		@exec path /exec
+		handle @exec {
+			basic_auth {
+				${CADDY_ADMIN_USER} ${CADDY_ADMIN_PASS_HASH}
+			}
+			reverse_proxy localhost:9000
+		}
+
+		# Block everything else
+		handle {
+			respond "Not Found" 404
+		}
 	}
 }

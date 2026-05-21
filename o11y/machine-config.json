@@ -2,16 +2,26 @@
   "containers": [
     {
       "name": "caddy",
-      "image": "registry.fly.io/fastbreak-o11y:caddy-v6"
+      "image": "registry.fly.io/fastbreak-o11y:caddy-v19"
     },
     {
       "name": "questdb",
-      "image": "questdb/questdb:8.2.3",
+      "image": "registry.fly.io/fastbreak-o11y:questdb-v6",
       "env": {
         "QDB_TELEMETRY_ENABLED": "false",
         "QDB_SHARED_WORKER_COUNT": "2",
         "QDB_HTTP_WORKER_COUNT": "2",
         "QDB_LINE_TCP_WORKER_COUNT": "1"
+      }
+    },
+    {
+      "name": "grafana",
+      "image": "registry.fly.io/fastbreak-o11y:grafana-v1",
+      "env": {
+        "GF_SERVER_ROOT_URL": "https://fastbreak-o11y.fly.dev/grafana/",
+        "GF_SERVER_SERVE_FROM_SUB_PATH": "true",
+        "GF_USERS_ALLOW_SIGN_UP": "false",
+        "GF_PATHS_DATA": "/data/grafana"
       }
     }
   ]

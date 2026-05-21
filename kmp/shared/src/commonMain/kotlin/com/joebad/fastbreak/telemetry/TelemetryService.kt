@@ -43,14 +43,16 @@ object TelemetryService {
 
     /**
      * Track app boot event.
+     * @param trigger The trigger for the boot event: "cold_start" for fresh launch, "foreground" for resume from background
      */
-    fun trackAppBoot() {
+    fun trackAppBoot(trigger: String = "cold_start") {
         trackEvent(
             name = "app_boot",
             tags = mapOf(
                 "app_version" to AppVersion.versionName,
                 "build" to AppVersion.buildNumber,
-                "dev_mode" to AppConfig.DEV_MODE.toString()
+                "dev_mode" to AppConfig.DEV_MODE.toString(),
+                "trigger" to trigger
             )
         )
     }

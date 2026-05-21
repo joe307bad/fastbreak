@@ -33,6 +33,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 
 class MainActivity : ComponentActivity() {
+    // Track if the app has been stopped (went to background)
+    private var wasInBackground = false
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -124,6 +127,20 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             App(rootComponent)
+        }
+    }
+
+    override fun onStop() {
+        super.onStop()
+        // Mark that the app went to background
+        wasInBackground = true
+    }
+
+    override fun onStart() {
+        super.onStart()
+        // Track app boot when returning from background
+        if (wasInBackground) {
+            TelemetryService.trackAppBoot(trigger = "foreground")
         }
     }
 }

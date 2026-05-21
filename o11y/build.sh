@@ -10,8 +10,10 @@ if [ ! -f .env ]; then
     exit 1
 fi
 
-# Source secrets
+# Source secrets and export them for envsubst
+set -a
 source .env
+set +a
 
 # Validate required vars
 if [ -z "$API_KEY" ] || [ -z "$CADDY_ADMIN_USER" ] || [ -z "$CADDY_ADMIN_PASS_HASH" ]; then

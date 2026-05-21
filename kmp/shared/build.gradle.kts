@@ -1,4 +1,4 @@
-// Deploy trigger: 2026-05-19-v5 - Build offset 1000
+// Deploy trigger: 2026-05-21-v6 - Build offset 1000
 import java.io.File
 
 plugins {

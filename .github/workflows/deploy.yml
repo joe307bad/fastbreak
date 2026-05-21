@@ -284,4 +284,14 @@ jobs:
           VERSION_NAME: ${{ steps.build_info.outputs.version_name }}
           BUILD_NUMBER: ${{ steps.build_info.outputs.build_number }}
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          # fastlane's build_app triggers xcodebuild, whose "Compile Kotlin
+          # Framework" build phase runs ./gradlew :shared:embedAndSignAppleFrameworkForXcode
+          # with no -P flags. That regenerates AppConfig.kt from gradle.properties
+          # defaults (dev_mode=true), overwriting the framework built earlier.
+          # Pass the values via ORG_GRADLE_PROJECT_* so that in-Xcode Gradle run
+          # picks them up and produces a prod (dev_mode=false) framework.
+          ORG_GRADLE_PROJECT_dev_mode: "false"
+          ORG_GRADLE_PROJECT_built_in_release_id: ${{ steps.release_id.outputs.release_id }}
+          ORG_GRADLE_PROJECT_otel_endpoint: ${{ secrets.OTEL_ENDPOINT }}
+          ORG_GRADLE_PROJECT_otel_auth_token: ${{ secrets.OTEL_AUTH_TOKEN }}
         run: bundle exec fastlane ios beta

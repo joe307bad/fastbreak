@@ -185,16 +185,18 @@ object TelemetryService {
             append(" ").append(timestampNs)
         }
 
+        println("📊 TelemetryService sending: $line")
         try {
-            httpClient.post(writeEndpoint) {
+            val response = httpClient.post(writeEndpoint) {
                 contentType(ContentType.Text.Plain)
                 if (AppConfig.OTEL_AUTH_TOKEN.isNotBlank()) {
                     header("X-API-Key", AppConfig.OTEL_AUTH_TOKEN)
                 }
                 setBody(line)
             }
+            println("📊 TelemetryService response: ${response.status}")
         } catch (e: Exception) {
-            // Network errors are expected when offline
+            println("📊 TelemetryService error: ${e.message}")
         }
     }
 
@@ -227,13 +229,25 @@ object TelemetryService {
      */
     private fun formatIlpFieldValue(value: Any): String {
         return when (value) {
-            is String -> "\"${value.replace("\"", "\\\"")}\""
+            is String -> "\"${escapeIlpString(value)}\""
             is Long -> "${value}i"
             is Int -> "${value}i"
             is Double -> value.toString()
             is Float -> value.toString()
             is Boolean -> if (value) "t" else "f"
-            else -> "\"${value.toString().replace("\"", "\\\"")}\""
+            else -> "\"${escapeIlpString(value.toString())}\""
         }
+    }
+
+    /**
+     * Escape special characters in ILP string field values.
+     * Must escape backslash first, then quotes, then remove newlines.
+     */
+    private fun escapeIlpString(value: String): String {
+        return value
+            .replace("\\", "\\\\")
+            .replace("\"", "\\\"")
+            .replace("\n", " ")
+            .replace("\r", "")
     }
 }

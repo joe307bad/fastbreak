@@ -151,17 +151,27 @@ jobs:
         run: |
           echo "${{ secrets.RELEASE_KEYSTORE }}" | base64 -d > release-keystore.jks
 
+      - name: Verify telemetry secrets
+        run: |
+          if [ -n "${{ secrets.OTEL_ENDPOINT }}" ]; then echo "OTEL_ENDPOINT is set"; else echo "WARNING: OTEL_ENDPOINT is empty"; fi
+          if [ -n "${{ secrets.OTEL_AUTH_TOKEN }}" ]; then echo "OTEL_AUTH_TOKEN is set"; else echo "WARNING: OTEL_AUTH_TOKEN is empty"; fi
+
+      - name: Clean generated config (force regeneration)
+        run: rm -rf shared/build/generated/appconfig
+
       - name: Build Android App Bundle
         env:
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
         run: |
-          ./gradlew :androidApp:bundleRelease --no-daemon \
+          ./gradlew :androidApp:bundleRelease --no-daemon --no-build-cache \
             -PVERSION_NAME="${{ steps.build_info.outputs.version_name }}" \
             -PVERSION_CODE="${{ steps.build_info.outputs.build_number }}" \
             -Pbuilt_in_release_id="${{ steps.release_id.outputs.release_id }}" \
             -Pdev_mode=false \
             -Potel_endpoint="${{ secrets.OTEL_ENDPOINT }}" \
             -Potel_auth_token="${{ secrets.OTEL_AUTH_TOKEN }}"
+          echo "=== Generated AppConfig.kt ==="
+          cat shared/build/generated/appconfig/com/joebad/fastbreak/config/AppConfig.kt
 
       - name: Upload to Google Play Alpha
         uses: r0adkll/upload-google-play@v1
@@ -237,13 +247,23 @@ jobs:
           bundler-cache: true
           working-directory: kmp/iosApp
 
+      - name: Verify telemetry secrets
+        run: |
+          if [ -n "${{ secrets.OTEL_ENDPOINT }}" ]; then echo "OTEL_ENDPOINT is set"; else echo "WARNING: OTEL_ENDPOINT is empty"; fi
+          if [ -n "${{ secrets.OTEL_AUTH_TOKEN }}" ]; then echo "OTEL_AUTH_TOKEN is set"; else echo "WARNING: OTEL_AUTH_TOKEN is empty"; fi
+
+      - name: Clean generated config (force regeneration)
+        run: rm -rf shared/build/generated/appconfig
+
       - name: Build KMP Framework
         run: |
-          ./gradlew :shared:linkReleaseFrameworkIosArm64 \
+          ./gradlew :shared:linkReleaseFrameworkIosArm64 --no-build-cache \
             -Pbuilt_in_release_id="${{ steps.release_id.outputs.release_id }}" \
             -Pdev_mode=false \
             -Potel_endpoint="${{ secrets.OTEL_ENDPOINT }}" \
             -Potel_auth_token="${{ secrets.OTEL_AUTH_TOKEN }}"
+          echo "=== Generated AppConfig.kt ==="
+          cat shared/build/generated/appconfig/com/joebad/fastbreak/config/AppConfig.kt
 
       - name: Install CocoaPods
         working-directory: kmp/iosApp

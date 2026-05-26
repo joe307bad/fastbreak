@@ -14,7 +14,7 @@ export function AnnouncementCard({ date, title, children }: AnnouncementCardProp
           {date}
         </span>
       </div>
-      <h3 className="text-lg font-bold text-black mb-2">{title}</h3>
+      <h3 className="text-lg font-bold text-[var(--foreground)] mb-2">{title}</h3>
       <div className="text-sm text-[var(--muted)]">{children}</div>
     </div>
   );

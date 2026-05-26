@@ -17,6 +17,7 @@ import { WorksheetLightbox } from "./src/components/ui/WorksheetLightbox";
 import { SportsTalkExamplesGallery } from "./src/components/ui/SportsTalkExamplesGallery";
 import { GoalProgress } from "./src/components/ui/GoalProgress";
 import { FullWidthImage } from "./src/components/ui/FullWidthImage";
+import { AnnouncementCard } from "./src/components/ui/AnnouncementCard";
 import { BracketComparison, Pros, Cons } from "./src/components/ui/BracketComparison";
 
 export function useMDXComponents(components: MDXComponents): MDXComponents {
@@ -38,6 +39,7 @@ export function useMDXComponents(components: MDXComponents): MDXComponents {
     WorksheetLightbox,
     SportsTalkExamplesGallery,
     GoalProgress,
+    AnnouncementCard,
     BracketComparison,
     Pros,
     Cons,

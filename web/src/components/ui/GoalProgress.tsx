@@ -10,7 +10,7 @@ export function GoalProgress({ total, completed, inProgress = 0, label = "Roadma
   const inProgressPercent = Math.round((inProgress / total) * 100);
 
   return (
-    <div className="my-6 p-4 rounded-lg border border-[var(--border)] bg-[var(--card-bg)]">
+    <div className="my-6 p-4 rounded-lg border-[4px] border-green-500 bg-[var(--card-bg)]">
       <div className="flex justify-between items-center mb-2">
         <span className="text-sm font-medium text-[var(--foreground)]">{label}</span>
         <span className="text-sm text-[var(--muted)]">

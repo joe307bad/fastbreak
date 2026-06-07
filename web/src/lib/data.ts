@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { ChartData, Registry, isChartEntry } from '@/types/chart';
+import { fileKeyToChartId } from '@/lib/registry';
 
 const DATA_DIR = path.join(process.cwd(), 'data');
 const CHARTS_DIR = path.join(DATA_DIR, 'charts');
@@ -20,7 +21,7 @@ export function getChartRegistry(): Registry {
   for (const [key, entry] of Object.entries(registry)) {
     if (isChartEntry(entry)) {
       // Only include charts that have local data files
-      const chartId = key.replace('dev/', '').replace('.json', '');
+      const chartId = fileKeyToChartId(key);
       const chartPath = path.join(CHARTS_DIR, `${chartId}.json`);
       if (fs.existsSync(chartPath)) {
         chartRegistry[key] = entry;

@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import { fileKeyToChartId, filterRegistryKeys, getRegistryPrefix } from '../src/lib/registry';
 
 const BASE_URL = 'https://d2jyizt5xogu23.cloudfront.net';
 const DATA_DIR = path.join(process.cwd(), 'data');
@@ -37,15 +38,18 @@ async function main() {
     throw new Error(`Failed to fetch registry: ${registryRes.status}`);
   }
   const registry: Registry = await registryRes.json();
+  const envRegistry = filterRegistryKeys(registry);
 
-  // Save registry
+  // Save registry (env-scoped so runtime only sees relevant entries)
   const registryPath = path.join(DATA_DIR, 'registry.json');
-  fs.writeFileSync(registryPath, JSON.stringify(registry, null, 2));
-  console.log(`Saved registry (${Object.keys(registry).length} entries)\n`);
+  fs.writeFileSync(registryPath, JSON.stringify(envRegistry, null, 2));
+  console.log(
+    `Saved registry (${Object.keys(envRegistry).length} entries, prefix=${getRegistryPrefix()})\n`
+  );
 
-  // Filter to chart entries only (exclude topics)
-  const chartEntries = Object.entries(registry).filter(
-    ([, entry]) => entry.type !== 'topics'
+  // Filter to chart entries only (exclude topics and system metadata)
+  const chartEntries = Object.entries(envRegistry).filter(
+    ([, entry]) => entry.type !== 'topics' && entry.type !== 'system'
   );
 
   // Download each chart
@@ -53,7 +57,7 @@ async function main() {
   let failCount = 0;
 
   for (const [key, entry] of chartEntries) {
-    const chartId = key.replace('dev/', '').replace('.json', '');
+    const chartId = fileKeyToChartId(key);
     const chartPath = path.join(CHARTS_DIR, `${chartId}.json`);
 
     try {

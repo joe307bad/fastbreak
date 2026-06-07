@@ -2,6 +2,8 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
+ENV FASTBREAK_ENV=prod
+
 # Copy package files
 COPY package*.json ./
 

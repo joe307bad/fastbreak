@@ -1,4 +1,5 @@
 import { ChartData, Registry } from '@/types/chart';
+import { chartIdToFileKey, fileKeyToChartId } from '@/lib/registry';
 import { getRegistry, getChartRegistry, getChartData } from './data';
 
 export async function fetchRegistry(): Promise<Registry> {
@@ -15,9 +16,9 @@ export async function fetchChartData(key: string): Promise<ChartData> {
 }
 
 export function keyToSlug(key: string): string {
-  return key.replace('dev/', '').replace('.json', '');
+  return fileKeyToChartId(key);
 }
 
 export function slugToKey(slug: string): string {
-  return `dev/${slug}.json`;
+  return chartIdToFileKey(slug);
 }

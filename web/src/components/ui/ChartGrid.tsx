@@ -7,6 +7,7 @@ import { UpcomingMatchups } from '@/components/charts/UpcomingMatchups';
 import { TopMatchupsWidget } from '@/components/charts/TopMatchupsWidget';
 import { ChartData, MatchupData, MatchupV2Data, NBAMatchupData, NHLMatchupData } from '@/types/chart';
 import { ChartNav } from './ChartNav';
+import { keyToSlug } from '@/lib/api';
 
 type AnyMatchupData = MatchupData | MatchupV2Data | NBAMatchupData | NHLMatchupData;
 
@@ -21,10 +22,6 @@ function slugify(text: string): string {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-|-$/g, '');
-}
-
-function keyToSlug(key: string): string {
-  return key.replace('dev/', '').replace('.json', '');
 }
 
 export function ChartGrid({ charts, matchups, topMatchupGameIds = [] }: ChartGridProps) {

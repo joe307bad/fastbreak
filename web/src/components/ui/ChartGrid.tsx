@@ -7,7 +7,7 @@ import { UpcomingMatchups } from '@/components/charts/UpcomingMatchups';
 import { TopMatchupsWidget } from '@/components/charts/TopMatchupsWidget';
 import { ChartData, MatchupData, MatchupV2Data, NBAMatchupData, NHLMatchupData } from '@/types/chart';
 import { ChartNav } from './ChartNav';
-import { keyToSlug } from '@/lib/api';
+import { fileKeyToChartId } from '@/lib/registry';
 
 type AnyMatchupData = MatchupData | MatchupV2Data | NBAMatchupData | NHLMatchupData;
 
@@ -221,7 +221,7 @@ export function ChartGrid({ charts, matchups, topMatchupGameIds = [] }: ChartGri
                 <div className="flex items-center justify-between">
                   <h3 className="text-sm font-bold">{data.title}</h3>
                   <Link
-                    href={`/${data.sport.toLowerCase()}/chart/${keyToSlug(key)}`}
+                    href={`/${data.sport.toLowerCase()}/chart/${fileKeyToChartId(key)}`}
                     className="text-[var(--muted)] hover:text-[var(--foreground)] transition-colors"
                     aria-label="Expand chart"
                   >

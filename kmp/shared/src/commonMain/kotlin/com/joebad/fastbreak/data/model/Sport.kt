@@ -1,9 +1,9 @@
 package com.joebad.fastbreak.data.model
 
 enum class Sport(val displayName: String) {
+    MLB("MLB"),
     NBA("NBA"),
     NHL("NHL"),
-    MLB("MLB"),
     NFL("NFL"),
     CBB("CBB")
 }

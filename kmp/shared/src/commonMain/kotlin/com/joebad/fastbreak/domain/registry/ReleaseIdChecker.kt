@@ -2,6 +2,7 @@ package com.joebad.fastbreak.domain.registry
 
 import com.joebad.fastbreak.config.AppConfig
 import com.joebad.fastbreak.data.model.RegistryEntry
+import com.joebad.fastbreak.platform.BuildFlags
 
 /**
  * Result of checking the release ID compatibility between client and server.
@@ -35,7 +36,7 @@ sealed class ReleaseIdCheckResult {
  * The release ID format is "fb-{number}" where the number is monotonically increasing.
  * The client must have a release ID >= the server's release ID to download charts.
  *
- * Dev mode bypasses this check entirely.
+ * Dev mode and debug builds bypass this check entirely.
  */
 class ReleaseIdChecker {
 
@@ -46,9 +47,11 @@ class ReleaseIdChecker {
      * @return ReleaseIdCheckResult indicating whether charts can be downloaded
      */
     fun checkReleaseId(registryEntries: Map<String, RegistryEntry>): ReleaseIdCheckResult {
-        // Dev mode bypasses release ID checking
-        if (AppConfig.DEV_MODE) {
-            println("🔓 ReleaseIdChecker: Dev mode enabled, bypassing release ID check")
+        if (AppConfig.DEV_MODE || BuildFlags.isDebugBuild) {
+            println(
+                "🔓 ReleaseIdChecker: Bypassing release ID check " +
+                    "(dev_mode=${AppConfig.DEV_MODE}, debug=${BuildFlags.isDebugBuild})"
+            )
             return ReleaseIdCheckResult.DevModeBypass
         }
 

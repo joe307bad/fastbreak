@@ -1,5 +1,6 @@
 package com.joebad.fastbreak.domain.teams
 
+import com.joebad.fastbreak.config.AppConfig
 import com.joebad.fastbreak.data.api.HttpClientFactory
 import com.joebad.fastbreak.data.model.TeamRoster
 import com.joebad.fastbreak.data.repository.TeamRosterRepository
@@ -16,8 +17,7 @@ import kotlinx.serialization.json.Json
  */
 class TeamRosterSynchronizer(
     private val teamRosterRepository: TeamRosterRepository,
-    private val httpClient: HttpClient = HttpClientFactory.create(),
-    private val isProd: Boolean = false  // Default to dev for now
+    private val httpClient: HttpClient = HttpClientFactory.create()
 ) {
     private val json = Json {
         ignoreUnknownKeys = true
@@ -33,7 +33,7 @@ class TeamRosterSynchronizer(
      * Gets the S3 URL for a sport's team roster.
      */
     private fun getTeamRosterUrl(sport: String): String {
-        val prefix = if (isProd) "" else "dev/"
+        val prefix = if (AppConfig.DEV_MODE) "dev/" else "prod/"
         return "$CLOUDFRONT_URL/${prefix}teams/${sport.lowercase()}__teams.json"
     }
 

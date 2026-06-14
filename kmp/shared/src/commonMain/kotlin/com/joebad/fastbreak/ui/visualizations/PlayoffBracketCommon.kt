@@ -184,6 +184,41 @@ internal fun parsePlayoffHexColor(hexColor: String): Color? {
 }
 
 // ============================================================================
+// Bracket arm placement (semifinals must align with their R1 feeder matchups)
+// ============================================================================
+
+private fun playoffBracketArmParticipants(r1Games: List<PlayoffBracketGame>, arm: Int): Set<String> {
+    val indices = if (arm == 0) listOf(0, 1) else listOf(2, 3)
+    return indices.flatMap { idx ->
+        val game = r1Games.getOrNull(idx) ?: return@flatMap emptyList()
+        listOfNotNull(game.team1?.abbreviation, game.team2?.abbreviation)
+    }.toSet()
+}
+
+private fun playoffSemiArmIndex(
+    semiGame: PlayoffBracketGame,
+    r1Games: List<PlayoffBracketGame>,
+    fallbackIndex: Int
+): Int {
+    val semiTeams = buildSet {
+        semiGame.team1?.abbreviation?.let { add(it) }
+        semiGame.team2?.abbreviation?.let { add(it) }
+    }
+    if (semiTeams.isEmpty()) return fallbackIndex
+
+    val leftTeams = playoffBracketArmParticipants(r1Games, 0)
+    val rightTeams = playoffBracketArmParticipants(r1Games, 1)
+    val fromLeft = semiTeams.all { it in leftTeams }
+    val fromRight = semiTeams.all { it in rightTeams }
+
+    return when {
+        fromLeft && !fromRight -> 0
+        fromRight && !fromLeft -> 1
+        else -> fallbackIndex
+    }
+}
+
+// ============================================================================
 // Bracket canvas rendering (shared composable)
 // ============================================================================
 
@@ -300,8 +335,15 @@ internal fun PlayoffBracketCanvas(
                     }
                 })
             }
+            val usedSemiArms = mutableSetOf<Int>()
             semiGames.forEachIndexed { gi, game ->
-                if (gi < 2) LinePlot(data = listOf(DefaultPoint(semiX[gi], semiY[gi])), lineStyle = noLine, symbol = {
+                if (gi >= 2) return@forEachIndexed
+                var armIdx = playoffSemiArmIndex(game, r1Games, gi)
+                if (armIdx in usedSemiArms) {
+                    armIdx = (0..1).first { it !in usedSemiArms }
+                }
+                usedSemiArms.add(armIdx)
+                LinePlot(data = listOf(DefaultPoint(semiX[armIdx], semiY[armIdx])), lineStyle = noLine, symbol = {
                     PlayoffMatchupBoxSymbol(game, conf.color, textColor, backgroundColor) {
                         game.sourceMatchup?.let { onMatchupClick(it, conf.name, "Conference Semifinals", conf.color) }
                     }

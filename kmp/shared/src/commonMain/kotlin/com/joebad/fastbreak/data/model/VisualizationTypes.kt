@@ -346,6 +346,8 @@ data class PlayoffChanceEntry(
     val champProb: Double? = null,
     val conference: String? = null,
     val winPct: Double? = null,
+    val wins: Int? = null,
+    val losses: Int? = null,
     val netRating: Double? = null,
     val leaguePoints: Int? = null,
     val goalDiff: Int? = null
@@ -1174,6 +1176,83 @@ data class MLBMatchupVisualization(
     val leagueCumRunDiffStats: LeagueCumRunDiffStats? = null,
     val leagueWeeklyStats: LeagueWeeklyStats? = null,
     val dataPoints: List<MLBMatchup>
+) : VisualizationType
+
+// MLB Team Report Card data structures
+@Serializable
+data class ReportCardStatValue(
+    val label: String,
+    val value: Double? = null,
+    val rank: Int? = null,
+    val rankDisplay: String? = null
+)
+
+@Serializable
+data class ReportCardTeamSummary(
+    val stats: Map<String, ReportCardStatValue> = emptyMap()
+)
+
+@Serializable
+data class ReportCardPlayer(
+    val playerId: String,
+    val name: String,
+    val position: String? = null,
+    val war: Double? = null,
+    val stats: Map<String, ReportCardStatValue> = emptyMap()
+)
+
+@Serializable
+data class ReportCardCategory(
+    val label: String,
+    val description: String? = null,
+    val team: ReportCardTeamSummary? = null,
+    val players: List<ReportCardPlayer> = emptyList()
+)
+
+@Serializable
+data class ReportCardCategories(
+    val hitters: ReportCardCategory,
+    val starters: ReportCardCategory,
+    val relievers: ReportCardCategory,
+    val fielders: ReportCardCategory
+)
+
+@Serializable
+data class ReportCardTeam(
+    val teamCode: String,
+    val teamName: String,
+    val division: String? = null,
+    val league: String? = null,
+    val wins: Int? = null,
+    val losses: Int? = null,
+    val recordRank: Int? = null,
+    val recordRankDisplay: String? = null,
+    val divisionRank: Int? = null,
+    val divisionRankDisplay: String? = null,
+    val overallComposite: Double? = null,
+    val overallCompositeRank: Int? = null,
+    val overallCompositeRankDisplay: String? = null,
+    val playoffProb: Double? = null,
+    val categories: ReportCardCategories
+)
+
+@Serializable
+data class MLBTeamReportCardVisualization(
+    override val sport: String,
+    override val visualizationType: String,
+    override val title: String,
+    override val subtitle: String,
+    override val description: String,
+    override val lastUpdated: Instant,
+    override val source: String? = null,
+    @Serializable(with = TagListSerializer::class)
+    override val tags: List<Tag>? = null,
+    override val sortOrder: Int? = null,
+    val season: Int,
+    val topN: Int,
+    val rankings: Map<String, List<RankingEntry>> = emptyMap(),
+    val playoffChances: List<PlayoffChanceEntry> = emptyList(),
+    val teams: Map<String, ReportCardTeam>
 ) : VisualizationType
 
 // Hello World visualization (placeholder for future features)

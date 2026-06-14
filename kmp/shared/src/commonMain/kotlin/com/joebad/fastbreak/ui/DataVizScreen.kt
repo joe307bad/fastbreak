@@ -394,6 +394,7 @@ private fun SuccessContent(
             && visualization !is NBAMatchupVisualization
             && visualization !is NHLMatchupVisualization
             && visualization !is MLBMatchupVisualization
+            && visualization !is MLBTeamReportCardVisualization
             && visualization !is CBBMatchupVisualization
             && visualization !is NCAABracketVisualization
             && visualization !is NBAPlayoffBracketVisualization
@@ -562,6 +563,13 @@ private fun RenderVisualization(
             highlightedTeamCodes = highlightedTeamCodes,
             onScheduleToggleHandlerChanged = onScheduleToggleHandlerChanged
         )
+    } else if (visualization is MLBTeamReportCardVisualization) {
+        MLBTeamReportCardWorksheet(
+            visualization = visualization,
+            modifier = Modifier.fillMaxSize(),
+            pinnedTeams = pinnedTeams,
+            highlightedTeamCodes = highlightedTeamCodes
+        )
     } else if (visualization is CBBMatchupVisualization) {
         // CBB Matchup has its own dedicated screen with two-row navigation
         CBBMatchupWorksheet(
@@ -687,6 +695,9 @@ private fun RenderVisualization(
                             is MLBMatchupVisualization -> {
                                 // Handled by MLBMatchupWorksheet above
                             }
+                            is MLBTeamReportCardVisualization -> {
+                                // Handled by MLBTeamReportCardWorksheet above
+                            }
                             is CBBMatchupVisualization -> {
                                 // Handled by CBBMatchupWorksheet above
                             }
@@ -809,6 +820,10 @@ private fun extractFiltersAndCalculateHighlights(
             emptyList<FilterOption>() to highlights
         }
         is MLBMatchupVisualization -> {
+            val highlights = selectedFilters["team"]?.let { setOf(it.uppercase()) } ?: emptySet()
+            emptyList<FilterOption>() to highlights
+        }
+        is MLBTeamReportCardVisualization -> {
             val highlights = selectedFilters["team"]?.let { setOf(it.uppercase()) } ?: emptySet()
             emptyList<FilterOption>() to highlights
         }

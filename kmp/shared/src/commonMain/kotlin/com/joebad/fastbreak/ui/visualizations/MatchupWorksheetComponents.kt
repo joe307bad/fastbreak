@@ -181,6 +181,50 @@ fun getNBAPlayerRankColor(rank: Int?): Color {
 }
 
 /**
+ * MLB player ranks (league-wide, hundreds of qualified players):
+ * 1-30 green, 31-60 yellow-green, 61-100 orange, 101+ red
+ */
+fun getMLBPlayerRankColor(rank: Int?): Color {
+    if (rank == null || rank <= 0) return Color.Transparent
+    return when {
+        rank <= 30 -> {
+            val ratio = (rank - 1) / 29f
+            Color((0 + ratio * 50).toInt(), (150 - ratio * 35).toInt(), 0)
+        }
+        rank <= 60 -> {
+            val ratio = (rank - 31) / 29f
+            Color((170 + ratio * 85).toInt(), (190 - ratio * 50).toInt(), 0)
+        }
+        rank <= 100 -> {
+            val ratio = (rank - 61) / 39f
+            Color((255 - ratio * 55).toInt(), (140 - ratio * 100).toInt(), 0)
+        }
+        else -> Color(178, 0, 0)
+    }
+}
+
+/**
+ * MLB team ranks (30 teams) — matches MLB matchup worksheet colors.
+ */
+fun getMLBTeamRankColor(rank: Int?): Color {
+    if (rank == null || rank <= 0) return Color.Transparent
+    return when {
+        rank <= 5 -> {
+            val ratio = (rank - 1) / 4f
+            Color((0 + ratio * 80).toInt(), (150 - ratio * 25).toInt(), (42 - ratio * 32).toInt())
+        }
+        rank <= 15 -> {
+            val ratio = (rank - 6) / 9f
+            Color((255 - ratio * 55).toInt(), (160 - ratio * 60).toInt(), 0)
+        }
+        else -> {
+            val ratio = ((rank - 16).coerceAtMost(14)) / 14f
+            Color((200 - ratio * 61).toInt(), (50 - ratio * 50).toInt(), 0)
+        }
+    }
+}
+
+/**
  * Pre-computed rank colors for CBB team stats (1-64 scale)
  * - Ranks 1-21: Green gradient
  * - Ranks 22-42: Orange gradient
@@ -479,6 +523,51 @@ fun ThreeColumnRow(
 }
 
 /**
+ * Shared rank badge used across matchup and report card rows.
+ */
+@Composable
+fun MatchupRankBadge(
+    rank: Int?,
+    rankDisplay: String?,
+    rankColorFn: ((Int?) -> Color)? = null,
+    usePlayerRanks: Boolean = false,
+    useCBBRanks: Boolean = false,
+    useNHLRanks: Boolean = false,
+    useNBARanks: Boolean = true,
+    emptyPlaceholder: String = "-"
+) {
+    if (rank == null && rankDisplay.isNullOrBlank()) {
+        if (emptyPlaceholder.isEmpty()) {
+            Spacer(modifier = Modifier.width(32.dp))
+            return
+        }
+    }
+    val color = rankColorFn?.invoke(rank) ?: when {
+        usePlayerRanks -> getNBAPlayerRankColor(rank)
+        useCBBRanks -> getCBBTeamRankColor(rank)
+        useNHLRanks -> getNHLTeamRankColor(rank)
+        useNBARanks -> getNBATeamRankColor(rank)
+        else -> Color.Gray
+    }
+    Box(
+        modifier = Modifier
+            .width(32.dp)
+            .background(color, RoundedCornerShape(4.dp))
+            .padding(4.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = rankDisplay ?: emptyPlaceholder,
+            style = MaterialTheme.typography.bodySmall,
+            fontSize = 9.sp,
+            fontWeight = FontWeight.Bold,
+            color = Color.White,
+            maxLines = 1
+        )
+    }
+}
+
+/**
  * Five-column layout with stat values and rank indicators
  */
 @Composable
@@ -496,7 +585,8 @@ fun FiveColumnRowWithRanks(
     useCBBRanks: Boolean = false, // true for CBB (64 teams), overrides useNBARanks
     useNHLRanks: Boolean = false, // true for NHL (32 teams), overrides useNBARanks
     onClick: (() -> Unit)? = null,
-    rankColorFn: ((Int?) -> Color)? = null // optional override for rank badge colors
+    rankColorFn: ((Int?) -> Color)? = null, // optional override for rank badge colors
+    emptyRankPlaceholder: String = "-"
 ) {
     Row(
         modifier = Modifier
@@ -530,32 +620,16 @@ fun FiveColumnRowWithRanks(
 
         Spacer(modifier = Modifier.width(4.dp))
 
-        // Left rank box
-        Box(
-            modifier = Modifier
-                .width(32.dp)
-                .background(
-                    rankColorFn?.invoke(leftRank) ?: when {
-                        usePlayerRanks -> getNBAPlayerRankColor(leftRank)
-                        useCBBRanks -> getCBBTeamRankColor(leftRank)
-                        useNHLRanks -> getNHLTeamRankColor(leftRank)
-                        useNBARanks -> getNBATeamRankColor(leftRank)
-                        else -> Color.Gray
-                    },
-                    RoundedCornerShape(4.dp)
-                )
-                .padding(4.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = leftRankDisplay ?: "-",
-                style = MaterialTheme.typography.bodySmall,
-                fontSize = 9.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color.White,
-                maxLines = 1
-            )
-        }
+        MatchupRankBadge(
+            rank = leftRank,
+            rankDisplay = leftRankDisplay,
+            rankColorFn = rankColorFn,
+            usePlayerRanks = usePlayerRanks,
+            useCBBRanks = useCBBRanks,
+            useNHLRanks = useNHLRanks,
+            useNBARanks = useNBARanks,
+            emptyPlaceholder = emptyRankPlaceholder
+        )
 
         Spacer(modifier = Modifier.width(8.dp))
 
@@ -573,32 +647,16 @@ fun FiveColumnRowWithRanks(
 
         Spacer(modifier = Modifier.width(8.dp))
 
-        // Right rank box
-        Box(
-            modifier = Modifier
-                .width(32.dp)
-                .background(
-                    rankColorFn?.invoke(rightRank) ?: when {
-                        usePlayerRanks -> getNBAPlayerRankColor(rightRank)
-                        useCBBRanks -> getCBBTeamRankColor(rightRank)
-                        useNHLRanks -> getNHLTeamRankColor(rightRank)
-                        useNBARanks -> getNBATeamRankColor(rightRank)
-                        else -> Color.Gray
-                    },
-                    RoundedCornerShape(4.dp)
-                )
-                .padding(4.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = rightRankDisplay ?: "-",
-                style = MaterialTheme.typography.bodySmall,
-                fontSize = 9.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color.White,
-                maxLines = 1
-            )
-        }
+        MatchupRankBadge(
+            rank = rightRank,
+            rankDisplay = rightRankDisplay,
+            rankColorFn = rankColorFn,
+            usePlayerRanks = usePlayerRanks,
+            useCBBRanks = useCBBRanks,
+            useNHLRanks = useNHLRanks,
+            useNBARanks = useNBARanks,
+            emptyPlaceholder = emptyRankPlaceholder
+        )
 
         Spacer(modifier = Modifier.width(4.dp))
 

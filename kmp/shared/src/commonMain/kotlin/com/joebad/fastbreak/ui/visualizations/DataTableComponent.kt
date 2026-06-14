@@ -128,6 +128,9 @@ fun DataTableComponent(
             is MLBMatchupVisualization -> {
                 // MLBMatchup doesn't need a data table - it's handled by MLBMatchupWorksheet
             }
+            is MLBTeamReportCardVisualization -> {
+                // Handled by MLBTeamReportCardWorksheet
+            }
             is CBBMatchupVisualization -> {
                 // CBBMatchup doesn't need a data table - it's handled by CBBMatchupWorksheet
             }

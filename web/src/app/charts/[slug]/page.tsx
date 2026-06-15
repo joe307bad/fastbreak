@@ -1,15 +1,14 @@
-import { fetchChartRegistry, fetchChartData, slugToKey, keyToSlug } from '@/lib/api';
+import { fetchAllCharts, fetchChartData, fetchOrderedSportsWithCharts, slugToKey, keyToSlug } from '@/lib/api';
 import { ChartRenderer } from '@/components/charts';
 import { SportTabs } from '@/components/ui/SportTabs';
-import { getOrderedLeagues } from '@/lib/leagues';
 
 interface Props {
   params: Promise<{ slug: string }>;
 }
 
 export async function generateStaticParams() {
-  const registry = await fetchChartRegistry();
-  return Object.keys(registry).map(key => ({
+  const allCharts = await fetchAllCharts();
+  return allCharts.map(({ key }) => ({
     slug: keyToSlug(key),
   }));
 }
@@ -28,7 +27,7 @@ export default async function ChartPage({ params }: Props) {
   const { slug } = await params;
   const key = slugToKey(slug);
   const data = await fetchChartData(key);
-  const orderedSports = getOrderedLeagues();
+  const orderedSports = await fetchOrderedSportsWithCharts();
 
   return (
     <main className="max-w-[2000px] mx-auto px-0 md:px-4">

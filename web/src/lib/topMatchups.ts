@@ -1,4 +1,12 @@
-import { NBAMatchupData, NBAMatchupDataPoint, NHLMatchupData, NHLMatchupDataPoint } from '@/types/chart';
+import {
+  MLBMatchupData,
+  MLBMatchupDataPoint,
+  NBAMatchupData,
+  NBAMatchupDataPoint,
+  NHLMatchupData,
+  NHLMatchupDataPoint,
+} from '@/types/chart';
+import { getRunDiffPerGame } from '@/lib/mlbStats';
 
 const MAX_DAYS = 4;
 const GAMES_PER_DAY = 2;
@@ -59,8 +67,31 @@ function selectNHL(data: NHLMatchupData): string[] {
   return ids;
 }
 
-export function selectTopMatchups(data: NBAMatchupData | NHLMatchupData): string[] {
+function getTeamRunDiff(team: MLBMatchupDataPoint['homeTeam']): number {
+  return getRunDiffPerGame(team.stats)?.value ?? 0;
+}
+
+function selectMLB(data: MLBMatchupData): string[] {
+  const upcoming = data.dataPoints.filter(m => !m.gameCompleted);
+  const byDay = groupByDay(upcoming);
+  const days = orderedDays(byDay).slice(0, MAX_DAYS);
+  const ids: string[] = [];
+  for (const [, games] of days) {
+    const ranked = [...games].sort((a: MLBMatchupDataPoint, b: MLBMatchupDataPoint) => {
+      const ta = getTeamRunDiff(a.homeTeam) + getTeamRunDiff(a.awayTeam);
+      const tb = getTeamRunDiff(b.homeTeam) + getTeamRunDiff(b.awayTeam);
+      return tb - ta;
+    });
+    for (const g of ranked.slice(0, GAMES_PER_DAY)) ids.push(g.gameId);
+  }
+  return ids;
+}
+
+export function selectTopMatchups(
+  data: NBAMatchupData | NHLMatchupData | MLBMatchupData
+): string[] {
   if (data.visualizationType === 'NBA_MATCHUP') return selectNBA(data);
   if (data.visualizationType === 'NHL_MATCHUP') return selectNHL(data);
+  if (data.visualizationType === 'MLB_MATCHUP') return selectMLB(data);
   return [];
 }

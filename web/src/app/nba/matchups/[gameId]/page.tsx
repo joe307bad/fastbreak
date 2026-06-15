@@ -6,7 +6,7 @@ import { MatchupComparisons } from '@/components/charts/MatchupComparisons';
 import { CumNetRatingChart } from '@/components/charts/CumNetRatingChart';
 import { WeeklyEfficiencyChart } from '@/components/charts/WeeklyEfficiencyChart';
 import { ChartDownloadWrapper } from '@/components/charts/ChartDownloadWrapper';
-import { getOrderedLeagues } from '@/lib/leagues';
+import { fetchOrderedSportsWithCharts } from '@/lib/api';
 import { notFound } from 'next/navigation';
 
 interface Props {
@@ -355,7 +355,7 @@ function MatchupResults({ results, awayAbbrev, homeAbbrev }: {
 
 export default async function NBAMatchupPage({ params }: Props) {
   const { gameId } = await params;
-  const orderedSports = getOrderedLeagues();
+  const orderedSports = await fetchOrderedSportsWithCharts();
   const matchupData = await getNBAMatchupData();
 
   if (!matchupData) {

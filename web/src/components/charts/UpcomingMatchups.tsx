@@ -1,8 +1,8 @@
 'use client';
 
-import { MatchupData, NBAMatchupData, NBAMatchupDataPoint, NHLMatchupData, NHLMatchupDataPoint, MatchupV2Data, MatchupV2DataPoint, MatchupV2Odds } from '@/types/chart';
-
-type AnyMatchupData = MatchupData | NBAMatchupData | NHLMatchupData | MatchupV2Data;
+import { MatchupData, MLBMatchupData, MLBMatchupDataPoint, NBAMatchupData, NBAMatchupDataPoint, NHLMatchupData, NHLMatchupDataPoint, MatchupV2Data, MatchupV2DataPoint, MatchupV2Odds } from '@/types/chart';
+import { AnyMatchupData } from '@/lib/charts';
+import { formatRunDiff, getLeagueAbbrev, getRecordRank, getRunDiffPerGame } from '@/lib/mlbStats';
 
 interface Props {
   data: AnyMatchupData;
@@ -175,6 +175,52 @@ function NHLMatchupCard({ matchup }: { matchup: NHLMatchupDataPoint }) {
           <span className="font-mono">{matchup.awayTeam.stats.goalsAgainstPerGame.toFixed(2)}</span>
           <span> vs </span>
           <span className="font-mono">{matchup.homeTeam.stats.goalsAgainstPerGame.toFixed(2)}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MLBMatchupCard({ matchup }: { matchup: MLBMatchupDataPoint }) {
+  const { date, time } = formatGameTime(matchup.gameDate);
+  const isCompleted = matchup.gameCompleted;
+  const awayRunDiff = getRunDiffPerGame(matchup.awayTeam.stats);
+  const homeRunDiff = getRunDiffPerGame(matchup.homeTeam.stats);
+
+  return (
+    <div className="border border-[var(--border)] rounded p-3 bg-[var(--card)]">
+      <div className="flex justify-between items-center text-xs text-[var(--muted)] mb-2">
+        <span>{date}</span>
+        <span>{isCompleted ? 'Final' : time}</span>
+      </div>
+
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-[var(--muted)] w-4">{getLeagueAbbrev(matchup.awayTeam.league)}</span>
+            <span className="font-bold">{matchup.awayTeam.abbreviation}</span>
+            <span className="text-xs text-[var(--muted)]">({matchup.awayTeam.record})</span>
+          </div>
+          <div className="flex items-center gap-3 text-xs">
+            <span className="text-[var(--muted)]">#{getRecordRank(matchup.awayTeam.stats.monthTrend) ?? '-'}</span>
+            <span className={`font-mono w-10 text-right ${(awayRunDiff?.value ?? 0) >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+              {formatRunDiff(awayRunDiff?.value)}
+            </span>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-[var(--muted)] w-4">{getLeagueAbbrev(matchup.homeTeam.league)}</span>
+            <span className="font-bold">{matchup.homeTeam.abbreviation}</span>
+            <span className="text-xs text-[var(--muted)]">({matchup.homeTeam.record})</span>
+          </div>
+          <div className="flex items-center gap-3 text-xs">
+            <span className="text-[var(--muted)]">#{getRecordRank(matchup.homeTeam.stats.monthTrend) ?? '-'}</span>
+            <span className={`font-mono w-10 text-right ${(homeRunDiff?.value ?? 0) >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+              {formatRunDiff(homeRunDiff?.value)}
+            </span>
+          </div>
         </div>
       </div>
     </div>
@@ -378,6 +424,37 @@ export function UpcomingMatchups({ data }: Props) {
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {upcomingGames.slice(0, 12).map((matchup) => (
           <NHLMatchupCard key={matchup.gameId} matchup={matchup} />
+        ))}
+      </div>
+    );
+  }
+
+  // Handle MLB_MATCHUP type
+  if (data.visualizationType === 'MLB_MATCHUP') {
+    const mlbData = data as MLBMatchupData;
+    const upcomingGames = mlbData.dataPoints
+      .filter(m => !m.gameCompleted)
+      .sort((a, b) => new Date(a.gameDate).getTime() - new Date(b.gameDate).getTime());
+
+    if (upcomingGames.length === 0) {
+      const recentGames = mlbData.dataPoints
+        .filter(m => m.gameCompleted)
+        .sort((a, b) => new Date(b.gameDate).getTime() - new Date(a.gameDate).getTime())
+        .slice(0, 8);
+
+      return (
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {recentGames.map(matchup => (
+            <MLBMatchupCard key={matchup.gameId} matchup={matchup} />
+          ))}
+        </div>
+      );
+    }
+
+    return (
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        {upcomingGames.slice(0, 12).map(matchup => (
+          <MLBMatchupCard key={matchup.gameId} matchup={matchup} />
         ))}
       </div>
     );

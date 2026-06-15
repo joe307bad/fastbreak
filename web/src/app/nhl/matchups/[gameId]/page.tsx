@@ -7,7 +7,7 @@ import { CumXgChart } from '@/components/charts/CumXgChart';
 import { XgVsPointsChart } from '@/components/charts/XgVsPointsChart';
 import { ChartDownloadWrapper } from '@/components/charts/ChartDownloadWrapper';
 import { NHLPlayerComparison } from '@/components/charts/NHLPlayerComparison';
-import { getOrderedLeagues } from '@/lib/leagues';
+import { fetchOrderedSportsWithCharts } from '@/lib/api';
 import { notFound } from 'next/navigation';
 
 interface Props {
@@ -313,7 +313,7 @@ function MatchupResults({ results, awayAbbrev, homeAbbrev }: {
 
 export default async function NHLMatchupPage({ params }: Props) {
   const { gameId } = await params;
-  const orderedSports = getOrderedLeagues();
+  const orderedSports = await fetchOrderedSportsWithCharts();
   const matchupData = await getNHLMatchupData();
 
   if (!matchupData) {

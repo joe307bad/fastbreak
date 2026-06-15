@@ -2,7 +2,7 @@ import type { TeamRoster } from '@/types/pinnedTeams';
 import { getRegistryPrefix } from '@/lib/registry';
 
 const CLOUDFRONT_URL = 'https://d2jyizt5xogu23.cloudfront.net';
-const SPORTS = ['nfl', 'nba', 'nhl'] as const;
+const SPORTS = ['nfl', 'nba', 'nhl', 'mlb'] as const;
 
 function getTeamRosterUrl(sport: string): string {
   return `${CLOUDFRONT_URL}/${getRegistryPrefix()}teams/${sport}__teams.json`;

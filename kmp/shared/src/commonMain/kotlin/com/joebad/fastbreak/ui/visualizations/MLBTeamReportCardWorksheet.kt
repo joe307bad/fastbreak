@@ -34,6 +34,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.joebad.fastbreak.data.model.MLBTeamReportCardVisualization
 import com.joebad.fastbreak.data.model.PinnedTeam
+import com.joebad.fastbreak.data.model.RankingEntry
 import com.joebad.fastbreak.data.model.ReportCardCategory
 import com.joebad.fastbreak.data.model.ReportCardPlayer
 import com.joebad.fastbreak.data.model.ReportCardStatValue
@@ -64,9 +65,68 @@ private data class CategoryConfig(
 private val CATEGORY_CONFIGS = mapOf(
     "hitters" to CategoryConfig(listOf("wRC_plus", "xwOBA"), ::getMLBTeamRankColor),
     "starters" to CategoryConfig(listOf("K-BB_pct", "xFIP"), ::getMLBTeamRankColor),
-    "relievers" to CategoryConfig(listOf("K-BB_pct", "FIP"), ::getMLBTeamRankColor),
+    "relievers" to CategoryConfig(listOf("K-BB_pct", "FIP", "SV"), ::getMLBTeamRankColor),
     "fielders" to CategoryConfig(listOf("OAA", "DRS"), ::getMLBTeamRankColor)
 )
+
+private val CATEGORY_COMPOSITE_RANKING_KEYS = mapOf(
+    "hitters" to "hittersComposite",
+    "starters" to "startersComposite",
+    "relievers" to "relieversComposite",
+    "fielders" to "fieldersComposite"
+)
+
+private fun formatReportCardRankingLabel(seasonLabel: String, key: String): String {
+    return when (key) {
+        "record" -> "$seasonLabel / Record"
+        "overallComposite" -> "$seasonLabel / Overall Composite"
+        "hittersComposite" -> "$seasonLabel / Hitters Composite"
+        "startersComposite" -> "$seasonLabel / Starting Pitchers Composite"
+        "relieversComposite" -> "$seasonLabel / Bullpen Composite"
+        "fieldersComposite" -> "$seasonLabel / Fielders Composite"
+        else -> "$seasonLabel / $key"
+    }
+}
+
+private fun buildCategoryCompositeRanking(
+    teams: List<ReportCardTeam>,
+    categoryKey: String
+): List<RankingEntry> {
+    val categoryForTeam: (ReportCardTeam) -> ReportCardCategory = when (categoryKey) {
+        "hitters" -> { team -> team.categories.hitters }
+        "starters" -> { team -> team.categories.starters }
+        "relievers" -> { team -> team.categories.relievers }
+        "fielders" -> { team -> team.categories.fielders }
+        else -> return emptyList()
+    }
+    return teams.mapNotNull { team ->
+        val aggregate = categoryForTeam(team).team?.stats?.get("aggregate")
+        val rank = aggregate?.rank
+        val value = aggregate?.value
+        if (rank == null || value == null) return@mapNotNull null
+        RankingEntry(
+            rank = rank,
+            rankDisplay = aggregate.rankDisplay ?: rank.toString(),
+            value = value,
+            team = team.teamCode
+        )
+    }.sortedBy { it.rank }
+}
+
+private fun mergeReportCardRankings(
+    rankings: Map<String, List<RankingEntry>>,
+    teams: List<ReportCardTeam>
+): Map<String, List<RankingEntry>> {
+    if (teams.isEmpty()) return rankings
+    val merged = rankings.toMutableMap()
+    CATEGORY_COMPOSITE_RANKING_KEYS.forEach { (categoryKey, rankingKey) ->
+        if (merged[rankingKey].isNullOrEmpty()) {
+            val built = buildCategoryCompositeRanking(teams, categoryKey)
+            if (built.isNotEmpty()) merged[rankingKey] = built
+        }
+    }
+    return merged
+}
 
 private enum class ReportCardShareTarget(val categoryKey: String?, val shareLabel: String) {
     HITTERS("hitters", "Hitters"),
@@ -142,6 +202,10 @@ fun MLBTeamReportCardWorksheet(
         filterReportCardTeams(teams, teamSearchQuery)
     }
 
+    val reportCardRankings = remember(visualization.rankings, teams) {
+        mergeReportCardRankings(visualization.rankings, teams)
+    }
+
     val selectedTeam = teams.find { it.teamCode == selectedTeamCode }
     var captureRequest by remember { mutableStateOf<ReportCardCaptureRequest?>(null) }
     val graphicsLayer = rememberGraphicsLayer()
@@ -153,13 +217,11 @@ fun MLBTeamReportCardWorksheet(
                 .fillMaxSize()
                 .padding(horizontal = 16.dp)
         ) {
-        Spacer(modifier = Modifier.height(8.dp))
-
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .clickable { teamPickerOpen = true }
-                .padding(vertical = 4.dp),
+                .padding(bottom = 4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
@@ -192,16 +254,16 @@ fun MLBTeamReportCardWorksheet(
 
             ReportCardTeamSummaryRow(
                 team = selectedTeam,
-                hasRecordRankings = visualization.rankings.containsKey("record"),
-                hasOverallRankings = visualization.rankings.containsKey("overallComposite"),
+                hasRecordRankings = reportCardRankings.containsKey("record"),
+                hasOverallRankings = reportCardRankings.containsKey("overallComposite"),
                 hasPlayoffChances = visualization.playoffChances.isNotEmpty(),
                 onRecordRankClick = {
-                    if (visualization.rankings.containsKey("record")) {
+                    if (reportCardRankings.containsKey("record")) {
                         selectedRankingKey = "record"
                     }
                 },
                 onOverallRankClick = {
-                    if (visualization.rankings.containsKey("overallComposite")) {
+                    if (reportCardRankings.containsKey("overallComposite")) {
                         selectedRankingKey = "overallComposite"
                     }
                 },
@@ -250,13 +312,9 @@ fun MLBTeamReportCardWorksheet(
         }
 
         selectedRankingKey?.let { key ->
-            val entries = visualization.rankings[key] ?: emptyList()
+            val entries = reportCardRankings[key] ?: emptyList()
             if (entries.isNotEmpty() && selectedTeam != null) {
-                val statLabel = when (key) {
-                    "record" -> "$seasonLabel / Record"
-                    "overallComposite" -> "$seasonLabel / Overall Composite"
-                    else -> "$seasonLabel / $key"
-                }
+                val statLabel = formatReportCardRankingLabel(seasonLabel, key)
                 StatRankingsBottomSheet(
                     statLabel = statLabel,
                     entries = entries,
@@ -368,7 +426,10 @@ fun MLBTeamReportCardWorksheet(
                     ReportCardCategorySection(
                         category = category,
                         statKeys = config.statKeys,
-                        teamRankColorFn = config.teamRankColorFn
+                        teamRankColorFn = config.teamRankColorFn,
+                        compositeRankingKey = CATEGORY_COMPOSITE_RANKING_KEYS[key],
+                        rankings = reportCardRankings,
+                        onCompositeRankClick = { selectedRankingKey = it }
                     )
                     if (index < categories.lastIndex) {
                         Spacer(modifier = Modifier.height(12.dp))
@@ -470,6 +531,9 @@ private fun ReportCardCategorySection(
     category: ReportCardCategory,
     statKeys: List<String>,
     teamRankColorFn: (Int?) -> Color,
+    compositeRankingKey: String? = null,
+    rankings: Map<String, List<RankingEntry>> = emptyMap(),
+    onCompositeRankClick: ((String) -> Unit)? = null,
     expandStatsForShare: Boolean = false
 ) {
     val teamStats = category.team?.stats.orEmpty()
@@ -491,6 +555,8 @@ private fun ReportCardCategorySection(
         )
     }
     teamStats["aggregate"]?.let { composite ->
+        val compositeRankingAvailable =
+            compositeRankingKey != null && rankings.containsKey(compositeRankingKey)
         FiveColumnRowWithRanks(
             leftValue = formatReportCardStat(composite),
             leftRank = composite.rank,
@@ -500,6 +566,12 @@ private fun ReportCardCategorySection(
             rightRank = null,
             rightRankDisplay = null,
             rankColorFn = teamRankColorFn,
+            useNBARanks = false,
+            onClick = if (compositeRankingAvailable) {
+                { onCompositeRankClick?.invoke(compositeRankingKey!!) }
+            } else {
+                null
+            },
             emptyRankPlaceholder = ""
         )
     }
@@ -624,8 +696,6 @@ private fun ReportCardPlayerStatsColumns(
     val isHeader = player == null
     val headerStyle = MaterialTheme.typography.labelSmall
     val headerColor = MaterialTheme.colorScheme.onSurfaceVariant
-    val stat1 = statKeys.getOrNull(0)?.let { player?.stats?.get(it) }
-    val stat2 = statKeys.getOrNull(1)?.let { player?.stats?.get(it) }
 
     Row(verticalAlignment = Alignment.CenterVertically) {
         ReportCardFixedColumn(PLAYER_POS_WIDTH, Alignment.Center) {
@@ -648,7 +718,8 @@ private fun ReportCardPlayerStatsColumns(
         }
 
         statLabels.forEachIndexed { index, label ->
-            val stat = if (index == 0) stat1 else stat2
+            val statKey = statKeys.getOrNull(index)
+            val stat = statKey?.let { player?.stats?.get(it) }
 
             Spacer(modifier = Modifier.width(PLAYER_STAT_GROUP_SPACING))
 
@@ -1030,6 +1101,8 @@ private fun formatReportCardStat(stat: ReportCardStatValue): String {
         stat.label.equals("OAA", ignoreCase = true) || stat.label.equals("DRS", ignoreCase = true) ->
             formatReportCardValue(value, 1)
         stat.label.equals("xwOBA", ignoreCase = true) -> formatReportCardValue(value, 3)
+        stat.label.equals("SV", ignoreCase = true) -> formatReportCardValue(value, 0)
+        stat.label.equals("SV/G", ignoreCase = true) -> formatReportCardValue(value, 2)
         else -> formatReportCardValue(value, 2)
     }
 }

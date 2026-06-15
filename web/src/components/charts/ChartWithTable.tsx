@@ -290,19 +290,20 @@ export function ChartWithTable({ data, title, subtitle, source, lastUpdated }: P
   }, [data]);
 
   const isScatterPlot = data.visualizationType === 'SCATTER_PLOT';
+  const isReportCard = data.visualizationType === 'MLB_TEAM_REPORT_CARD';
 
   return (
-    <div className="flex flex-col lg:flex-row gap-4 h-full">
-      {/* Chart + About — left 50% */}
-      <div className="lg:w-1/2 lg:overflow-y-auto">
-        <section className="relative border border-[var(--border)] bg-[var(--card)] rounded-none md:rounded p-2 md:p-4">
+    <div className={`flex flex-col gap-4 h-full min-h-0 ${isReportCard ? '' : 'lg:flex-row'}`}>
+      {/* Chart + About — left 50% (full height for report cards) */}
+      <div className={isReportCard ? 'w-full h-full min-h-0 flex flex-col' : 'lg:w-1/2 lg:overflow-y-auto'}>
+        <section className={`relative ${isReportCard ? 'flex-1 min-h-0 flex flex-col' : 'border border-[var(--border)] bg-[var(--card)] rounded-none md:rounded p-2 md:p-4'}`}>
           {showDownload && (
             <div className="absolute top-[5px] right-[5px] flex gap-0.5 z-10">
               <CopyButton onClick={handleCopy} />
               <DownloadButton onClick={handleDownload} />
             </div>
           )}
-          <div ref={chartRef} className="h-[400px] md:h-[500px]">
+          <div ref={chartRef} className={isReportCard ? 'flex-1 min-h-0 h-full' : 'h-[400px] md:h-[500px]'}>
             <ChartRenderer
               data={data}
               highlightedLabels={effectiveHighlightedLabels}
@@ -318,7 +319,7 @@ export function ChartWithTable({ data, title, subtitle, source, lastUpdated }: P
             />
           )}
         </section>
-        {title && (
+        {!isReportCard && title && (
           <div className="mt-4">
             <h1 className="text-lg font-bold">{title}</h1>
             {subtitle && (
@@ -331,7 +332,7 @@ export function ChartWithTable({ data, title, subtitle, source, lastUpdated }: P
             )}
           </div>
         )}
-        {data.description && (
+        {!isReportCard && data.description && (
           <aside className="mt-4">
             <h2 className="text-sm font-bold mb-2">About</h2>
             <p className="text-xs text-[var(--muted)] leading-relaxed">{data.description}</p>
@@ -340,6 +341,7 @@ export function ChartWithTable({ data, title, subtitle, source, lastUpdated }: P
       </div>
 
       {/* Data table — right 50% */}
+      {!isReportCard && (
       <section className="lg:w-1/2 flex flex-col min-h-0">
         <ChartDataTable
           data={data}
@@ -350,6 +352,7 @@ export function ChartWithTable({ data, title, subtitle, source, lastUpdated }: P
           quadrantFilter={selectedQuadrant}
         />
       </section>
+      )}
     </div>
   );
 }

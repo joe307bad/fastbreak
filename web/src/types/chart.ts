@@ -1,4 +1,4 @@
-export type VisualizationType = 'SCATTER_PLOT' | 'LINE_CHART' | 'BAR_CHART' | 'BAR_GRAPH' | 'TABLE' | 'MATCHUP' | 'MATCHUP_V2' | 'NBA_MATCHUP' | 'NHL_MATCHUP';
+export type VisualizationType = 'SCATTER_PLOT' | 'LINE_CHART' | 'BAR_CHART' | 'BAR_GRAPH' | 'TABLE' | 'MATCHUP' | 'MATCHUP_V2' | 'NBA_MATCHUP' | 'NHL_MATCHUP' | 'MLB_MATCHUP' | 'MLB_TEAM_REPORT_CARD';
 
 export interface QuadrantConfig {
   color: string;
@@ -450,6 +450,189 @@ export interface NHLMatchupData extends BaseChartData {
   dataPoints: NHLMatchupDataPoint[];
 }
 
+// MLB Matchup types
+export interface MLBStatValue {
+  value: number | null;
+  rank: number | null;
+  rankDisplay?: string | null;
+}
+
+export interface MLBMonthTrend {
+  gamesPlayed?: number;
+  record?: { wins: number; losses: number; rank: number; rankDisplay?: string };
+  runsPerGame?: MLBStatValue;
+  runsAllowedPerGame?: MLBStatValue;
+  runDiffPerGame?: MLBStatValue;
+  hitsPerGame?: MLBStatValue;
+  hrsPerGame?: MLBStatValue;
+}
+
+export interface MLBTeamStats {
+  gamesPlayed?: number;
+  runsPerGame?: MLBStatValue;
+  runsAllowedPerGame?: MLBStatValue;
+  battingAvg?: MLBStatValue;
+  onBasePct?: MLBStatValue;
+  sluggingPct?: MLBStatValue;
+  ops?: MLBStatValue;
+  hitsPerGame?: MLBStatValue;
+  hrPerGame?: MLBStatValue;
+  era?: MLBStatValue;
+  whip?: MLBStatValue;
+  kPer9?: MLBStatValue;
+  bbPer9?: MLBStatValue;
+  cumRunDiffByWeek?: Record<string, number>;
+  performanceByWeek?: Record<string, { runsScored: number; runsAllowed: number }>;
+  monthTrend?: MLBMonthTrend;
+  [key: string]: MLBStatValue | number | Record<string, unknown> | MLBMonthTrend | undefined;
+}
+
+export interface MLBTeamInfo {
+  id: string;
+  name: string;
+  abbreviation: string;
+  logo?: string;
+  record?: string;
+  division?: string;
+  league?: string;
+  stats: MLBTeamStats;
+}
+
+export interface MLBMatchupOdds {
+  provider?: string;
+  spread?: number;
+  overUnder?: number;
+  homeMoneyline?: number;
+  awayMoneyline?: number;
+  details?: string;
+}
+
+export interface MLBGameResults {
+  homeScore?: number;
+  awayScore?: number;
+  winner?: string;
+  margin?: number;
+  homeWon?: boolean;
+}
+
+export interface LeagueCumRunDiffStats {
+  minCumRunDiff: number | null;
+  maxCumRunDiff: number | null;
+  top10ByWeek?: Record<string, number>;
+}
+
+export interface LeagueWeeklyStats {
+  avgRunsScored: number | null;
+  avgRunsAllowed: number | null;
+  minRunsScored: number | null;
+  maxRunsScored: number | null;
+  minRunsAllowed: number | null;
+  maxRunsAllowed: number | null;
+}
+
+export interface MLBMatchupDataPoint {
+  gameId: string;
+  gameDate: string;
+  gameName: string;
+  gameStatus?: string;
+  gameCompleted: boolean;
+  homeTeam: MLBTeamInfo;
+  awayTeam: MLBTeamInfo;
+  location?: { stadium?: string };
+  odds?: MLBMatchupOdds;
+  comparisons?: NBAComparisons;
+  results?: MLBGameResults;
+}
+
+export interface MLBMatchupData extends BaseChartData {
+  visualizationType: 'MLB_MATCHUP';
+  leagueCumRunDiffStats?: LeagueCumRunDiffStats;
+  leagueWeeklyStats?: LeagueWeeklyStats;
+  dataPoints: MLBMatchupDataPoint[];
+}
+
+// MLB Team Report Card types
+export interface ReportCardStatValue {
+  label: string;
+  value?: number | null;
+  rank?: number | null;
+  rankDisplay?: string | null;
+}
+
+export interface ReportCardTeamSummary {
+  stats: Record<string, ReportCardStatValue>;
+}
+
+export interface ReportCardPlayer {
+  playerId: string;
+  name: string;
+  position?: string;
+  war?: number | null;
+  stats: Record<string, ReportCardStatValue>;
+}
+
+export interface ReportCardCategory {
+  label: string;
+  description?: string;
+  team?: ReportCardTeamSummary;
+  players: ReportCardPlayer[];
+}
+
+export interface ReportCardCategories {
+  hitters: ReportCardCategory;
+  starters: ReportCardCategory;
+  relievers: ReportCardCategory;
+  fielders: ReportCardCategory;
+}
+
+export interface ReportCardTeam {
+  teamCode: string;
+  teamName: string;
+  division?: string;
+  league?: string;
+  wins?: number;
+  losses?: number;
+  recordRank?: number;
+  recordRankDisplay?: string;
+  divisionRank?: number;
+  divisionRankDisplay?: string;
+  overallComposite?: number;
+  overallCompositeRank?: number;
+  overallCompositeRankDisplay?: string;
+  playoffProb?: number;
+  categories: ReportCardCategories;
+}
+
+export interface RankingEntry {
+  team?: string;
+  teamCode?: string;
+  teamName?: string;
+  value: number;
+  rank: number;
+  rankDisplay?: string;
+}
+
+export interface PlayoffChanceEntry {
+  team?: string;
+  teamCode?: string;
+  teamName?: string;
+  playoffProb?: number | null;
+  champProb?: number | null;
+  conference?: string | null;
+  winPct?: number | null;
+  wins?: number | null;
+  losses?: number | null;
+}
+
+export interface MLBTeamReportCardData extends BaseChartData {
+  visualizationType: 'MLB_TEAM_REPORT_CARD';
+  season: number;
+  topN: number;
+  rankings: Record<string, RankingEntry[]>;
+  playoffChances: PlayoffChanceEntry[];
+  teams: Record<string, ReportCardTeam>;
+}
+
 // NFL/MATCHUP_V2 types
 export interface MatchupV2Odds {
   home_spread: string;
@@ -478,7 +661,7 @@ export interface MatchupV2DataPoint {
   };
 }
 
-export type ChartData = ScatterPlotData | LineChartData | BarChartData | TableData | MatchupData | MatchupV2Data | NBAMatchupData | NHLMatchupData;
+export type ChartData = ScatterPlotData | LineChartData | BarChartData | TableData | MatchupData | MatchupV2Data | NBAMatchupData | NHLMatchupData | MLBMatchupData | MLBTeamReportCardData;
 
 export interface RegistryEntry {
   interval: string;

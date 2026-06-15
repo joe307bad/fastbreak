@@ -2,6 +2,8 @@ import fs from 'fs';
 import path from 'path';
 import { ChartData, Registry, isChartEntry } from '@/types/chart';
 import { fileKeyToChartId } from '@/lib/registry';
+import { isDisplayableChart } from '@/lib/charts';
+import { getOrderedLeagues } from '@/lib/leagues';
 
 const DATA_DIR = path.join(process.cwd(), 'data');
 const CHARTS_DIR = path.join(DATA_DIR, 'charts');
@@ -62,4 +64,24 @@ export function getManifest(): Manifest | null {
   }
   const content = fs.readFileSync(manifestPath, 'utf-8');
   return JSON.parse(content);
+}
+
+export function getOrderedSportsWithCharts(): string[] {
+  const chartRegistry = getChartRegistry();
+  const sportsWithCharts = new Set<string>();
+
+  for (const key of Object.keys(chartRegistry)) {
+    const chartId = fileKeyToChartId(key);
+    const chartPath = path.join(CHARTS_DIR, `${chartId}.json`);
+    if (!fs.existsSync(chartPath)) {
+      continue;
+    }
+
+    const data = getChartData(chartId);
+    if (isDisplayableChart(data) && data.sport) {
+      sportsWithCharts.add(data.sport.toLowerCase());
+    }
+  }
+
+  return getOrderedLeagues().filter(sport => sportsWithCharts.has(sport));
 }

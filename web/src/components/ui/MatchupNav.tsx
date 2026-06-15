@@ -1,9 +1,9 @@
 'use client';
 
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
-import { MatchupData, NBAMatchupData, NBAMatchupDataPoint, NHLMatchupData, NHLMatchupDataPoint, MatchupV2Data, MatchupV2DataPoint } from '@/types/chart';
+import { MatchupData, MLBMatchupData, NBAMatchupData, NBAMatchupDataPoint, NHLMatchupData, NHLMatchupDataPoint, MatchupV2Data, MatchupV2DataPoint } from '@/types/chart';
 
-type AnyMatchupData = MatchupData | NBAMatchupData | NHLMatchupData | MatchupV2Data;
+type AnyMatchupData = MatchupData | NBAMatchupData | NHLMatchupData | MLBMatchupData | MatchupV2Data;
 
 interface MatchupNavProps {
   data: AnyMatchupData;
@@ -69,6 +69,28 @@ function groupMatchupsByDay(data: AnyMatchupData): DayGroup[] {
   } else if (data.visualizationType === 'NHL_MATCHUP') {
     const nhlData = data as NHLMatchupData;
     const sortedGames = [...nhlData.dataPoints]
+      .sort((a, b) => new Date(a.gameDate).getTime() - new Date(b.gameDate).getTime());
+
+    for (const matchup of sortedGames) {
+      const date = new Date(matchup.gameDate);
+      const dateKey = getDateKey(date);
+
+      if (!groups.has(dateKey)) {
+        groups.set(dateKey, {
+          dateKey,
+          label: formatDayLabel(date),
+          matchups: [],
+        });
+      }
+
+      groups.get(dateKey)!.matchups.push({
+        id: matchup.gameId,
+        label: `${matchup.awayTeam.abbreviation} @ ${matchup.homeTeam.abbreviation}`,
+      });
+    }
+  } else if (data.visualizationType === 'MLB_MATCHUP') {
+    const mlbData = data as MLBMatchupData;
+    const sortedGames = [...mlbData.dataPoints]
       .sort((a, b) => new Date(a.gameDate).getTime() - new Date(b.gameDate).getTime());
 
     for (const matchup of sortedGames) {

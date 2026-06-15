@@ -1,20 +1,16 @@
-import { fetchChartRegistry, fetchChartData } from '@/lib/api';
-import { ChartData, MatchupData, MatchupV2Data, NBAMatchupData, NHLMatchupData } from '@/types/chart';
+import { fetchAllCharts, fetchOrderedSportsWithCharts } from '@/lib/api';
+import { AnyMatchupData, filterChartsForSport } from '@/lib/charts';
 import { SportTabs } from '@/components/ui/SportTabs';
 import { MatchupsWithNav } from '@/components/charts/MatchupsWithNav';
-import { getOrderedLeagues } from '@/lib/leagues';
 import { notFound } from 'next/navigation';
-
-type AnyMatchupData = MatchupData | MatchupV2Data | NBAMatchupData | NHLMatchupData;
-
-const VALID_SPORTS = ['nfl', 'nba', 'nhl'];
 
 interface Props {
   params: Promise<{ sport: string }>;
 }
 
 export async function generateStaticParams() {
-  return VALID_SPORTS.map(sport => ({ sport }));
+  const orderedSports = await fetchOrderedSportsWithCharts();
+  return orderedSports.map(sport => ({ sport }));
 }
 
 export async function generateMetadata({ params }: Props) {
@@ -26,32 +22,15 @@ export async function generateMetadata({ params }: Props) {
 
 export default async function MatchupsPage({ params }: Props) {
   const { sport } = await params;
+  const orderedSports = await fetchOrderedSportsWithCharts();
 
-  if (!VALID_SPORTS.includes(sport.toLowerCase())) {
+  if (!orderedSports.includes(sport.toLowerCase())) {
     notFound();
   }
 
-  const orderedSports = getOrderedLeagues();
-  const registry = await fetchChartRegistry();
-  const keys = Object.keys(registry);
-
-  const allCharts: { key: string; data: ChartData }[] = await Promise.all(
-    keys.map(async key => ({
-      key,
-      data: await fetchChartData(key),
-    }))
-  );
-
-  const sportCharts = allCharts.filter(
-    chart => chart.data.sport?.toLowerCase() === sport.toLowerCase()
-  );
-
-  const MATCHUP_TYPES = ['MATCHUP', 'MATCHUP_V2', 'NBA_MATCHUP', 'NHL_MATCHUP'];
-  const matchups = sportCharts.filter(
-    chart => MATCHUP_TYPES.includes(chart.data.visualizationType)
-  ) as { key: string; data: AnyMatchupData }[];
-
-  const matchupData = matchups[0]?.data;
+  const allCharts = await fetchAllCharts();
+  const { matchups } = filterChartsForSport(allCharts, sport);
+  const matchupData = matchups[0]?.data as AnyMatchupData | undefined;
 
   if (!matchupData) {
     return (

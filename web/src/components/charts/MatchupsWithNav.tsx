@@ -1,11 +1,12 @@
 'use client';
 
 import { useState, useMemo, useCallback } from 'react';
-import { MatchupData, NBAMatchupData, NBAMatchupDataPoint, NHLMatchupData, NHLMatchupDataPoint, MatchupV2Data, MatchupV2DataPoint } from '@/types/chart';
+import { MatchupData, MLBMatchupData, MLBMatchupDataPoint, NBAMatchupData, NBAMatchupDataPoint, NHLMatchupData, NHLMatchupDataPoint, MatchupV2Data, MatchupV2DataPoint } from '@/types/chart';
 import { MatchupNav, getFilteredMatchups } from '@/components/ui/MatchupNav';
 import { usePinnedTeams } from '@/lib/usePinnedTeams';
+import { formatRunDiff, getLeagueAbbrev, getRecordRank, getRunDiffPerGame } from '@/lib/mlbStats';
 
-type AnyMatchupData = MatchupData | NBAMatchupData | NHLMatchupData | MatchupV2Data;
+type AnyMatchupData = MatchupData | NBAMatchupData | NHLMatchupData | MLBMatchupData | MatchupV2Data;
 
 interface Props {
   data: AnyMatchupData;
@@ -240,6 +241,71 @@ function NFLMatchupCard({ matchupKey, matchup, expanded, pinned }: { matchupKey:
   );
 }
 
+function MLBMatchupCard({ matchup, expanded, pinned }: { matchup: MLBMatchupDataPoint; expanded?: boolean; pinned?: boolean }) {
+  const { date, time } = formatGameTime(matchup.gameDate);
+  const isCompleted = matchup.gameCompleted;
+  const awayRunDiff = getRunDiffPerGame(matchup.awayTeam.stats);
+  const homeRunDiff = getRunDiffPerGame(matchup.homeTeam.stats);
+
+  return (
+    <div className={`border border-[var(--border)] rounded p-3 bg-[var(--card)] ${expanded ? 'ring-2 ring-[var(--foreground)]/20' : ''} ${pinned ? 'border-l-2 border-l-blue-500' : ''}`}>
+      <div className="flex justify-between items-center text-xs text-[var(--muted)] mb-2">
+        <span>{date}</span>
+        <span>{isCompleted ? 'Final' : time}</span>
+      </div>
+
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-[var(--muted)] w-4">
+              {getLeagueAbbrev(matchup.awayTeam.league)}
+            </span>
+            <span className="font-bold">{matchup.awayTeam.abbreviation}</span>
+            <span className="text-xs text-[var(--muted)]">({matchup.awayTeam.record})</span>
+          </div>
+          <div className="flex items-center gap-3 text-xs">
+            <span className="text-[var(--muted)]">#{getRecordRank(matchup.awayTeam.stats.monthTrend) ?? '-'}</span>
+            <span className={`font-mono w-10 text-right ${(awayRunDiff?.value ?? 0) >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+              {formatRunDiff(awayRunDiff?.value)}
+            </span>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-[var(--muted)] w-4">
+              {getLeagueAbbrev(matchup.homeTeam.league)}
+            </span>
+            <span className="font-bold">{matchup.homeTeam.abbreviation}</span>
+            <span className="text-xs text-[var(--muted)]">({matchup.homeTeam.record})</span>
+          </div>
+          <div className="flex items-center gap-3 text-xs">
+            <span className="text-[var(--muted)]">#{getRecordRank(matchup.homeTeam.stats.monthTrend) ?? '-'}</span>
+            <span className={`font-mono w-10 text-right ${(homeRunDiff?.value ?? 0) >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+              {formatRunDiff(homeRunDiff?.value)}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex justify-between items-center mt-3 pt-2 border-t border-[var(--border)] text-xs text-[var(--muted)]">
+        <div>
+          <span>R/G: </span>
+          <span className="font-mono">{matchup.awayTeam.stats.runsPerGame?.value?.toFixed(2) ?? '-'}</span>
+          <span> vs </span>
+          <span className="font-mono">{matchup.homeTeam.stats.runsPerGame?.value?.toFixed(2) ?? '-'}</span>
+        </div>
+        <div>
+          <span>ERA: </span>
+          <span className="font-mono">{matchup.awayTeam.stats.era?.value?.toFixed(2) ?? '-'}</span>
+          <span> vs </span>
+          <span className="font-mono">{matchup.homeTeam.stats.era?.value?.toFixed(2) ?? '-'}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function MatchupsWithNav({ data }: Props) {
   // Default to today
   const [selectedDay, setSelectedDay] = useState<string | null>(getTodayKey());
@@ -249,6 +315,7 @@ export function MatchupsWithNav({ data }: Props) {
   const sport = useMemo(() => {
     if (data.visualizationType === 'NBA_MATCHUP') return 'nba';
     if (data.visualizationType === 'NHL_MATCHUP') return 'nhl';
+    if (data.visualizationType === 'MLB_MATCHUP') return 'mlb';
     if (data.visualizationType === 'MATCHUP_V2') return 'nfl';
     return data.sport?.toLowerCase() ?? '';
   }, [data]);
@@ -322,6 +389,35 @@ export function MatchupsWithNav({ data }: Props) {
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {sortedGames.map(matchup => (
             <NHLMatchupCard
+              key={matchup.gameId}
+              matchup={matchup}
+              expanded={selectedMatchup === matchup.gameId}
+              pinned={[matchup.awayTeam.abbreviation, matchup.homeTeam.abbreviation].some(c => pinnedCodes.has(c.toUpperCase()))}
+            />
+          ))}
+        </div>
+      );
+    }
+
+    if (data.visualizationType === 'MLB_MATCHUP') {
+      const mlbData = data as MLBMatchupData;
+      const games = mlbData.dataPoints
+        .sort((a, b) => new Date(a.gameDate).getTime() - new Date(b.gameDate).getTime());
+
+      const filteredGames = showAll
+        ? games
+        : games.filter(g => matchupIds.includes(g.gameId));
+
+      const sortedGames = sortPinnedFirst(filteredGames, g => [g.awayTeam.abbreviation, g.homeTeam.abbreviation]);
+
+      if (sortedGames.length === 0) {
+        return <p className="text-[var(--muted)] text-sm">No upcoming games</p>;
+      }
+
+      return (
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {sortedGames.map(matchup => (
+            <MLBMatchupCard
               key={matchup.gameId}
               matchup={matchup}
               expanded={selectedMatchup === matchup.gameId}

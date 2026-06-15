@@ -5,11 +5,10 @@ import Link from 'next/link';
 import { ChartRenderer } from '@/components/charts';
 import { UpcomingMatchups } from '@/components/charts/UpcomingMatchups';
 import { TopMatchupsWidget } from '@/components/charts/TopMatchupsWidget';
-import { ChartData, MatchupData, MatchupV2Data, NBAMatchupData, NHLMatchupData } from '@/types/chart';
+import { ChartData, MatchupV2Data, MLBMatchupData, NBAMatchupData, NHLMatchupData } from '@/types/chart';
 import { ChartNav } from './ChartNav';
 import { fileKeyToChartId } from '@/lib/registry';
-
-type AnyMatchupData = MatchupData | MatchupV2Data | NBAMatchupData | NHLMatchupData;
+import { AnyMatchupData, TOP_MATCHUP_TYPES, getTopMatchupMetricLabel, isMatchupVisibleOnHomeGrid } from '@/lib/charts';
 
 interface ChartGridProps {
   charts: { key: string; data: ChartData }[];
@@ -29,20 +28,28 @@ export function ChartGrid({ charts, matchups, topMatchupGameIds = [] }: ChartGri
 
   // Find NBA or NHL matchup for the top matchups widget
   const topMatchupData = matchups.find(m =>
-    m.data.visualizationType === 'NBA_MATCHUP' || m.data.visualizationType === 'NHL_MATCHUP'
-  ) as { key: string; data: NBAMatchupData | NHLMatchupData } | undefined;
+    TOP_MATCHUP_TYPES.includes(m.data.visualizationType)
+  ) as { key: string; data: NBAMatchupData | NHLMatchupData | MLBMatchupData } | undefined;
 
   // Find NFL/MATCHUP_V2 matchup for NFL homepage
   const nflMatchupData = matchups.find(m =>
     m.data.visualizationType === 'MATCHUP_V2'
   ) as { key: string; data: MatchupV2Data } | undefined;
 
+  const visibleMatchups = matchups.filter(m =>
+    isMatchupVisibleOnHomeGrid(m, {
+      topMatchupGameIds,
+      topMatchupKey: topMatchupData?.key,
+      nflMatchupKey: nflMatchupData?.key,
+    })
+  );
+
   const allChartItems = [
-    ...matchups.map(m => ({
+    ...visibleMatchups.map(m => ({
       key: m.key,
       title: m.data.title,
       // Use simple "matchups" slug for NBA/NHL/NFL matchup widgets
-      slug: m.data.visualizationType === 'NBA_MATCHUP' || m.data.visualizationType === 'NHL_MATCHUP' || m.data.visualizationType === 'MATCHUP_V2'
+      slug: TOP_MATCHUP_TYPES.includes(m.data.visualizationType) || m.data.visualizationType === 'MATCHUP_V2'
         ? 'matchups'
         : slugify(m.data.title),
     })),
@@ -123,7 +130,7 @@ export function ChartGrid({ charts, matchups, topMatchupGameIds = [] }: ChartGri
               </div>
               <div className="flex items-center justify-between mt-1">
                 <h3 className="text-sm font-bold">
-                  Best Games by {topMatchupData.data.visualizationType === 'NHL_MATCHUP' ? 'Goal Diff' : 'Net Rating'}
+                  Best Games by {getTopMatchupMetricLabel(topMatchupData.data.visualizationType)}
                 </h3>
                 <Link
                   href={`/${topMatchupData.data.sport.toLowerCase()}/matchups`}
@@ -207,11 +214,14 @@ export function ChartGrid({ charts, matchups, topMatchupGameIds = [] }: ChartGri
         {charts.map(({ key, data }) => {
           const slug = slugify(data.title);
           const isActive = activeChart === key;
+          const isReportCard = data.visualizationType === 'MLB_TEAM_REPORT_CARD';
           return (
             <article
               key={key}
               id={`chart-${slug}`}
               className={`border bg-[var(--card)] rounded-none md:rounded p-2 md:p-4 transition-all duration-300 scroll-mt-24 md:scroll-mt-4 ${
+                isReportCard ? 'flex flex-col min-h-[300px] md:min-h-[450px]' : ''
+              } ${
                 isActive
                   ? 'border-[var(--foreground)] ring-2 ring-[var(--foreground)]/20'
                   : 'border-[var(--border)]'
@@ -242,8 +252,8 @@ export function ChartGrid({ charts, matchups, topMatchupGameIds = [] }: ChartGri
                 </div>
               </header>
 
-              <div className="h-[300px] md:h-[450px]">
-                <ChartRenderer data={data} />
+              <div className={isReportCard ? 'flex-1 min-h-0 h-[300px] md:h-[450px]' : 'h-[300px] md:h-[450px]'}>
+                <ChartRenderer data={data} compact />
               </div>
 
               <footer className="mt-3 pt-3 border-t border-[var(--border)] text-xs text-[var(--muted)] flex justify-between">
@@ -256,9 +266,9 @@ export function ChartGrid({ charts, matchups, topMatchupGameIds = [] }: ChartGri
       </div>
 
       {/* Full Matchups Section - exclude NBA/NHL/NFL matchups since they're shown in widgets above */}
-      {matchups.filter(m => m.data.visualizationType !== 'NBA_MATCHUP' && m.data.visualizationType !== 'NHL_MATCHUP' && m.data.visualizationType !== 'MATCHUP_V2').length > 0 && (
+      {matchups.filter(m => !TOP_MATCHUP_TYPES.includes(m.data.visualizationType) && m.data.visualizationType !== 'MATCHUP_V2').length > 0 && (
         <section className="mt-10">
-          {matchups.filter(m => m.data.visualizationType !== 'NBA_MATCHUP' && m.data.visualizationType !== 'NHL_MATCHUP' && m.data.visualizationType !== 'MATCHUP_V2').map(({ key, data }) => {
+          {matchups.filter(m => !TOP_MATCHUP_TYPES.includes(m.data.visualizationType) && m.data.visualizationType !== 'MATCHUP_V2').map(({ key, data }) => {
             const slug = slugify(data.title);
             const isActive = activeChart === key;
             return (

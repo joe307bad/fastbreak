@@ -30,6 +30,12 @@ const LEAGUES: LeagueSeason[] = [
     seasonStart: '10-10', // Early October
     championshipEnd: '06-25', // Stanley Cup late June
   },
+  {
+    id: 'mlb',
+    label: 'MLB',
+    seasonStart: '03-20', // Opening Day late March
+    championshipEnd: '11-05', // World Series early November
+  },
 ];
 
 function parseMonthDay(monthDay: string, year: number): Date {

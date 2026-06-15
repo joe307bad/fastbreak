@@ -1,4 +1,3 @@
-import type { Metadata } from 'next';
 import fs from 'fs';
 import path from 'path';
 import matter from 'gray-matter';
@@ -7,11 +6,12 @@ import type { MDXComponents } from 'mdx/types';
 import remarkGfm from 'remark-gfm';
 import { BetaLinks } from '@/components/ui/BetaLinks';
 import { PlatformSupport } from '@/components/ui/PlatformSupport';
+import { pageMetadata } from '@/lib/og';
 
-export const metadata: Metadata = {
+export const metadata = pageMetadata({
   title: 'Documentation - fastbreak',
   description: 'Documentation for the fastbreak sports analytics dashboard',
-};
+});
 
 const components: MDXComponents = {
   table: (props) => <table {...props} />,

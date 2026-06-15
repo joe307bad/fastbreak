@@ -1,10 +1,10 @@
-import type { Metadata } from 'next';
 import Link from 'next/link';
+import { pageMetadata } from '@/lib/og';
 
-export const metadata: Metadata = {
+export const metadata = pageMetadata({
   title: 'Privacy Policy - fastbreak',
   description: 'Privacy policy for the fastbreak sports analytics dashboard',
-};
+});
 
 export default function PrivacyPolicy() {
   return (

@@ -16,6 +16,7 @@ import { NavigateChartsDemo } from '@/components/ui/NavigateChartsDemo';
 import { HeadingWithAnchor } from '@/components/ui/HeadingWithAnchor';
 import { ScrollToHash } from '@/components/ui/ScrollToHash';
 import { ManualPage } from '@/components/ui/ManualPage';
+import { pageMetadata } from '@/lib/og';
 
 interface DocMetadata {
   title: string;
@@ -69,10 +70,10 @@ export async function generateMetadata({
   const { data } = matter(fileContents);
   const metadata = data as DocMetadata;
 
-  return {
+  return pageMetadata({
     title: `${metadata.title} - fastbreak`,
     description: metadata.description,
-  };
+  });
 }
 
 export default async function DocPage({ params }: { params: Promise<{ slug: string }> }) {

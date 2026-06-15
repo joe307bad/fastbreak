@@ -1,4 +1,5 @@
 import { fetchAllCharts, fetchChartData, fetchOrderedSportsWithCharts, slugToKey, keyToSlug } from '@/lib/api';
+import { pageMetadata } from '@/lib/og';
 import { ChartWithTable } from '@/components/charts/ChartWithTable';
 import { SportTabs } from '@/components/ui/SportTabs';
 
@@ -23,10 +24,10 @@ export async function generateStaticParams() {
 export async function generateMetadata({ params }: Props) {
   const { slug } = await params;
   const data = await fetchChartData(slugToKey(slug));
-  return {
+  return pageMetadata({
     title: data.title,
     description: data.description || data.subtitle,
-  };
+  });
 }
 
 export default async function ChartPage({ params }: Props) {

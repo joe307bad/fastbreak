@@ -7,6 +7,7 @@ import { CumRunDiffChart } from '@/components/charts/CumRunDiffChart';
 import { WeeklyRunsChart } from '@/components/charts/WeeklyRunsChart';
 import { ChartDownloadWrapper } from '@/components/charts/ChartDownloadWrapper';
 import { formatRunDiff, getLeagueAbbrev, getRecordRank, getRunDiffPerGame } from '@/lib/mlbStats';
+import { pageMetadata } from '@/lib/og';
 import { notFound } from 'next/navigation';
 
 interface Props {
@@ -42,13 +43,14 @@ export async function generateMetadata({ params }: Props) {
   const game = matchupData?.dataPoints.find(g => g.gameId === gameId);
 
   if (!game) {
-    return { title: 'MLB Matchup' };
+    return pageMetadata({ title: 'MLB Matchup' });
   }
 
-  return {
-    title: `${game.awayTeam.abbreviation} @ ${game.homeTeam.abbreviation} - MLB Matchup`,
+  const title = `${game.awayTeam.abbreviation} @ ${game.homeTeam.abbreviation} - MLB Matchup`;
+  return pageMetadata({
+    title,
     description: `${game.awayTeam.name} vs ${game.homeTeam.name} matchup analysis`,
-  };
+  });
 }
 
 function formatGameTime(gameTime: string): { date: string; time: string } {

@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { MDXRemote } from "next-mdx-remote/rsc";
 import { getAllSlugs, getPostBySlug } from "@/lib/blog";
+import { pageMetadata } from "@/lib/og";
 import { useMDXComponents } from "../../../../mdx-components";
 
 interface Props {
@@ -23,32 +24,10 @@ export async function generateMetadata({ params }: Props) {
     return { title: "Not Found" };
   }
 
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://fastbreak.joebad.com";
-
-  // Use generated SVG OG image with cache busting
-  const cacheBuster = Date.now();
-  const ogImageUrl = `${siteUrl}/og-images/${slug}.png?v=${cacheBuster}`;
-
-  return {
+  return pageMetadata({
     title: post.title,
     description: post.description,
-    openGraph: {
-      title: post.title,
-      description: post.description,
-      images: [{
-        url: ogImageUrl,
-        type: 'image/png',
-        alt: post.title,
-      }],
-      type: "website"
-    },
-    twitter: {
-      card: "summary_large_image",
-      title: post.title,
-      description: post.description,
-      images: [ogImageUrl],
-    },
-  };
+  });
 }
 
 export default async function BlogPostPage({ params }: Props) {

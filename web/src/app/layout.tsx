@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Header } from "@/components/ui";
+import { ogImageUrl } from "@/lib/og";
 
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
@@ -17,13 +18,13 @@ export const metadata: Metadata = {
   openGraph: {
     title: "fastbreak",
     description: "Fast sports analytics dashboard",
-    images: [`${siteUrl}/og-image.png`],
+    images: [ogImageUrl("fastbreak")],
   },
   twitter: {
     card: "summary_large_image",
     title: "fastbreak",
     description: "Fast sports analytics dashboard",
-    images: [`${siteUrl}/og-image.png`],
+    images: [ogImageUrl("fastbreak")],
   },
 };
 

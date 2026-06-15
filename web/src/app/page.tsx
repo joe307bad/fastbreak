@@ -4,13 +4,13 @@ import { SportTabs } from '@/components/ui/SportTabs';
 import { ChartGrid } from '@/components/ui/ChartGrid';
 import { filterChartsForSport } from '@/lib/charts';
 import { selectTopMatchups } from '@/lib/topMatchups';
-import type { Metadata } from 'next';
+import { pageMetadata } from '@/lib/og';
 import { MLBMatchupData, NBAMatchupData, NHLMatchupData } from '@/types/chart';
 
-export const metadata: Metadata = {
+export const metadata = pageMetadata({
   title: 'fastbreak',
   description: 'Fast sports analytics dashboard',
-};
+});
 
 export default async function Home() {
   const orderedSports = await fetchOrderedSportsWithCharts();

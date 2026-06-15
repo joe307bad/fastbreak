@@ -7,6 +7,7 @@ import { CumNetRatingChart } from '@/components/charts/CumNetRatingChart';
 import { WeeklyEfficiencyChart } from '@/components/charts/WeeklyEfficiencyChart';
 import { ChartDownloadWrapper } from '@/components/charts/ChartDownloadWrapper';
 import { fetchOrderedSportsWithCharts } from '@/lib/api';
+import { pageMetadata } from '@/lib/og';
 import { notFound } from 'next/navigation';
 
 interface Props {
@@ -42,13 +43,14 @@ export async function generateMetadata({ params }: Props) {
   const game = matchupData?.dataPoints.find(g => g.gameId === gameId);
 
   if (!game) {
-    return { title: 'NBA Matchup' };
+    return pageMetadata({ title: 'NBA Matchup' });
   }
 
-  return {
-    title: `${game.awayTeam.abbreviation} @ ${game.homeTeam.abbreviation} - NBA Matchup`,
+  const title = `${game.awayTeam.abbreviation} @ ${game.homeTeam.abbreviation} - NBA Matchup`;
+  return pageMetadata({
+    title,
     description: `${game.awayTeam.name} vs ${game.homeTeam.name} matchup analysis`,
-  };
+  });
 }
 
 function formatGameTime(gameTime: string): { date: string; time: string } {

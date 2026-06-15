@@ -4,6 +4,7 @@ import { SportTabs } from '@/components/ui/SportTabs';
 import { ChartGrid } from '@/components/ui/ChartGrid';
 import { selectTopMatchups } from '@/lib/topMatchups';
 import { notFound } from 'next/navigation';
+import { pageMetadata } from '@/lib/og';
 import { MLBMatchupData, NBAMatchupData, NHLMatchupData } from '@/types/chart';
 
 interface Props {
@@ -17,9 +18,7 @@ export async function generateStaticParams() {
 
 export async function generateMetadata({ params }: Props) {
   const { sport } = await params;
-  return {
-    title: `${sport.toUpperCase()}`,
-  };
+  return pageMetadata({ title: sport.toUpperCase() });
 }
 
 export default async function SportPage({ params }: Props) {

@@ -8,6 +8,7 @@ import { XgVsPointsChart } from '@/components/charts/XgVsPointsChart';
 import { ChartDownloadWrapper } from '@/components/charts/ChartDownloadWrapper';
 import { NHLPlayerComparison } from '@/components/charts/NHLPlayerComparison';
 import { fetchOrderedSportsWithCharts } from '@/lib/api';
+import { pageMetadata } from '@/lib/og';
 import { notFound } from 'next/navigation';
 
 interface Props {
@@ -43,13 +44,14 @@ export async function generateMetadata({ params }: Props) {
   const game = matchupData?.dataPoints.find(g => g.gameId === gameId);
 
   if (!game) {
-    return { title: 'NHL Matchup' };
+    return pageMetadata({ title: 'NHL Matchup' });
   }
 
-  return {
-    title: `${game.awayTeam.abbreviation} @ ${game.homeTeam.abbreviation} - NHL Matchup`,
+  const title = `${game.awayTeam.abbreviation} @ ${game.homeTeam.abbreviation} - NHL Matchup`;
+  return pageMetadata({
+    title,
     description: `${game.awayTeam.name} vs ${game.homeTeam.name} matchup analysis`,
-  };
+  });
 }
 
 function formatGameTime(gameTime: string): { date: string; time: string } {

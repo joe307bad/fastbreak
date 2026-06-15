@@ -1,25 +1,13 @@
 import Link from "next/link";
 import { getAllPosts } from "@/lib/blog";
+import { pageMetadata } from "@/lib/og";
 
 export const dynamic = "force-static";
 
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://fastbreak.joebad.com";
-
-export const metadata = {
+export const metadata = pageMetadata({
   title: "Blog",
   description: "Updates and insights from the fastbreak team",
-  openGraph: {
-    title: "Blog",
-    description: "Updates and insights from the fastbreak team",
-    images: [`${siteUrl}/og-image.png`],
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: "Blog",
-    description: "Updates and insights from the fastbreak team",
-    images: [`${siteUrl}/og-image.png`],
-  },
-};
+});
 
 export default function BlogPage() {
   const posts = getAllPosts();

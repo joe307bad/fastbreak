@@ -3,6 +3,7 @@ import { AnyMatchupData, filterChartsForSport } from '@/lib/charts';
 import { SportTabs } from '@/components/ui/SportTabs';
 import { MatchupsWithNav } from '@/components/charts/MatchupsWithNav';
 import { notFound } from 'next/navigation';
+import { pageMetadata } from '@/lib/og';
 
 interface Props {
   params: Promise<{ sport: string }>;
@@ -15,9 +16,7 @@ export async function generateStaticParams() {
 
 export async function generateMetadata({ params }: Props) {
   const { sport } = await params;
-  return {
-    title: `${sport.toUpperCase()} Matchups`,
-  };
+  return pageMetadata({ title: `${sport.toUpperCase()} Matchups` });
 }
 
 export default async function MatchupsPage({ params }: Props) {

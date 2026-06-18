@@ -83,5 +83,9 @@ export function getOrderedSportsWithCharts(): string[] {
     }
   }
 
-  return getOrderedLeagues().filter(sport => sportsWithCharts.has(sport));
+  const ordered = getOrderedLeagues().filter(sport => sportsWithCharts.has(sport));
+  if (ordered.includes('mlb')) {
+    return ['mlb', ...ordered.filter(sport => sport !== 'mlb')];
+  }
+  return ordered;
 }

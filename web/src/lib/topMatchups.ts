@@ -35,36 +35,46 @@ function orderedDays<T extends { gameDate: string }>(groups: Map<string, T[]>): 
   });
 }
 
-function selectNBA(data: NBAMatchupData): string[] {
-  const upcoming = data.dataPoints.filter(m => !m.gameCompleted);
+function selectTopGameIds<T extends { gameId: string; gameDate: string }>(
+  upcoming: T[],
+  rankGames: (games: T[]) => T[]
+): string[] {
   const byDay = groupByDay(upcoming);
   const days = orderedDays(byDay).slice(0, MAX_DAYS);
   const ids: string[] = [];
+  const seen = new Set<string>();
+
   for (const [, games] of days) {
-    const ranked = [...games].sort((a: NBAMatchupDataPoint, b: NBAMatchupDataPoint) => {
+    for (const game of rankGames(games).slice(0, GAMES_PER_DAY)) {
+      if (seen.has(game.gameId)) continue;
+      seen.add(game.gameId);
+      ids.push(game.gameId);
+    }
+  }
+
+  return ids;
+}
+
+function selectNBA(data: NBAMatchupData): string[] {
+  const upcoming = data.dataPoints.filter(m => !m.gameCompleted);
+  return selectTopGameIds(upcoming, games =>
+    [...games].sort((a: NBAMatchupDataPoint, b: NBAMatchupDataPoint) => {
       const ta = (a.homeTeam.stats.netRating ?? 0) + (a.awayTeam.stats.netRating ?? 0);
       const tb = (b.homeTeam.stats.netRating ?? 0) + (b.awayTeam.stats.netRating ?? 0);
       return tb - ta;
-    });
-    for (const g of ranked.slice(0, GAMES_PER_DAY)) ids.push(g.gameId);
-  }
-  return ids;
+    })
+  );
 }
 
 function selectNHL(data: NHLMatchupData): string[] {
   const upcoming = data.dataPoints.filter(m => !m.gameCompleted);
-  const byDay = groupByDay(upcoming);
-  const days = orderedDays(byDay).slice(0, MAX_DAYS);
-  const ids: string[] = [];
-  for (const [, games] of days) {
-    const ranked = [...games].sort((a: NHLMatchupDataPoint, b: NHLMatchupDataPoint) => {
+  return selectTopGameIds(upcoming, games =>
+    [...games].sort((a: NHLMatchupDataPoint, b: NHLMatchupDataPoint) => {
       const ta = a.homeTeam.stats.goalDiffPerGame + a.awayTeam.stats.goalDiffPerGame;
       const tb = b.homeTeam.stats.goalDiffPerGame + b.awayTeam.stats.goalDiffPerGame;
       return tb - ta;
-    });
-    for (const g of ranked.slice(0, GAMES_PER_DAY)) ids.push(g.gameId);
-  }
-  return ids;
+    })
+  );
 }
 
 function getTeamRunDiff(team: MLBMatchupDataPoint['homeTeam']): number {
@@ -73,18 +83,13 @@ function getTeamRunDiff(team: MLBMatchupDataPoint['homeTeam']): number {
 
 function selectMLB(data: MLBMatchupData): string[] {
   const upcoming = data.dataPoints.filter(m => !m.gameCompleted);
-  const byDay = groupByDay(upcoming);
-  const days = orderedDays(byDay).slice(0, MAX_DAYS);
-  const ids: string[] = [];
-  for (const [, games] of days) {
-    const ranked = [...games].sort((a: MLBMatchupDataPoint, b: MLBMatchupDataPoint) => {
+  return selectTopGameIds(upcoming, games =>
+    [...games].sort((a: MLBMatchupDataPoint, b: MLBMatchupDataPoint) => {
       const ta = getTeamRunDiff(a.homeTeam) + getTeamRunDiff(a.awayTeam);
       const tb = getTeamRunDiff(b.homeTeam) + getTeamRunDiff(b.awayTeam);
       return tb - ta;
-    });
-    for (const g of ranked.slice(0, GAMES_PER_DAY)) ids.push(g.gameId);
-  }
-  return ids;
+    })
+  );
 }
 
 export function selectTopMatchups(

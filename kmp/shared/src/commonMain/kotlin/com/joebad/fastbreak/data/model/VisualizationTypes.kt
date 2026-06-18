@@ -350,7 +350,11 @@ data class PlayoffChanceEntry(
     val losses: Int? = null,
     val netRating: Double? = null,
     val leaguePoints: Int? = null,
-    val goalDiff: Int? = null
+    val goalDiff: Int? = null,
+    val division: String? = null,
+    val divisionRank: Int? = null,
+    val gamesBackFromPlayoff: Double? = null,
+    val standingsSection: String? = null
 )
 
 @Serializable

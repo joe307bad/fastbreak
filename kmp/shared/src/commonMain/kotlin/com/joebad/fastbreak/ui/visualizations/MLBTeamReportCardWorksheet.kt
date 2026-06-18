@@ -34,6 +34,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.joebad.fastbreak.data.model.MLBTeamReportCardVisualization
 import com.joebad.fastbreak.data.model.PinnedTeam
+import com.joebad.fastbreak.data.model.PlayoffChanceEntry
 import com.joebad.fastbreak.data.model.RankingEntry
 import com.joebad.fastbreak.data.model.ReportCardCategory
 import com.joebad.fastbreak.data.model.ReportCardPlayer
@@ -113,6 +114,11 @@ private fun buildCategoryCompositeRanking(
     }.sortedBy { it.rank }
 }
 
+private fun hasReportCardRankings(
+    rankings: Map<String, List<RankingEntry>>,
+    key: String
+): Boolean = !rankings[key].isNullOrEmpty()
+
 private fun mergeReportCardRankings(
     rankings: Map<String, List<RankingEntry>>,
     teams: List<ReportCardTeam>
@@ -191,6 +197,10 @@ fun MLBTeamReportCardWorksheet(
     var teamPickerOpen by remember { mutableStateOf(false) }
     var teamSearchQuery by remember { mutableStateOf("") }
     var selectedRankingKey by remember { mutableStateOf<String?>(null) }
+    val displayPlayoffChances = remember(visualization.playoffChances, visualization.teams) {
+        organizeMlbPlayoffChancesForDisplay(visualization.playoffChances, visualization.teams)
+    }
+
     var showPlayoffChances by remember { mutableStateOf(false) }
 
     val seasonLabel = remember(visualization.season) {
@@ -254,16 +264,16 @@ fun MLBTeamReportCardWorksheet(
 
             ReportCardTeamSummaryRow(
                 team = selectedTeam,
-                hasRecordRankings = reportCardRankings.containsKey("record"),
-                hasOverallRankings = reportCardRankings.containsKey("overallComposite"),
+                hasRecordRankings = hasReportCardRankings(reportCardRankings, "record"),
+                hasOverallRankings = hasReportCardRankings(reportCardRankings, "overallComposite"),
                 hasPlayoffChances = visualization.playoffChances.isNotEmpty(),
                 onRecordRankClick = {
-                    if (reportCardRankings.containsKey("record")) {
+                    if (hasReportCardRankings(reportCardRankings, "record")) {
                         selectedRankingKey = "record"
                     }
                 },
                 onOverallRankClick = {
-                    if (reportCardRankings.containsKey("overallComposite")) {
+                    if (hasReportCardRankings(reportCardRankings, "overallComposite")) {
                         selectedRankingKey = "overallComposite"
                     }
                 },
@@ -278,7 +288,7 @@ fun MLBTeamReportCardWorksheet(
                 PlayoffChancesBottomSheet(
                     title = "$seasonLabel / Playoff Chances",
                     champLabel = "WS",
-                    entries = visualization.playoffChances,
+                    entries = displayPlayoffChances,
                     onDismiss = { showPlayoffChances = false },
                     probColorFn = ::getMLBPlayoffProbabilityColor,
                     highlightedTeams = setOf(selectedTeam.teamCode),
@@ -287,6 +297,8 @@ fun MLBTeamReportCardWorksheet(
                     playoffCutoff = 6,
                     playInCutoff = 0,
                     showPlayoffColumn = true,
+                    useStandingsLayout = true,
+                    wildCardPlayoffCutoff = 3,
                     extraColumns = listOf(
                         PlayoffExtraColumn(
                             label = "W-L",
@@ -307,23 +319,6 @@ fun MLBTeamReportCardWorksheet(
                             sortValue = { it.winPct ?: 0.0 }
                         )
                     )
-                )
-            }
-        }
-
-        selectedRankingKey?.let { key ->
-            val entries = reportCardRankings[key] ?: emptyList()
-            if (entries.isNotEmpty() && selectedTeam != null) {
-                val statLabel = formatReportCardRankingLabel(seasonLabel, key)
-                StatRankingsBottomSheet(
-                    statLabel = statLabel,
-                    entries = entries,
-                    onDismiss = { selectedRankingKey = null },
-                    rankColorFn = ::getMLBTeamRankColor,
-                    highlightedTeams = setOf(selectedTeam.teamCode),
-                    isPct = key == "record",
-                    subtitle = "Season Rankings",
-                    source = visualization.source ?: "FanGraphs"
                 )
             }
         }
@@ -473,6 +468,23 @@ fun MLBTeamReportCardWorksheet(
             )
         }
 
+        selectedRankingKey?.let { key ->
+            val entries = reportCardRankings[key] ?: emptyList()
+            val team = selectedTeam
+            if (entries.isNotEmpty() && team != null) {
+                StatRankingsBottomSheet(
+                    statLabel = formatReportCardRankingLabel(seasonLabel, key),
+                    entries = entries,
+                    onDismiss = { selectedRankingKey = null },
+                    rankColorFn = ::getMLBTeamRankColor,
+                    highlightedTeams = setOf(team.teamCode),
+                    isPct = key == "record",
+                    subtitle = "Season Rankings",
+                    source = visualization.source ?: "FanGraphs"
+                )
+            }
+        }
+
         captureRequest?.let { request ->
             val team = selectedTeam ?: return@let
             val categoriesToShare = teamCategoryEntries(team).filter { (key, _) ->
@@ -521,10 +533,12 @@ private val PLAYER_ROW_MIN_HEIGHT = 24.dp
 private val PLAYER_POS_WIDTH = 40.dp
 private val PLAYER_WAR_WIDTH = 32.dp
 private val PLAYER_STAT_WIDTH = 44.dp
-private val PLAYER_RANK_WIDTH = 32.dp
+private val PLAYER_RANK_WIDTH = 40.dp
 private val PLAYER_RANK_LEFT_PADDING = 6.dp
 private val PLAYER_COMP_WIDTH = 36.dp
 private val PLAYER_STAT_GROUP_SPACING = 8.dp
+
+private val SHARE_REPORT_CARD_WIDTH = 564.dp
 
 @Composable
 private fun ReportCardCategorySection(
@@ -551,12 +565,13 @@ private fun ReportCardCategorySection(
             rightRank = null,
             rightRankDisplay = null,
             rankColorFn = teamRankColorFn,
+            useNBARanks = false,
             emptyRankPlaceholder = ""
         )
     }
     teamStats["aggregate"]?.let { composite ->
         val compositeRankingAvailable =
-            compositeRankingKey != null && rankings.containsKey(compositeRankingKey)
+            compositeRankingKey != null && hasReportCardRankings(rankings, compositeRankingKey)
         FiveColumnRowWithRanks(
             leftValue = formatReportCardStat(composite),
             leftRank = composite.rank,
@@ -659,7 +674,7 @@ private fun ReportCardPlayerLine(
         if (expandStatsForShare) {
             Row(
                 modifier = Modifier
-                    .weight(1f)
+                    .wrapContentWidth(unbounded = true)
                     .padding(end = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -739,6 +754,8 @@ private fun ReportCardPlayerStatsColumns(
                         rank = stat?.rank,
                         rankDisplay = stat?.rankDisplay,
                         rankColorFn = ::getMLBPlayerRankColor,
+                        usePlayerRanks = true,
+                        useNBARanks = false,
                         emptyPlaceholder = ""
                     )
                 }
@@ -832,11 +849,120 @@ private fun formatReportCardTeamSubtitle(team: ReportCardTeam): String {
     }
 
     return listOfNotNull(
-        team.teamCode,
         divisionPart,
-        team.league,
         formatTeamRecord(team.wins, team.losses)
     ).joinToString(" • ")
+}
+
+private val MLB_STANDINGS_SECTION_ORDER = mapOf(
+    "National" to listOf("NL East", "NL Central", "NL West", "Wild Card"),
+    "American" to listOf("AL East", "AL Central", "AL West", "Wild Card")
+)
+
+private fun mlbGamesBack(w: Int, l: Int, wRef: Int, lRef: Int): Double =
+    ((wRef - w) + (l - lRef)) / 2.0
+
+private fun organizeMlbPlayoffChancesForDisplay(
+    entries: List<PlayoffChanceEntry>,
+    teams: Map<String, ReportCardTeam>
+): List<PlayoffChanceEntry> {
+    val uniqueEntries = entries
+        .groupBy { it.team.uppercase() }
+        .map { (_, group) ->
+            group.firstOrNull { it.standingsSection != "Wild Card" } ?: group.first()
+        }
+
+    if (uniqueEntries.any { !it.standingsSection.isNullOrBlank() && it.standingsSection != "Wild Card" }) {
+        return uniqueEntries
+    }
+
+    data class Enriched(
+        val entry: PlayoffChanceEntry,
+        val division: String?,
+        val league: String?,
+        val divisionRank: Int?,
+        val wins: Int?,
+        val losses: Int?,
+        val winPct: Double?
+    )
+
+    fun enrich(entry: PlayoffChanceEntry): Enriched {
+        val team = teams[entry.team]
+            ?: teams.entries.find { it.key.equals(entry.team, ignoreCase = true) }?.value
+        val wins = entry.wins ?: team?.wins
+        val losses = entry.losses ?: team?.losses
+        val winPct = entry.winPct ?: if (wins != null && losses != null && wins + losses > 0) {
+            wins.toDouble() / (wins + losses)
+        } else {
+            null
+        }
+        val division = entry.division ?: team?.division
+        val league = when {
+            division?.startsWith("AL") == true -> "American"
+            division?.startsWith("NL") == true -> "National"
+            else -> entry.conference
+        }
+        return Enriched(
+            entry = entry,
+            division = division,
+            league = league,
+            divisionRank = entry.divisionRank ?: team?.divisionRank,
+            wins = wins,
+            losses = losses,
+            winPct = winPct
+        )
+    }
+
+    fun organizeLeague(
+        leagueEntries: List<Enriched>,
+        divisions: List<String>
+    ): List<PlayoffChanceEntry> {
+        if (leagueEntries.isEmpty()) return emptyList()
+
+        val divLeaders = leagueEntries.filter { it.divisionRank == 1 }
+        val nonLeaders = leagueEntries
+            .filter { (it.divisionRank ?: Int.MAX_VALUE) > 1 }
+            .sortedWith(compareByDescending<Enriched> { it.winPct ?: 0.0 }.thenByDescending { it.wins ?: 0 }.thenBy { it.losses ?: Int.MAX_VALUE })
+        val wcWinners = nonLeaders.take(3)
+        val playoffTeams = (divLeaders + wcWinners).sortedWith(
+            compareBy<Enriched> { it.winPct ?: 1.0 }.thenBy { it.wins ?: Int.MAX_VALUE }.thenByDescending { it.losses ?: 0 }
+        )
+        val cutoff = playoffTeams.firstOrNull()
+        val cutoffW = cutoff?.wins
+        val cutoffL = cutoff?.losses
+
+        fun gamesBackFor(item: Enriched): Double? {
+            if (cutoffW == null || cutoffL == null || item.wins == null || item.losses == null) return null
+            val gb = mlbGamesBack(item.wins, item.losses, cutoffW, cutoffL)
+            return if (gb <= 0.0) 0.0 else kotlin.math.round(gb * 10) / 10
+        }
+
+        fun toEntry(item: Enriched, section: String): PlayoffChanceEntry {
+            return item.entry.copy(
+                conference = item.league ?: item.entry.conference,
+                division = item.division,
+                divisionRank = item.divisionRank,
+                wins = item.wins,
+                losses = item.losses,
+                winPct = item.winPct,
+                gamesBackFromPlayoff = gamesBackFor(item),
+                standingsSection = section
+            )
+        }
+
+        val organized = mutableListOf<PlayoffChanceEntry>()
+        divisions.forEach { division ->
+            leagueEntries
+                .filter { it.division == division }
+                .sortedWith(compareBy<Enriched> { it.divisionRank ?: Int.MAX_VALUE }.thenByDescending { it.winPct ?: 0.0 }.thenByDescending { it.wins ?: 0 })
+                .forEach { organized += toEntry(it, division) }
+        }
+        return organized
+    }
+
+    val enriched = uniqueEntries.map(::enrich)
+    return organizeLeague(enriched.filter { it.league == "National" }, listOf("NL East", "NL Central", "NL West")) +
+        organizeLeague(enriched.filter { it.league == "American" }, listOf("AL East", "AL Central", "AL West"))
 }
 
 private fun buildReportCardSourceAttribution(
@@ -1009,11 +1135,10 @@ private fun MLBTeamReportCardShareImage(
 ) {
     val bg = MaterialTheme.colorScheme.background
     val onBg = MaterialTheme.colorScheme.onSurface
-    val dimColor = onBg.copy(alpha = 0.5f)
 
     Column(
         modifier = Modifier
-            .requiredWidth(420.dp)
+            .requiredWidth(SHARE_REPORT_CARD_WIDTH)
             .background(bg)
             .padding(16.dp)
     ) {
@@ -1024,14 +1149,15 @@ private fun MLBTeamReportCardShareImage(
             color = onBg,
             maxLines = 1
         )
+        Spacer(modifier = Modifier.height(4.dp))
         Text(
             text = listOfNotNull(
                 seasonLabel,
                 formatReportCardTeamSubtitle(team)
             ).joinToString(" • "),
-            style = MaterialTheme.typography.bodySmall,
-            fontSize = 12.sp,
-            color = dimColor,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            color = onBg,
             maxLines = 2
         )
 
@@ -1078,7 +1204,7 @@ private fun MLBTeamReportCardShareImage(
                 text = source,
                 style = MaterialTheme.typography.labelSmall,
                 fontSize = 9.sp,
-                color = dimColor,
+                color = onBg,
                 maxLines = 1
             )
             Text(
@@ -1086,7 +1212,7 @@ private fun MLBTeamReportCardShareImage(
                 style = MaterialTheme.typography.labelSmall,
                 fontSize = 9.sp,
                 fontWeight = FontWeight.Bold,
-                color = dimColor
+                color = onBg
             )
         }
     }

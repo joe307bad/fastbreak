@@ -51,6 +51,88 @@ data class PlayoffExtraColumn(
     val sortValue: (PlayoffChanceEntry) -> Double
 )
 
+private val MLB_STANDINGS_SECTION_ORDER = mapOf(
+    "National" to listOf("NL East", "NL Central", "NL West", "Wild Card"),
+    "American" to listOf("AL East", "AL Central", "AL West", "Wild Card")
+)
+
+internal fun formatPlayoffGamesBack(gamesBack: Double?): String {
+    if (gamesBack == null || gamesBack <= 0.0) return "-"
+    val rounded = kotlin.math.round(gamesBack * 10) / 10
+    return if (kotlin.math.abs(rounded % 1.0) < 0.05) {
+        rounded.toInt().toString()
+    } else {
+        val parts = rounded.toString().split('.')
+        "${parts[0]}.${parts.getOrElse(1) { "0" }.padEnd(1, '0').take(1)}"
+    }
+}
+
+private fun mlbStandingsGamesBack(w: Int, l: Int, wRef: Int, lRef: Int): Double =
+    ((wRef - w) + (l - lRef)) / 2.0
+
+internal fun displayMlbStandingsGamesBack(
+    sectionName: String,
+    entry: PlayoffChanceEntry,
+    sectionEntries: List<PlayoffChanceEntry>
+): Double? {
+    if (sectionName == "Wild Card") {
+        return entry.gamesBackFromPlayoff
+    }
+    val leader = sectionEntries.firstOrNull { it.divisionRank == 1 }
+        ?: sectionEntries.minByOrNull { it.divisionRank ?: Int.MAX_VALUE }
+    val leaderWins = leader?.wins ?: return null
+    val leaderLosses = leader?.losses ?: return null
+    val wins = entry.wins ?: return null
+    val losses = entry.losses ?: return null
+    val gb = mlbStandingsGamesBack(wins, losses, leaderWins, leaderLosses)
+    return if (gb <= 0.0) 0.0 else kotlin.math.round(gb * 10) / 10
+}
+
+private fun dedupeMlbPlayoffChanceEntries(entries: List<PlayoffChanceEntry>): List<PlayoffChanceEntry> {
+    return entries
+        .groupBy { it.team.uppercase() }
+        .map { (_, group) ->
+            group.firstOrNull { it.standingsSection != "Wild Card" } ?: group.first()
+        }
+}
+
+private fun wildCardEntriesForConference(entries: List<PlayoffChanceEntry>): List<PlayoffChanceEntry> {
+    return entries
+        .filter { (it.divisionRank ?: Int.MAX_VALUE) > 1 }
+        .sortedWith(
+            compareByDescending<PlayoffChanceEntry> { it.winPct ?: 0.0 }
+                .thenByDescending { it.wins ?: 0 }
+                .thenBy { it.losses ?: Int.MAX_VALUE }
+        )
+}
+
+private fun buildMlbStandingsConferenceGroups(
+    entries: List<PlayoffChanceEntry>
+): List<Pair<String, List<Pair<String, List<PlayoffChanceEntry>>>>>? {
+    val uniqueEntries = dedupeMlbPlayoffChanceEntries(entries)
+    if (uniqueEntries.none { !it.standingsSection.isNullOrBlank() && it.standingsSection != "Wild Card" }) {
+        return null
+    }
+    return uniqueEntries.groupBy { it.conference ?: "Unknown" }
+        .entries
+        .sortedBy { it.key }
+        .map { (conference, confEntries) ->
+            val sectionOrder = MLB_STANDINGS_SECTION_ORDER[conference]
+                ?: confEntries.mapNotNull { it.standingsSection }.distinct()
+            val sections = sectionOrder.mapNotNull { section ->
+                val sectionEntries = if (section == "Wild Card") {
+                    wildCardEntriesForConference(confEntries)
+                } else {
+                    confEntries
+                        .filter { it.standingsSection == section || it.division == section }
+                        .sortedBy { it.divisionRank ?: Int.MAX_VALUE }
+                }
+                if (sectionEntries.isEmpty()) null else section to sectionEntries
+            }
+            conference to sections
+        }
+}
+
 // Team colors for advantage indicators
 internal val Team1Color = Color(0xFF2196F3) // Blue (away team)
 internal val Team2Color = Color(0xFFFF5722) // Deep Orange (home team)
@@ -549,11 +631,16 @@ fun MatchupRankBadge(
         useNBARanks -> getNBATeamRankColor(rank)
         else -> Color.Gray
     }
+    val badgeWidth = when (rankDisplay?.length ?: 0) {
+        0, 1, 2 -> 32.dp
+        3 -> 34.dp
+        else -> 40.dp
+    }
     Box(
         modifier = Modifier
-            .width(32.dp)
+            .width(badgeWidth)
             .background(color, RoundedCornerShape(4.dp))
-            .padding(4.dp),
+            .padding(horizontal = 3.dp, vertical = 4.dp),
         contentAlignment = Alignment.Center
     ) {
         Text(
@@ -562,7 +649,8 @@ fun MatchupRankBadge(
             fontSize = 9.sp,
             fontWeight = FontWeight.Bold,
             color = Color.White,
-            maxLines = 1
+            maxLines = 1,
+            softWrap = false
         )
     }
 }
@@ -1165,16 +1253,29 @@ private fun PlayoffChancesShareImage(
     playoffCutoff: Int = 0,
     playInCutoff: Int = 0,
     showPlayoffColumn: Boolean = true,
-    extraColumns: List<PlayoffExtraColumn> = emptyList()
+    extraColumns: List<PlayoffExtraColumn> = emptyList(),
+    useStandingsLayout: Boolean = false,
+    wildCardPlayoffCutoff: Int = 3
 ) {
     val bg = MaterialTheme.colorScheme.background
     val onBg = MaterialTheme.colorScheme.onSurface
     val dimColor = onBg.copy(alpha = 0.5f)
     val highlightColor = MaterialTheme.colorScheme.primary
 
-    val hasConferenceData = entries.any { it.conference != null }
-    val conferenceGroups: List<Pair<String, List<PlayoffChanceEntry>>>? = if (hasConferenceData) {
-        entries.groupBy { it.conference ?: "Unknown" }
+    val uniqueEntries = dedupeMlbPlayoffChanceEntries(entries)
+    val standingsConferenceGroups = if (useStandingsLayout) {
+        buildMlbStandingsConferenceGroups(entries)
+    } else {
+        null
+    }
+    val showGamesBackColumn = useStandingsLayout &&
+        uniqueEntries.any { it.gamesBackFromPlayoff != null }
+    val hasConferenceData = uniqueEntries.any { it.conference != null }
+    val conferenceGroups: List<Pair<String, List<PlayoffChanceEntry>>>? =
+        if (standingsConferenceGroups != null) {
+            null
+        } else if (hasConferenceData) {
+        uniqueEntries.groupBy { it.conference ?: "Unknown" }
             .entries
             .sortedBy { it.key }
             .map { (conf, teams) ->
@@ -1183,9 +1284,10 @@ private fun PlayoffChancesShareImage(
     } else null
 
     val extraWidth = if (extraColumns.isNotEmpty()) (38 * extraColumns.size).dp else 0.dp
+    val gamesBackWidth = if (showGamesBackColumn) 28.dp else 0.dp
     Column(
         modifier = Modifier
-            .requiredWidth(340.dp + extraWidth)
+            .requiredWidth(340.dp + extraWidth + gamesBackWidth)
             .background(bg)
             .padding(16.dp)
     ) {
@@ -1195,7 +1297,38 @@ private fun PlayoffChancesShareImage(
         }
         Spacer(modifier = Modifier.height(8.dp))
 
-        if (conferenceGroups != null) {
+        if (standingsConferenceGroups != null) {
+            standingsConferenceGroups.forEachIndexed { groupIndex, (confName, sections) ->
+                if (groupIndex > 0) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                }
+                Text(confName.uppercase(), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, color = onBg.copy(alpha = 0.7f))
+                sections.forEachIndexed { sectionIndex, (sectionName, sectionEntries) ->
+                    if (sectionIndex > 0) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(sectionName, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.SemiBold, fontFamily = FontFamily.Monospace, color = onBg.copy(alpha = 0.55f))
+                    Spacer(modifier = Modifier.height(2.dp))
+                    ShareImageHeaderRow(champLabel, dimColor, extraColumns, showPlayoffColumn, showGamesBackColumn)
+                    sectionEntries.forEachIndexed { index, entry ->
+                        val seed = if (sectionName == "Wild Card") index + 1 else entry.divisionRank ?: (index + 1)
+                        if (sectionName == "Wild Card" && showPlayoffColumn && wildCardPlayoffCutoff > 0 && seed == wildCardPlayoffCutoff + 1) {
+                            ShareImageCutoffDivider("PLAYOFF CUTOFF", dimColor)
+                        }
+                        ShareImageTeamRow(
+                            entry, seed, highlightedTeams, probColorFn, champProbColorFn, highlightColor, onBg, dimColor,
+                            extraColumns, showPlayoffColumn, showGamesBackColumn,
+                            gamesBack = if (showGamesBackColumn) {
+                                displayMlbStandingsGamesBack(sectionName, entry, sectionEntries)
+                            } else {
+                                null
+                            }
+                        )
+                    }
+                }
+            }
+        } else if (conferenceGroups != null) {
             conferenceGroups.forEachIndexed { groupIndex, (confName, confEntries) ->
                 if (groupIndex > 0) {
                     Spacer(modifier = Modifier.height(12.dp))
@@ -1266,6 +1399,34 @@ private fun PlayoffChancesShareImage(
 }
 
 @Composable
+private fun ShareImageHeaderRow(
+    champLabel: String,
+    dimColor: Color,
+    extraColumns: List<PlayoffExtraColumn>,
+    showPlayoffColumn: Boolean,
+    showGamesBackColumn: Boolean = false
+) {
+    Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+        Spacer(modifier = Modifier.width(8.dp))
+        Text("#", style = MaterialTheme.typography.labelSmall, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = dimColor, modifier = Modifier.width(22.dp), textAlign = TextAlign.Center)
+        Spacer(modifier = Modifier.width(4.dp))
+        Text("TEAM", style = MaterialTheme.typography.labelSmall, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = dimColor, modifier = Modifier.weight(1f))
+        extraColumns.forEach { col ->
+            Text(col.label, style = MaterialTheme.typography.labelSmall, fontSize = 9.sp, fontWeight = FontWeight.Bold, color = dimColor, textAlign = TextAlign.End, modifier = Modifier.width(36.dp), maxLines = 1)
+            Spacer(modifier = Modifier.width(2.dp))
+        }
+        if (showGamesBackColumn) {
+            Text("GB", style = MaterialTheme.typography.labelSmall, fontSize = 9.sp, fontWeight = FontWeight.Bold, color = dimColor, textAlign = TextAlign.End, modifier = Modifier.width(24.dp), maxLines = 1)
+            Spacer(modifier = Modifier.width(2.dp))
+        }
+        if (showPlayoffColumn) {
+            Text("PLAYOFF", style = MaterialTheme.typography.labelSmall, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = dimColor, textAlign = TextAlign.Center, modifier = Modifier.width(52.dp), maxLines = 1)
+        }
+        Text(champLabel.uppercase(), style = MaterialTheme.typography.labelSmall, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = dimColor, textAlign = TextAlign.Center, modifier = Modifier.width(52.dp), maxLines = 1)
+    }
+}
+
+@Composable
 private fun ShareImageTeamRow(
     entry: PlayoffChanceEntry,
     seed: Int,
@@ -1276,7 +1437,9 @@ private fun ShareImageTeamRow(
     onBg: Color,
     dimColor: Color,
     extraColumns: List<PlayoffExtraColumn> = emptyList(),
-    showPlayoffColumn: Boolean = true
+    showPlayoffColumn: Boolean = true,
+    showGamesBackColumn: Boolean = false,
+    gamesBack: Double? = null
 ) {
     val playoffColor = probColorFn(entry.playoffProb)
     val isHighlighted = entry.team in highlightedTeams
@@ -1304,6 +1467,10 @@ private fun ShareImageTeamRow(
         )
         extraColumns.forEach { col ->
             Text(col.format(entry), fontSize = 10.sp, fontWeight = FontWeight.Medium, fontFamily = FontFamily.Monospace, color = dimColor, textAlign = TextAlign.End, modifier = Modifier.width(36.dp), maxLines = 1)
+            Spacer(modifier = Modifier.width(2.dp))
+        }
+        if (showGamesBackColumn) {
+            Text(formatPlayoffGamesBack(gamesBack ?: entry.gamesBackFromPlayoff), fontSize = 10.sp, fontWeight = FontWeight.Medium, fontFamily = FontFamily.Monospace, color = dimColor, textAlign = TextAlign.End, modifier = Modifier.width(24.dp), maxLines = 1)
             Spacer(modifier = Modifier.width(2.dp))
         }
         if (showPlayoffColumn) {
@@ -1636,13 +1803,23 @@ fun PlayoffChancesBottomSheet(
     playoffCutoff: Int = 0,
     playInCutoff: Int = 0,
     showPlayoffColumn: Boolean = true,
-    extraColumns: List<PlayoffExtraColumn> = emptyList()
+    extraColumns: List<PlayoffExtraColumn> = emptyList(),
+    useStandingsLayout: Boolean = false,
+    wildCardPlayoffCutoff: Int = 3
 ) {
     var isReversed by remember { mutableStateOf(false) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var selectedTeams by remember { mutableStateOf(highlightedTeams) }
 
     val hasConferenceData = entries.any { it.conference != null }
+    val uniqueEntries = dedupeMlbPlayoffChanceEntries(entries)
+    val standingsConferenceGroups = if (useStandingsLayout) {
+        buildMlbStandingsConferenceGroups(entries)
+    } else {
+        null
+    }
+    val showGamesBackColumn = useStandingsLayout &&
+        uniqueEntries.any { it.gamesBackFromPlayoff != null }
 
     // Sort by champProb during postseason (when showPlayoffColumn is false),
     // otherwise by first extra column if available, otherwise by champProb
@@ -1655,8 +1832,11 @@ fun PlayoffChancesBottomSheet(
     }
 
     // Build conference groups: list of (conference name, sorted teams)
-    val conferenceGroups: List<Pair<String, List<PlayoffChanceEntry>>>? = if (hasConferenceData) {
-        entries.groupBy { it.conference ?: "Unknown" }
+    val conferenceGroups: List<Pair<String, List<PlayoffChanceEntry>>>? =
+        if (standingsConferenceGroups != null) {
+            null
+        } else if (hasConferenceData) {
+        uniqueEntries.groupBy { it.conference ?: "Unknown" }
             .entries
             .sortedBy { it.key }
             .map { (conf, teams) ->
@@ -1669,7 +1849,7 @@ fun PlayoffChancesBottomSheet(
             }
     } else null
 
-    val displayEntries = if (isReversed) entries.reversed() else entries
+    val displayEntries = if (isReversed) uniqueEntries.reversed() else uniqueEntries
 
     // Share capture state
     var shareRange by remember { mutableStateOf<ShareRange?>(null) }
@@ -1682,8 +1862,12 @@ fun PlayoffChancesBottomSheet(
             try {
                 val bitmap = graphicsLayer.toImageBitmap()
                 val rangeLabel = when (shareRange) {
-                    ShareRange.TOP_HALF -> if (hasConferenceData) conferenceGroups?.firstOrNull()?.first ?: "Top Half" else "Top Half"
-                    ShareRange.BOTTOM_HALF -> if (hasConferenceData) conferenceGroups?.lastOrNull()?.first ?: "Bottom Half" else "Bottom Half"
+                    ShareRange.TOP_HALF -> standingsConferenceGroups?.firstOrNull()?.first
+                        ?: conferenceGroups?.firstOrNull()?.first
+                        ?: "Top Half"
+                    ShareRange.BOTTOM_HALF -> standingsConferenceGroups?.lastOrNull()?.first
+                        ?: conferenceGroups?.lastOrNull()?.first
+                        ?: "Bottom Half"
                     else -> ""
                 }
                 val shareTitle = if (rangeLabel.isNotEmpty()) "$title - $rangeLabel" else title
@@ -1698,18 +1882,30 @@ fun PlayoffChancesBottomSheet(
 
     // Off-screen share image
     shareRange?.let { range ->
-        val shareEntries = if (hasConferenceData && conferenceGroups != null) {
-            when (range) {
-                ShareRange.FULL -> displayEntries
-                ShareRange.TOP_HALF -> conferenceGroups.firstOrNull()?.second ?: emptyList()
-                ShareRange.BOTTOM_HALF -> conferenceGroups.lastOrNull()?.second ?: emptyList()
+        val shareEntries = when {
+            standingsConferenceGroups != null -> {
+                when (range) {
+                    ShareRange.FULL -> uniqueEntries
+                    ShareRange.TOP_HALF -> standingsConferenceGroups.firstOrNull()?.second
+                        ?.flatMap { it.second } ?: emptyList()
+                    ShareRange.BOTTOM_HALF -> standingsConferenceGroups.lastOrNull()?.second
+                        ?.flatMap { it.second } ?: emptyList()
+                }
             }
-        } else {
-            val mid = displayEntries.size / 2
-            when (range) {
-                ShareRange.FULL -> displayEntries
-                ShareRange.TOP_HALF -> displayEntries.take(mid)
-                ShareRange.BOTTOM_HALF -> displayEntries.drop(mid)
+            hasConferenceData && conferenceGroups != null -> {
+                when (range) {
+                    ShareRange.FULL -> displayEntries
+                    ShareRange.TOP_HALF -> conferenceGroups.firstOrNull()?.second ?: emptyList()
+                    ShareRange.BOTTOM_HALF -> conferenceGroups.lastOrNull()?.second ?: emptyList()
+                }
+            }
+            else -> {
+                val mid = displayEntries.size / 2
+                when (range) {
+                    ShareRange.FULL -> displayEntries
+                    ShareRange.TOP_HALF -> displayEntries.take(mid)
+                    ShareRange.BOTTOM_HALF -> displayEntries.drop(mid)
+                }
             }
         }
         val rangeSubtitle = subtitle
@@ -1737,7 +1933,9 @@ fun PlayoffChancesBottomSheet(
                     playoffCutoff = playoffCutoff,
                     playInCutoff = playInCutoff,
                     showPlayoffColumn = showPlayoffColumn,
-                    extraColumns = extraColumns
+                    extraColumns = extraColumns,
+                    useStandingsLayout = useStandingsLayout,
+                    wildCardPlayoffCutoff = wildCardPlayoffCutoff
                 )
             }
         }
@@ -1766,15 +1964,17 @@ fun PlayoffChancesBottomSheet(
                         fontFamily = FontFamily.Monospace,
                         maxLines = 1
                     )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Icon(
-                        imageVector = if (isReversed) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
-                        contentDescription = if (isReversed) "Sort best first" else "Sort worst first",
-                        modifier = Modifier
-                            .size(20.dp)
-                            .clickable { isReversed = !isReversed },
-                        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                    )
+                    if (standingsConferenceGroups == null) {
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Icon(
+                            imageVector = if (isReversed) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
+                            contentDescription = if (isReversed) "Sort best first" else "Sort worst first",
+                            modifier = Modifier
+                                .size(20.dp)
+                                .clickable { isReversed = !isReversed },
+                            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                        )
+                    }
                 }
 
                 // Scrollable content
@@ -1784,7 +1984,81 @@ fun PlayoffChancesBottomSheet(
                         .weight(1f, fill = false)
                         .verticalScroll(rememberScrollState())
                 ) {
-                    if (conferenceGroups != null) {
+                    if (standingsConferenceGroups != null) {
+                        standingsConferenceGroups.forEachIndexed { groupIndex, (confName, sections) ->
+                            if (groupIndex > 0) {
+                                Spacer(modifier = Modifier.height(16.dp))
+                            }
+
+                            Text(
+                                text = confName.uppercase(),
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = FontFamily.Monospace,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                                modifier = Modifier.padding(bottom = 4.dp)
+                            )
+
+                            sections.forEachIndexed { sectionIndex, (sectionName, sectionEntries) ->
+                                if (sectionIndex > 0) {
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                }
+
+                                Text(
+                                    text = sectionName,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.SemiBold,
+                                    fontFamily = FontFamily.Monospace,
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f),
+                                    modifier = Modifier.padding(bottom = 2.dp)
+                                )
+
+                                PlayoffChancesHeaderRow(
+                                    champLabel = champLabel,
+                                    extraColumns = extraColumns,
+                                    showPlayoffColumn = showPlayoffColumn,
+                                    showGamesBackColumn = showGamesBackColumn
+                                )
+
+                                sectionEntries.forEachIndexed { index, entry ->
+                                    val seed = if (sectionName == "Wild Card") {
+                                        index + 1
+                                    } else {
+                                        entry.divisionRank ?: (index + 1)
+                                    }
+                                    if (sectionName == "Wild Card" &&
+                                        showPlayoffColumn &&
+                                        wildCardPlayoffCutoff > 0 &&
+                                        seed == wildCardPlayoffCutoff + 1
+                                    ) {
+                                        PlayoffCutoffDivider()
+                                    }
+                                    PlayoffChanceTeamRow(
+                                        entry = entry,
+                                        seed = seed,
+                                        isSelected = entry.team in selectedTeams,
+                                        probColorFn = probColorFn,
+                                        champProbColorFn = champProbColorFn,
+                                        extraColumns = extraColumns,
+                                        showPlayoffColumn = showPlayoffColumn,
+                                        showGamesBackColumn = showGamesBackColumn,
+                                        gamesBack = if (showGamesBackColumn) {
+                                            displayMlbStandingsGamesBack(sectionName, entry, sectionEntries)
+                                        } else {
+                                            null
+                                        },
+                                        onToggle = {
+                                            selectedTeams = if (entry.team in selectedTeams) {
+                                                selectedTeams - entry.team
+                                            } else {
+                                                selectedTeams + entry.team
+                                            }
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                    } else if (conferenceGroups != null) {
                         // Conference-grouped layout
                         conferenceGroups.forEachIndexed { groupIndex, (confName, confEntries) ->
                             if (groupIndex > 0) {
@@ -1802,7 +2076,12 @@ fun PlayoffChancesBottomSheet(
                             )
 
                             // Column headers
-                            PlayoffChancesHeaderRow(champLabel, extraColumns, showPlayoffColumn)
+                            PlayoffChancesHeaderRow(
+                                champLabel = champLabel,
+                                extraColumns = extraColumns,
+                                showPlayoffColumn = showPlayoffColumn,
+                                showGamesBackColumn = showGamesBackColumn
+                            )
 
                             confEntries.forEachIndexed { index, entry ->
                                 val seed = index + 1
@@ -1822,6 +2101,7 @@ fun PlayoffChancesBottomSheet(
                                     champProbColorFn = champProbColorFn,
                                     extraColumns = extraColumns,
                                     showPlayoffColumn = showPlayoffColumn,
+                                    showGamesBackColumn = showGamesBackColumn,
                                     onToggle = {
                                         selectedTeams = if (entry.team in selectedTeams) selectedTeams - entry.team else selectedTeams + entry.team
                                     }
@@ -1830,7 +2110,12 @@ fun PlayoffChancesBottomSheet(
                         }
                     } else {
                         // Flat list fallback (no conference data)
-                        PlayoffChancesHeaderRow(champLabel, extraColumns, showPlayoffColumn)
+                        PlayoffChancesHeaderRow(
+                            champLabel = champLabel,
+                            extraColumns = extraColumns,
+                            showPlayoffColumn = showPlayoffColumn,
+                            showGamesBackColumn = showGamesBackColumn
+                        )
                         displayEntries.forEachIndexed { index, entry ->
                             val seed = index + 1
                             if (showPlayoffColumn && playoffCutoff > 0 && seed == playoffCutoff + 1) {
@@ -1847,6 +2132,7 @@ fun PlayoffChancesBottomSheet(
                                 champProbColorFn = champProbColorFn,
                                 extraColumns = extraColumns,
                                 showPlayoffColumn = showPlayoffColumn,
+                                showGamesBackColumn = showGamesBackColumn,
                                 onToggle = {
                                     selectedTeams = if (entry.team in selectedTeams) selectedTeams - entry.team else selectedTeams + entry.team
                                 }
@@ -1860,18 +2146,32 @@ fun PlayoffChancesBottomSheet(
 
             // Share FAB
             MultiOptionFab(
-                options = if (hasConferenceData && conferenceGroups != null) {
+                options = when {
+                    standingsConferenceGroups != null -> {
+                        listOf(
+                            FabOption(Icons.Filled.Share, "Full List") { shareRange = ShareRange.FULL },
+                            FabOption(Icons.Filled.Share, standingsConferenceGroups.firstOrNull()?.first ?: "First") {
+                                shareRange = ShareRange.TOP_HALF
+                            },
+                            FabOption(Icons.Filled.Share, standingsConferenceGroups.lastOrNull()?.first ?: "Second") {
+                                shareRange = ShareRange.BOTTOM_HALF
+                            }
+                        )
+                    }
+                    hasConferenceData && conferenceGroups != null -> {
                     listOf(
                         FabOption(Icons.Filled.Share, "Full List") { shareRange = ShareRange.FULL },
                         FabOption(Icons.Filled.Share, conferenceGroups.firstOrNull()?.first ?: "First") { shareRange = ShareRange.TOP_HALF },
                         FabOption(Icons.Filled.Share, conferenceGroups.lastOrNull()?.first ?: "Second") { shareRange = ShareRange.BOTTOM_HALF }
                     )
-                } else {
+                    }
+                    else -> {
                     listOf(
                         FabOption(Icons.Filled.Share, "Full List") { shareRange = ShareRange.FULL },
                         FabOption(Icons.Filled.Share, "Top Half") { shareRange = ShareRange.TOP_HALF },
                         FabOption(Icons.Filled.Share, "Bottom Half") { shareRange = ShareRange.BOTTOM_HALF }
                     )
+                    }
                 },
                 modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp)
             )
@@ -1880,7 +2180,13 @@ fun PlayoffChancesBottomSheet(
 }
 
 @Composable
-private fun PlayoffChancesHeaderRow(champLabel: String, extraColumns: List<PlayoffExtraColumn> = emptyList(), showPlayoffColumn: Boolean = true) {
+private fun PlayoffChancesHeaderRow(
+    champLabel: String,
+    extraColumns: List<PlayoffExtraColumn> = emptyList(),
+    showPlayoffColumn: Boolean = true,
+    showGamesBackColumn: Boolean = false,
+    gamesBack: Double? = null
+) {
     Row(
         modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -1914,6 +2220,18 @@ private fun PlayoffChancesHeaderRow(champLabel: String, extraColumns: List<Playo
                 textAlign = TextAlign.End,
                 modifier = Modifier.width(36.dp),
                 maxLines = 1
+            )
+        }
+        if (showGamesBackColumn) {
+            Spacer(modifier = Modifier.width(4.dp))
+            Text(
+                text = "GB",
+                style = MaterialTheme.typography.labelSmall,
+                fontSize = 9.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                textAlign = TextAlign.End,
+                modifier = Modifier.width(24.dp)
             )
         }
         Spacer(modifier = Modifier.width(12.dp))
@@ -1997,10 +2315,13 @@ private fun PlayoffChanceTeamRow(
     champProbColorFn: (Double?) -> Color,
     extraColumns: List<PlayoffExtraColumn> = emptyList(),
     showPlayoffColumn: Boolean = true,
+    showGamesBackColumn: Boolean = false,
+    gamesBack: Double? = null,
     onToggle: () -> Unit
 ) {
     val playoffColor = probColorFn(entry.playoffProb)
     val extraColumnsWidth = if (extraColumns.isNotEmpty()) (40 * extraColumns.size).dp else 0.dp
+    val gamesBackWidth = if (showGamesBackColumn) 28.dp else 0.dp
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -2014,7 +2335,7 @@ private fun PlayoffChanceTeamRow(
             .drawBehind {
                 if (showPlayoffColumn) {
                     val y = size.height / 2
-                    val startX = 66.dp.toPx() + extraColumnsWidth.toPx()
+                    val startX = 66.dp.toPx() + extraColumnsWidth.toPx() + gamesBackWidth.toPx()
                     val endX = startX + 12.dp.toPx()
                     if (endX > startX) {
                         drawLine(
@@ -2065,6 +2386,21 @@ private fun PlayoffChanceTeamRow(
                 fontFamily = FontFamily.Monospace,
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
                 modifier = Modifier.width(36.dp),
+                textAlign = TextAlign.End,
+                maxLines = 1
+            )
+        }
+
+        if (showGamesBackColumn) {
+            Spacer(modifier = Modifier.width(4.dp))
+            Text(
+                text = formatPlayoffGamesBack(gamesBack ?: entry.gamesBackFromPlayoff),
+                style = MaterialTheme.typography.bodySmall,
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Medium,
+                fontFamily = FontFamily.Monospace,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                modifier = Modifier.width(24.dp),
                 textAlign = TextAlign.End,
                 maxLines = 1
             )

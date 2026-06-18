@@ -1,5 +1,10 @@
+'use client';
+
 import Link from 'next/link';
+import { useMemo } from 'react';
 import { MLBMatchupDataPoint } from '@/types/chart';
+import { getPreferredGameForDay } from '@/lib/mlbMatchups';
+import { usePinnedTeams } from '@/lib/usePinnedTeams';
 
 interface DayGroup {
   dateKey: string;
@@ -60,6 +65,12 @@ interface MLBMatchupNavProps {
 }
 
 export function MLBMatchupNav({ games, selectedGameId }: MLBMatchupNavProps) {
+  const { getPinnedForSport, mounted } = usePinnedTeams();
+  const pinnedMlbTeamCodes = useMemo(
+    () => (mounted ? getPinnedForSport('mlb').map(team => team.teamCode) : []),
+    [getPinnedForSport, mounted]
+  );
+
   const dayGroups = groupGamesByDay(games);
 
   const selectedGame = games.find(g => g.gameId === selectedGameId);
@@ -81,16 +92,23 @@ export function MLBMatchupNav({ games, selectedGameId }: MLBMatchupNavProps) {
     }`;
 
   return (
-    <nav className="mb-4 sticky top-10 z-30 bg-[var(--background)] py-1">
+    <nav className="py-1">
       <div className="overflow-x-auto scrollbar-hide">
         <div className="flex gap-2 pb-2">
           {dayGroups.map(group => {
             const isSelected = group.dateKey === selectedDayKey;
-            const firstGameOfDay = group.games[0];
+            const targetGame = getPreferredGameForDay(
+              games,
+              group.dateKey,
+              pinnedMlbTeamCodes,
+              group.games[0]
+            );
+            if (!targetGame) return null;
+
             return (
               <Link
                 key={group.dateKey}
-                href={`/mlb/matchups/${firstGameOfDay.gameId}`}
+                href={`/mlb/matchups/${targetGame.gameId}`}
                 className={dayBadgeClasses(isSelected)}
               >
                 {group.label} ({group.games.length})

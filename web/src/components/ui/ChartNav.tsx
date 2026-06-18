@@ -64,9 +64,9 @@ export function ChartNav({ charts, activeChart, onChartClick }: ChartNavProps) {
         )}
       </div>
 
-      {/* Desktop horizontal scroll */}
-      <div className="hidden md:block overflow-x-auto scrollbar-hide">
-        <div className="flex gap-2 pb-2">
+      {/* Tablet: horizontal scroll. Desktop: show all badges wrapped. */}
+      <div className="hidden md:block md:overflow-x-auto md:scrollbar-hide lg:overflow-visible">
+        <div className="flex gap-2 pb-2 lg:flex-wrap">
           {charts.map(chart => {
             const isActive = activeChart === chart.key;
             return (

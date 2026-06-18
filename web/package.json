@@ -3,13 +3,14 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "FASTBREAK_ENV=prod next dev",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
     "generate-og": "tsx scripts/generate-og-images.ts",
     "download-charts": "tsx scripts/download-charts.ts",
-    "prebuild": "npm run download-charts"
+    "download-charts:prod": "FASTBREAK_ENV=prod tsx scripts/download-charts.ts",
+    "prebuild": "npm run download-charts:prod"
   },
   "dependencies": {
     "@mdx-js/loader": "^3.1.1",

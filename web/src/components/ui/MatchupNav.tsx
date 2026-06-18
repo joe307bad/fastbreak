@@ -194,9 +194,8 @@ export function MatchupNav({
       onMatchupSelect(null);
     } else {
       onDaySelect(dateKey);
-      onMatchupSelect(null);
     }
-  }, [effectiveDay, onDaySelect, onMatchupSelect]);
+  }, [effectiveDay, onDaySelect]);
 
   const handleMatchupClick = useCallback((matchupId: string) => {
     if (matchupId === selectedMatchup) {

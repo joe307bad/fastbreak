@@ -116,7 +116,7 @@ function CategoryPanel({
   if (!hasTeam && !hasPlayers) return null;
 
   return (
-    <div className="border border-[var(--border)] rounded bg-[var(--card)]">
+    <div className="border border-[var(--border)] rounded bg-[var(--card)] break-inside-avoid mb-2">
       <div className="grid grid-cols-[1fr_minmax(60px,1fr)_1fr] gap-0 px-2 py-1 border-b border-[var(--border)] bg-[var(--border)]/30 items-center">
         <div />
         <div className="text-center text-xs font-bold">{title}</div>
@@ -396,8 +396,9 @@ export function MLBTeamReportCard({ data }: Props) {
   }
 
   return (
-    <div className="h-full min-h-0 flex flex-col gap-3">
-      <div className="flex flex-wrap items-center gap-3 shrink-0">
+    <div className="h-full min-h-0 flex flex-col">
+      <div className="mx-auto w-full h-full min-h-0 flex flex-col gap-3">
+        <div className="max-w-3xl w-full mx-auto flex flex-wrap items-center gap-3 shrink-0">
         <div className="flex items-center gap-1">
           <select
             value={activeTeamCode}
@@ -458,7 +459,7 @@ export function MLBTeamReportCard({ data }: Props) {
         </div>
       </div>
 
-      <div className="flex-1 min-h-0 overflow-y-auto space-y-2">
+      <div className="flex-1 min-h-0 overflow-y-auto columns-[48rem] gap-2">
         {CATEGORY_KEYS.map(key => {
           const compositeRankingKey = CATEGORY_COMPOSITE_RANKING_KEYS[key];
           const hasCategoryCompositeRankings =
@@ -479,6 +480,7 @@ export function MLBTeamReportCard({ data }: Props) {
           );
         })}
       </div>
+      </div>
 
       {rankingSheetKey && (
         <StatRankingsSheet
@@ -497,6 +499,7 @@ export function MLBTeamReportCard({ data }: Props) {
         onClose={() => setShowPlayoffSheet(false)}
         title={`${seasonLabel} / Playoff Chances`}
         entries={data.playoffChances}
+        teams={data.teams}
         highlightedTeam={activeTeamCode}
       />
 

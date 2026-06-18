@@ -6,6 +6,7 @@ import { MatchupComparisons } from '@/components/charts/MatchupComparisons';
 import { CumRunDiffChart } from '@/components/charts/CumRunDiffChart';
 import { WeeklyRunsChart } from '@/components/charts/WeeklyRunsChart';
 import { ChartDownloadWrapper } from '@/components/charts/ChartDownloadWrapper';
+import { MLBMatchupInfoButton } from '@/components/charts/MLBMatchupInfoButton';
 import { formatRunDiff, getLeagueAbbrev, getRecordRank, getRunDiffPerGame } from '@/lib/mlbStats';
 import { pageMetadata } from '@/lib/og';
 import { notFound } from 'next/navigation';
@@ -148,7 +149,12 @@ export default async function MLBMatchupPage({ params }: Props) {
       <SportTabs orderedSports={orderedSports} />
 
       <div className="px-1 md:px-0">
-        <MLBMatchupNav games={matchupData.dataPoints} selectedGameId={gameId} />
+        <div className="sticky top-10 z-30 mb-4 flex items-start gap-1 bg-[var(--background)] py-1">
+          <div className="flex-1 min-w-0">
+            <MLBMatchupNav games={matchupData.dataPoints} selectedGameId={gameId} />
+          </div>
+          <MLBMatchupInfoButton title="MLB Matchup Stats" source={matchupData.source} />
+        </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-2">
           <div className="flex flex-col gap-2 h-[700px] lg:h-[calc(100vh-80px)] order-2 lg:order-1">

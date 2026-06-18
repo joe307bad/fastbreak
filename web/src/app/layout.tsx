@@ -47,6 +47,14 @@ export default function RootLayout({
                   document.documentElement.classList.toggle('dark', isDark);
                 } catch (_) {}
               })();
+              (function() {
+                try {
+                  var pinnedTeams = localStorage.getItem('pinnedTeams');
+                  if (pinnedTeams) {
+                    document.cookie = 'pinnedTeams=' + encodeURIComponent(pinnedTeams) + '; path=/; max-age=31536000; SameSite=Lax';
+                  }
+                } catch (_) {}
+              })();
             `,
           }}
         />

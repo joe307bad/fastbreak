@@ -1,5 +1,13 @@
 import { fetchChartRegistry, fetchChartData } from '@/lib/api';
 import { MLBMatchupData } from '@/types/chart';
+import { MLBMatchupsClientRedirect } from '@/components/charts/MLBMatchupsClientRedirect';
+import { getDefaultMLBMatchupGame } from '@/lib/mlbMatchups';
+import {
+  getPinnedTeamCodesForSport,
+  getPinnedTeamsFromCookieValue,
+  PINNED_TEAMS_COOKIE_KEY,
+} from '@/lib/pinnedTeamsStorage';
+import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 
 async function getMLBMatchupData(): Promise<MLBMatchupData | null> {
@@ -16,21 +24,6 @@ async function getMLBMatchupData(): Promise<MLBMatchupData | null> {
   return null;
 }
 
-function getTodayKey(): string {
-  const today = new Date();
-  const year = today.getFullYear();
-  const month = String(today.getMonth() + 1).padStart(2, '0');
-  const day = String(today.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
-
-function getDateKey(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
-
 export default async function MLBMatchupsPage() {
   const matchupData = await getMLBMatchupData();
 
@@ -44,18 +37,18 @@ export default async function MLBMatchupsPage() {
     );
   }
 
-  const todayKey = getTodayKey();
-  const sortedGames = [...matchupData.dataPoints].sort(
-    (a, b) => new Date(a.gameDate).getTime() - new Date(b.gameDate).getTime()
-  );
+  const cookieStore = await cookies();
+  const pinnedTeamsCookie = cookieStore.get(PINNED_TEAMS_COOKIE_KEY);
 
-  let targetGame = sortedGames.find(g => getDateKey(new Date(g.gameDate)) === todayKey);
-  if (!targetGame) {
-    targetGame = sortedGames.find(g => getDateKey(new Date(g.gameDate)) > todayKey);
-  }
-  if (!targetGame) {
-    targetGame = sortedGames[sortedGames.length - 1];
+  if (pinnedTeamsCookie) {
+    const pinnedTeams = getPinnedTeamsFromCookieValue(pinnedTeamsCookie.value);
+    const pinnedMlbTeamCodes = getPinnedTeamCodesForSport(pinnedTeams, 'mlb');
+    const targetGame = getDefaultMLBMatchupGame(matchupData.dataPoints, pinnedMlbTeamCodes);
+
+    if (targetGame) {
+      redirect(`/mlb/matchups/${targetGame.gameId}`);
+    }
   }
 
-  redirect(`/mlb/matchups/${targetGame.gameId}`);
+  return <MLBMatchupsClientRedirect games={matchupData.dataPoints} />;
 }

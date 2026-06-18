@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { MatchupData, MLBMatchupData, MLBMatchupDataPoint, NBAMatchupData, NBAMatchupDataPoint, NHLMatchupData, NHLMatchupDataPoint, MatchupV2Data, MatchupV2DataPoint } from '@/types/chart';
 import { MatchupNav, getFilteredMatchups } from '@/components/ui/MatchupNav';
 import { usePinnedTeams } from '@/lib/usePinnedTeams';
 import { formatRunDiff, getLeagueAbbrev, getRecordRank, getRunDiffPerGame } from '@/lib/mlbStats';
+import { findPinnedMatchupIdForDay } from '@/lib/pinnedMatchups';
 
 type AnyMatchupData = MatchupData | NBAMatchupData | NHLMatchupData | MLBMatchupData | MatchupV2Data;
 
@@ -307,10 +308,9 @@ function MLBMatchupCard({ matchup, expanded, pinned }: { matchup: MLBMatchupData
 }
 
 export function MatchupsWithNav({ data }: Props) {
-  // Default to today
   const [selectedDay, setSelectedDay] = useState<string | null>(getTodayKey());
   const [selectedMatchup, setSelectedMatchup] = useState<string | null>(null);
-  const { getPinnedForSport } = usePinnedTeams();
+  const { getPinnedForSport, mounted } = usePinnedTeams();
 
   const sport = useMemo(() => {
     if (data.visualizationType === 'NBA_MATCHUP') return 'nba';
@@ -324,6 +324,36 @@ export function MatchupsWithNav({ data }: Props) {
     const pinned = getPinnedForSport(sport);
     return new Set(pinned.map(t => t.teamCode.toUpperCase()));
   }, [sport, getPinnedForSport]);
+
+  const pinnedTeamCodes = useMemo(
+    () => (mounted ? getPinnedForSport(sport).map(team => team.teamCode) : []),
+    [getPinnedForSport, mounted, sport]
+  );
+
+  const findPinnedMatchupForDay = useCallback(
+    (dayKey: string) => findPinnedMatchupIdForDay(data, dayKey, pinnedTeamCodes),
+    [data, pinnedTeamCodes]
+  );
+
+  const handleDaySelect = useCallback(
+    (day: string | null) => {
+      setSelectedDay(day);
+      if (!day) {
+        setSelectedMatchup(null);
+        return;
+      }
+      setSelectedMatchup(mounted ? findPinnedMatchupForDay(day) : null);
+    },
+    [findPinnedMatchupForDay, mounted]
+  );
+
+  useEffect(() => {
+    if (!mounted || !selectedDay || selectedMatchup) return;
+    const pinnedMatchupId = findPinnedMatchupForDay(selectedDay);
+    if (pinnedMatchupId) {
+      setSelectedMatchup(pinnedMatchupId);
+    }
+  }, [mounted, selectedDay, selectedMatchup, findPinnedMatchupForDay]);
 
   const sortPinnedFirst = useCallback(<T,>(items: T[], getTeams: (item: T) => string[]): T[] => {
     if (pinnedCodes.size === 0) return items;
@@ -496,7 +526,7 @@ export function MatchupsWithNav({ data }: Props) {
         data={data}
         selectedDay={selectedDay}
         selectedMatchup={selectedMatchup}
-        onDaySelect={setSelectedDay}
+        onDaySelect={handleDaySelect}
         onMatchupSelect={setSelectedMatchup}
       />
       {renderMatchups()}

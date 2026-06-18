@@ -622,6 +622,10 @@ export interface PlayoffChanceEntry {
   winPct?: number | null;
   wins?: number | null;
   losses?: number | null;
+  division?: string | null;
+  divisionRank?: number | null;
+  gamesBackFromPlayoff?: number | null;
+  standingsSection?: string | null;
 }
 
 export interface MLBTeamReportCardData extends BaseChartData {

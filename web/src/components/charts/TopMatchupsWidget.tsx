@@ -198,6 +198,24 @@ function MLBMatchupCard({ matchup, dayLabel }: { matchup: MLBMatchupDataPoint; d
   );
 }
 
+function resolveSelectedMatchups<T extends { gameId: string }>(
+  selectedGameIds: string[],
+  byId: Map<string, T>
+): T[] {
+  const seen = new Set<string>();
+  const matchups: T[] = [];
+
+  for (const id of selectedGameIds) {
+    if (seen.has(id)) continue;
+    const matchup = byId.get(id);
+    if (!matchup) continue;
+    seen.add(id);
+    matchups.push(matchup);
+  }
+
+  return matchups;
+}
+
 export function TopMatchupsWidget({ data, selectedGameIds }: Props) {
   if (selectedGameIds.length === 0) return null;
 
@@ -205,9 +223,7 @@ export function TopMatchupsWidget({ data, selectedGameIds }: Props) {
     const byId = new Map<string, NBAMatchupDataPoint>(
       (data as NBAMatchupData).dataPoints.map(g => [g.gameId, g])
     );
-    const matchups = selectedGameIds
-      .map(id => byId.get(id))
-      .filter((g): g is NBAMatchupDataPoint => g !== undefined);
+    const matchups = resolveSelectedMatchups(selectedGameIds, byId);
     if (matchups.length === 0) return null;
 
     return (
@@ -227,9 +243,7 @@ export function TopMatchupsWidget({ data, selectedGameIds }: Props) {
     const byId = new Map<string, NHLMatchupDataPoint>(
       (data as NHLMatchupData).dataPoints.map(g => [g.gameId, g])
     );
-    const matchups = selectedGameIds
-      .map(id => byId.get(id))
-      .filter((g): g is NHLMatchupDataPoint => g !== undefined);
+    const matchups = resolveSelectedMatchups(selectedGameIds, byId);
     if (matchups.length === 0) return null;
 
     return (
@@ -249,9 +263,7 @@ export function TopMatchupsWidget({ data, selectedGameIds }: Props) {
     const byId = new Map<string, MLBMatchupDataPoint>(
       (data as MLBMatchupData).dataPoints.map(g => [g.gameId, g])
     );
-    const matchups = selectedGameIds
-      .map(id => byId.get(id))
-      .filter((g): g is MLBMatchupDataPoint => g !== undefined);
+    const matchups = resolveSelectedMatchups(selectedGameIds, byId);
     if (matchups.length === 0) return null;
 
     return (

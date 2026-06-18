@@ -2,33 +2,26 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import type { PinnedTeam } from '@/types/pinnedTeams';
-
-const STORAGE_KEY = 'pinnedTeams';
-
-function readPinnedTeams(): PinnedTeam[] {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : [];
-  } catch {
-    return [];
-  }
-}
-
-function writePinnedTeams(teams: PinnedTeam[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(teams));
-}
+import {
+  readPinnedTeamsFromStorage,
+  syncPinnedTeams,
+} from '@/lib/pinnedTeamsStorage';
 
 export function usePinnedTeams() {
   const [mounted, setMounted] = useState(false);
   const [pinnedTeams, setPinnedTeams] = useState<PinnedTeam[]>([]);
 
   useEffect(() => {
-    setPinnedTeams(readPinnedTeams());
+    const teams = readPinnedTeamsFromStorage();
+    setPinnedTeams(teams);
+    syncPinnedTeams(teams);
     setMounted(true);
 
     const onStorage = (e: StorageEvent) => {
-      if (e.key === STORAGE_KEY) {
-        setPinnedTeams(readPinnedTeams());
+      if (e.key === 'pinnedTeams') {
+        const nextTeams = readPinnedTeamsFromStorage();
+        setPinnedTeams(nextTeams);
+        syncPinnedTeams(nextTeams);
       }
     };
     window.addEventListener('storage', onStorage);
@@ -39,7 +32,7 @@ export function usePinnedTeams() {
     setPinnedTeams(prev => {
       if (prev.some(t => t.sport === sport && t.teamCode === teamCode)) return prev;
       const next = [...prev, { sport, teamCode, teamLabel, pinnedAt: new Date().toISOString() }];
-      writePinnedTeams(next);
+      syncPinnedTeams(next);
       return next;
     });
   }, []);
@@ -47,7 +40,7 @@ export function usePinnedTeams() {
   const unpinTeam = useCallback((sport: string, teamCode: string) => {
     setPinnedTeams(prev => {
       const next = prev.filter(t => !(t.sport === sport && t.teamCode === teamCode));
-      writePinnedTeams(next);
+      syncPinnedTeams(next);
       return next;
     });
   }, []);

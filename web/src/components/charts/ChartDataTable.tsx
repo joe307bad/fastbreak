@@ -288,9 +288,8 @@ export function ChartDataTable({ data, onHighlight, selectedLabel, getItemColor,
         if (pointQuadrant !== quadrantFilter) passesStandardFilters = false;
       }
 
-      // Pinned filter is additive: row shows if it matches pinned OR passes standard filters
-      if (pinnedFilterCodes) {
-        return matchesPinned || passesStandardFilters;
+      if (pinnedFilterCodes && !matchesPinned) {
+        return false;
       }
       return passesStandardFilters;
     });

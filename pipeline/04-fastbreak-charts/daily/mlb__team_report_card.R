@@ -237,36 +237,120 @@ scrape_mlb_playoff_probabilities <- function() {
   })
 }
 
+mlb_games_back <- function(w, l, w_ref, l_ref) {
+  if (any(is.na(c(w, l, w_ref, l_ref)))) return(NA_real_)
+  ((w_ref - w) + (l - l_ref)) / 2
+}
+
+make_playoff_entry <- function(row, standings_section) {
+  gb <- row$games_back
+  if (length(gb) == 0 || is.na(gb)) {
+    gb_out <- NULL
+  } else if (gb <= 0) {
+    gb_out <- 0
+  } else {
+    gb_out <- round(gb + 1e-9, 1)
+  }
+
+  list(
+    team = row$team_code,
+    playoffProb = row$playoff_prob,
+    champProb = row$champ_prob,
+    conference = row$league,
+    winPct = row$win_pct,
+    wins = if (is.na(row$wins)) NULL else as.integer(row$wins),
+    losses = if (is.na(row$losses)) NULL else as.integer(row$losses),
+    division = row$division,
+    divisionRank = if (is.na(row$division_rank)) NULL else as.integer(row$division_rank),
+    gamesBackFromPlayoff = gb_out,
+    standingsSection = standings_section
+  )
+}
+
 build_playoff_chances <- function(scrape_results, team_records_df) {
   if (is.null(scrape_results) || length(scrape_results) == 0) return(list())
 
-  entries <- lapply(names(scrape_results), function(abbrev) {
+  base_rows <- lapply(names(scrape_results), function(abbrev) {
     scraped <- scrape_results[[abbrev]]
     rec <- team_records_df %>% filter(team_code == abbrev)
     wins <- scraped$wins
     losses <- scraped$losses
     win_pct <- scraped$winPct
+    division <- team_divisions[[abbrev]]
+    league <- team_leagues[[abbrev]]
+    division_rank <- NA_integer_
     if (nrow(rec) > 0) {
       wins <- rec$W[1]
       losses <- rec$L[1]
       win_pct <- rec$win_pct[1]
+      division <- rec$division[1]
+      league <- rec$league[1]
+      division_rank <- as.integer(rec$division_rank[1])
     }
-
-    list(
-      team = abbrev,
-      playoffProb = scraped$playoffProb,
-      champProb = scraped$champProb,
-      conference = scraped$conference,
-      winPct = win_pct,
+    tibble::tibble(
+      team_code = abbrev,
+      playoff_prob = scraped$playoffProb,
+      champ_prob = scraped$champProb,
+      league = league,
       wins = wins,
-      losses = losses
+      losses = losses,
+      win_pct = win_pct,
+      division = division,
+      division_rank = division_rank
     )
   })
 
-  entries[order(sapply(entries, function(e) {
-    prob <- e$playoffProb
-    if (is.null(prob) || is.na(prob)) 0 else -prob
-  }))]
+  df <- dplyr::bind_rows(base_rows) %>%
+    dplyr::filter(!is.na(team_code), !is.na(league))
+
+  organize_mlb_league <- function(league_df, divisions) {
+    if (nrow(league_df) == 0) return(list())
+
+    div_leaders <- league_df %>% dplyr::filter(division_rank == 1)
+    non_leaders <- league_df %>%
+      dplyr::filter(division_rank > 1) %>%
+      dplyr::arrange(dplyr::desc(win_pct), dplyr::desc(wins), losses)
+    wc_winners <- non_leaders %>% dplyr::slice_head(n = 3)
+    playoff_teams <- dplyr::bind_rows(div_leaders, wc_winners)
+
+    cutoff_w <- NA_integer_
+    cutoff_l <- NA_integer_
+    if (nrow(playoff_teams) > 0) {
+      cutoff_row <- playoff_teams %>%
+        dplyr::arrange(win_pct, wins, dplyr::desc(losses)) %>%
+        dplyr::slice_head(n = 1)
+      cutoff_w <- cutoff_row$wins[1]
+      cutoff_l <- cutoff_row$losses[1]
+    }
+
+    league_df <- league_df %>%
+      dplyr::mutate(
+        games_back = if (!is.na(cutoff_w)) {
+          mapply(mlb_games_back, wins, losses, cutoff_w, cutoff_l)
+        } else {
+          NA_real_
+        }
+      )
+
+    out <- list()
+    for (div in divisions) {
+      div_teams <- league_df %>%
+        dplyr::filter(division == div) %>%
+        dplyr::arrange(division_rank, dplyr::desc(win_pct), dplyr::desc(wins))
+      if (nrow(div_teams) > 0) {
+        for (i in seq_len(nrow(div_teams))) {
+          out[[length(out) + 1]] <- make_playoff_entry(div_teams[i, ], div)
+        }
+      }
+    }
+
+    out
+  }
+
+  c(
+    organize_mlb_league(df %>% dplyr::filter(league == "National"), c("NL East", "NL Central", "NL West")),
+    organize_mlb_league(df %>% dplyr::filter(league == "American"), c("AL East", "AL Central", "AL West"))
+  )
 }
 
 # ============================================================================

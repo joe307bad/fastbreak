@@ -49,7 +49,9 @@ data class ShareGameInfo(
     val awaySeed: Int? = null,
     val homeSeed: Int? = null,
     // Series status (shown below the event label), e.g. "Series tied, 0-0"
-    val seriesStatus: String? = null
+    val seriesStatus: String? = null,
+    // When true, show W-L record directly below team abbreviation in header
+    val recordsBelowTeamName: Boolean = false
 )
 
 /** Generic odds information */
@@ -536,7 +538,8 @@ fun GenericMatchupShareImage(
     modifier: Modifier = Modifier,
     rowSpacing: androidx.compose.ui.unit.Dp = 6.dp,
     firstRowWeight: Float = 1f,
-    secondRowWeight: Float = 1f
+    secondRowWeight: Float = 1f,
+    dynamicHeight: Boolean = false
 ) {
     val backgroundColor = MaterialTheme.colorScheme.surface
     val textColor = MaterialTheme.colorScheme.onSurface
@@ -561,8 +564,21 @@ fun GenericMatchupShareImage(
                     text = gameInfo.awaySeed?.let { "($it) ${gameInfo.awayTeam}" } ?: gameInfo.awayTeam,
                     fontSize = 72.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Team1Color
+                    color = Team1Color,
+                    maxLines = 1,
+                    softWrap = false
                 )
+                if (gameInfo.recordsBelowTeamName) {
+                    gameInfo.awayRecord?.let { record ->
+                        Text(
+                            text = record,
+                            fontSize = 36.sp,
+                            color = textColor.copy(alpha = 0.7f),
+                            maxLines = 1,
+                            softWrap = false
+                        )
+                    }
+                }
                 // Away moneyline and spread
                 if (odds != null) {
                     Row(
@@ -634,8 +650,21 @@ fun GenericMatchupShareImage(
                     text = gameInfo.homeSeed?.let { "($it) ${gameInfo.homeTeam}" } ?: gameInfo.homeTeam,
                     fontSize = 72.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Team2Color
+                    color = Team2Color,
+                    maxLines = 1,
+                    softWrap = false
                 )
+                if (gameInfo.recordsBelowTeamName) {
+                    gameInfo.homeRecord?.let { record ->
+                        Text(
+                            text = record,
+                            fontSize = 36.sp,
+                            color = textColor.copy(alpha = 0.7f),
+                            maxLines = 1,
+                            softWrap = false
+                        )
+                    }
+                }
                 // Home moneyline and spread
                 if (odds != null) {
                     Row(
@@ -745,8 +774,8 @@ fun GenericMatchupShareImage(
                     }
                 }
             }
-        } else if (gameInfo.awayRecord != null || gameInfo.homeRecord != null ||
-            gameInfo.awayConferenceRank != null || gameInfo.homeConferenceRank != null) {
+        } else if (!gameInfo.recordsBelowTeamName && (gameInfo.awayRecord != null || gameInfo.homeRecord != null ||
+            gameInfo.awayConferenceRank != null || gameInfo.homeConferenceRank != null)) {
             // NBA-style display: Record and Conference Standing
             Spacer(modifier = Modifier.height(8.dp))
 
@@ -932,14 +961,20 @@ fun GenericMatchupShareImage(
 
         // 2x3 Grid of stat boxes
         Column(
-            modifier = Modifier.weight(1f),
+            modifier = if (dynamicHeight) {
+                Modifier.fillMaxWidth()
+            } else {
+                Modifier.weight(1f)
+            },
             verticalArrangement = Arrangement.spacedBy(rowSpacing)
         ) {
             // Row 1: Boxes 0-2
             Row(
-                modifier = Modifier
-                    .weight(firstRowWeight)
-                    .fillMaxWidth(),
+                modifier = if (dynamicHeight) {
+                    Modifier.fillMaxWidth()
+                } else {
+                    Modifier.weight(firstRowWeight).fillMaxWidth()
+                },
                 horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 statBoxes.take(3).forEach { box ->
@@ -951,7 +986,8 @@ fun GenericMatchupShareImage(
                         middleLabel = box.middleLabel,
                         rightLabel = box.rightLabel,
                         leftColor = box.leftColor ?: Team1Color,
-                        rightColor = box.rightColor ?: Team2Color
+                        rightColor = box.rightColor ?: Team2Color,
+                        fillHeight = !dynamicHeight
                     ) {
                         GenericStatBoxContent(box, textColor)
                     }
@@ -960,9 +996,11 @@ fun GenericMatchupShareImage(
 
             // Row 2: Boxes 3-5
             Row(
-                modifier = Modifier
-                    .weight(secondRowWeight)
-                    .fillMaxWidth(),
+                modifier = if (dynamicHeight) {
+                    Modifier.fillMaxWidth()
+                } else {
+                    Modifier.weight(secondRowWeight).fillMaxWidth()
+                },
                 horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 statBoxes.drop(3).take(3).forEach { box ->
@@ -974,7 +1012,8 @@ fun GenericMatchupShareImage(
                         middleLabel = box.middleLabel,
                         rightLabel = box.rightLabel,
                         leftColor = box.leftColor ?: Team1Color,
-                        rightColor = box.rightColor ?: Team2Color
+                        rightColor = box.rightColor ?: Team2Color,
+                        fillHeight = !dynamicHeight
                     ) {
                         GenericStatBoxContent(box, textColor)
                     }
@@ -1188,13 +1227,14 @@ private fun ShareComparisonCard(
     rightLabel: String? = null,
     leftColor: Color = Team1Color,
     rightColor: Color = Team2Color,
+    fillHeight: Boolean = true,
     content: @Composable ColumnScope.() -> Unit
 ) {
     val textColor = MaterialTheme.colorScheme.onSurface
 
     Column(
         modifier = modifier
-            .fillMaxHeight()
+            .then(if (fillHeight) Modifier.fillMaxHeight() else Modifier)
             .padding(8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
@@ -1211,14 +1251,18 @@ private fun ShareComparisonCard(
                     fontSize = 36.sp,
                     fontWeight = FontWeight.Bold,
                     color = leftColor,
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(1f),
+                    maxLines = 1,
+                    softWrap = false
                 )
                 Text(
                     text = middleLabel ?: "vs",
                     fontSize = 36.sp,
                     fontWeight = FontWeight.Normal,
                     color = textColor.copy(alpha = 0.6f),
-                    textAlign = TextAlign.Center
+                    textAlign = TextAlign.Center,
+                    maxLines = 1,
+                    softWrap = false
                 )
                 Text(
                     text = rightLabel,
@@ -1226,7 +1270,9 @@ private fun ShareComparisonCard(
                     fontWeight = FontWeight.Bold,
                     color = rightColor,
                     textAlign = TextAlign.End,
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(1f),
+                    maxLines = 1,
+                    softWrap = false
                 )
             }
         } else {
@@ -1237,7 +1283,9 @@ private fun ShareComparisonCard(
                 fontWeight = FontWeight.Bold,
                 color = textColor,
                 textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                maxLines = 1,
+                softWrap = false
             )
         }
 

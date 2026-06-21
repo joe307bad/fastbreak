@@ -55,6 +55,16 @@ import kotlin.math.roundToInt
 import kotlin.time.Clock
 import kotlin.time.Instant
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.yield
+
+/** Wrapper so each topic row keeps a stable LazyColumn key even after dismissals. */
+private data class DisplayTopic(
+    val id: String,
+    val topic: Topic
+)
+
+private fun displayTopicId(index: Int, topic: Topic): String =
+    "${index}_${topic.league}_${topic.category}_${topic.summary.hashCode()}"
 
 private fun formatRelativeTime(instant: Instant?): String {
     if (instant == null) return "never"
@@ -126,9 +136,13 @@ private fun SwipeToDismissItem(
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit
 ) {
-    val offsetX = remember { Animatable(0f) }
-    var width by remember { mutableStateOf(0) }
+    var dragOffset by remember { mutableFloatStateOf(0f) }
+    val offsetAnim = remember { Animatable(0f) }
+    var useAnimatable by remember { mutableStateOf(false) }
+    var width by remember { mutableIntStateOf(0) }
     val scope = rememberCoroutineScope()
+
+    val displayOffset = if (useAnimatable) offsetAnim.value else dragOffset
 
     Box(
         modifier = modifier
@@ -138,30 +152,45 @@ private fun SwipeToDismissItem(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .offset { IntOffset(offsetX.value.roundToInt(), 0) }
+                .offset { IntOffset(displayOffset.roundToInt(), 0) }
                 .pointerInput(Unit) {
                     detectHorizontalDragGestures(
                         onDragEnd = {
                             val w = width
-                            if (w == 0) return@detectHorizontalDragGestures
+                            if (w == 0) {
+                                dragOffset = 0f
+                                return@detectHorizontalDragGestures
+                            }
                             val threshold = w * 0.4f
                             scope.launch {
-                                if (abs(offsetX.value) > threshold) {
-                                    val target = if (offsetX.value > 0) w.toFloat() else -w.toFloat()
-                                    offsetX.animateTo(target, tween(200))
-                                    onDismissed()
-                                } else {
-                                    offsetX.animateTo(0f, tween(200))
+                                try {
+                                    useAnimatable = true
+                                    offsetAnim.snapTo(dragOffset)
+                                    if (abs(dragOffset) > threshold) {
+                                        val target = if (dragOffset > 0) w.toFloat() else -w.toFloat()
+                                        offsetAnim.animateTo(target, tween(200))
+                                        onDismissed()
+                                    } else {
+                                        offsetAnim.animateTo(0f, tween(200))
+                                        useAnimatable = false
+                                        dragOffset = 0f
+                                    }
+                                } catch (e: Exception) {
+                                    useAnimatable = false
+                                    dragOffset = 0f
                                 }
                             }
                         },
                         onDragCancel = {
-                            scope.launch { offsetX.animateTo(0f, tween(200)) }
+                            dragOffset = 0f
+                            useAnimatable = false
+                        },
+                        onHorizontalDrag = { change, dragAmount ->
+                            change.consume()
+                            useAnimatable = false
+                            dragOffset += dragAmount
                         }
-                    ) { change, dragAmount ->
-                        change.consume()
-                        scope.launch { offsetX.snapTo(offsetX.value + dragAmount) }
-                    }
+                    )
                 }
         ) {
             content()
@@ -386,7 +415,13 @@ fun TopicsV2Screen(
     }
 
     val initial = remember(topics) { topics?.topics ?: emptyList() }
-    val items = remember(initial) { mutableStateListOf<Topic>().apply { addAll(initial) } }
+    val items = remember(initial) {
+        mutableStateListOf<DisplayTopic>().apply {
+            addAll(initial.mapIndexed { index, topic ->
+                DisplayTopic(id = displayTopicId(index, topic), topic = topic)
+            })
+        }
+    }
     var headerVisible by remember { mutableStateOf(true) }
     var showSizeSlider by remember { mutableStateOf(false) }
     var showInfoSheet by remember { mutableStateOf(false) }
@@ -508,11 +543,11 @@ fun TopicsV2Screen(
                     ) {
                         items(
                             items = items,
-                            key = { it.summary.take(40) + ":" + it.league }
-                        ) { item ->
+                            key = { it.id }
+                        ) { displayTopic ->
+                            val item = displayTopic.topic
                             SwipeToDismissItem(
-                                onDismissed = { items.remove(item) },
-                                modifier = Modifier.animateItem()
+                                onDismissed = { items.remove(displayTopic) }
                             ) {
                                 Column(
                                     modifier = Modifier
@@ -581,10 +616,16 @@ fun TopicsV2Screen(
 
             SmallFloatingActionButton(
                 onClick = {
-                    val target = listState.firstVisibleItemIndex + 1
-                    if (target < items.size) {
-                        scrollScope.launch {
+                    scrollScope.launch {
+                        if (items.isEmpty()) return@launch
+                        val target = (listState.firstVisibleItemIndex + 1)
+                            .coerceIn(0, items.lastIndex)
+                        if (target == listState.firstVisibleItemIndex) return@launch
+                        try {
+                            yield()
                             listState.animateScrollToItem(target)
+                        } catch (e: Exception) {
+                            println("Topics scroll failed: ${e.message}")
                         }
                     }
                 },

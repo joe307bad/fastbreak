@@ -583,6 +583,7 @@ export interface ReportCardCategories {
   starters: ReportCardCategory;
   relievers: ReportCardCategory;
   fielders: ReportCardCategory;
+  injuries?: ReportCardCategory;
 }
 
 export interface ReportCardTeam {

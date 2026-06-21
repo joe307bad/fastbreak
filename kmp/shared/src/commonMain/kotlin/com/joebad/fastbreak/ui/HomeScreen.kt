@@ -1,5 +1,6 @@
 package com.joebad.fastbreak.ui
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -18,7 +19,9 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
@@ -32,6 +35,7 @@ import com.joebad.fastbreak.navigation.HomeComponent
 import com.joebad.fastbreak.ui.components.TagBadge
 import com.joebad.fastbreak.ui.components.TagFilterBar
 import com.joebad.fastbreak.ui.container.RegistryState
+import com.joebad.fastbreak.ui.theme.accentColor
 import kotlin.time.Clock
 import kotlin.time.Instant
 
@@ -43,6 +47,27 @@ import kotlin.time.Instant
 @Composable
 internal fun unreadDotColor(): Color =
     if (isSystemInDarkTheme()) Color(0xFFFF6D00) else Color(0xFFE53935)
+
+private val HomeChartListHorizontalPadding = 16.dp
+
+@Composable
+private fun ChartListDottedDivider(modifier: Modifier = Modifier) {
+    val color = accentColor().copy(alpha = 0.35f)
+    Canvas(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(1.dp)
+    ) {
+        val y = size.height / 2f
+        drawLine(
+            color = color,
+            start = Offset(0f, y),
+            end = Offset(size.width, y),
+            strokeWidth = 1.dp.toPx(),
+            pathEffect = PathEffect.dashPathEffect(floatArrayOf(4.dp.toPx(), 4.dp.toPx()))
+        )
+    }
+}
 
 @Composable
 fun HomeScreen(
@@ -402,7 +427,7 @@ fun HomeScreen(
                     // Display charts
                     LazyColumn(
                         modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 16.dp),
+                        contentPadding = PaddingValues(top = 8.dp, bottom = 16.dp),
                         verticalArrangement = Arrangement.spacedBy(0.dp)
                     ) {
                         // Sync progress indicator at the top
@@ -411,7 +436,8 @@ fun HomeScreen(
                         if (registryState.syncProgress != null && registryState.syncProgress.totalToSync > 0) {
                             item {
                                 SyncProgressIndicator(
-                                    progress = registryState.syncProgress
+                                    progress = registryState.syncProgress,
+                                    modifier = Modifier.padding(horizontal = HomeChartListHorizontalPadding)
                                 )
                             }
                         }
@@ -438,6 +464,8 @@ fun HomeScreen(
                         items(filteredCharts) { chart ->
                             // Determine chart sync state
                             val isSyncing = registryState.syncProgress?.isChartSyncing(chart.id) == true
+                            val failedChart = registryState.diagnostics.failedCharts.find { it.first == chart.id }
+                            val isFailed = failedChart != null
                             // During sync, defer to per-chart progress.
                             // Outside sync, "ready" means the chart actually has cached data — a
                             // placeholder whose data never downloaded keeps cachedAt=null and
@@ -456,6 +484,8 @@ fun HomeScreen(
                                 viewed = chart.viewed,
                                 isSyncing = isSyncing,
                                 isReady = isReady,
+                                isFailed = isFailed,
+                                failureMessage = failedChart?.second,
                                 tags = chart.tags ?: emptyList(),
                                 onClick = {
                                     // Only navigate if chart is ready
@@ -483,6 +513,8 @@ private fun VisualizationItem(
     viewed: Boolean,
     isSyncing: Boolean,
     isReady: Boolean,
+    isFailed: Boolean = false,
+    failureMessage: String? = null,
     tags: List<com.joebad.fastbreak.data.model.Tag>,
     onClick: () -> Unit
 ) {
@@ -496,12 +528,16 @@ private fun VisualizationItem(
     // Build the metadata line (interval + relative time)
     val metadataText = buildMetadataText(interval, lastUpdated)
 
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .then(clickableModifier)
-            .padding(vertical = 12.dp)
-    ) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .then(clickableModifier)
+                .padding(
+                    horizontal = HomeChartListHorizontalPadding,
+                    vertical = 12.dp
+                )
+        ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -557,21 +593,38 @@ private fun VisualizationItem(
                         }
                     }
                 }
+                // Show sync failure hint (tap refresh in header to retry)
+                if (isFailed && !isSyncing) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = failureMessage?.let { "Sync failed — tap refresh to retry" }
+                            ?: "Sync failed — tap refresh to retry",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.error.copy(alpha = alpha)
+                    )
+                }
             }
 
-            // Show loading indicator if syncing
-            if (isSyncing) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(20.dp),
-                    strokeWidth = 2.dp
-                )
+            // Show loading indicator if syncing, error icon if failed
+            when {
+                isSyncing -> {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(20.dp),
+                        strokeWidth = 2.dp
+                    )
+                }
+                isFailed && !isReady -> {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = "Sync failed",
+                        tint = MaterialTheme.colorScheme.error.copy(alpha = alpha),
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
             }
         }
-        Spacer(modifier = Modifier.height(12.dp))
-        HorizontalDivider(
-            color = MaterialTheme.colorScheme.onBackground,
-            thickness = 0.5.dp
-        )
+        }
+        ChartListDottedDivider()
     }
 }
 
@@ -617,7 +670,8 @@ private fun formatRelativeTime(instant: Instant): String {
 
 @Composable
 private fun SyncProgressIndicator(
-    progress: ChartSyncProgress
+    progress: ChartSyncProgress,
+    modifier: Modifier = Modifier
 ) {
     val isComplete = progress.isComplete
     val hasFailures = progress.hasFailures
@@ -643,7 +697,7 @@ private fun SyncProgressIndicator(
     }
 
     Card(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .padding(vertical = 8.dp),
         colors = CardDefaults.cardColors(

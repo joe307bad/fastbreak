@@ -1218,7 +1218,8 @@ data class ReportCardCategories(
     val hitters: ReportCardCategory,
     val starters: ReportCardCategory,
     val relievers: ReportCardCategory,
-    val fielders: ReportCardCategory
+    val fielders: ReportCardCategory,
+    val injuries: ReportCardCategory? = null
 )
 
 @Serializable

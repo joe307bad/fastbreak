@@ -673,6 +673,8 @@ export function formatReportCardRankingLabel(seasonLabel: string, key: string): 
       return `${seasonLabel} / Bullpen Composite`;
     case 'fieldersComposite':
       return `${seasonLabel} / Fielders Composite`;
+    case 'injuriesComposite':
+      return `${seasonLabel} / Injury Report Composite`;
     default:
       return `${seasonLabel} / ${key}`;
   }

@@ -155,3 +155,13 @@ data class ChartSyncProgress(
             else -> "Syncing $currentChartName ($completedCount/$totalToSync)"
         }
 }
+
+/**
+ * Result of a chart synchronization run.
+ */
+data class ChartSyncResult(
+    /** Number of charts that were actually attempted in this run. */
+    val attemptedCount: Int,
+    /** Charts that failed during this run (not previously skipped failures). */
+    val newFailures: List<Pair<String, String>>
+)

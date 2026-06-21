@@ -16,15 +16,16 @@ import {
   StatRankingsSheet,
 } from '@/components/charts/MLBReportCardSheets';
 
-type CategoryKey = 'hitters' | 'starters' | 'relievers' | 'fielders';
+type CategoryKey = 'hitters' | 'starters' | 'relievers' | 'fielders' | 'injuries';
 
-const CATEGORY_KEYS: CategoryKey[] = ['hitters', 'starters', 'relievers', 'fielders'];
+const CATEGORY_KEYS: CategoryKey[] = ['hitters', 'starters', 'relievers', 'fielders', 'injuries'];
 
 const CATEGORY_STAT_KEYS: Record<CategoryKey, string[]> = {
   hitters: ['wRC_plus', 'xwOBA'],
   starters: ['K-BB_pct', 'xFIP'],
   relievers: ['K-BB_pct', 'FIP', 'SV'],
   fielders: ['OAA', 'DRS'],
+  injuries: ['impact'],
 };
 
 const CATEGORY_COMPOSITE_RANKING_KEYS: Record<CategoryKey, string> = {
@@ -32,6 +33,15 @@ const CATEGORY_COMPOSITE_RANKING_KEYS: Record<CategoryKey, string> = {
   starters: 'startersComposite',
   relievers: 'relieversComposite',
   fielders: 'fieldersComposite',
+  injuries: 'injuriesComposite',
+};
+
+const CATEGORY_POSITION_LABELS: Partial<Record<CategoryKey, string>> = {
+  injuries: 'Status',
+};
+
+const CATEGORY_SHOW_PLAYER_RANK_AND_COMPOSITE: Partial<Record<CategoryKey, boolean>> = {
+  injuries: false,
 };
 
 const PLAYER_COMPOSITE_KEY = 'aggregate';
@@ -79,12 +89,20 @@ function PlayerRankBadge({ rank, display }: { rank?: number | null; display?: st
   return <span className={playerRankBadgeClasses(rank)}>{value}</span>;
 }
 
-function StatCell({ stat, playerRank }: { stat?: ReportCardStatValue; playerRank?: boolean }) {
+function StatCell({
+  stat,
+  playerRank,
+  showRank = true,
+}: {
+  stat?: ReportCardStatValue;
+  playerRank?: boolean;
+  showRank?: boolean;
+}) {
   const Badge = playerRank ? PlayerRankBadge : RankBadge;
   return (
     <div className="flex items-center justify-end gap-1.5 whitespace-nowrap">
       <span className="font-mono text-sm">{formatStatValue(stat)}</span>
-      <Badge rank={stat?.rank} display={stat?.rankDisplay} />
+      {showRank && <Badge rank={stat?.rank} display={stat?.rankDisplay} />}
     </div>
   );
 }
@@ -96,12 +114,16 @@ function CategoryPanel({
   title,
   category,
   statKeys,
+  positionColumnLabel = 'Pos',
+  showPlayerRankAndComposite = true,
   hasCompositeRankings,
   onCompositeRankClick,
 }: {
   title: string;
   category: ReportCardCategory;
   statKeys: string[];
+  positionColumnLabel?: string;
+  showPlayerRankAndComposite?: boolean;
   hasCompositeRankings: boolean;
   onCompositeRankClick?: () => void;
 }) {
@@ -140,8 +162,20 @@ function CategoryPanel({
 
       {hasPlayers && (
         <>
-          <MobilePlayerTable players={category.players} statKeys={statKeys} labels={statLabels} />
-          <DesktopPlayerTable players={category.players} statKeys={statKeys} labels={statLabels} />
+          <MobilePlayerTable
+            players={category.players}
+            statKeys={statKeys}
+            labels={statLabels}
+            positionColumnLabel={positionColumnLabel}
+            showPlayerRankAndComposite={showPlayerRankAndComposite}
+          />
+          <DesktopPlayerTable
+            players={category.players}
+            statKeys={statKeys}
+            labels={statLabels}
+            positionColumnLabel={positionColumnLabel}
+            showPlayerRankAndComposite={showPlayerRankAndComposite}
+          />
         </>
       )}
     </div>
@@ -169,18 +203,25 @@ function TeamStatRow({ stat, onClick }: { stat?: ReportCardStatValue; onClick?: 
   );
 }
 
-function playerGridColumns(statKeys: string[]): string {
-  return `minmax(0, 1fr) 2.25rem repeat(${statKeys.length}, minmax(0, 5rem)) minmax(0, 5rem)`;
+function playerGridColumns(statKeys: string[], showPlayerRankAndComposite = true): string {
+  const statCols = showPlayerRankAndComposite
+    ? `repeat(${statKeys.length}, minmax(0, 5rem)) minmax(0, 5rem)`
+    : `repeat(${statKeys.length}, minmax(0, 5rem))`;
+  return `minmax(0, 1fr) 2.25rem ${statCols}`;
 }
 
 function MobilePlayerTable({
   players,
   statKeys,
   labels,
+  positionColumnLabel = 'Pos',
+  showPlayerRankAndComposite = true,
 }: {
   players: ReportCardPlayer[];
   statKeys: string[];
   labels: Record<string, string>;
+  positionColumnLabel?: string;
+  showPlayerRankAndComposite?: boolean;
 }) {
   return (
     <div className="md:hidden overflow-x-auto">
@@ -190,13 +231,15 @@ function MobilePlayerTable({
             <th className={`${STICKY_PLAYER_CELL} z-20 bg-[var(--card)] py-1 pl-2 pr-1 text-left`}>
               Player
             </th>
-            <th className="py-1 px-2 text-center whitespace-nowrap w-9">Pos</th>
+            <th className="py-1 px-2 text-center whitespace-nowrap w-9">{positionColumnLabel}</th>
             {statKeys.map(key => (
               <th key={key} className={`py-1 text-right ${MOBILE_STAT_COL}`}>
                 {labels[key] ?? key}
               </th>
             ))}
-            <th className={`py-1 text-right ${MOBILE_STAT_COL}`}>Comp</th>
+            {showPlayerRankAndComposite && (
+              <th className={`py-1 text-right ${MOBILE_STAT_COL}`}>Comp</th>
+            )}
           </tr>
         </thead>
         <tbody>
@@ -215,12 +258,22 @@ function MobilePlayerTable({
               </td>
               {statKeys.map(key => (
                 <td key={key} className={`py-1 text-right ${MOBILE_STAT_COL}`}>
-                  <StatCell stat={player.stats[key]} playerRank />
+                  <StatCell
+                    stat={player.stats[key]}
+                    playerRank={showPlayerRankAndComposite}
+                    showRank={showPlayerRankAndComposite}
+                  />
                 </td>
               ))}
-              <td className={`py-1 text-right ${MOBILE_STAT_COL}`}>
-                <StatCell stat={player.stats[PLAYER_COMPOSITE_KEY]} playerRank />
-              </td>
+              {showPlayerRankAndComposite && (
+                <td className={`py-1 text-right ${MOBILE_STAT_COL}`}>
+                  <StatCell
+                    stat={player.stats[PLAYER_COMPOSITE_KEY]}
+                    playerRank
+                    showRank
+                  />
+                </td>
+              )}
             </tr>
           ))}
         </tbody>
@@ -233,17 +286,31 @@ function DesktopPlayerTable({
   players,
   statKeys,
   labels,
+  positionColumnLabel = 'Pos',
+  showPlayerRankAndComposite = true,
 }: {
   players: ReportCardPlayer[];
   statKeys: string[];
   labels: Record<string, string>;
+  positionColumnLabel?: string;
+  showPlayerRankAndComposite?: boolean;
 }) {
   return (
     <div className="hidden md:block">
-      <PlayerTableHeader statKeys={statKeys} labels={labels} />
+      <PlayerTableHeader
+        statKeys={statKeys}
+        labels={labels}
+        positionColumnLabel={positionColumnLabel}
+        showPlayerRankAndComposite={showPlayerRankAndComposite}
+      />
       <div className="px-2">
         {players.map(player => (
-          <PlayerRow key={player.playerId} player={player} statKeys={statKeys} />
+          <PlayerRow
+            key={player.playerId}
+            player={player}
+            statKeys={statKeys}
+            showPlayerRankAndComposite={showPlayerRankAndComposite}
+          />
         ))}
       </div>
     </div>
@@ -253,39 +320,58 @@ function DesktopPlayerTable({
 function PlayerTableHeader({
   statKeys,
   labels,
+  positionColumnLabel = 'Pos',
+  showPlayerRankAndComposite = true,
 }: {
   statKeys: string[];
   labels: Record<string, string>;
+  positionColumnLabel?: string;
+  showPlayerRankAndComposite?: boolean;
 }) {
   return (
     <div
       className="grid gap-x-3 px-2 py-1 border-b border-[var(--border)] bg-[var(--border)]/30 text-xs font-bold items-center"
-      style={{ gridTemplateColumns: playerGridColumns(statKeys) }}
+      style={{ gridTemplateColumns: playerGridColumns(statKeys, showPlayerRankAndComposite) }}
     >
       <div>Player</div>
-      <div>Pos</div>
+      <div>{positionColumnLabel}</div>
       {statKeys.map(key => (
         <div key={key} className="text-right">
           {labels[key] ?? key}
         </div>
       ))}
-      <div className="text-right">Comp</div>
+      {showPlayerRankAndComposite && <div className="text-right">Comp</div>}
     </div>
   );
 }
 
-function PlayerRow({ player, statKeys }: { player: ReportCardPlayer; statKeys: string[] }) {
+function PlayerRow({
+  player,
+  statKeys,
+  showPlayerRankAndComposite = true,
+}: {
+  player: ReportCardPlayer;
+  statKeys: string[];
+  showPlayerRankAndComposite?: boolean;
+}) {
   return (
     <div
       className={`grid gap-x-3 text-sm items-center whitespace-nowrap ${tableRowClass}`}
-      style={{ gridTemplateColumns: playerGridColumns(statKeys) }}
+      style={{ gridTemplateColumns: playerGridColumns(statKeys, showPlayerRankAndComposite) }}
     >
       <div className="min-w-0 font-medium truncate">{player.name}</div>
       <div className="text-xs text-[var(--muted)]">{player.position ?? '-'}</div>
       {statKeys.map(key => (
-        <StatCell key={key} stat={player.stats[key]} playerRank />
+        <StatCell
+          key={key}
+          stat={player.stats[key]}
+          playerRank={showPlayerRankAndComposite}
+          showRank={showPlayerRankAndComposite}
+        />
       ))}
-      <StatCell stat={player.stats[PLAYER_COMPOSITE_KEY]} playerRank />
+      {showPlayerRankAndComposite && (
+        <StatCell stat={player.stats[PLAYER_COMPOSITE_KEY]} playerRank showRank />
+      )}
     </div>
   );
 }
@@ -460,24 +546,28 @@ export function MLBTeamReportCard({ data }: Props) {
       </div>
 
       <div className="flex-1 min-h-0 overflow-y-auto columns-[48rem] gap-2">
-        {CATEGORY_KEYS.map(key => {
+        {CATEGORY_KEYS.flatMap(key => {
+          const category = team.categories[key];
+          if (!category) return [];
           const compositeRankingKey = CATEGORY_COMPOSITE_RANKING_KEYS[key];
           const hasCategoryCompositeRankings =
             (data.rankings[compositeRankingKey]?.length ?? 0) > 0;
-          return (
+          return [
             <CategoryPanel
               key={key}
-              title={team.categories[key].label}
-              category={team.categories[key]}
+              title={category.label}
+              category={category}
               statKeys={CATEGORY_STAT_KEYS[key]}
+              positionColumnLabel={CATEGORY_POSITION_LABELS[key]}
+              showPlayerRankAndComposite={CATEGORY_SHOW_PLAYER_RANK_AND_COMPOSITE[key] ?? true}
               hasCompositeRankings={hasCategoryCompositeRankings}
               onCompositeRankClick={
                 hasCategoryCompositeRankings
                   ? () => setRankingSheetKey(compositeRankingKey)
                   : undefined
               }
-            />
-          );
+            />,
+          ];
         })}
       </div>
       </div>

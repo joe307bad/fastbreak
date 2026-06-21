@@ -69,7 +69,9 @@ class ChartDataContainer(
 
         // Check if this chart failed during synchronization
         val syncProgress = registryContainer.container.stateFlow.value.syncProgress
+        val sessionFailure = chartSyncManager.getFailedCharts()[chartId]
         val failedChart = syncProgress?.failedCharts?.find { it.first == chartId }
+            ?: sessionFailure?.let { chartId to it }
         if (failedChart != null) {
             val (_, errorMessage) = failedChart
             reduce {

@@ -71,7 +71,10 @@ fun DataVizScreen(
         try {
             // First check if this chart failed during synchronization
             val syncProgress = registryState.syncProgress
+            val diagnosticsFailure = registryState.diagnostics.failedCharts
+                .find { it.first == component.chartId }
             val failedChart = syncProgress?.failedCharts?.find { it.first == component.chartId }
+                ?: diagnosticsFailure
             if (failedChart != null) {
                 val (_, errorMessage) = failedChart
                 println("📊 [DataVizScreen] Chart failed during sync: $errorMessage")
@@ -267,7 +270,10 @@ fun DataVizScreen(
                             try {
                                 val currentRegistryState = component.registryContainer.container.stateFlow.value
                                 val syncProgress = currentRegistryState.syncProgress
+                                val diagnosticsFailure = registryState.diagnostics.failedCharts
+                                    .find { it.first == component.chartId }
                                 val failedChart = syncProgress?.failedCharts?.find { it.first == component.chartId }
+                                    ?: diagnosticsFailure
                                 if (failedChart != null) {
                                     val (_, errorMessage) = failedChart
                                     state = DataVizState.Error("Failed to sync chart data: $errorMessage")

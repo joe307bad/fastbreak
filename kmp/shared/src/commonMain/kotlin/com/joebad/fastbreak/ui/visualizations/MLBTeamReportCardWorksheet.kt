@@ -24,6 +24,7 @@ import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.TextStyle
@@ -60,21 +61,30 @@ private fun filterReportCardTeams(
 
 private data class CategoryConfig(
     val statKeys: List<String>,
-    val teamRankColorFn: (Int?) -> Color
+    val teamRankColorFn: (Int?) -> Color,
+    val positionColumnLabel: String = "Pos",
+    val showPlayerRankAndComposite: Boolean = true
 )
 
 private val CATEGORY_CONFIGS = mapOf(
     "hitters" to CategoryConfig(listOf("wRC_plus", "xwOBA"), ::getMLBTeamRankColor),
     "starters" to CategoryConfig(listOf("K-BB_pct", "xFIP"), ::getMLBTeamRankColor),
     "relievers" to CategoryConfig(listOf("K-BB_pct", "FIP", "SV"), ::getMLBTeamRankColor),
-    "fielders" to CategoryConfig(listOf("OAA", "DRS"), ::getMLBTeamRankColor)
+    "fielders" to CategoryConfig(listOf("OAA", "DRS"), ::getMLBTeamRankColor),
+    "injuries" to CategoryConfig(
+        statKeys = listOf("impact"),
+        teamRankColorFn = ::getMLBTeamRankColor,
+        positionColumnLabel = "Status",
+        showPlayerRankAndComposite = false
+    )
 )
 
 private val CATEGORY_COMPOSITE_RANKING_KEYS = mapOf(
     "hitters" to "hittersComposite",
     "starters" to "startersComposite",
     "relievers" to "relieversComposite",
-    "fielders" to "fieldersComposite"
+    "fielders" to "fieldersComposite",
+    "injuries" to "injuriesComposite"
 )
 
 private fun formatReportCardRankingLabel(seasonLabel: String, key: String): String {
@@ -85,6 +95,7 @@ private fun formatReportCardRankingLabel(seasonLabel: String, key: String): Stri
         "startersComposite" -> "$seasonLabel / Starting Pitchers Composite"
         "relieversComposite" -> "$seasonLabel / Bullpen Composite"
         "fieldersComposite" -> "$seasonLabel / Fielders Composite"
+        "injuriesComposite" -> "$seasonLabel / Injury Report Composite"
         else -> "$seasonLabel / $key"
     }
 }
@@ -93,15 +104,16 @@ private fun buildCategoryCompositeRanking(
     teams: List<ReportCardTeam>,
     categoryKey: String
 ): List<RankingEntry> {
-    val categoryForTeam: (ReportCardTeam) -> ReportCardCategory = when (categoryKey) {
-        "hitters" -> { team -> team.categories.hitters }
-        "starters" -> { team -> team.categories.starters }
-        "relievers" -> { team -> team.categories.relievers }
-        "fielders" -> { team -> team.categories.fielders }
-        else -> return emptyList()
-    }
     return teams.mapNotNull { team ->
-        val aggregate = categoryForTeam(team).team?.stats?.get("aggregate")
+        val category = when (categoryKey) {
+            "hitters" -> team.categories.hitters
+            "starters" -> team.categories.starters
+            "relievers" -> team.categories.relievers
+            "fielders" -> team.categories.fielders
+            "injuries" -> team.categories.injuries
+            else -> return@mapNotNull null
+        } ?: return@mapNotNull null
+        val aggregate = category.team?.stats?.get("aggregate")
         val rank = aggregate?.rank
         val value = aggregate?.value
         if (rank == null || value == null) return@mapNotNull null
@@ -139,6 +151,7 @@ private enum class ReportCardShareTarget(val categoryKey: String?, val shareLabe
     STARTERS("starters", "Starting Pitchers"),
     RELIEVERS("relievers", "Bullpen"),
     FIELDERS("fielders", "Fielders"),
+    INJURIES("injuries", "Injury Report"),
     FULL(null, "Full Report Card")
 }
 
@@ -148,11 +161,12 @@ private data class ReportCardCaptureRequest(
 )
 
 private fun teamCategoryEntries(team: ReportCardTeam): List<Pair<String, ReportCardCategory>> =
-    listOf(
+    listOfNotNull(
         "hitters" to team.categories.hitters,
         "starters" to team.categories.starters,
         "relievers" to team.categories.relievers,
-        "fielders" to team.categories.fielders
+        "fielders" to team.categories.fielders,
+        team.categories.injuries?.let { "injuries" to it }
     )
 
 @Composable
@@ -422,6 +436,8 @@ fun MLBTeamReportCardWorksheet(
                         category = category,
                         statKeys = config.statKeys,
                         teamRankColorFn = config.teamRankColorFn,
+                        positionColumnLabel = config.positionColumnLabel,
+                        showPlayerRankAndComposite = config.showPlayerRankAndComposite,
                         compositeRankingKey = CATEGORY_COMPOSITE_RANKING_KEYS[key],
                         rankings = reportCardRankings,
                         onCompositeRankClick = { selectedRankingKey = it }
@@ -518,7 +534,9 @@ fun MLBTeamReportCardWorksheet(
                     MLBTeamReportCardShareImage(
                         team = team,
                         seasonLabel = seasonLabel,
-                        source = visualization.source ?: "FanGraphs",
+                        source = buildReportCardSourceAttribution(visualization)
+                            ?: visualization.source
+                            ?: "FanGraphs",
                         categories = categoriesToShare,
                         showSummary = request.target.categoryKey == null
                     )
@@ -538,13 +556,94 @@ private val PLAYER_RANK_LEFT_PADDING = 6.dp
 private val PLAYER_COMP_WIDTH = 36.dp
 private val PLAYER_STAT_GROUP_SPACING = 8.dp
 
-private val SHARE_REPORT_CARD_WIDTH = 564.dp
+private val SHARE_REPORT_CARD_MIN_WIDTH = 240.dp
+private val SHARE_REPORT_CARD_HORIZONTAL_PADDING = 32.dp
+
+private fun reportCardSharePlayerStatsWidth(
+    statCount: Int,
+    showPlayerRankAndComposite: Boolean
+): Dp {
+    var width = PLAYER_POS_WIDTH + PLAYER_WAR_WIDTH
+    repeat(statCount) {
+        width += PLAYER_STAT_GROUP_SPACING + PLAYER_STAT_WIDTH
+        if (showPlayerRankAndComposite) {
+            width += PLAYER_RANK_LEFT_PADDING + PLAYER_RANK_WIDTH
+        }
+    }
+    if (showPlayerRankAndComposite) {
+        width += PLAYER_STAT_GROUP_SPACING + PLAYER_COMP_WIDTH
+    }
+    return width
+}
+
+private fun reportCardSharePlayerContentWidth(
+    categories: List<Pair<String, ReportCardCategory>>
+): Dp {
+    val nameAndStatsPadding = 20.dp
+    return categories.maxOfOrNull { (key, _) ->
+        val config = CATEGORY_CONFIGS[key] ?: return@maxOfOrNull 0.dp
+        PLAYER_NAME_COLUMN_WIDTH + nameAndStatsPadding +
+            reportCardSharePlayerStatsWidth(config.statKeys.size, config.showPlayerRankAndComposite)
+    } ?: (PLAYER_NAME_COLUMN_WIDTH + nameAndStatsPadding + reportCardSharePlayerStatsWidth(2, true))
+}
+
+@Composable
+private fun rememberReportCardShareImageWidth(
+    team: ReportCardTeam,
+    seasonLabel: String,
+    source: String,
+    categories: List<Pair<String, ReportCardCategory>>,
+    showSummary: Boolean
+): Dp {
+    val density = LocalDensity.current
+    val textMeasurer = rememberTextMeasurer()
+    val subtitleLine = formatReportCardShareSubtitleLine(seasonLabel, team)
+    val titleStyle = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
+    val sourceStyle = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp)
+
+    val subtitleWidth = with(density) {
+        textMeasurer.measure(text = subtitleLine, style = titleStyle).size.width.toDp()
+    }
+    val teamNameWidth = with(density) {
+        textMeasurer.measure(text = team.teamName, style = titleStyle).size.width.toDp()
+    }
+    val sourceWidth = with(density) {
+        textMeasurer.measure(text = source, style = sourceStyle).size.width.toDp()
+    }
+    val playerRowWidth = reportCardSharePlayerContentWidth(categories)
+
+    return remember(
+        team,
+        seasonLabel,
+        source,
+        categories,
+        showSummary,
+        subtitleWidth,
+        teamNameWidth,
+        sourceWidth,
+        playerRowWidth
+    ) {
+        listOf(
+            playerRowWidth + SHARE_REPORT_CARD_HORIZONTAL_PADDING,
+            subtitleWidth + SHARE_REPORT_CARD_HORIZONTAL_PADDING + 16.dp,
+            teamNameWidth + SHARE_REPORT_CARD_HORIZONTAL_PADDING,
+            sourceWidth + 72.dp + SHARE_REPORT_CARD_HORIZONTAL_PADDING,
+            if (showSummary) 260.dp else 0.dp
+        ).max().coerceAtLeast(SHARE_REPORT_CARD_MIN_WIDTH)
+    }
+}
+
+private fun formatReportCardShareSubtitleLine(seasonLabel: String, team: ReportCardTeam): String {
+    return listOfNotNull(seasonLabel, formatReportCardTeamSubtitle(team)).joinToString(" • ")
+}
 
 @Composable
 private fun ReportCardCategorySection(
     category: ReportCardCategory,
     statKeys: List<String>,
     teamRankColorFn: (Int?) -> Color,
+    positionColumnLabel: String = "Pos",
+    showPlayerRankAndComposite: Boolean = true,
     compositeRankingKey: String? = null,
     rankings: Map<String, List<RankingEntry>> = emptyMap(),
     onCompositeRankClick: ((String) -> Unit)? = null,
@@ -596,6 +695,8 @@ private fun ReportCardCategorySection(
         ReportCardPlayersSection(
             players = category.players,
             statKeys = statKeys,
+            positionColumnLabel = positionColumnLabel,
+            showPlayerRankAndComposite = showPlayerRankAndComposite,
             expandStatsForShare = expandStatsForShare
         )
     }
@@ -607,6 +708,8 @@ private fun ReportCardCategorySection(
 private fun ReportCardPlayersSection(
     players: List<ReportCardPlayer>,
     statKeys: List<String>,
+    positionColumnLabel: String = "Pos",
+    showPlayerRankAndComposite: Boolean = true,
     expandStatsForShare: Boolean = false
 ) {
     val scrollState = rememberScrollState()
@@ -620,6 +723,8 @@ private fun ReportCardPlayersSection(
         player = null,
         statLabels = statLabels,
         statKeys = statKeys,
+        positionColumnLabel = positionColumnLabel,
+        showPlayerRankAndComposite = showPlayerRankAndComposite,
         expandStatsForShare = expandStatsForShare
     )
 
@@ -630,6 +735,8 @@ private fun ReportCardPlayersSection(
             player = player,
             statLabels = statLabels,
             statKeys = statKeys,
+            positionColumnLabel = positionColumnLabel,
+            showPlayerRankAndComposite = showPlayerRankAndComposite,
             expandStatsForShare = expandStatsForShare
         )
     }
@@ -642,6 +749,8 @@ private fun ReportCardPlayerLine(
     player: ReportCardPlayer?,
     statLabels: List<String>,
     statKeys: List<String>,
+    positionColumnLabel: String = "Pos",
+    showPlayerRankAndComposite: Boolean = true,
     expandStatsForShare: Boolean = false
 ) {
     Row(
@@ -681,7 +790,9 @@ private fun ReportCardPlayerLine(
                 ReportCardPlayerStatsColumns(
                     player = player,
                     statLabels = statLabels,
-                    statKeys = statKeys
+                    statKeys = statKeys,
+                    positionColumnLabel = positionColumnLabel,
+                    showPlayerRankAndComposite = showPlayerRankAndComposite
                 )
             }
         } else {
@@ -695,7 +806,9 @@ private fun ReportCardPlayerLine(
                 ReportCardPlayerStatsColumns(
                     player = player,
                     statLabels = statLabels,
-                    statKeys = statKeys
+                    statKeys = statKeys,
+                    positionColumnLabel = positionColumnLabel,
+                    showPlayerRankAndComposite = showPlayerRankAndComposite
                 )
             }
         }
@@ -706,7 +819,9 @@ private fun ReportCardPlayerLine(
 private fun ReportCardPlayerStatsColumns(
     player: ReportCardPlayer?,
     statLabels: List<String>,
-    statKeys: List<String>
+    statKeys: List<String>,
+    positionColumnLabel: String = "Pos",
+    showPlayerRankAndComposite: Boolean = true
 ) {
     val isHeader = player == null
     val headerStyle = MaterialTheme.typography.labelSmall
@@ -715,7 +830,7 @@ private fun ReportCardPlayerStatsColumns(
     Row(verticalAlignment = Alignment.CenterVertically) {
         ReportCardFixedColumn(PLAYER_POS_WIDTH, Alignment.Center) {
             if (isHeader) {
-                ReportCardHeaderText("Pos", headerStyle, headerColor, TextAlign.Center)
+                ReportCardHeaderText(positionColumnLabel, headerStyle, headerColor, TextAlign.Center)
             } else {
                 ReportCardStatText(player?.position.orEmpty(), TextAlign.Center, muted = true)
             }
@@ -746,33 +861,37 @@ private fun ReportCardPlayerStatsColumns(
                 }
             }
 
-            ReportCardFixedColumn(PLAYER_RANK_WIDTH, Alignment.Center, startPadding = PLAYER_RANK_LEFT_PADDING) {
-                if (isHeader) {
-                    ReportCardHeaderText("Rk", headerStyle, headerColor, TextAlign.Center)
-                } else {
-                    MatchupRankBadge(
-                        rank = stat?.rank,
-                        rankDisplay = stat?.rankDisplay,
-                        rankColorFn = ::getMLBPlayerRankColor,
-                        usePlayerRanks = true,
-                        useNBARanks = false,
-                        emptyPlaceholder = ""
-                    )
+            if (showPlayerRankAndComposite) {
+                ReportCardFixedColumn(PLAYER_RANK_WIDTH, Alignment.Center, startPadding = PLAYER_RANK_LEFT_PADDING) {
+                    if (isHeader) {
+                        ReportCardHeaderText("Rk", headerStyle, headerColor, TextAlign.Center)
+                    } else {
+                        MatchupRankBadge(
+                            rank = stat?.rank,
+                            rankDisplay = stat?.rankDisplay,
+                            rankColorFn = ::getMLBPlayerRankColor,
+                            usePlayerRanks = true,
+                            useNBARanks = false,
+                            emptyPlaceholder = ""
+                        )
+                    }
                 }
             }
         }
 
-        Spacer(modifier = Modifier.width(PLAYER_STAT_GROUP_SPACING))
+        if (showPlayerRankAndComposite) {
+            Spacer(modifier = Modifier.width(PLAYER_STAT_GROUP_SPACING))
 
-        ReportCardFixedColumn(PLAYER_COMP_WIDTH, Alignment.CenterEnd) {
-            if (isHeader) {
-                ReportCardHeaderText("Comp", headerStyle, headerColor, TextAlign.End)
-            } else {
-                ReportCardStatText(
-                    player?.stats?.get("aggregate")?.let { formatReportCardStat(it) }.orEmpty(),
-                    TextAlign.End,
-                    muted = true
-                )
+            ReportCardFixedColumn(PLAYER_COMP_WIDTH, Alignment.CenterEnd) {
+                if (isHeader) {
+                    ReportCardHeaderText("Comp", headerStyle, headerColor, TextAlign.End)
+                } else {
+                    ReportCardStatText(
+                        player?.stats?.get("aggregate")?.let { formatReportCardStat(it) }.orEmpty(),
+                        TextAlign.End,
+                        muted = true
+                    )
+                }
             }
         }
     }
@@ -965,15 +1084,24 @@ private fun organizeMlbPlayoffChancesForDisplay(
         organizeLeague(enriched.filter { it.league == "American" }, listOf("AL East", "AL Central", "AL West"))
 }
 
+private fun parseReportCardSources(source: String): List<String> {
+    return source
+        .split(",", "•", "/", "|")
+        .map { it.trim() }
+        .filter { it.isNotEmpty() }
+}
+
 private fun buildReportCardSourceAttribution(
     visualization: MLBTeamReportCardVisualization
 ): String? {
     val sources = buildList {
-        visualization.source?.takeIf { it.isNotBlank() }?.let { add(it) }
+        visualization.source?.takeIf { it.isNotBlank() }?.let { raw ->
+            addAll(parseReportCardSources(raw))
+        }
         if (visualization.playoffChances.isNotEmpty()) {
             add("PlayoffStatus.com")
         }
-    }
+    }.distinct()
     return sources.takeIf { it.isNotEmpty() }?.joinToString(" • ")
 }
 
@@ -1135,10 +1263,12 @@ private fun MLBTeamReportCardShareImage(
 ) {
     val bg = MaterialTheme.colorScheme.background
     val onBg = MaterialTheme.colorScheme.onSurface
+    val shareWidth = rememberReportCardShareImageWidth(team, seasonLabel, source, categories, showSummary)
 
     Column(
         modifier = Modifier
-            .requiredWidth(SHARE_REPORT_CARD_WIDTH)
+            .width(shareWidth)
+            .wrapContentHeight()
             .background(bg)
             .padding(16.dp)
     ) {
@@ -1151,14 +1281,11 @@ private fun MLBTeamReportCardShareImage(
         )
         Spacer(modifier = Modifier.height(4.dp))
         Text(
-            text = listOfNotNull(
-                seasonLabel,
-                formatReportCardTeamSubtitle(team)
-            ).joinToString(" • "),
+            text = formatReportCardShareSubtitleLine(seasonLabel, team),
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold,
             color = onBg,
-            maxLines = 2
+            maxLines = 1
         )
 
         if (showSummary) {
@@ -1191,6 +1318,8 @@ private fun MLBTeamReportCardShareImage(
                 category = shareCategory,
                 statKeys = config.statKeys,
                 teamRankColorFn = config.teamRankColorFn,
+                positionColumnLabel = config.positionColumnLabel,
+                showPlayerRankAndComposite = config.showPlayerRankAndComposite,
                 expandStatsForShare = true
             )
         }
@@ -1205,7 +1334,7 @@ private fun MLBTeamReportCardShareImage(
                 style = MaterialTheme.typography.labelSmall,
                 fontSize = 9.sp,
                 color = onBg,
-                maxLines = 1
+                modifier = Modifier.weight(1f, fill = false)
             )
             Text(
                 text = "fbrk.app",

@@ -170,6 +170,14 @@ private val MonospaceTypography = Typography(
 )
 
 /**
+ * App accent color used for titles, tabs, and branded UI elements.
+ * In the default theme this is purple (light) / pink (dark), stored as Material `onBackground`
+ * — not `primary`, which is black/white for controls and metadata.
+ */
+@Composable
+fun accentColor(): Color = MaterialTheme.colorScheme.onBackground
+
+/**
  * Platform-specific system UI configuration (status bar, navigation bar).
  * On Android, this sets the status bar icon colors to match the theme.
  * On iOS, this is a no-op as iOS handles this automatically.

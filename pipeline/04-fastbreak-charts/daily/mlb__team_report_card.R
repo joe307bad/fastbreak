@@ -454,10 +454,11 @@ build_player <- function(row, stat_cols, stat_labels, digits_map = list()) {
     stat_cols
   )
   stats$aggregate <- composite_stat_entry(row)
-  war_val <- if ("WAR" %in% names(row) && !is.na(row$WAR)) round(as.numeric(row$WAR), 2) else NULL
+  player_name <- resolve_player_name(row)
+  war_val <- resolve_player_war(row)
   list(
     playerId = as.character(row$playerid),
-    name = as.character(row$PlayerName),
+    name = player_name,
     position = if (!is.null(row$Pos) && !is.na(row$Pos)) as.character(row$Pos) else NULL,
     war = war_val,
     stats = stats
@@ -503,6 +504,185 @@ aggregate_pitching_team_stats <- function(df, k_bb_col = "K-BB_pct", fip_col = "
       !!fip_col := weighted.mean(.data[[fip_col]], IP, na.rm = TRUE),
       .groups = "drop"
     )
+}
+
+normalize_player_name <- function(x) {
+  x <- tolower(trimws(as.character(x)))
+  x <- iconv(x, to = "ASCII//TRANSLIT")
+  x <- gsub("[^a-z ]", "", x)
+  gsub("\\s+", " ", x)
+}
+
+resolve_player_name <- function(row) {
+  pick_name <- function(col) {
+    if (!col %in% names(row)) return(NA_character_)
+    val <- row[[col]]
+    if (length(val) == 0 || is.na(val)) return(NA_character_)
+    name <- as.character(val[[1]])
+    if (!nzchar(name)) NA_character_ else name
+  }
+  name <- pick_name("PlayerName")
+  if (is.na(name)) name <- pick_name("PlayerName.x")
+  if (is.na(name)) name <- pick_name("PlayerName.y")
+  name
+}
+
+resolve_player_war <- function(row) {
+  pick_war <- function(col) {
+    if (!col %in% names(row)) return(NA_real_)
+    val <- as.numeric(row[[col]])
+    if (length(val) == 0 || is.na(val[[1]])) NA_real_ else val[[1]]
+  }
+  war <- pick_war("WAR")
+  if (is.na(war)) war <- pick_war("WAR.y")
+  if (is.na(war)) NULL else round(war, 2)
+}
+
+lookup_player_war <- function(name, lookup) {
+  norm <- normalize_player_name(name)
+  exact <- lookup %>% filter(normalize_player_name(PlayerName) == norm)
+  if (nrow(exact) >= 1) {
+    best <- exact[which.max(exact$WAR), , drop = FALSE]
+    return(list(
+      playerid = best$playerid[1],
+      PlayerName = best$PlayerName[1],
+      WAR = best$WAR[1]
+    ))
+  }
+  list(playerid = NA, PlayerName = name, WAR = NA_real_)
+}
+
+espn_team_to_abbrev <- function(display_name) {
+  for (suffix in names(MLB_TEAM_NAME_TO_ABBREV)) {
+    if (grepl(paste0(suffix, "$"), display_name) || grepl(suffix, display_name, fixed = TRUE)) {
+      return(MLB_TEAM_NAME_TO_ABBREV[[suffix]])
+    }
+  }
+  NA_character_
+}
+
+injury_status_weight <- function(status) {
+  st <- tolower(trimws(as.character(status)))
+  if (!nzchar(st)) return(NA_real_)
+  if (grepl("suspension", st)) return(NA_real_)
+  if (grepl("developmental", st)) return(NA_real_)
+  if (grepl("60-day|60 day", st)) return(1.0)
+  if (grepl("15-day|15 day", st)) return(0.9)
+  if (grepl("10-day|10 day", st)) return(0.85)
+  if (grepl("7-day|7 day", st)) return(0.75)
+  if (grepl("day-to-day|day to day", st)) return(0.5)
+  if (grepl("^out$", st)) return(0.85)
+  0.8
+}
+
+fetch_espn_mlb_injuries <- function() {
+  url <- "https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/injuries"
+  safe_scalar <- function(x, default = NA_character_) {
+    if (is.null(x) || length(x) == 0) return(default)
+    if (length(x) > 1) x <- x[[1]]
+    if (is.na(x) || !nzchar(as.character(x))) return(default)
+    as.character(x)
+  }
+  tryCatch({
+    payload <- fromJSON(url, simplifyVector = FALSE)
+    groups <- payload$injuries
+    if (is.null(groups)) groups <- list()
+    rows <- list()
+    for (group in groups) {
+      team_code <- espn_team_to_abbrev(safe_scalar(group$displayName, ""))
+      if (is.na(team_code)) next
+      entries <- group$injuries
+      if (is.null(entries)) entries <- list()
+      for (entry in entries) {
+        status <- safe_scalar(entry$status, "")
+        weight <- injury_status_weight(status)
+        if (is.na(weight)) next
+        athlete <- entry$athlete
+        if (is.null(athlete)) athlete <- list()
+        position <- if (is.null(athlete$position)) NA_character_ else safe_scalar(athlete$position$abbreviation)
+        rows[[length(rows) + 1]] <- list(
+          team_code = team_code,
+          entry_id = safe_scalar(entry$id),
+          athlete_id = safe_scalar(athlete$id),
+          athlete_name = safe_scalar(athlete$displayName),
+          status = status,
+          position = position,
+          short_comment = safe_scalar(entry$shortComment),
+          status_weight = weight
+        )
+      }
+    }
+    if (length(rows) == 0) {
+      return(tibble(
+        team_code = character(),
+        entry_id = character(),
+        athlete_id = character(),
+        athlete_name = character(),
+        status = character(),
+        position = character(),
+        short_comment = character(),
+        status_weight = numeric(),
+        playerid = character(),
+        PlayerName = character(),
+        WAR = numeric(),
+        impact = numeric()
+      ))
+    }
+    bind_rows(rows)
+  }, error = function(e) {
+    cat("Warning: could not load ESPN injury report:", e$message, "\n")
+    tibble(
+      team_code = character(),
+      entry_id = character(),
+      athlete_id = character(),
+      athlete_name = character(),
+      status = character(),
+      position = character(),
+      short_comment = character(),
+      status_weight = numeric(),
+      playerid = character(),
+      PlayerName = character(),
+      WAR = numeric(),
+      impact = numeric()
+    )
+  })
+}
+
+build_injury_player <- function(row) {
+  war_val <- if (!is.na(row$WAR)) round(as.numeric(row$WAR), 2) else NULL
+  impact_val <- if (!is.na(row$impact)) round(as.numeric(row$impact), 2) else NULL
+  player_id <- if (!is.na(row$playerid)) {
+    as.character(row$playerid)
+  } else if (!is.na(row$entry_id)) {
+    row$entry_id
+  } else {
+    row$athlete_id
+  }
+  list(
+    playerId = player_id,
+    name = as.character(row$athlete_name),
+    position = if (!is.na(row$status) && nzchar(row$status)) as.character(row$status) else NULL,
+    war = war_val,
+    stats = list(
+      impact = list(
+        label = "Impact",
+        value = impact_val,
+        rank = NULL,
+        rankDisplay = NULL
+      ),
+      aggregate = list(label = "Composite", value = NULL, rank = NULL, rankDisplay = NULL)
+    )
+  )
+}
+
+team_injured_players <- function(df, team) {
+  team_df <- df %>%
+    filter(team_code == team) %>%
+    arrange(desc(impact), desc(WAR), athlete_name)
+  if (nrow(team_df) == 0) return(list())
+  lapply(seq_len(nrow(team_df)), function(i) {
+    build_injury_player(team_df[i, ])
+  })
 }
 
 # ============================================================================
@@ -689,11 +869,51 @@ relievers <- pitcher_stats %>%
   )
 
 war_lookup <- bind_rows(
-  batter_stats %>% transmute(playerid, WAR = as.numeric(WAR)),
-  pitcher_stats %>% transmute(playerid, WAR = as.numeric(WAR))
+  batter_stats %>% transmute(playerid, PlayerName, WAR = as.numeric(WAR)),
+  pitcher_stats %>% transmute(playerid, PlayerName, WAR = as.numeric(WAR))
 ) %>%
   group_by(playerid) %>%
-  summarise(WAR = max(WAR, na.rm = TRUE), .groups = "drop")
+  summarise(PlayerName = first(PlayerName), WAR = max(WAR, na.rm = TRUE), .groups = "drop")
+
+cat("Loading ESPN MLB injury report...\n")
+injury_players_raw <- fetch_espn_mlb_injuries()
+injury_players <- injury_players_raw %>%
+  rowwise() %>%
+  mutate(
+    war_match = list(lookup_player_war(athlete_name, war_lookup)),
+    playerid = war_match$playerid,
+    PlayerName = war_match$PlayerName,
+    WAR = war_match$WAR,
+    impact = pmax(coalesce(WAR, 0), 0) * status_weight
+  ) %>%
+  ungroup() %>%
+  select(-war_match)
+
+team_injury_totals <- injury_players %>%
+  group_by(team_code) %>%
+  summarise(
+    injured_count = n(),
+    injury_war = sum(impact, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+team_injuries <- tibble(team_code = ALL_TEAMS) %>%
+  left_join(team_injury_totals, by = "team_code") %>%
+  mutate(
+    injured_count = coalesce(as.integer(injured_count), 0L),
+    injury_war = coalesce(injury_war, 0)
+  )
+
+team_injuries <- rank_and_assign(team_injuries, "injured_count", lower_better = FALSE)
+team_injuries <- rank_and_assign(team_injuries, "injury_war", lower_better = FALSE)
+team_injuries <- add_composite_score(team_injuries, c("injured_count", "injury_war"))
+team_injuries <- rank_and_assign(team_injuries, "composite_score")
+
+cat(
+  "Injury report — players:", nrow(injury_players),
+  "| teams with injuries:", sum(team_injuries$injured_count > 0),
+  "\n"
+)
 
 fielders <- fielder_stats %>%
   mutate(
@@ -709,7 +929,7 @@ fielders <- fielder_stats %>%
     !is.na(OAA), !is.na(DRS),
     Inn >= MIN_FIELDER_INN
   ) %>%
-  left_join(war_lookup, by = "playerid")
+  left_join(war_lookup %>% select(playerid, WAR), by = "playerid")
 
 for (col in c("wRC_plus", "xwOBA")) hitters <- rank_and_assign(hitters, col)
 for (col in c("K-BB_pct", "xFIP")) {
@@ -842,6 +1062,8 @@ reliever_digits <- list(`K-BB_pct` = 1, FIP = 2, SV = 0)
 reliever_team_labels <- c(`K-BB_pct` = "K-BB%", FIP = "FIP", SV_per_G = "SV/G")
 reliever_team_digits <- list(`K-BB_pct` = 1, FIP = 2, SV_per_G = 2)
 fielder_digits <- list(OAA = 1, DRS = 1)
+injury_labels <- c(injured_count = "Injured", injury_war = "WAR Lost")
+injury_digits <- list(injured_count = 0, injury_war = 2)
 
 # Scale K-BB% to percentage points for display consistency with other MLB charts.
 scale_k_bb <- function(df) {
@@ -875,6 +1097,7 @@ teams_json <- lapply(ALL_TEAMS, function(team) {
     fielders, team,
     c("OAA", "DRS"), fielder_labels, fielder_digits
   )
+  injuries_list <- team_injured_players(injury_players, team)
 
   record_row <- team_records %>% filter(team_code == team)
   overall_row <- team_overall %>% filter(team_code == team)
@@ -942,6 +1165,19 @@ teams_json <- lapply(ALL_TEAMS, function(team) {
           c("OAA", "DRS"), fielder_labels, fielder_digits
         ),
         players = fielders_list
+      ),
+      injuries = list(
+        label = "Injury Report",
+        description = paste0(
+          "Current injured players weighted by FanGraphs WAR and IL severity ",
+          "(60-day = 100%, 15-day = 90%, 10-day = 85%, day-to-day = 50%). ",
+          "Higher composite = more injury impact. Rank 1 = most injured."
+        ),
+        team = build_team_category_stats(
+          team_injuries, team,
+          c("injured_count", "injury_war"), injury_labels, injury_digits
+        ),
+        players = injuries_list
       )
     )
   )
@@ -987,6 +1223,13 @@ rankings_json <- list(
     "composite_score",
     "composite_score_rank",
     "composite_score_rankDisplay"
+  ),
+  injuriesComposite = build_rankings(
+    team_injuries,
+    "team_code",
+    "composite_score",
+    "composite_score_rank",
+    "composite_score_rankDisplay"
   )
 )
 
@@ -1016,10 +1259,17 @@ output_data <- list(
     " • OAA: Outs Above Average from Statcast range. Higher is better.\n\n",
     " • DRS: Defensive Runs Saved. Higher is better.\n\n",
     " • Composite: Average percentile across each category's stats (bullpen ",
-    "includes K-BB%, FIP, and SV/G). Higher is better."
+    "includes K-BB%, FIP, and SV/G). Higher is better.\n\n",
+    " • Injury Report: ESPN daily injury list weighted by FanGraphs WAR and ",
+    "IL severity. Team composite averages injured-count and WAR-lost ",
+    "percentiles (more injuries and more WAR lost = higher score). Rank 1 ",
+    "is the most injured team.\n\n",
+    " • WAR Lost: Sum of max(WAR, 0) × status weight for injured players. ",
+    "Higher means more impact.\n\n",
+    " • Impact: Per-player weighted WAR lost from that injury."
   ),
   lastUpdated = format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC"),
-  source = "FanGraphs",
+  source = "FanGraphs • ESPN",
   season = mlb_season,
   topN = TOP_N,
   rankings = rankings_json,

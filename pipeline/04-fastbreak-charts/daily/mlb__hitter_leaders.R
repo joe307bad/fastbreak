@@ -27,6 +27,23 @@ current_month <- as.numeric(format(Sys.Date(), "%m"))
 # the prior season so we never produce an empty chart.
 mlb_season <- if (current_month >= 3) current_year else current_year - 1
 
+# FanGraphs uses "2 Tms" when a player played for multiple teams. Use the
+# first comma-separated team when present; otherwise skip division lookup.
+primary_mlb_team <- function(team_abb) {
+  if (is.na(team_abb) || !nzchar(team_abb) || grepl("Tms", team_abb, fixed = TRUE)) {
+    return(NA_character_)
+  }
+  trimws(strsplit(as.character(team_abb), ",")[[1]][1])
+}
+
+# jsonlite auto_unbox turns explicit NULL list fields into {} — omit optional keys.
+scatter_plot_point <- function(label, x, y, sum, team_code, division = NULL, conference = NULL) {
+  pt <- list(label = label, x = x, y = y, sum = sum, teamCode = team_code)
+  if (!is.null(division) && !is.na(division) && nzchar(division)) pt$division <- as.character(division)
+  if (!is.null(conference) && !is.na(conference) && nzchar(conference)) pt$conference <- as.character(conference)
+  pt
+}
+
 cat("Processing MLB Hitting Leaders for", mlb_season, "season\n")
 
 # Pull batter leaderboard from FanGraphs (qual="0" so we filter ourselves)
@@ -81,7 +98,8 @@ qualified_hitters <- batter_stats %>%
   filter(
     !is.na(PA), !is.na(G), !is.na(wRC_plus), !is.na(xwOBA),
     PA >= min_pa,
-    G >= min_g
+    G >= min_g,
+    !grepl("Tms", team, fixed = TRUE)
   )
 
 cat("Qualified hitters (PA >=", min_pa, ", G >=", min_g, "):",
@@ -101,17 +119,15 @@ print(head(top_hitters, 10))
 data_points <- top_hitters %>%
   rowwise() %>%
   mutate(
-    primary_team = strsplit(team, ",")[[1]][1],
-    division = team_divisions[primary_team],
-    league = team_leagues[primary_team],
-    data_point = list(list(
+    primary_team = primary_mlb_team(team),
+    data_point = list(scatter_plot_point(
       label = player,
       x = round(wRC_plus, 0),
       y = round(xwOBA, 3),
       sum = round(wRC_plus, 0),
-      teamCode = team,
-      division = if (!is.na(division) && !is.null(division)) as.character(division) else NULL,
-      conference = if (!is.na(league) && !is.null(league)) as.character(league) else NULL
+      team_code = team,
+      division = if (is.na(primary_team)) NULL else team_divisions[[primary_team]],
+      conference = if (is.na(primary_team)) NULL else team_leagues[[primary_team]]
     ))
   ) %>%
   pull(data_point)

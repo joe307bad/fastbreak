@@ -74,25 +74,70 @@ class ChartSyncManager(
     val syncProgress: StateFlow<ChartSyncProgress?> = _syncProgress.asStateFlow()
 
     /**
+     * Charts that failed to download in this app session.
+     * Skipped on automatic sync (e.g. returning to home); cleared on manual refresh.
+     */
+    private val failedCharts = mutableMapOf<String, String>()
+
+    /** Failed charts from the current session: chartId to error message. */
+    fun getFailedCharts(): Map<String, String> = failedCharts.toMap()
+
+    /** Clears session failure state so all charts are retried (manual refresh). */
+    fun clearFailedCharts() {
+        if (failedCharts.isNotEmpty()) {
+            println("🔄 Clearing ${failedCharts.size} failed chart(s) for retry")
+            failedCharts.clear()
+        }
+    }
+
+    /**
      * Synchronizes all charts that need updating.
      * Updates state via StateFlow for UI consumption.
      *
      * @param registryEntries Map of file_key to RegistryEntry
+     * @param retryFailed When true, previously failed charts are retried (manual refresh).
+     *                    When false, they are skipped until the user refreshes.
      */
-    suspend fun synchronizeCharts(registryEntries: Map<String, RegistryEntry>) {
+    suspend fun synchronizeCharts(
+        registryEntries: Map<String, RegistryEntry>,
+        retryFailed: Boolean = false
+    ): ChartSyncResult {
         println("📊 ChartSyncManager.synchronizeCharts() - Starting")
         println("   Total entries in registry: ${registryEntries.size}")
 
         val chartEntries = registryEntries.filter { (_, entry) -> entry.isChart && !entry.isSystem }
         println("   Chart entries (excluding topics): ${chartEntries.size}")
 
-        val chartsNeedingUpdate = chartEntries.filter { (fileKey, entry) ->
+        val allNeedingUpdate = chartEntries.filter { (fileKey, entry) ->
             needsUpdate(fileKey, entry)
         }
 
-        println("   Charts needing update: ${chartsNeedingUpdate.size}")
-        chartsNeedingUpdate.forEach { (fileKey, entry) ->
+        val skippedFailed = if (retryFailed) {
+            emptyMap()
+        } else {
+            allNeedingUpdate.filter { (fileKey, _) ->
+                fileKeyToChartId(fileKey) in failedCharts
+            }
+        }
+
+        val chartsNeedingUpdate = if (retryFailed) {
+            allNeedingUpdate
+        } else {
+            allNeedingUpdate.filter { (fileKey, _) ->
+                fileKeyToChartId(fileKey) !in failedCharts
+            }
+        }
+
+        println("   Charts needing update: ${allNeedingUpdate.size}")
+        allNeedingUpdate.forEach { (fileKey, entry) ->
             println("     - $fileKey (${entry.title})")
+        }
+        if (skippedFailed.isNotEmpty()) {
+            println("   Skipping ${skippedFailed.size} previously failed chart(s):")
+            skippedFailed.forEach { (fileKey, entry) ->
+                val chartId = fileKeyToChartId(fileKey)
+                println("     - $fileKey (${entry.title}): ${failedCharts[chartId]}")
+            }
         }
 
         if (chartsNeedingUpdate.isEmpty()) {
@@ -102,7 +147,7 @@ class ChartSyncManager(
                 chartStates = emptyMap(),
                 totalToSync = 0
             )
-            return
+            return ChartSyncResult(attemptedCount = 0, newFailures = emptyList())
         }
 
         // Initialize sync progress with all charts in Idle state
@@ -140,9 +185,11 @@ class ChartSyncManager(
                         println("⚠️ Chart $chartId cancelled: ${e.message}")
                         throw e
                     } catch (e: Exception) {
-                        println("❌ Failed to sync chart '$fileKey': ${e.message}")
+                        val errorMessage = e.message ?: "Unknown error"
+                        println("❌ Failed to sync chart '$fileKey': $errorMessage")
                         println("   Exception: ${e::class.simpleName}")
-                        updateChartState(chartId, ChartSyncState.Failed(e.message ?: "Unknown error"))
+                        failedCharts[chartId] = errorMessage
+                        updateChartState(chartId, ChartSyncState.Failed(errorMessage))
                     } finally {
                         semaphore.release()
                     }
@@ -169,7 +216,12 @@ class ChartSyncManager(
         // Clean up orphaned charts
         cleanupOrphanedCharts(chartEntries)
 
+        val newFailures = finalProgress?.failedCharts ?: emptyList()
         println("📊 ChartSyncManager.synchronizeCharts() - Complete")
+        return ChartSyncResult(
+            attemptedCount = chartsNeedingUpdate.size,
+            newFailures = newFailures
+        )
     }
 
     private fun updateChartState(chartId: String, state: ChartSyncState, chartName: String? = null) {
@@ -283,6 +335,7 @@ class ChartSyncManager(
 
             // SQLite write is atomic - no verification retry needed!
             chartCache.saveChartData(chartId, cachedData)
+            failedCharts.remove(chartId)
             println("✅ Chart $chartId saved to cache")
 
             SentryLogger.finishSpan(spanId, SpanStatus.OK)
@@ -421,7 +474,10 @@ class ChartSyncManager(
 
     fun estimateCacheSize(): Long = chartCache.estimateTotalCacheSize()
 
-    suspend fun clearAllCache() = chartCache.clearAllChartData()
+    suspend fun clearAllCache() {
+        failedCharts.clear()
+        chartCache.clearAllChartData()
+    }
 
     fun markChartAsViewed(chartId: String): Boolean = chartCache.markChartAsViewed(chartId)
 

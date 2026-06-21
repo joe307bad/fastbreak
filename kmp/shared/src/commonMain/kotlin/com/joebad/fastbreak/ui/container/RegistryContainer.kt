@@ -6,6 +6,7 @@ import com.joebad.fastbreak.data.model.RegistryEntry
 import com.joebad.fastbreak.data.repository.ChartCache
 import com.joebad.fastbreak.domain.registry.ChartSyncManager
 import com.joebad.fastbreak.domain.registry.ChartSyncProgress
+import com.joebad.fastbreak.domain.registry.ChartSyncResult
 import com.joebad.fastbreak.domain.registry.ReleaseIdCheckResult
 import com.joebad.fastbreak.domain.registry.ReleaseIdChecker
 import com.joebad.fastbreak.domain.registry.RegistryManager
@@ -197,8 +198,7 @@ class RegistryContainer(
                 syncProgress = null,
                 diagnostics = state.diagnostics.copy(
                     lastError = null,
-                    isSyncing = true,
-                    failedCharts = emptyList()
+                    isSyncing = true
                 )
             )
         }
@@ -254,7 +254,7 @@ class RegistryContainer(
 
                 // Sync chart data and topics after loading registry entries (await completion)
                 try {
-                    syncChartData(entries)
+                    val syncResult = syncChartData(entries, retryFailed = false)
                     // Also sync topics data
                     chartSyncManager.synchronizeTopics(entries)
 
@@ -269,9 +269,9 @@ class RegistryContainer(
                         )
                     }
 
-                    // Show toast if any charts failed to sync
-                    if (state.diagnostics.failedCharts.isNotEmpty()) {
-                        val count = state.diagnostics.failedCharts.size
+                    // Show toast only for failures that occurred in this sync run
+                    if (syncResult.newFailures.isNotEmpty()) {
+                        val count = syncResult.newFailures.size
                         postSideEffect(RegistrySideEffect.ShowError(
                             "Failed to sync $count chart${if (count > 1) "s" else ""}"
                         ))
@@ -320,7 +320,7 @@ class RegistryContainer(
 
                     // Continue with chart data sync using cached entries
                     try {
-                        syncChartData(cachedEntries)
+                        val syncResult = syncChartData(cachedEntries, retryFailed = false)
                         // Also sync topics data
                         chartSyncManager.synchronizeTopics(cachedEntries)
 
@@ -334,9 +334,9 @@ class RegistryContainer(
                             )
                         }
 
-                        // Show toast if any charts failed to sync
-                        if (state.diagnostics.failedCharts.isNotEmpty()) {
-                            val count = state.diagnostics.failedCharts.size
+                        // Show toast only for failures that occurred in this sync run
+                        if (syncResult.newFailures.isNotEmpty()) {
+                            val count = syncResult.newFailures.size
                             postSideEffect(RegistrySideEffect.ShowError(
                                 "Failed to sync $count chart${if (count > 1) "s" else ""}"
                             ))
@@ -391,6 +391,9 @@ class RegistryContainer(
 
         // Track sync started
         val syncStartTime = Clock.System.now()
+
+        // Manual refresh retries previously failed charts
+        chartSyncManager.clearFailedCharts()
 
         // Set initial sync state - syncProgress with total=1 keeps charts disabled
         // until sync completes (isChartReady returns false when chart not in syncedChartIds)
@@ -464,7 +467,7 @@ class RegistryContainer(
 
                 // Sync chart data after refresh
                 try {
-                    syncChartData(entries)
+                    val syncResult = syncChartData(entries, retryFailed = true)
 
                     // Sync topics - only downloads if server has newer data
                     // (synchronizeTopics compares timestamps internally)
@@ -489,7 +492,7 @@ class RegistryContainer(
                     }
 
                     // All done - clear sync state and update topicsViewed
-                    val failedCount = state.diagnostics.failedCharts.size
+                    val failedCount = syncResult.newFailures.size
                     val successCount = chartCount - failedCount
                     TelemetryService.trackSyncCompleted(
                         duration = (Clock.System.now() - syncStartTime).inWholeMilliseconds,
@@ -560,7 +563,7 @@ class RegistryContainer(
 
                     // Continue with chart data sync using cached entries
                     try {
-                        syncChartData(cachedEntries)
+                        val syncResult = syncChartData(cachedEntries, retryFailed = true)
 
                         val topicsUpdatedAtBefore = chartSyncManager.getTopicsUpdatedAt()
                         chartSyncManager.synchronizeTopics(cachedEntries)
@@ -591,9 +594,9 @@ class RegistryContainer(
                             )
                         }
 
-                        // Show toast if any charts failed to sync
-                        if (state.diagnostics.failedCharts.isNotEmpty()) {
-                            val count = state.diagnostics.failedCharts.size
+                        // Show toast if any charts failed to sync in this run
+                        if (syncResult.newFailures.isNotEmpty()) {
+                            val count = syncResult.newFailures.size
                             postSideEffect(RegistrySideEffect.ShowError(
                                 "Failed to sync $count chart${if (count > 1) "s" else ""}"
                             ))
@@ -638,9 +641,15 @@ class RegistryContainer(
      * Compares timestamps and downloads charts that need updating.
      * Builds Registry from cached data after sync completes.
      * Keeps isSyncing = true - caller is responsible for clearing sync state.
+     *
+     * @param retryFailed When true, previously failed charts are retried (manual refresh).
      */
-    private suspend fun syncChartData(entries: Map<String, RegistryEntry>) {
+    private suspend fun syncChartData(
+        entries: Map<String, RegistryEntry>,
+        retryFailed: Boolean
+    ): ChartSyncResult {
         var progressCollectorJob: Job? = null
+        var syncResult = ChartSyncResult(attemptedCount = 0, newFailures = emptyList())
         try {
             // Launch a coroutine to collect sync progress updates from StateFlow
             progressCollectorJob = scope.launch {
@@ -662,6 +671,9 @@ class RegistryContainer(
                     if (progress.isComplete) {
                         // Capture failed charts before clearing syncProgress
                         val completedFailedCharts = progress.failedCharts
+                        val sessionFailedCharts = chartSyncManager.getFailedCharts()
+                            .entries
+                            .map { it.key to it.value }
 
                         // Update state with registry - keep isSyncing true for caller
                         intent {
@@ -673,13 +685,13 @@ class RegistryContainer(
                                     lastSyncTime = Clock.System.now(),
                                     diagnostics = loadDiagnostics().copy(
                                         isSyncing = true,
-                                        lastError = if (progress.hasFailures) {
-                                            "Failed to sync ${progress.failedCount} charts"
+                                        lastError = if (sessionFailedCharts.isNotEmpty()) {
+                                            "Failed to sync ${sessionFailedCharts.size} charts"
                                         } else null,
                                         failedSyncs = if (progress.hasFailures) {
                                             container.stateFlow.value.diagnostics.failedSyncs + progress.failedCount
                                         } else container.stateFlow.value.diagnostics.failedSyncs,
-                                        failedCharts = completedFailedCharts
+                                        failedCharts = sessionFailedCharts.ifEmpty { completedFailedCharts }
                                     )
                                 )
                             }
@@ -704,7 +716,7 @@ class RegistryContainer(
 
             // Call synchronizeCharts - this suspends until all downloads complete
             // While running, it updates the StateFlow which the collector above observes
-            chartSyncManager.synchronizeCharts(entries)
+            syncResult = chartSyncManager.synchronizeCharts(entries, retryFailed = retryFailed)
 
             // Sync complete - cancel the collector
             progressCollectorJob.cancel()
@@ -712,6 +724,9 @@ class RegistryContainer(
             // Build final registry and update state
             val finalRegistry = buildRegistry(entries)
             val finalProgress = chartSyncManager.syncProgress.value
+            val sessionFailedCharts = chartSyncManager.getFailedCharts()
+                .entries
+                .map { it.key to it.value }
 
             intent {
                 reduce {
@@ -722,13 +737,13 @@ class RegistryContainer(
                         lastSyncTime = Clock.System.now(),
                         diagnostics = loadDiagnostics().copy(
                             isSyncing = true,
-                            lastError = if (finalProgress?.hasFailures == true) {
-                                "Failed to sync ${finalProgress.failedCount} charts"
+                            lastError = if (sessionFailedCharts.isNotEmpty()) {
+                                "Failed to sync ${sessionFailedCharts.size} charts"
                             } else null,
-                            failedSyncs = if (finalProgress?.hasFailures == true) {
-                                container.stateFlow.value.diagnostics.failedSyncs + finalProgress.failedCount
+                            failedSyncs = if (syncResult.newFailures.isNotEmpty()) {
+                                container.stateFlow.value.diagnostics.failedSyncs + syncResult.newFailures.size
                             } else container.stateFlow.value.diagnostics.failedSyncs,
-                            failedCharts = finalProgress?.failedCharts ?: emptyList()
+                            failedCharts = sessionFailedCharts
                         )
                     )
                 }
@@ -750,12 +765,16 @@ class RegistryContainer(
                         syncProgress = null,
                         diagnostics = state.diagnostics.copy(
                             isSyncing = false,
-                            lastError = "Sync error: ${e.message}"
+                            lastError = "Sync error: ${e.message}",
+                            failedCharts = chartSyncManager.getFailedCharts()
+                                .entries
+                                .map { it.key to it.value }
                         )
                     )
                 }
             }.join()
         }
+        return syncResult
     }
 
     /**
@@ -793,7 +812,7 @@ class RegistryContainer(
             lastError = currentState.diagnostics.lastError,
             isStale = registryManager.isRegistryStale(),
             isSyncing = currentState.isSyncing,
-            failedCharts = currentState.syncProgress?.failedCharts ?: currentState.diagnostics.failedCharts
+            failedCharts = chartSyncManager.getFailedCharts().entries.map { it.key to it.value }
         )
     }
 

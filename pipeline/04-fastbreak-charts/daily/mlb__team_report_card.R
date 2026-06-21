@@ -15,6 +15,7 @@ library(baseballr)
 library(dplyr)
 library(jsonlite)
 library(rvest)
+library(httr)
 
 # ============================================================================
 # Constants
@@ -382,9 +383,9 @@ normalize_team <- function(team_abb) {
 
 `%||%` <- function(a, b) if (!is.null(a) && !is.na(a) && nzchar(a)) a else b
 
-stat_entry <- function(row, col, label, digits = NULL) {
+stat_entry <- function(row, col, label, digits = NULL, display_value = NULL) {
   if (is.null(row) || !col %in% names(row) || is.na(row[[col]])) {
-    return(list(label = label, value = NULL, rank = NULL, rankDisplay = NULL))
+    return(list(label = label, value = NULL, rank = NULL, rankDisplay = NULL, displayValue = NULL))
   }
   value <- as.numeric(row[[col]])
   if (!is.null(digits)) value <- round(value, digits)
@@ -393,7 +394,8 @@ stat_entry <- function(row, col, label, digits = NULL) {
     label = label,
     value = value,
     rank = if (is.na(rank_val)) NULL else as.integer(rank_val),
-    rankDisplay = row[[paste0(col, "_rankDisplay")]]
+    rankDisplay = row[[paste0(col, "_rankDisplay")]],
+    displayValue = display_value
   )
 }
 
@@ -927,6 +929,207 @@ cat(
   "\n"
 )
 
+# ============================================================================
+# 10-week trend (ESPN completed games)
+# ============================================================================
+TREND_WEEKS <- 10
+TREND_DAYS <- TREND_WEEKS * 7
+
+safe_num <- function(x) {
+  if (is.null(x) || length(x) == 0) return(NA_real_)
+  val <- suppressWarnings(as.numeric(x))
+  if (is.na(val)) NA_real_ else val
+}
+
+add_api_delay <- function() Sys.sleep(0.5)
+
+espn_to_app_abbrev <- function(abbrev) {
+  if (abbrev %in% names(FG_TO_APP_ABBREV)) FG_TO_APP_ABBREV[[abbrev]] else abbrev
+}
+
+extract_box_score_stats <- function(competitor) {
+  stats <- list()
+  if (!is.null(competitor$statistics)) {
+    for (s in competitor$statistics) {
+      if (!is.null(s$name) && !is.null(s$displayValue)) {
+        stats[[s$name]] <- safe_num(s$displayValue)
+      }
+    }
+  }
+  stats
+}
+
+fetch_recent_trend_games <- function() {
+  cat("Fetching ESPN completed games for 10-week trend...\n")
+  fetch_end <- Sys.Date() - 1
+  fetch_start <- fetch_end - TREND_DAYS + 1
+  trend_games <- list()
+  fetch_date <- fetch_start
+
+  while (fetch_date <= fetch_end) {
+    date_str <- format(fetch_date, "%Y%m%d")
+    url <- paste0(
+      "https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/scoreboard?dates=",
+      date_str
+    )
+    add_api_delay()
+    resp <- tryCatch(GET(url), error = function(e) NULL)
+    if (!is.null(resp) && status_code(resp) == 200) {
+      data <- content(resp, as = "parsed")
+      if (!is.null(data$events)) {
+        for (ev in data$events) {
+          comp <- ev$competitions[[1]]
+          if (length(comp$competitors) != 2) next
+          if (!isTRUE(comp$status$type$completed)) next
+
+          home <- NULL
+          away <- NULL
+          for (ct in comp$competitors) {
+            if (ct$homeAway == "home") home <- ct else away <- ct
+          }
+          if (is.null(home) || is.null(away)) next
+
+          home_score <- safe_num(home$score)
+          away_score <- safe_num(away$score)
+          if (is.na(home_score) || is.na(away_score)) next
+
+          home_abbrev <- espn_to_app_abbrev(home$team$abbreviation)
+          away_abbrev <- espn_to_app_abbrev(away$team$abbreviation)
+          if (is.na(home_abbrev) || is.na(away_abbrev)) next
+
+          home_box <- extract_box_score_stats(home)
+          away_box <- extract_box_score_stats(away)
+
+          trend_games[[length(trend_games) + 1]] <- list(
+            team_code = home_abbrev,
+            runs_scored = home_score,
+            runs_allowed = away_score,
+            won = home_score > away_score,
+            hits = safe_num(home_box[["hits"]]),
+            hrs = safe_num(home_box[["homeRuns"]])
+          )
+          trend_games[[length(trend_games) + 1]] <- list(
+            team_code = away_abbrev,
+            runs_scored = away_score,
+            runs_allowed = home_score,
+            won = away_score > home_score,
+            hits = safe_num(away_box[["hits"]]),
+            hrs = safe_num(away_box[["homeRuns"]])
+          )
+        }
+      }
+    }
+    fetch_date <- fetch_date + 1
+  }
+  trend_games
+}
+
+trend_games_list <- fetch_recent_trend_games()
+cat("Fetched", length(trend_games_list), "team-game entries for 10-week trend\n")
+
+team_trend <- tibble(team_code = ALL_TEAMS)
+if (length(trend_games_list) > 0) {
+  trend_df <- bind_rows(trend_games_list) %>%
+    filter(team_code %in% ALL_TEAMS) %>%
+    group_by(team_code) %>%
+    summarise(
+      games_played = n(),
+      wins = sum(won, na.rm = TRUE),
+      losses = sum(!won, na.rm = TRUE),
+      runs_per_game = mean(runs_scored, na.rm = TRUE),
+      runs_allowed_per_game = mean(runs_allowed, na.rm = TRUE),
+      run_diff_per_game = mean(runs_scored - runs_allowed, na.rm = TRUE),
+      hits_per_game = mean(hits, na.rm = TRUE),
+      hrs_per_game = mean(hrs, na.rm = TRUE),
+      .groups = "drop"
+    ) %>%
+    mutate(win_pct = wins / pmax(wins + losses, 1))
+
+  for (stat in c("win_pct", "runs_per_game", "run_diff_per_game", "hits_per_game", "hrs_per_game")) {
+    trend_df <- rank_and_assign(trend_df, stat, lower_better = FALSE)
+  }
+  trend_df <- rank_and_assign(trend_df, "runs_allowed_per_game", lower_better = TRUE)
+
+  team_trend <- team_trend %>%
+    left_join(trend_df, by = "team_code")
+
+  cat("Calculated 10-week trend rankings for", sum(!is.na(team_trend$win_pct)), "teams\n")
+}
+
+trend_labels <- list(
+  record = "Record",
+  runDiffPerGame = "Run Diff/G",
+  runsPerGame = "Runs/G",
+  runsAllowedPerGame = "RA/G",
+  hitsPerGame = "Hits/G",
+  hrsPerGame = "HR/G"
+)
+trend_digits <- list(
+  runDiffPerGame = 2,
+  runsPerGame = 2,
+  runsAllowedPerGame = 2,
+  hitsPerGame = 2,
+  hrsPerGame = 2
+)
+trend_stat_cols <- list(
+  runDiffPerGame = "run_diff_per_game",
+  runsPerGame = "runs_per_game",
+  runsAllowedPerGame = "runs_allowed_per_game",
+  hitsPerGame = "hits_per_game",
+  hrsPerGame = "hrs_per_game"
+)
+
+build_trend_category_stats <- function(trend_df, team) {
+  row <- trend_df %>% filter(team_code == team)
+  empty_stat <- function(label) {
+    list(label = label, value = NULL, rank = NULL, rankDisplay = NULL, displayValue = NULL)
+  }
+  if (nrow(row) == 0 || is.na(row$win_pct[1])) {
+    return(list(stats = setNames(
+      lapply(names(trend_labels), function(key) empty_stat(trend_labels[[key]])),
+      names(trend_labels)
+    )))
+  }
+  row <- row[1, ]
+  stats <- list(
+    record = list(
+      label = trend_labels$record,
+      value = round(row$win_pct, 3),
+      rank = as.integer(row$win_pct_rank),
+      rankDisplay = row$win_pct_rankDisplay,
+      displayValue = paste0(row$wins, "-", row$losses)
+    )
+  )
+  for (key in names(trend_stat_cols)) {
+    col <- trend_stat_cols[[key]]
+    stats[[key]] <- stat_entry(row, col, trend_labels[[key]], trend_digits[[key]])
+  }
+  list(stats = stats)
+}
+
+build_trend_rankings <- function(trend_df) {
+  if (nrow(trend_df) == 0 || all(is.na(trend_df$win_pct))) return(list())
+  ranked_df <- trend_df %>% filter(!is.na(win_pct))
+  stat_rankings <- setNames(
+    lapply(names(trend_stat_cols), function(key) {
+      col <- trend_stat_cols[[key]]
+      build_rankings(
+        ranked_df, "team_code", col,
+        paste0(col, "_rank"), paste0(col, "_rankDisplay")
+      )
+    }),
+    paste0("recentTrend.", names(trend_stat_cols))
+  )
+  c(
+    list(
+      "recentTrend.record" = build_rankings(
+        ranked_df, "team_code", "win_pct", "win_pct_rank", "win_pct_rankDisplay"
+      )
+    ),
+    stat_rankings
+  )
+}
+
 fielders <- fielder_stats %>%
   mutate(
     team_code = vapply(team_name_abb, normalize_team, character(1)),
@@ -1193,6 +1396,16 @@ teams_json <- lapply(ALL_TEAMS, function(team) {
     overallCompositeRankDisplay = team_overall_rank_display,
     playoffProb = team_playoff_prob,
     categories = list(
+      recentTrend = list(
+        label = "10 Week Trend",
+        description = paste0(
+          "Recent team performance over the last ", TREND_WEEKS,
+          " weeks from ESPN completed games. Includes record, run differential, ",
+          "and per-game offense metrics."
+        ),
+        team = build_trend_category_stats(team_trend, team),
+        players = list()
+      ),
       hitters = list(
         label = "Hitters",
         description = "Top offensive producers by wRC+, contact quality (xwOBA), expected average (xBA), and barrel rate.",
@@ -1311,6 +1524,7 @@ rankings_json <- c(
   build_category_stat_rankings(
     "injuries", team_injuries, c("injured_count", "injury_war")
   ),
+  build_trend_rankings(team_trend),
   build_player_pool_rankings(
     "hitters", hitters, c("wRC_plus", "xwOBA", "xBA", "Barrel_pct")
   ),
@@ -1364,7 +1578,10 @@ output_data <- list(
     "is the most injured team.\n\n",
     " • WAR Lost: Sum of max(WAR, 0) × status weight for injured players. ",
     "Higher means more impact.\n\n",
-    " • Impact: Per-player weighted WAR lost from that injury."
+    " • Impact: Per-player weighted WAR lost from that injury.\n\n",
+    " • 10 Week Trend: Recent team performance from ESPN completed games ",
+    "over the last 10 weeks. Includes record, run differential per game, ",
+    "runs scored/allowed per game, hits per game, and home runs per game."
   ),
   lastUpdated = format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC"),
   source = "FanGraphs • ESPN",

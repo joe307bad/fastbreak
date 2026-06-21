@@ -68,6 +68,11 @@ private data class CategoryConfig(
 )
 
 private val CATEGORY_CONFIGS = mapOf(
+    "recentTrend" to CategoryConfig(
+        statKeys = listOf("record", "runDiffPerGame", "runsPerGame", "runsAllowedPerGame", "hitsPerGame", "hrsPerGame"),
+        teamRankColorFn = ::getMLBTeamRankColor,
+        showPlayerRankAndComposite = false
+    ),
     "hitters" to CategoryConfig(listOf("wRC_plus", "xwOBA", "xBA", "Barrel_pct"), ::getMLBTeamRankColor),
     "starters" to CategoryConfig(listOf("K-BB_pct", "xFIP", "SIERA", "ERA"), ::getMLBTeamRankColor),
     "relievers" to CategoryConfig(listOf("K-BB_pct", "FIP", "SV", "SIERA", "ERA"), ::getMLBTeamRankColor),
@@ -160,11 +165,21 @@ private fun reportCardStatLabel(categoryKey: String, statKey: String): String {
             "injury_war" -> "WAR Lost"
             else -> statKey
         }
+        "recentTrend" -> when (statKey) {
+            "record" -> "Record"
+            "runDiffPerGame" -> "Run Diff/G"
+            "runsPerGame" -> "Runs/G"
+            "runsAllowedPerGame" -> "RA/G"
+            "hitsPerGame" -> "Hits/G"
+            "hrsPerGame" -> "HR/G"
+            else -> statKey
+        }
         else -> statKey
     }
 }
 
 private fun formatReportCardCategoryLabel(categoryKey: String): String = when (categoryKey) {
+    "recentTrend" -> "10 Week Trend"
     "hitters" -> "Hitters"
     "starters" -> "Starting Pitchers"
     "relievers" -> "Bullpen"
@@ -243,6 +258,7 @@ private fun mergeReportCardRankings(
 }
 
 private enum class ReportCardShareTarget(val categoryKey: String?, val shareLabel: String) {
+    RECENT_TREND("recentTrend", "10 Week Trend"),
     HITTERS("hitters", "Hitters"),
     STARTERS("starters", "Starting Pitchers"),
     RELIEVERS("relievers", "Bullpen"),
@@ -258,6 +274,7 @@ private data class ReportCardCaptureRequest(
 
 private fun teamCategoryEntries(team: ReportCardTeam): List<Pair<String, ReportCardCategory>> =
     listOfNotNull(
+        team.categories.recentTrend?.let { "recentTrend" to it },
         "hitters" to team.categories.hitters,
         "starters" to team.categories.starters,
         "relievers" to team.categories.relievers,
@@ -1284,6 +1301,7 @@ private fun buildReportCardShareSourceAttribution(
     categoryKey: String?
 ): String {
     return when (categoryKey) {
+        "recentTrend" -> "ESPN"
         "injuries" -> {
             val sources = parseReportCardSources(visualization.source ?: "FanGraphs • ESPN")
                 .filter { source ->
@@ -1548,8 +1566,13 @@ private fun MLBTeamReportCardShareImage(
 }
 
 private fun formatReportCardStat(stat: ReportCardStatValue): String {
+    stat.displayValue?.let { return it }
     val value = stat.value ?: return ""
     return when {
+        stat.label.equals("Run Diff/G", ignoreCase = true) -> {
+            val formatted = formatReportCardValue(value, 2)
+            if (value >= 0) "+$formatted" else formatted
+        }
         stat.label.contains("%", ignoreCase = true) -> formatReportCardValue(value, 1)
         stat.label.equals("wRC+", ignoreCase = true) -> formatReportCardValue(value, 0)
         stat.label.equals("Composite", ignoreCase = true) -> formatReportCardValue(value, 1)

@@ -1189,7 +1189,8 @@ data class ReportCardStatValue(
     val label: String,
     val value: Double? = null,
     val rank: Int? = null,
-    val rankDisplay: String? = null
+    val rankDisplay: String? = null,
+    val displayValue: String? = null
 )
 
 @Serializable
@@ -1217,6 +1218,7 @@ data class ReportCardCategory(
 
 @Serializable
 data class ReportCardCategories(
+    val recentTrend: ReportCardCategory? = null,
     val hitters: ReportCardCategory,
     val starters: ReportCardCategory,
     val relievers: ReportCardCategory,

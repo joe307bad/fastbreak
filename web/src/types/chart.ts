@@ -557,6 +557,7 @@ export interface ReportCardStatValue {
   value?: number | null;
   rank?: number | null;
   rankDisplay?: string | null;
+  displayValue?: string | null;
 }
 
 export interface ReportCardTeamSummary {
@@ -580,6 +581,7 @@ export interface ReportCardCategory {
 }
 
 export interface ReportCardCategories {
+  recentTrend?: ReportCardCategory;
   hitters: ReportCardCategory;
   starters: ReportCardCategory;
   relievers: ReportCardCategory;

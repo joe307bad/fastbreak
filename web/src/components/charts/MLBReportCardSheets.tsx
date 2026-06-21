@@ -765,6 +765,8 @@ export function formatReportCardRankingLabel(seasonLabel: string, key: string): 
 
 function formatReportCardCategoryLabel(categoryKey: string): string {
   switch (categoryKey) {
+    case 'recentTrend':
+      return '10 Week Trend';
     case 'hitters':
       return 'Hitters';
     case 'starters':
@@ -840,6 +842,23 @@ function formatReportCardStatLabel(categoryKey: string, statKey: string): string
           return 'Injured';
         case 'injury_war':
           return 'WAR Lost';
+        default:
+          return statKey;
+      }
+    case 'recentTrend':
+      switch (statKey) {
+        case 'record':
+          return 'Record';
+        case 'runDiffPerGame':
+          return 'Run Diff/G';
+        case 'runsPerGame':
+          return 'Runs/G';
+        case 'runsAllowedPerGame':
+          return 'RA/G';
+        case 'hitsPerGame':
+          return 'Hits/G';
+        case 'hrsPerGame':
+          return 'HR/G';
         default:
           return statKey;
       }

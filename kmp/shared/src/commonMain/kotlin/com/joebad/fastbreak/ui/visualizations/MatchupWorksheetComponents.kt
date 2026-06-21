@@ -286,21 +286,22 @@ fun getMLBPlayerRankColor(rank: Int?): Color {
 }
 
 /**
- * MLB team ranks (30 teams) — matches MLB matchup worksheet colors.
+ * MLB team ranks (30 teams) for report card team/composite rankings.
+ * Top 10 green, middle third orange, bottom third red.
  */
 fun getMLBTeamRankColor(rank: Int?): Color {
     if (rank == null || rank <= 0) return Color.Transparent
     return when {
-        rank <= 5 -> {
-            val ratio = (rank - 1) / 4f
+        rank <= 10 -> {
+            val ratio = (rank - 1) / 9f
             Color((0 + ratio * 80).toInt(), (150 - ratio * 25).toInt(), (42 - ratio * 32).toInt())
         }
-        rank <= 15 -> {
-            val ratio = (rank - 6) / 9f
+        rank <= 20 -> {
+            val ratio = (rank - 11) / 9f
             Color((255 - ratio * 55).toInt(), (160 - ratio * 60).toInt(), 0)
         }
         else -> {
-            val ratio = ((rank - 16).coerceAtMost(14)) / 14f
+            val ratio = ((rank - 21).coerceAtMost(9)) / 9f
             Color((200 - ratio * 61).toInt(), (50 - ratio * 50).toInt(), 0)
         }
     }

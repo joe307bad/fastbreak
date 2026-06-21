@@ -18,11 +18,12 @@ import {
   StatRankingsSheet,
 } from '@/components/charts/MLBReportCardSheets';
 
-type CategoryKey = 'hitters' | 'starters' | 'relievers' | 'fielders' | 'injuries';
+type CategoryKey = 'recentTrend' | 'hitters' | 'starters' | 'relievers' | 'fielders' | 'injuries';
 
-const CATEGORY_KEYS: CategoryKey[] = ['hitters', 'starters', 'relievers', 'fielders', 'injuries'];
+const CATEGORY_KEYS: CategoryKey[] = ['recentTrend', 'hitters', 'starters', 'relievers', 'fielders', 'injuries'];
 
 const CATEGORY_STAT_KEYS: Record<CategoryKey, string[]> = {
+  recentTrend: ['record', 'runDiffPerGame', 'runsPerGame', 'runsAllowedPerGame', 'hitsPerGame', 'hrsPerGame'],
   hitters: ['wRC_plus', 'xwOBA', 'xBA', 'Barrel_pct'],
   starters: ['K-BB_pct', 'xFIP', 'SIERA', 'ERA'],
   relievers: ['K-BB_pct', 'FIP', 'SV', 'SIERA', 'ERA'],
@@ -43,6 +44,7 @@ const CATEGORY_SHOW_STATUS_COLUMN: Partial<Record<CategoryKey, boolean>> = {
 };
 
 const CATEGORY_SHOW_PLAYER_RANK_AND_COMPOSITE: Partial<Record<CategoryKey, boolean>> = {
+  recentTrend: false,
   injuries: false,
 };
 
@@ -53,7 +55,13 @@ const STICKY_PLAYER_CELL = `sticky left-0 z-10 ${PLAYER_NAME_WIDTH} border-r bor
 const MOBILE_STAT_COL = 'min-w-[5.5rem] px-2 whitespace-nowrap';
 
 function formatStatValue(stat: ReportCardStatValue | undefined): string {
-  if (!stat || stat.value == null) return '-';
+  if (!stat) return '-';
+  if (stat.displayValue) return stat.displayValue;
+  if (stat.value == null) return '-';
+  if (stat.label === 'Run Diff/G') {
+    const formatted = stat.value.toFixed(2);
+    return stat.value >= 0 ? `+${formatted}` : formatted;
+  }
   if (stat.label.toLowerCase().includes('%') || stat.label.includes('+')) {
     return stat.value.toFixed(1);
   }
@@ -659,7 +667,9 @@ export function MLBTeamReportCard({ data }: Props) {
 
       <div className="flex-1 min-h-0 overflow-y-auto columns-[48rem] gap-2">
         {CATEGORY_KEYS.flatMap(key => {
-          const category = team.categories[key];
+          const category = key === 'recentTrend'
+            ? team.categories.recentTrend
+            : team.categories[key];
           if (!category) return [];
           return [
             <CategoryPanel

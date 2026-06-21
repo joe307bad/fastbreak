@@ -5,11 +5,11 @@
 # ranks each player's advanced stats league-wide, and surfaces the top players
 # on every team. Players can appear in multiple categories (e.g. two-way players).
 #
-# Stat pairs mirror the advanced metrics used elsewhere in the MLB pipeline:
-#  - Hitters:    wRC+ (production) + xwOBA (contact quality)
-#  - Starters:   K-BB% (command) + xFIP (skill-based run prevention)
-#  - Relievers:  K-BB% (miss+command) + FIP (run prevention) + SV (closing value)
-#  - Fielders:   OAA (Statcast range) + DRS (comprehensive defense)
+# Stat groups mirror advanced metrics used elsewhere in the MLB pipeline:
+#  - Hitters:    wRC+ (production) + xwOBA (contact quality) + xBA + Barrel%
+#  - Starters:   K-BB% (command) + xFIP + SIERA + ERA (official)
+#  - Relievers:  K-BB% (miss+command) + FIP + SV + SIERA + ERA (official)
+#  - Fielders:   OAA (Statcast range) + DRS (comprehensive defense) + FRP
 
 library(baseballr)
 library(dplyr)
@@ -496,12 +496,16 @@ build_team_category_stats <- function(team_df, team, stat_cols, stat_labels, dig
   list(stats = stats)
 }
 
-aggregate_pitching_team_stats <- function(df, k_bb_col = "K-BB_pct", fip_col = "xFIP") {
+aggregate_pitching_team_stats <- function(df, stat_cols, weight_col = "IP") {
+  if (nrow(df) == 0) {
+    empty <- tibble(team_code = character())
+    for (col in stat_cols) empty[[col]] <- numeric()
+    return(empty)
+  }
   df %>%
     group_by(team_code) %>%
     summarise(
-      !!k_bb_col := weighted.mean(.data[[k_bb_col]], IP, na.rm = TRUE),
-      !!fip_col := weighted.mean(.data[[fip_col]], IP, na.rm = TRUE),
+      across(all_of(stat_cols), ~ weighted.mean(.x, .data[[weight_col]], na.rm = TRUE)),
       .groups = "drop"
     )
 }
@@ -661,7 +665,8 @@ build_injury_player <- function(row) {
   list(
     playerId = player_id,
     name = as.character(row$athlete_name),
-    position = if (!is.na(row$status) && nzchar(row$status)) as.character(row$status) else NULL,
+    position = if (!is.na(row$position) && nzchar(row$position)) as.character(row$position) else NULL,
+    status = if (!is.na(row$status) && nzchar(row$status)) as.character(row$status) else NULL,
     war = war_val,
     stats = list(
       impact = list(
@@ -816,6 +821,8 @@ hitters <- batter_stats %>%
     G = as.integer(G),
     wRC_plus = as.numeric(wRC_plus),
     xwOBA = as.numeric(xwOBA),
+    xBA = as.numeric(xAVG),
+    Barrel_pct = round(as.numeric(Barrel_pct) * 100, 1),
     WAR = as.numeric(WAR),
     Pos = coalesce(as.character(position), as.character(positionDB))
   ) %>%
@@ -823,6 +830,7 @@ hitters <- batter_stats %>%
     !is.na(team_code),
     !is.na(PA), !is.na(G),
     !is.na(wRC_plus), !is.na(xwOBA),
+    !is.na(xBA), !is.na(Barrel_pct),
     PA >= MIN_PA,
     G >= MIN_G_HIT
   )
@@ -835,6 +843,8 @@ starters <- pitcher_stats %>%
     G = as.integer(G),
     `K-BB_pct` = as.numeric(`K-BB_pct`),
     xFIP = as.numeric(xFIP),
+    SIERA = as.numeric(SIERA),
+    ERA = as.numeric(ERA),
     FIP = as.numeric(FIP),
     WAR = as.numeric(WAR),
     Pos = "P"
@@ -842,7 +852,7 @@ starters <- pitcher_stats %>%
   filter(
     !is.na(team_code),
     !is.na(IP), !is.na(GS), !is.na(G),
-    !is.na(`K-BB_pct`), !is.na(xFIP),
+    !is.na(`K-BB_pct`), !is.na(xFIP), !is.na(SIERA), !is.na(ERA),
     IP >= MIN_STARTER_IP,
     GS >= MIN_STARTER_GS
   )
@@ -856,13 +866,15 @@ relievers <- pitcher_stats %>%
     SV = coalesce(as.integer(SV), 0L),
     `K-BB_pct` = as.numeric(`K-BB_pct`),
     FIP = as.numeric(FIP),
+    SIERA = as.numeric(SIERA),
+    ERA = as.numeric(ERA),
     WAR = as.numeric(WAR),
     Pos = "P"
   ) %>%
   filter(
     !is.na(team_code),
     !is.na(IP), !is.na(GS), !is.na(G),
-    !is.na(`K-BB_pct`), !is.na(FIP),
+    !is.na(`K-BB_pct`), !is.na(FIP), !is.na(SIERA), !is.na(ERA),
     IP >= MIN_RELIEVER_IP,
     GS <= MAX_RELIEVER_GS,
     G > GS
@@ -921,43 +933,54 @@ fielders <- fielder_stats %>%
     Inn = as.numeric(Inn),
     OAA = as.numeric(OAA),
     DRS = as.numeric(DRS),
+    FRP = as.numeric(FRP),
     Pos = coalesce(as.character(Position), as.character(Pos))
   ) %>%
   filter(
     !is.na(team_code),
     !is.na(Inn),
-    !is.na(OAA), !is.na(DRS),
+    !is.na(OAA), !is.na(DRS), !is.na(FRP),
     Inn >= MIN_FIELDER_INN
   ) %>%
   left_join(war_lookup %>% select(playerid, WAR), by = "playerid")
 
-for (col in c("wRC_plus", "xwOBA")) hitters <- rank_and_assign(hitters, col)
-for (col in c("K-BB_pct", "xFIP")) {
-  starters <- rank_and_assign(starters, col, lower_better = col == "xFIP")
+for (col in c("wRC_plus", "xwOBA", "xBA", "Barrel_pct")) hitters <- rank_and_assign(hitters, col)
+for (col in c("K-BB_pct", "xFIP", "SIERA", "ERA")) {
+  starters <- rank_and_assign(starters, col, lower_better = col %in% c("xFIP", "SIERA", "ERA"))
 }
-for (col in c("K-BB_pct", "FIP")) {
-  relievers <- rank_and_assign(relievers, col, lower_better = col == "FIP")
+for (col in c("K-BB_pct", "FIP", "SIERA", "ERA")) {
+  relievers <- rank_and_assign(relievers, col, lower_better = col %in% c("FIP", "SIERA", "ERA"))
 }
 relievers <- rank_and_assign(relievers, "SV")
-for (col in c("OAA", "DRS")) fielders <- rank_and_assign(fielders, col)
+for (col in c("OAA", "DRS", "FRP")) fielders <- rank_and_assign(fielders, col)
 
 team_hitting <- team_batting_stats %>%
   mutate(
     team_code = vapply(team_name_abb, normalize_team, character(1)),
     wRC_plus = as.numeric(wRC_plus),
-    xwOBA = as.numeric(xwOBA)
+    xwOBA = as.numeric(xwOBA),
+    xBA = as.numeric(xAVG),
+    Barrel_pct = round(as.numeric(Barrel_pct) * 100, 1)
   ) %>%
-  filter(!is.na(team_code), !is.na(wRC_plus), !is.na(xwOBA))
+  filter(
+    !is.na(team_code),
+    !is.na(wRC_plus), !is.na(xwOBA),
+    !is.na(xBA), !is.na(Barrel_pct)
+  )
 
 team_fielding <- team_fielding_stats %>%
   mutate(
     team_code = vapply(team_name_abb, normalize_team, character(1)),
     OAA = as.numeric(OAA),
-    DRS = as.numeric(DRS)
+    DRS = as.numeric(DRS),
+    FRP = as.numeric(FRP)
   ) %>%
-  filter(!is.na(team_code), !is.na(OAA), !is.na(DRS))
+  filter(
+    !is.na(team_code),
+    !is.na(OAA), !is.na(DRS), !is.na(FRP)
+  )
 
-team_starters <- aggregate_pitching_team_stats(starters, "K-BB_pct", "xFIP")
+team_starters <- aggregate_pitching_team_stats(starters, c("K-BB_pct", "xFIP", "SIERA", "ERA"))
 
 team_bullpen_saves <- team_pitching_stats %>%
   mutate(
@@ -969,27 +992,27 @@ team_bullpen_saves <- team_pitching_stats %>%
   filter(!is.na(team_code)) %>%
   select(team_code, SV, SV_per_G)
 
-team_relievers <- aggregate_pitching_team_stats(relievers, "K-BB_pct", "FIP") %>%
+team_relievers <- aggregate_pitching_team_stats(relievers, c("K-BB_pct", "FIP", "SIERA", "ERA")) %>%
   left_join(team_bullpen_saves, by = "team_code")
 
-for (col in c("wRC_plus", "xwOBA")) team_hitting <- rank_and_assign(team_hitting, col)
-for (col in c("K-BB_pct", "xFIP")) {
-  team_starters <- rank_and_assign(team_starters, col, lower_better = col == "xFIP")
+for (col in c("wRC_plus", "xwOBA", "xBA", "Barrel_pct")) team_hitting <- rank_and_assign(team_hitting, col)
+for (col in c("K-BB_pct", "xFIP", "SIERA", "ERA")) {
+  team_starters <- rank_and_assign(team_starters, col, lower_better = col %in% c("xFIP", "SIERA", "ERA"))
 }
-for (col in c("K-BB_pct", "FIP")) {
-  team_relievers <- rank_and_assign(team_relievers, col, lower_better = col == "FIP")
+for (col in c("K-BB_pct", "FIP", "SIERA", "ERA")) {
+  team_relievers <- rank_and_assign(team_relievers, col, lower_better = col %in% c("FIP", "SIERA", "ERA"))
 }
 team_relievers <- rank_and_assign(team_relievers, "SV_per_G")
-for (col in c("OAA", "DRS")) team_fielding <- rank_and_assign(team_fielding, col)
+for (col in c("OAA", "DRS", "FRP")) team_fielding <- rank_and_assign(team_fielding, col)
 
-hitters <- add_composite_score(hitters, c("wRC_plus", "xwOBA"))
-starters <- add_composite_score(starters, c("K-BB_pct", "xFIP"))
-relievers <- add_composite_score(relievers, c("K-BB_pct", "FIP", "SV"))
-fielders <- add_composite_score(fielders, c("OAA", "DRS"))
-team_hitting <- add_composite_score(team_hitting, c("wRC_plus", "xwOBA"))
-team_starters <- add_composite_score(team_starters, c("K-BB_pct", "xFIP"))
-team_relievers <- add_composite_score(team_relievers, c("K-BB_pct", "FIP", "SV_per_G"))
-team_fielding <- add_composite_score(team_fielding, c("OAA", "DRS"))
+hitters <- add_composite_score(hitters, c("wRC_plus", "xwOBA", "xBA", "Barrel_pct"))
+starters <- add_composite_score(starters, c("K-BB_pct", "xFIP", "SIERA", "ERA"))
+relievers <- add_composite_score(relievers, c("K-BB_pct", "FIP", "SV", "SIERA", "ERA"))
+fielders <- add_composite_score(fielders, c("OAA", "DRS", "FRP"))
+team_hitting <- add_composite_score(team_hitting, c("wRC_plus", "xwOBA", "xBA", "Barrel_pct"))
+team_starters <- add_composite_score(team_starters, c("K-BB_pct", "xFIP", "SIERA", "ERA"))
+team_relievers <- add_composite_score(team_relievers, c("K-BB_pct", "FIP", "SV_per_G", "SIERA", "ERA"))
+team_fielding <- add_composite_score(team_fielding, c("OAA", "DRS", "FRP"))
 team_hitting <- rank_and_assign(team_hitting, "composite_score")
 team_starters <- rank_and_assign(team_starters, "composite_score")
 team_relievers <- rank_and_assign(team_relievers, "composite_score")
@@ -1046,22 +1069,62 @@ build_rankings <- function(team_df, team_col, stat_col, rank_col, rankDisplay_co
   })
 }
 
+build_category_stat_rankings <- function(category, team_df, stat_cols) {
+  setNames(
+    lapply(stat_cols, function(col) {
+      build_rankings(
+        team_df, "team_code", col,
+        paste0(col, "_rank"), paste0(col, "_rankDisplay")
+      )
+    }),
+    paste0(category, ".", stat_cols)
+  )
+}
+
+build_player_rankings <- function(df, stat_col) {
+  rank_col <- paste0(stat_col, "_rank")
+  rankDisplay_col <- paste0(stat_col, "_rankDisplay")
+  valid <- !is.na(df[[rank_col]]) & !is.na(df[[stat_col]])
+  if (!any(valid)) return(list())
+  subset <- df[valid, , drop = FALSE]
+  subset <- subset[order(subset[[rank_col]]), , drop = FALSE]
+  lapply(seq_len(nrow(subset)), function(i) {
+    row <- subset[i, , drop = FALSE]
+    list(
+      rank = as.integer(row[[rank_col]][[1]]),
+      rankDisplay = as.character(row[[rankDisplay_col]][[1]]),
+      value = round(as.numeric(row[[stat_col]][[1]]), 4),
+      team = as.character(row$team_code[[1]]),
+      player = resolve_player_name(row)
+    )
+  })
+}
+
+build_player_pool_rankings <- function(category, df, stat_cols) {
+  setNames(
+    lapply(stat_cols, function(col) {
+      build_player_rankings(df, col)
+    }),
+    paste0(category, ".player.", stat_cols)
+  )
+}
+
 cat("Qualified pools — hitters:", nrow(hitters),
     "| starters:", nrow(starters),
     "| relievers:", nrow(relievers),
     "| fielders:", nrow(fielders), "\n")
 
-hitter_labels <- c(wRC_plus = "wRC+", xwOBA = "xwOBA")
-starter_labels <- c(`K-BB_pct` = "K-BB%", xFIP = "xFIP")
-reliever_labels <- c(`K-BB_pct` = "K-BB%", FIP = "FIP", SV = "SV")
-fielder_labels <- c(OAA = "OAA", DRS = "DRS")
+hitter_labels <- c(wRC_plus = "wRC+", xwOBA = "xwOBA", xBA = "xBA", Barrel_pct = "Barrel%")
+starter_labels <- c(`K-BB_pct` = "K-BB%", xFIP = "xFIP", SIERA = "SIERA", ERA = "ERA")
+reliever_labels <- c(`K-BB_pct` = "K-BB%", FIP = "FIP", SV = "SV", SIERA = "SIERA", ERA = "ERA")
+fielder_labels <- c(OAA = "OAA", DRS = "DRS", FRP = "FRP")
 
-hitter_digits <- list(wRC_plus = 0, xwOBA = 3)
-starter_digits <- list(`K-BB_pct` = 1, xFIP = 2)
-reliever_digits <- list(`K-BB_pct` = 1, FIP = 2, SV = 0)
-reliever_team_labels <- c(`K-BB_pct` = "K-BB%", FIP = "FIP", SV_per_G = "SV/G")
-reliever_team_digits <- list(`K-BB_pct` = 1, FIP = 2, SV_per_G = 2)
-fielder_digits <- list(OAA = 1, DRS = 1)
+hitter_digits <- list(wRC_plus = 0, xwOBA = 3, xBA = 3, Barrel_pct = 1)
+starter_digits <- list(`K-BB_pct` = 1, xFIP = 2, SIERA = 2, ERA = 2)
+reliever_digits <- list(`K-BB_pct` = 1, FIP = 2, SV = 0, SIERA = 2, ERA = 2)
+reliever_team_labels <- c(`K-BB_pct` = "K-BB%", FIP = "FIP", SV_per_G = "SV/G", SIERA = "SIERA", ERA = "ERA")
+reliever_team_digits <- list(`K-BB_pct` = 1, FIP = 2, SV_per_G = 2, SIERA = 2, ERA = 2)
+fielder_digits <- list(OAA = 1, DRS = 1, FRP = 0)
 injury_labels <- c(injured_count = "Injured", injury_war = "WAR Lost")
 injury_digits <- list(injured_count = 0, injury_war = 2)
 
@@ -1083,19 +1146,19 @@ team_relievers <- scale_k_bb(team_relievers)
 teams_json <- lapply(ALL_TEAMS, function(team) {
   hitters_list <- top_team_players(
     hitters, team,
-    c("wRC_plus", "xwOBA"), hitter_labels, hitter_digits
+    c("wRC_plus", "xwOBA", "xBA", "Barrel_pct"), hitter_labels, hitter_digits
   )
   starters_list <- top_team_players(
     starters, team,
-    c("K-BB_pct", "xFIP"), starter_labels, starter_digits
+    c("K-BB_pct", "xFIP", "SIERA", "ERA"), starter_labels, starter_digits
   )
   relievers_list <- top_team_players(
     relievers, team,
-    c("K-BB_pct", "FIP", "SV"), reliever_labels, reliever_digits
+    c("K-BB_pct", "FIP", "SV", "SIERA", "ERA"), reliever_labels, reliever_digits
   )
   fielders_list <- top_team_players(
     fielders, team,
-    c("OAA", "DRS"), fielder_labels, fielder_digits
+    c("OAA", "DRS", "FRP"), fielder_labels, fielder_digits
   )
   injuries_list <- team_injured_players(injury_players, team)
 
@@ -1132,37 +1195,37 @@ teams_json <- lapply(ALL_TEAMS, function(team) {
     categories = list(
       hitters = list(
         label = "Hitters",
-        description = "Top offensive producers by wRC+ and contact quality (xwOBA).",
+        description = "Top offensive producers by wRC+, contact quality (xwOBA), expected average (xBA), and barrel rate.",
         team = build_team_category_stats(
           team_hitting, team,
-          c("wRC_plus", "xwOBA"), hitter_labels, hitter_digits
+          c("wRC_plus", "xwOBA", "xBA", "Barrel_pct"), hitter_labels, hitter_digits
         ),
         players = hitters_list
       ),
       starters = list(
         label = "Starting Pitchers",
-        description = "Rotation arms ranked by K-BB% and expected FIP.",
+        description = "Rotation arms ranked by K-BB%, expected FIP, SIERA, and official ERA.",
         team = build_team_category_stats(
           team_starters, team,
-          c("K-BB_pct", "xFIP"), starter_labels, starter_digits
+          c("K-BB_pct", "xFIP", "SIERA", "ERA"), starter_labels, starter_digits
         ),
         players = starters_list
       ),
       relievers = list(
         label = "Bullpen",
-        description = "Top relievers by K-BB%, FIP, and saves (SV). Team SV/G from official pitching totals.",
+        description = "Top relievers by K-BB%, FIP, saves (SV), SIERA, and official ERA. Team SV/G from official pitching totals.",
         team = build_team_category_stats(
           team_relievers, team,
-          c("K-BB_pct", "FIP", "SV_per_G"), reliever_team_labels, reliever_team_digits
+          c("K-BB_pct", "FIP", "SV_per_G", "SIERA", "ERA"), reliever_team_labels, reliever_team_digits
         ),
         players = relievers_list
       ),
       fielders = list(
         label = "Fielders",
-        description = "Defensive standouts by Outs Above Average and Defensive Runs Saved.",
+        description = "Defensive standouts by Outs Above Average, Defensive Runs Saved, and Fielding Runs (FRP).",
         team = build_team_category_stats(
           team_fielding, team,
-          c("OAA", "DRS"), fielder_labels, fielder_digits
+          c("OAA", "DRS", "FRP"), fielder_labels, fielder_digits
         ),
         players = fielders_list
       ),
@@ -1185,51 +1248,80 @@ teams_json <- lapply(ALL_TEAMS, function(team) {
 
 names(teams_json) <- ALL_TEAMS
 
-rankings_json <- list(
-  record = build_rankings(
-    team_records, "team_code", "win_pct", "win_pct_rank", "win_pct_rankDisplay"
+rankings_json <- c(
+  list(
+    record = build_rankings(
+      team_records, "team_code", "win_pct", "win_pct_rank", "win_pct_rankDisplay"
+    ),
+    overallComposite = build_rankings(
+      team_overall,
+      "team_code",
+      "overall_composite",
+      "overall_composite_rank",
+      "overall_composite_rankDisplay"
+    ),
+    hittersComposite = build_rankings(
+      team_hitting,
+      "team_code",
+      "composite_score",
+      "composite_score_rank",
+      "composite_score_rankDisplay"
+    ),
+    startersComposite = build_rankings(
+      team_starters,
+      "team_code",
+      "composite_score",
+      "composite_score_rank",
+      "composite_score_rankDisplay"
+    ),
+    relieversComposite = build_rankings(
+      team_relievers,
+      "team_code",
+      "composite_score",
+      "composite_score_rank",
+      "composite_score_rankDisplay"
+    ),
+    fieldersComposite = build_rankings(
+      team_fielding,
+      "team_code",
+      "composite_score",
+      "composite_score_rank",
+      "composite_score_rankDisplay"
+    ),
+    injuriesComposite = build_rankings(
+      team_injuries,
+      "team_code",
+      "composite_score",
+      "composite_score_rank",
+      "composite_score_rankDisplay"
+    )
   ),
-  overallComposite = build_rankings(
-    team_overall,
-    "team_code",
-    "overall_composite",
-    "overall_composite_rank",
-    "overall_composite_rankDisplay"
+  build_category_stat_rankings(
+    "hitters", team_hitting, c("wRC_plus", "xwOBA", "xBA", "Barrel_pct")
   ),
-  hittersComposite = build_rankings(
-    team_hitting,
-    "team_code",
-    "composite_score",
-    "composite_score_rank",
-    "composite_score_rankDisplay"
+  build_category_stat_rankings(
+    "starters", team_starters, c("K-BB_pct", "xFIP", "SIERA", "ERA")
   ),
-  startersComposite = build_rankings(
-    team_starters,
-    "team_code",
-    "composite_score",
-    "composite_score_rank",
-    "composite_score_rankDisplay"
+  build_category_stat_rankings(
+    "relievers", team_relievers, c("K-BB_pct", "FIP", "SV_per_G", "SIERA", "ERA")
   ),
-  relieversComposite = build_rankings(
-    team_relievers,
-    "team_code",
-    "composite_score",
-    "composite_score_rank",
-    "composite_score_rankDisplay"
+  build_category_stat_rankings(
+    "fielders", team_fielding, c("OAA", "DRS", "FRP")
   ),
-  fieldersComposite = build_rankings(
-    team_fielding,
-    "team_code",
-    "composite_score",
-    "composite_score_rank",
-    "composite_score_rankDisplay"
+  build_category_stat_rankings(
+    "injuries", team_injuries, c("injured_count", "injury_war")
   ),
-  injuriesComposite = build_rankings(
-    team_injuries,
-    "team_code",
-    "composite_score",
-    "composite_score_rank",
-    "composite_score_rankDisplay"
+  build_player_pool_rankings(
+    "hitters", hitters, c("wRC_plus", "xwOBA", "xBA", "Barrel_pct")
+  ),
+  build_player_pool_rankings(
+    "starters", starters, c("K-BB_pct", "xFIP", "SIERA", "ERA")
+  ),
+  build_player_pool_rankings(
+    "relievers", relievers, c("K-BB_pct", "FIP", "SV", "SIERA", "ERA")
+  ),
+  build_player_pool_rankings(
+    "fielders", fielders, c("OAA", "DRS", "FRP")
   )
 )
 
@@ -1244,7 +1336,7 @@ output_data <- list(
   description = paste0(
     "Per-team player report cards from FanGraphs advanced stats. Each team ",
     "surfaces its top ", TOP_N, " hitters, starters, relievers, and fielders ",
-    "ranked by composite score across two category stats, with MLB-wide rank ",
+    "ranked by composite score across category stats, with MLB-wide rank ",
     "badges and team-level summaries.\n\n",
     "STATS:\n\n",
     " • WAR: Wins Above Replacement — total player value. Higher is better.\n\n",
@@ -1252,14 +1344,20 @@ output_data <- list(
     "Higher is better.\n\n",
     " • xwOBA: Expected weighted on-base average from contact quality. ",
     "Higher is better.\n\n",
+    " • xBA: Expected batting average from Statcast batted-ball quality. ",
+    "Higher is better.\n\n",
+    " • Barrel%: Percent of batted balls hit with optimal launch angle and ",
+    "exit velocity. Higher is better.\n\n",
     " • K-BB%: Strikeout rate minus walk rate. Higher is better.\n\n",
-    " • xFIP / FIP: Fielding independent pitching. Lower is better.\n\n",
+    " • ERA: Official earned run average. Lower is better.\n\n",
+    " • xFIP / FIP / SIERA: Fielding independent pitching metrics. Lower is better.\n\n",
     " • SV: Saves — total for individual relievers.\n\n",
     " • SV/G: Team saves per game (bullpen closing output). Higher is better.\n\n",
     " • OAA: Outs Above Average from Statcast range. Higher is better.\n\n",
     " • DRS: Defensive Runs Saved. Higher is better.\n\n",
+    " • FRP: FanGraphs Fielding Runs above positional average. Higher is better.\n\n",
     " • Composite: Average percentile across each category's stats (bullpen ",
-    "includes K-BB%, FIP, and SV/G). Higher is better.\n\n",
+    "includes K-BB%, FIP, SV/G, SIERA, and ERA). Higher is better.\n\n",
     " • Injury Report: ESPN daily injury list weighted by FanGraphs WAR and ",
     "IL severity. Team composite averages injured-count and WAR-lost ",
     "percentiles (more injuries and more WAR lost = higher score). Rank 1 ",

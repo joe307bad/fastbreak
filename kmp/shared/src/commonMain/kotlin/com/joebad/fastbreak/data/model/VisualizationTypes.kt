@@ -336,7 +336,8 @@ data class RankingEntry(
     val rank: Int,
     val rankDisplay: String,
     val value: Double,
-    val team: String
+    val team: String,
+    val player: String? = null
 )
 
 @Serializable
@@ -1201,6 +1202,7 @@ data class ReportCardPlayer(
     val playerId: String,
     val name: String,
     val position: String? = null,
+    val status: String? = null,
     val war: Double? = null,
     val stats: Map<String, ReportCardStatValue> = emptyMap()
 )

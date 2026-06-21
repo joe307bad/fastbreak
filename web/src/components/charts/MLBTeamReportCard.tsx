@@ -12,6 +12,8 @@ import { usePinnedTeams } from '@/lib/usePinnedTeams';
 import {
   ChartInfoSheet,
   formatReportCardRankingLabel,
+  isReportCardPlayerRankingKey,
+  isReportCardRankingPct,
   PlayoffChancesSheet,
   StatRankingsSheet,
 } from '@/components/charts/MLBReportCardSheets';
@@ -21,10 +23,10 @@ type CategoryKey = 'hitters' | 'starters' | 'relievers' | 'fielders' | 'injuries
 const CATEGORY_KEYS: CategoryKey[] = ['hitters', 'starters', 'relievers', 'fielders', 'injuries'];
 
 const CATEGORY_STAT_KEYS: Record<CategoryKey, string[]> = {
-  hitters: ['wRC_plus', 'xwOBA'],
-  starters: ['K-BB_pct', 'xFIP'],
-  relievers: ['K-BB_pct', 'FIP', 'SV'],
-  fielders: ['OAA', 'DRS'],
+  hitters: ['wRC_plus', 'xwOBA', 'xBA', 'Barrel_pct'],
+  starters: ['K-BB_pct', 'xFIP', 'SIERA', 'ERA'],
+  relievers: ['K-BB_pct', 'FIP', 'SV', 'SIERA', 'ERA'],
+  fielders: ['OAA', 'DRS', 'FRP'],
   injuries: ['impact'],
 };
 
@@ -36,8 +38,8 @@ const CATEGORY_COMPOSITE_RANKING_KEYS: Record<CategoryKey, string> = {
   injuries: 'injuriesComposite',
 };
 
-const CATEGORY_POSITION_LABELS: Partial<Record<CategoryKey, string>> = {
-  injuries: 'Status',
+const CATEGORY_SHOW_STATUS_COLUMN: Partial<Record<CategoryKey, boolean>> = {
+  injuries: true,
 };
 
 const CATEGORY_SHOW_PLAYER_RANK_AND_COMPOSITE: Partial<Record<CategoryKey, boolean>> = {
@@ -54,6 +56,12 @@ function formatStatValue(stat: ReportCardStatValue | undefined): string {
   if (!stat || stat.value == null) return '-';
   if (stat.label.toLowerCase().includes('%') || stat.label.includes('+')) {
     return stat.value.toFixed(1);
+  }
+  if (stat.label === 'xwOBA' || stat.label === 'xBA') {
+    return stat.value.toFixed(3);
+  }
+  if (stat.label === 'FRP' || stat.label === 'SV') {
+    return Number.isInteger(stat.value) ? stat.value.toString() : stat.value.toFixed(0);
   }
   if (Number.isInteger(stat.value)) return stat.value.toString();
   return stat.value.toFixed(2);
@@ -93,39 +101,65 @@ function StatCell({
   stat,
   playerRank,
   showRank = true,
+  onClick,
 }: {
   stat?: ReportCardStatValue;
   playerRank?: boolean;
   showRank?: boolean;
+  onClick?: () => void;
 }) {
   const Badge = playerRank ? PlayerRankBadge : RankBadge;
-  return (
+  const content = (
     <div className="flex items-center justify-end gap-1.5 whitespace-nowrap">
       <span className="font-mono text-sm">{formatStatValue(stat)}</span>
       {showRank && <Badge rank={stat?.rank} display={stat?.rankDisplay} />}
     </div>
+  );
+
+  if (!onClick) return content;
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="cursor-pointer hover:bg-[var(--foreground)]/5 transition-colors rounded px-0.5 -mx-0.5 text-left"
+    >
+      {content}
+    </button>
   );
 }
 
 const tableRowClass =
   'py-1 border-b border-[var(--border)] last:border-b-0 hover:bg-[var(--foreground)]/5 transition-colors';
 
+function reportCardStatRankingKey(categoryKey: CategoryKey, statKey: string): string {
+  return `${categoryKey}.${statKey}`;
+}
+
+function reportCardPlayerStatRankingKey(categoryKey: CategoryKey, statKey: string): string {
+  return `${categoryKey}.player.${statKey}`;
+}
+
 function CategoryPanel({
+  categoryKey,
   title,
   category,
   statKeys,
   positionColumnLabel = 'Pos',
   showPlayerRankAndComposite = true,
-  hasCompositeRankings,
-  onCompositeRankClick,
+  showStatusColumn = false,
+  rankings,
+  onRankingClick,
 }: {
+  categoryKey: CategoryKey;
   title: string;
   category: ReportCardCategory;
   statKeys: string[];
   positionColumnLabel?: string;
   showPlayerRankAndComposite?: boolean;
-  hasCompositeRankings: boolean;
-  onCompositeRankClick?: () => void;
+  showStatusColumn?: boolean;
+  rankings: MLBTeamReportCardData['rankings'];
+  onRankingClick: (key: string) => void;
 }) {
   const statLabels = Object.fromEntries(
     statKeys.map(key => [key, category.players[0]?.stats[key]?.label ?? category.team?.stats[key]?.label ?? key])
@@ -150,12 +184,24 @@ function CategoryPanel({
           statKeys.map(key => {
             const stat = category.team!.stats[key];
             if (!stat) return null;
-            return <TeamStatRow key={key} stat={stat} />;
+            const rankingKey = reportCardStatRankingKey(categoryKey, key);
+            const hasRankings = (rankings[rankingKey]?.length ?? 0) > 0;
+            return (
+              <TeamStatRow
+                key={key}
+                stat={stat}
+                onClick={hasRankings ? () => onRankingClick(rankingKey) : undefined}
+              />
+            );
           })}
         {composite && (
           <TeamStatRow
             stat={composite}
-            onClick={hasCompositeRankings ? onCompositeRankClick : undefined}
+            onClick={
+              (rankings[CATEGORY_COMPOSITE_RANKING_KEYS[categoryKey]]?.length ?? 0) > 0
+                ? () => onRankingClick(CATEGORY_COMPOSITE_RANKING_KEYS[categoryKey])
+                : undefined
+            }
           />
         )}
       </div>
@@ -166,15 +212,23 @@ function CategoryPanel({
             players={category.players}
             statKeys={statKeys}
             labels={statLabels}
+            categoryKey={categoryKey}
+            rankings={rankings}
+            onRankingClick={onRankingClick}
             positionColumnLabel={positionColumnLabel}
             showPlayerRankAndComposite={showPlayerRankAndComposite}
+            showStatusColumn={showStatusColumn}
           />
           <DesktopPlayerTable
             players={category.players}
             statKeys={statKeys}
             labels={statLabels}
+            categoryKey={categoryKey}
+            rankings={rankings}
+            onRankingClick={onRankingClick}
             positionColumnLabel={positionColumnLabel}
             showPlayerRankAndComposite={showPlayerRankAndComposite}
+            showStatusColumn={showStatusColumn}
           />
         </>
       )}
@@ -203,25 +257,38 @@ function TeamStatRow({ stat, onClick }: { stat?: ReportCardStatValue; onClick?: 
   );
 }
 
-function playerGridColumns(statKeys: string[], showPlayerRankAndComposite = true): string {
+function playerGridColumns(
+  statKeys: string[],
+  showPlayerRankAndComposite = true,
+  showStatusColumn = false
+): string {
   const statCols = showPlayerRankAndComposite
     ? `repeat(${statKeys.length}, minmax(0, 5rem)) minmax(0, 5rem)`
     : `repeat(${statKeys.length}, minmax(0, 5rem))`;
-  return `minmax(0, 1fr) 2.25rem ${statCols}`;
+  const statusCol = showStatusColumn ? ' minmax(0, 4.5rem)' : '';
+  return `minmax(0, 1fr) 2.25rem${statusCol} ${statCols}`;
 }
 
 function MobilePlayerTable({
   players,
   statKeys,
   labels,
+  categoryKey,
+  rankings,
+  onRankingClick,
   positionColumnLabel = 'Pos',
   showPlayerRankAndComposite = true,
+  showStatusColumn = false,
 }: {
   players: ReportCardPlayer[];
   statKeys: string[];
   labels: Record<string, string>;
+  categoryKey: CategoryKey;
+  rankings: MLBTeamReportCardData['rankings'];
+  onRankingClick: (key: string) => void;
   positionColumnLabel?: string;
   showPlayerRankAndComposite?: boolean;
+  showStatusColumn?: boolean;
 }) {
   return (
     <div className="md:hidden overflow-x-auto">
@@ -232,6 +299,9 @@ function MobilePlayerTable({
               Player
             </th>
             <th className="py-1 px-2 text-center whitespace-nowrap w-9">{positionColumnLabel}</th>
+            {showStatusColumn && (
+              <th className="py-1 px-2 text-left whitespace-nowrap min-w-[4.5rem]">Status</th>
+            )}
             {statKeys.map(key => (
               <th key={key} className={`py-1 text-right ${MOBILE_STAT_COL}`}>
                 {labels[key] ?? key}
@@ -256,15 +326,25 @@ function MobilePlayerTable({
               <td className="py-1 px-2 text-xs text-[var(--muted)] text-center whitespace-nowrap w-9">
                 {player.position ?? '-'}
               </td>
-              {statKeys.map(key => (
-                <td key={key} className={`py-1 text-right ${MOBILE_STAT_COL}`}>
-                  <StatCell
-                    stat={player.stats[key]}
-                    playerRank={showPlayerRankAndComposite}
-                    showRank={showPlayerRankAndComposite}
-                  />
+              {showStatusColumn && (
+                <td className="py-1 px-2 text-xs text-[var(--muted)] text-left whitespace-nowrap min-w-[4.5rem]">
+                  {player.status ?? '-'}
                 </td>
-              ))}
+              )}
+              {statKeys.map(key => {
+                const rankingKey = reportCardPlayerStatRankingKey(categoryKey, key);
+                const hasRankings = (rankings[rankingKey]?.length ?? 0) > 0;
+                return (
+                  <td key={key} className={`py-1 text-right ${MOBILE_STAT_COL}`}>
+                    <StatCell
+                      stat={player.stats[key]}
+                      playerRank={showPlayerRankAndComposite}
+                      showRank={showPlayerRankAndComposite}
+                      onClick={hasRankings ? () => onRankingClick(rankingKey) : undefined}
+                    />
+                  </td>
+                );
+              })}
               {showPlayerRankAndComposite && (
                 <td className={`py-1 text-right ${MOBILE_STAT_COL}`}>
                   <StatCell
@@ -286,14 +366,22 @@ function DesktopPlayerTable({
   players,
   statKeys,
   labels,
+  categoryKey,
+  rankings,
+  onRankingClick,
   positionColumnLabel = 'Pos',
   showPlayerRankAndComposite = true,
+  showStatusColumn = false,
 }: {
   players: ReportCardPlayer[];
   statKeys: string[];
   labels: Record<string, string>;
+  categoryKey: CategoryKey;
+  rankings: MLBTeamReportCardData['rankings'];
+  onRankingClick: (key: string) => void;
   positionColumnLabel?: string;
   showPlayerRankAndComposite?: boolean;
+  showStatusColumn?: boolean;
 }) {
   return (
     <div className="hidden md:block">
@@ -302,6 +390,7 @@ function DesktopPlayerTable({
         labels={labels}
         positionColumnLabel={positionColumnLabel}
         showPlayerRankAndComposite={showPlayerRankAndComposite}
+        showStatusColumn={showStatusColumn}
       />
       <div className="px-2">
         {players.map(player => (
@@ -309,7 +398,11 @@ function DesktopPlayerTable({
             key={player.playerId}
             player={player}
             statKeys={statKeys}
+            categoryKey={categoryKey}
+            rankings={rankings}
+            onRankingClick={onRankingClick}
             showPlayerRankAndComposite={showPlayerRankAndComposite}
+            showStatusColumn={showStatusColumn}
           />
         ))}
       </div>
@@ -322,19 +415,22 @@ function PlayerTableHeader({
   labels,
   positionColumnLabel = 'Pos',
   showPlayerRankAndComposite = true,
+  showStatusColumn = false,
 }: {
   statKeys: string[];
   labels: Record<string, string>;
   positionColumnLabel?: string;
   showPlayerRankAndComposite?: boolean;
+  showStatusColumn?: boolean;
 }) {
   return (
     <div
       className="grid gap-x-3 px-2 py-1 border-b border-[var(--border)] bg-[var(--border)]/30 text-xs font-bold items-center"
-      style={{ gridTemplateColumns: playerGridColumns(statKeys, showPlayerRankAndComposite) }}
+      style={{ gridTemplateColumns: playerGridColumns(statKeys, showPlayerRankAndComposite, showStatusColumn) }}
     >
       <div>Player</div>
       <div>{positionColumnLabel}</div>
+      {showStatusColumn && <div>Status</div>}
       {statKeys.map(key => (
         <div key={key} className="text-right">
           {labels[key] ?? key}
@@ -348,27 +444,43 @@ function PlayerTableHeader({
 function PlayerRow({
   player,
   statKeys,
+  categoryKey,
+  rankings,
+  onRankingClick,
   showPlayerRankAndComposite = true,
+  showStatusColumn = false,
 }: {
   player: ReportCardPlayer;
   statKeys: string[];
+  categoryKey: CategoryKey;
+  rankings: MLBTeamReportCardData['rankings'];
+  onRankingClick: (key: string) => void;
   showPlayerRankAndComposite?: boolean;
+  showStatusColumn?: boolean;
 }) {
   return (
     <div
       className={`grid gap-x-3 text-sm items-center whitespace-nowrap ${tableRowClass}`}
-      style={{ gridTemplateColumns: playerGridColumns(statKeys, showPlayerRankAndComposite) }}
+      style={{ gridTemplateColumns: playerGridColumns(statKeys, showPlayerRankAndComposite, showStatusColumn) }}
     >
       <div className="min-w-0 font-medium truncate">{player.name}</div>
       <div className="text-xs text-[var(--muted)]">{player.position ?? '-'}</div>
-      {statKeys.map(key => (
-        <StatCell
-          key={key}
-          stat={player.stats[key]}
-          playerRank={showPlayerRankAndComposite}
-          showRank={showPlayerRankAndComposite}
-        />
-      ))}
+      {showStatusColumn && (
+        <div className="text-xs text-[var(--muted)] truncate">{player.status ?? '-'}</div>
+      )}
+      {statKeys.map(key => {
+        const rankingKey = reportCardPlayerStatRankingKey(categoryKey, key);
+        const hasRankings = (rankings[rankingKey]?.length ?? 0) > 0;
+        return (
+          <StatCell
+            key={key}
+            stat={player.stats[key]}
+            playerRank={showPlayerRankAndComposite}
+            showRank={showPlayerRankAndComposite}
+            onClick={hasRankings ? () => onRankingClick(rankingKey) : undefined}
+          />
+        );
+      })}
       {showPlayerRankAndComposite && (
         <StatCell stat={player.stats[PLAYER_COMPOSITE_KEY]} playerRank showRank />
       )}
@@ -549,23 +661,17 @@ export function MLBTeamReportCard({ data }: Props) {
         {CATEGORY_KEYS.flatMap(key => {
           const category = team.categories[key];
           if (!category) return [];
-          const compositeRankingKey = CATEGORY_COMPOSITE_RANKING_KEYS[key];
-          const hasCategoryCompositeRankings =
-            (data.rankings[compositeRankingKey]?.length ?? 0) > 0;
           return [
             <CategoryPanel
               key={key}
+              categoryKey={key}
               title={category.label}
               category={category}
               statKeys={CATEGORY_STAT_KEYS[key]}
-              positionColumnLabel={CATEGORY_POSITION_LABELS[key]}
               showPlayerRankAndComposite={CATEGORY_SHOW_PLAYER_RANK_AND_COMPOSITE[key] ?? true}
-              hasCompositeRankings={hasCategoryCompositeRankings}
-              onCompositeRankClick={
-                hasCategoryCompositeRankings
-                  ? () => setRankingSheetKey(compositeRankingKey)
-                  : undefined
-              }
+              showStatusColumn={CATEGORY_SHOW_STATUS_COLUMN[key] ?? false}
+              rankings={data.rankings}
+              onRankingClick={setRankingSheetKey}
             />,
           ];
         })}
@@ -579,7 +685,10 @@ export function MLBTeamReportCard({ data }: Props) {
           title={formatReportCardRankingLabel(seasonLabel, rankingSheetKey)}
           entries={data.rankings[rankingSheetKey] ?? []}
           highlightedTeam={activeTeamCode}
-          isPct={rankingSheetKey === 'record'}
+          isPct={isReportCardRankingPct(rankingSheetKey)}
+          subtitle={
+            isReportCardPlayerRankingKey(rankingSheetKey) ? 'Player Rankings' : 'Season Rankings'
+          }
           source={data.source}
         />
       )}

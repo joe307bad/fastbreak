@@ -63,19 +63,20 @@ private data class CategoryConfig(
     val statKeys: List<String>,
     val teamRankColorFn: (Int?) -> Color,
     val positionColumnLabel: String = "Pos",
-    val showPlayerRankAndComposite: Boolean = true
+    val showPlayerRankAndComposite: Boolean = true,
+    val showStatusColumn: Boolean = false
 )
 
 private val CATEGORY_CONFIGS = mapOf(
-    "hitters" to CategoryConfig(listOf("wRC_plus", "xwOBA"), ::getMLBTeamRankColor),
-    "starters" to CategoryConfig(listOf("K-BB_pct", "xFIP"), ::getMLBTeamRankColor),
-    "relievers" to CategoryConfig(listOf("K-BB_pct", "FIP", "SV"), ::getMLBTeamRankColor),
-    "fielders" to CategoryConfig(listOf("OAA", "DRS"), ::getMLBTeamRankColor),
+    "hitters" to CategoryConfig(listOf("wRC_plus", "xwOBA", "xBA", "Barrel_pct"), ::getMLBTeamRankColor),
+    "starters" to CategoryConfig(listOf("K-BB_pct", "xFIP", "SIERA", "ERA"), ::getMLBTeamRankColor),
+    "relievers" to CategoryConfig(listOf("K-BB_pct", "FIP", "SV", "SIERA", "ERA"), ::getMLBTeamRankColor),
+    "fielders" to CategoryConfig(listOf("OAA", "DRS", "FRP"), ::getMLBTeamRankColor),
     "injuries" to CategoryConfig(
         statKeys = listOf("impact"),
         teamRankColorFn = ::getMLBTeamRankColor,
-        positionColumnLabel = "Status",
-        showPlayerRankAndComposite = false
+        showPlayerRankAndComposite = false,
+        showStatusColumn = true
     )
 )
 
@@ -87,7 +88,102 @@ private val CATEGORY_COMPOSITE_RANKING_KEYS = mapOf(
     "injuries" to "injuriesComposite"
 )
 
+private fun reportCardStatRankingKey(categoryKey: String, statKey: String): String =
+    "$categoryKey.$statKey"
+
+private fun reportCardPlayerStatRankingKey(categoryKey: String, statKey: String): String =
+    "$categoryKey.player.$statKey"
+
+private data class ParsedReportCardRankingKey(
+    val categoryKey: String,
+    val statKey: String,
+    val isPlayer: Boolean
+)
+
+private fun parseReportCardRankingKey(key: String): ParsedReportCardRankingKey? {
+    val playerMarker = ".player."
+    val playerIndex = key.indexOf(playerMarker)
+    if (playerIndex > 0) {
+        return ParsedReportCardRankingKey(
+            categoryKey = key.substring(0, playerIndex),
+            statKey = key.substring(playerIndex + playerMarker.length),
+            isPlayer = true
+        )
+    }
+    val dotIndex = key.indexOf('.')
+    if (dotIndex > 0) {
+        return ParsedReportCardRankingKey(
+            categoryKey = key.substring(0, dotIndex),
+            statKey = key.substring(dotIndex + 1),
+            isPlayer = false
+        )
+    }
+    return null
+}
+
+private fun isReportCardPlayerRankingKey(key: String): Boolean =
+    key.contains(".player.")
+
+private fun reportCardStatLabel(categoryKey: String, statKey: String): String {
+    return when (categoryKey) {
+        "hitters" -> when (statKey) {
+            "wRC_plus" -> "wRC+"
+            "xwOBA" -> "xwOBA"
+            "xBA" -> "xBA"
+            "Barrel_pct" -> "Barrel%"
+            else -> statKey
+        }
+        "starters" -> when (statKey) {
+            "K-BB_pct" -> "K-BB%"
+            "xFIP" -> "xFIP"
+            "SIERA" -> "SIERA"
+            "ERA" -> "ERA"
+            else -> statKey
+        }
+        "relievers" -> when (statKey) {
+            "K-BB_pct" -> "K-BB%"
+            "FIP" -> "FIP"
+            "SV" -> "SV"
+            "SV_per_G" -> "SV/G"
+            "SIERA" -> "SIERA"
+            "ERA" -> "ERA"
+            else -> statKey
+        }
+        "fielders" -> when (statKey) {
+            "OAA" -> "OAA"
+            "DRS" -> "DRS"
+            "FRP" -> "FRP"
+            else -> statKey
+        }
+        "injuries" -> when (statKey) {
+            "injured_count" -> "Injured"
+            "injury_war" -> "WAR Lost"
+            else -> statKey
+        }
+        else -> statKey
+    }
+}
+
+private fun formatReportCardCategoryLabel(categoryKey: String): String = when (categoryKey) {
+    "hitters" -> "Hitters"
+    "starters" -> "Starting Pitchers"
+    "relievers" -> "Bullpen"
+    "fielders" -> "Fielders"
+    "injuries" -> "Injury Report"
+    else -> categoryKey
+}
+
+private fun isReportCardRankingPct(key: String): Boolean {
+    return key == "record" ||
+        key.endsWith(".K-BB_pct") ||
+        key.endsWith(".Barrel_pct")
+}
+
 private fun formatReportCardRankingLabel(seasonLabel: String, key: String): String {
+    parseReportCardRankingKey(key)?.let { parsed ->
+        val suffix = if (parsed.isPlayer) " / Players" else ""
+        return "$seasonLabel / ${formatReportCardCategoryLabel(parsed.categoryKey)} / ${reportCardStatLabel(parsed.categoryKey, parsed.statKey)}$suffix"
+    }
     return when (key) {
         "record" -> "$seasonLabel / Record"
         "overallComposite" -> "$seasonLabel / Overall Composite"
@@ -433,14 +529,16 @@ fun MLBTeamReportCardWorksheet(
                 categories.forEachIndexed { index, (key, category) ->
                     val config = CATEGORY_CONFIGS[key] ?: return@forEachIndexed
                     ReportCardCategorySection(
+                        categoryKey = key,
                         category = category,
                         statKeys = config.statKeys,
                         teamRankColorFn = config.teamRankColorFn,
                         positionColumnLabel = config.positionColumnLabel,
                         showPlayerRankAndComposite = config.showPlayerRankAndComposite,
+                        showStatusColumn = config.showStatusColumn,
                         compositeRankingKey = CATEGORY_COMPOSITE_RANKING_KEYS[key],
                         rankings = reportCardRankings,
-                        onCompositeRankClick = { selectedRankingKey = it }
+                        onRankingClick = { selectedRankingKey = it }
                     )
                     if (index < categories.lastIndex) {
                         Spacer(modifier = Modifier.height(12.dp))
@@ -492,10 +590,14 @@ fun MLBTeamReportCardWorksheet(
                     statLabel = formatReportCardRankingLabel(seasonLabel, key),
                     entries = entries,
                     onDismiss = { selectedRankingKey = null },
-                    rankColorFn = ::getMLBTeamRankColor,
+                    rankColorFn = if (isReportCardPlayerRankingKey(key)) {
+                        ::getMLBPlayerRankColor
+                    } else {
+                        ::getMLBTeamRankColor
+                    },
                     highlightedTeams = setOf(team.teamCode),
-                    isPct = key == "record",
-                    subtitle = "Season Rankings",
+                    isPct = isReportCardRankingPct(key),
+                    subtitle = if (isReportCardPlayerRankingKey(key)) "Player Rankings" else "Season Rankings",
                     source = visualization.source ?: "FanGraphs"
                 )
             }
@@ -534,9 +636,10 @@ fun MLBTeamReportCardWorksheet(
                     MLBTeamReportCardShareImage(
                         team = team,
                         seasonLabel = seasonLabel,
-                        source = buildReportCardSourceAttribution(visualization)
-                            ?: visualization.source
-                            ?: "FanGraphs",
+                        source = buildReportCardShareSourceAttribution(
+                            visualization,
+                            request.target.categoryKey
+                        ),
                         categories = categoriesToShare,
                         showSummary = request.target.categoryKey == null
                     )
@@ -549,6 +652,7 @@ fun MLBTeamReportCardWorksheet(
 private val PLAYER_NAME_COLUMN_WIDTH = 108.dp
 private val PLAYER_ROW_MIN_HEIGHT = 24.dp
 private val PLAYER_POS_WIDTH = 40.dp
+private val PLAYER_STATUS_WIDTH = 52.dp
 private val PLAYER_WAR_WIDTH = 32.dp
 private val PLAYER_STAT_WIDTH = 44.dp
 private val PLAYER_RANK_WIDTH = 40.dp
@@ -561,9 +665,11 @@ private val SHARE_REPORT_CARD_HORIZONTAL_PADDING = 32.dp
 
 private fun reportCardSharePlayerStatsWidth(
     statCount: Int,
-    showPlayerRankAndComposite: Boolean
+    showPlayerRankAndComposite: Boolean,
+    showStatusColumn: Boolean = false
 ): Dp {
     var width = PLAYER_POS_WIDTH + PLAYER_WAR_WIDTH
+    if (showStatusColumn) width += PLAYER_STATUS_WIDTH
     repeat(statCount) {
         width += PLAYER_STAT_GROUP_SPACING + PLAYER_STAT_WIDTH
         if (showPlayerRankAndComposite) {
@@ -583,7 +689,11 @@ private fun reportCardSharePlayerContentWidth(
     return categories.maxOfOrNull { (key, _) ->
         val config = CATEGORY_CONFIGS[key] ?: return@maxOfOrNull 0.dp
         PLAYER_NAME_COLUMN_WIDTH + nameAndStatsPadding +
-            reportCardSharePlayerStatsWidth(config.statKeys.size, config.showPlayerRankAndComposite)
+            reportCardSharePlayerStatsWidth(
+                config.statKeys.size,
+                config.showPlayerRankAndComposite,
+                config.showStatusColumn
+            )
     } ?: (PLAYER_NAME_COLUMN_WIDTH + nameAndStatsPadding + reportCardSharePlayerStatsWidth(2, true))
 }
 
@@ -639,14 +749,16 @@ private fun formatReportCardShareSubtitleLine(seasonLabel: String, team: ReportC
 
 @Composable
 private fun ReportCardCategorySection(
+    categoryKey: String,
     category: ReportCardCategory,
     statKeys: List<String>,
     teamRankColorFn: (Int?) -> Color,
     positionColumnLabel: String = "Pos",
     showPlayerRankAndComposite: Boolean = true,
+    showStatusColumn: Boolean = false,
     compositeRankingKey: String? = null,
     rankings: Map<String, List<RankingEntry>> = emptyMap(),
-    onCompositeRankClick: ((String) -> Unit)? = null,
+    onRankingClick: ((String) -> Unit)? = null,
     expandStatsForShare: Boolean = false
 ) {
     val teamStats = category.team?.stats.orEmpty()
@@ -654,7 +766,9 @@ private fun ReportCardCategorySection(
 
     SectionHeader(category.label)
 
-    primaryStats.forEach { (_, stat) ->
+    primaryStats.forEach { (statKey, stat) ->
+        val rankingKey = reportCardStatRankingKey(categoryKey, statKey)
+        val rankingAvailable = hasReportCardRankings(rankings, rankingKey)
         FiveColumnRowWithRanks(
             leftValue = formatReportCardStat(stat),
             leftRank = stat.rank,
@@ -665,6 +779,11 @@ private fun ReportCardCategorySection(
             rightRankDisplay = null,
             rankColorFn = teamRankColorFn,
             useNBARanks = false,
+            onClick = if (rankingAvailable) {
+                { onRankingClick?.invoke(rankingKey) }
+            } else {
+                null
+            },
             emptyRankPlaceholder = ""
         )
     }
@@ -682,7 +801,7 @@ private fun ReportCardCategorySection(
             rankColorFn = teamRankColorFn,
             useNBARanks = false,
             onClick = if (compositeRankingAvailable) {
-                { onCompositeRankClick?.invoke(compositeRankingKey!!) }
+                { onRankingClick?.invoke(compositeRankingKey!!) }
             } else {
                 null
             },
@@ -693,10 +812,14 @@ private fun ReportCardCategorySection(
     if (category.players.isNotEmpty()) {
         Spacer(modifier = Modifier.height(6.dp))
         ReportCardPlayersSection(
+            categoryKey = categoryKey,
             players = category.players,
             statKeys = statKeys,
             positionColumnLabel = positionColumnLabel,
             showPlayerRankAndComposite = showPlayerRankAndComposite,
+            showStatusColumn = showStatusColumn,
+            rankings = rankings,
+            onRankingClick = onRankingClick,
             expandStatsForShare = expandStatsForShare
         )
     }
@@ -706,10 +829,14 @@ private fun ReportCardCategorySection(
 
 @Composable
 private fun ReportCardPlayersSection(
+    categoryKey: String,
     players: List<ReportCardPlayer>,
     statKeys: List<String>,
     positionColumnLabel: String = "Pos",
     showPlayerRankAndComposite: Boolean = true,
+    showStatusColumn: Boolean = false,
+    rankings: Map<String, List<RankingEntry>> = emptyMap(),
+    onRankingClick: ((String) -> Unit)? = null,
     expandStatsForShare: Boolean = false
 ) {
     val scrollState = rememberScrollState()
@@ -721,10 +848,14 @@ private fun ReportCardPlayersSection(
         scrollState = scrollState,
         playerName = null,
         player = null,
+        categoryKey = categoryKey,
         statLabels = statLabels,
         statKeys = statKeys,
         positionColumnLabel = positionColumnLabel,
         showPlayerRankAndComposite = showPlayerRankAndComposite,
+        showStatusColumn = showStatusColumn,
+        rankings = rankings,
+        onRankingClick = onRankingClick,
         expandStatsForShare = expandStatsForShare
     )
 
@@ -733,10 +864,14 @@ private fun ReportCardPlayersSection(
             scrollState = scrollState,
             playerName = player.name,
             player = player,
+            categoryKey = categoryKey,
             statLabels = statLabels,
             statKeys = statKeys,
             positionColumnLabel = positionColumnLabel,
             showPlayerRankAndComposite = showPlayerRankAndComposite,
+            showStatusColumn = showStatusColumn,
+            rankings = rankings,
+            onRankingClick = onRankingClick,
             expandStatsForShare = expandStatsForShare
         )
     }
@@ -747,10 +882,14 @@ private fun ReportCardPlayerLine(
     scrollState: ScrollState,
     playerName: String?,
     player: ReportCardPlayer?,
+    categoryKey: String,
     statLabels: List<String>,
     statKeys: List<String>,
     positionColumnLabel: String = "Pos",
     showPlayerRankAndComposite: Boolean = true,
+    showStatusColumn: Boolean = false,
+    rankings: Map<String, List<RankingEntry>> = emptyMap(),
+    onRankingClick: ((String) -> Unit)? = null,
     expandStatsForShare: Boolean = false
 ) {
     Row(
@@ -788,11 +927,15 @@ private fun ReportCardPlayerLine(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 ReportCardPlayerStatsColumns(
+                    categoryKey = categoryKey,
                     player = player,
                     statLabels = statLabels,
                     statKeys = statKeys,
                     positionColumnLabel = positionColumnLabel,
-                    showPlayerRankAndComposite = showPlayerRankAndComposite
+                    showPlayerRankAndComposite = showPlayerRankAndComposite,
+                    showStatusColumn = showStatusColumn,
+                    rankings = rankings,
+                    onRankingClick = onRankingClick
                 )
             }
         } else {
@@ -804,11 +947,15 @@ private fun ReportCardPlayerLine(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 ReportCardPlayerStatsColumns(
+                    categoryKey = categoryKey,
                     player = player,
                     statLabels = statLabels,
                     statKeys = statKeys,
                     positionColumnLabel = positionColumnLabel,
-                    showPlayerRankAndComposite = showPlayerRankAndComposite
+                    showPlayerRankAndComposite = showPlayerRankAndComposite,
+                    showStatusColumn = showStatusColumn,
+                    rankings = rankings,
+                    onRankingClick = onRankingClick
                 )
             }
         }
@@ -817,11 +964,15 @@ private fun ReportCardPlayerLine(
 
 @Composable
 private fun ReportCardPlayerStatsColumns(
+    categoryKey: String,
     player: ReportCardPlayer?,
     statLabels: List<String>,
     statKeys: List<String>,
     positionColumnLabel: String = "Pos",
-    showPlayerRankAndComposite: Boolean = true
+    showPlayerRankAndComposite: Boolean = true,
+    showStatusColumn: Boolean = false,
+    rankings: Map<String, List<RankingEntry>> = emptyMap(),
+    onRankingClick: ((String) -> Unit)? = null
 ) {
     val isHeader = player == null
     val headerStyle = MaterialTheme.typography.labelSmall
@@ -833,6 +984,16 @@ private fun ReportCardPlayerStatsColumns(
                 ReportCardHeaderText(positionColumnLabel, headerStyle, headerColor, TextAlign.Center)
             } else {
                 ReportCardStatText(player?.position.orEmpty(), TextAlign.Center, muted = true)
+            }
+        }
+
+        if (showStatusColumn) {
+            ReportCardFixedColumn(PLAYER_STATUS_WIDTH, Alignment.CenterStart) {
+                if (isHeader) {
+                    ReportCardHeaderText("Status", headerStyle, headerColor, TextAlign.Start)
+                } else {
+                    ReportCardStatText(player?.status.orEmpty(), TextAlign.Start, muted = true)
+                }
             }
         }
 
@@ -850,30 +1011,43 @@ private fun ReportCardPlayerStatsColumns(
         statLabels.forEachIndexed { index, label ->
             val statKey = statKeys.getOrNull(index)
             val stat = statKey?.let { player?.stats?.get(it) }
+            val rankingKey = statKey?.let { reportCardPlayerStatRankingKey(categoryKey, it) }
+            val rankingAvailable = statKey != null &&
+                hasReportCardRankings(rankings, reportCardPlayerStatRankingKey(categoryKey, statKey))
+            val statClickModifier = if (!isHeader && rankingAvailable) {
+                Modifier.clickable { onRankingClick?.invoke(rankingKey!!) }
+            } else {
+                Modifier
+            }
 
             Spacer(modifier = Modifier.width(PLAYER_STAT_GROUP_SPACING))
 
-            ReportCardFixedColumn(PLAYER_STAT_WIDTH, Alignment.CenterEnd) {
-                if (isHeader) {
-                    ReportCardHeaderText(label, headerStyle, headerColor, TextAlign.End)
-                } else {
-                    ReportCardStatText(stat?.let { formatReportCardStat(it) }.orEmpty(), TextAlign.End)
-                }
-            }
-
-            if (showPlayerRankAndComposite) {
-                ReportCardFixedColumn(PLAYER_RANK_WIDTH, Alignment.Center, startPadding = PLAYER_RANK_LEFT_PADDING) {
+            Row(
+                modifier = statClickModifier,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                ReportCardFixedColumn(PLAYER_STAT_WIDTH, Alignment.CenterEnd) {
                     if (isHeader) {
-                        ReportCardHeaderText("Rk", headerStyle, headerColor, TextAlign.Center)
+                        ReportCardHeaderText(label, headerStyle, headerColor, TextAlign.End)
                     } else {
-                        MatchupRankBadge(
-                            rank = stat?.rank,
-                            rankDisplay = stat?.rankDisplay,
-                            rankColorFn = ::getMLBPlayerRankColor,
-                            usePlayerRanks = true,
-                            useNBARanks = false,
-                            emptyPlaceholder = ""
-                        )
+                        ReportCardStatText(stat?.let { formatReportCardStat(it) }.orEmpty(), TextAlign.End)
+                    }
+                }
+
+                if (showPlayerRankAndComposite) {
+                    ReportCardFixedColumn(PLAYER_RANK_WIDTH, Alignment.Center, startPadding = PLAYER_RANK_LEFT_PADDING) {
+                        if (isHeader) {
+                            ReportCardHeaderText("Rk", headerStyle, headerColor, TextAlign.Center)
+                        } else {
+                            MatchupRankBadge(
+                                rank = stat?.rank,
+                                rankDisplay = stat?.rankDisplay,
+                                rankColorFn = ::getMLBPlayerRankColor,
+                                usePlayerRanks = true,
+                                useNBARanks = false,
+                                emptyPlaceholder = ""
+                            )
+                        }
                     }
                 }
             }
@@ -1105,6 +1279,30 @@ private fun buildReportCardSourceAttribution(
     return sources.takeIf { it.isNotEmpty() }?.joinToString(" • ")
 }
 
+private fun buildReportCardShareSourceAttribution(
+    visualization: MLBTeamReportCardVisualization,
+    categoryKey: String?
+): String {
+    return when (categoryKey) {
+        "injuries" -> {
+            val sources = parseReportCardSources(visualization.source ?: "FanGraphs • ESPN")
+                .filter { source ->
+                    source.equals("FanGraphs", ignoreCase = true) ||
+                        source.equals("ESPN", ignoreCase = true)
+                }
+                .distinct()
+            if (sources.isEmpty()) "FanGraphs • ESPN" else sources.joinToString(" • ")
+        }
+        null -> {
+            parseReportCardSources(visualization.source ?: "FanGraphs • ESPN")
+                .distinct()
+                .joinToString(" • ")
+                .ifBlank { "FanGraphs • ESPN" }
+        }
+        else -> "FanGraphs"
+    }
+}
+
 private fun formatMLBPlayoffProbability(prob: Double?): String {
     return if (prob != null) {
         if (prob >= 99.5) ">99%" else "${prob.toInt()}%"
@@ -1315,11 +1513,13 @@ private fun MLBTeamReportCardShareImage(
                 Spacer(modifier = Modifier.height(8.dp))
             }
             ReportCardCategorySection(
+                categoryKey = key,
                 category = shareCategory,
                 statKeys = config.statKeys,
                 teamRankColorFn = config.teamRankColorFn,
                 positionColumnLabel = config.positionColumnLabel,
                 showPlayerRankAndComposite = config.showPlayerRankAndComposite,
+                showStatusColumn = config.showStatusColumn,
                 expandStatsForShare = true
             )
         }
@@ -1355,7 +1555,9 @@ private fun formatReportCardStat(stat: ReportCardStatValue): String {
         stat.label.equals("Composite", ignoreCase = true) -> formatReportCardValue(value, 1)
         stat.label.equals("OAA", ignoreCase = true) || stat.label.equals("DRS", ignoreCase = true) ->
             formatReportCardValue(value, 1)
-        stat.label.equals("xwOBA", ignoreCase = true) -> formatReportCardValue(value, 3)
+        stat.label.equals("xwOBA", ignoreCase = true) || stat.label.equals("xBA", ignoreCase = true) ->
+            formatReportCardValue(value, 3)
+        stat.label.equals("FRP", ignoreCase = true) -> formatReportCardValue(value, 0)
         stat.label.equals("SV", ignoreCase = true) -> formatReportCardValue(value, 0)
         stat.label.equals("SV/G", ignoreCase = true) -> formatReportCardValue(value, 2)
         else -> formatReportCardValue(value, 2)

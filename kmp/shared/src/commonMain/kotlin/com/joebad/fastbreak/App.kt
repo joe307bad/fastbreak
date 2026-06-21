@@ -1,26 +1,13 @@
 package com.joebad.fastbreak
 
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.height
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DrawerValue
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalNavigationDrawer
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.unit.dp
-import com.joebad.fastbreak.platform.AppUpdatePrompt
 import com.arkivanov.decompose.extensions.compose.stack.Children
 import com.arkivanov.decompose.extensions.compose.stack.animation.slide
 import com.arkivanov.decompose.extensions.compose.stack.animation.stackAnimation
@@ -63,54 +50,7 @@ fun App(rootComponent: RootComponent) {
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
 
-    // Track if user dismissed the update dialog (don't show again this session)
-    var updateDialogDismissed by remember { mutableStateOf(false) }
-
     AppTheme(themeMode = themeMode, teamColors = teamColors, brightness = themeBrightness, useSecondaryBackground = useSecondaryBackground) {
-        // Show update required dialog if needed
-        if (registryState.updateRequired && !updateDialogDismissed) {
-            AlertDialog(
-                onDismissRequest = { updateDialogDismissed = true },
-                title = {
-                    Text(
-                        text = "update available",
-                        fontFamily = FontFamily.Monospace
-                    )
-                },
-                text = {
-                    Column {
-                        Text(
-                            text = "a new version of fastbreak is available with updated charts and features.",
-                            fontFamily = FontFamily.Monospace,
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = "update to see the latest data.",
-                            fontFamily = FontFamily.Monospace,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                },
-                confirmButton = {
-                    TextButton(onClick = { AppUpdatePrompt.openAppStore() }) {
-                        Text(
-                            text = "update now",
-                            fontFamily = FontFamily.Monospace
-                        )
-                    }
-                },
-                dismissButton = {
-                    TextButton(onClick = { updateDialogDismissed = true }) {
-                        Text(
-                            text = "later",
-                            fontFamily = FontFamily.Monospace
-                        )
-                    }
-                }
-            )
-        }
         ModalNavigationDrawer(
             drawerState = drawerState,
             drawerContent = {

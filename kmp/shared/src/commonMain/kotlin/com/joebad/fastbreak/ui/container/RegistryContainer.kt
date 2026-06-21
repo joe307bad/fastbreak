@@ -7,8 +7,6 @@ import com.joebad.fastbreak.data.repository.ChartCache
 import com.joebad.fastbreak.domain.registry.ChartSyncManager
 import com.joebad.fastbreak.domain.registry.ChartSyncProgress
 import com.joebad.fastbreak.domain.registry.ChartSyncResult
-import com.joebad.fastbreak.domain.registry.ReleaseIdCheckResult
-import com.joebad.fastbreak.domain.registry.ReleaseIdChecker
 import com.joebad.fastbreak.domain.registry.RegistryManager
 import com.joebad.fastbreak.platform.NetworkPermissionChecker
 import com.joebad.fastbreak.telemetry.TelemetryService
@@ -31,7 +29,6 @@ class RegistryContainer(
     private val chartCache: ChartCache,
     private val scope: CoroutineScope,
     private val networkPermissionChecker: NetworkPermissionChecker = NetworkPermissionChecker(),
-    private val releaseIdChecker: ReleaseIdChecker = ReleaseIdChecker(),
     val pinnedTeamsContainer: PinnedTeamsContainer? = null  // Optional dependency
 ) : ContainerHost<RegistryState, RegistrySideEffect> {
 
@@ -225,33 +222,6 @@ class RegistryContainer(
                     )
                 }
 
-                // Check release ID compatibility before syncing charts
-                val releaseIdResult = releaseIdChecker.checkReleaseId(entries)
-                when (releaseIdResult) {
-                    is ReleaseIdCheckResult.UpdateRequired -> {
-                        println("⚠️ App update required: client=${releaseIdResult.clientReleaseId}, server=${releaseIdResult.serverReleaseId}")
-                        reduce {
-                            state.copy(
-                                updateRequired = true,
-                                serverReleaseId = releaseIdResult.serverReleaseId,
-                                isSyncing = false,
-                                syncProgress = null,
-                                diagnostics = state.diagnostics.copy(isSyncing = false)
-                            )
-                        }
-                        postSideEffect(RegistrySideEffect.UpdateRequired(
-                            serverReleaseId = releaseIdResult.serverReleaseId,
-                            clientReleaseId = releaseIdResult.clientReleaseId
-                        ))
-                        // Skip chart sync - user needs to update the app
-                        return@onSuccess
-                    }
-                    is ReleaseIdCheckResult.Compatible,
-                    is ReleaseIdCheckResult.DevModeBypass -> {
-                        // Continue with chart sync
-                    }
-                }
-
                 // Sync chart data and topics after loading registry entries (await completion)
                 try {
                     val syncResult = syncChartData(entries, retryFailed = false)
@@ -436,33 +406,6 @@ class RegistryContainer(
                             isSyncing = true  // Keep syncing state active for chart data sync
                         )
                     )
-                }
-
-                // Check release ID compatibility before syncing charts
-                val releaseIdResult = releaseIdChecker.checkReleaseId(entries)
-                when (releaseIdResult) {
-                    is ReleaseIdCheckResult.UpdateRequired -> {
-                        println("⚠️ App update required: client=${releaseIdResult.clientReleaseId}, server=${releaseIdResult.serverReleaseId}")
-                        reduce {
-                            state.copy(
-                                updateRequired = true,
-                                serverReleaseId = releaseIdResult.serverReleaseId,
-                                isSyncing = false,
-                                syncProgress = null,
-                                diagnostics = state.diagnostics.copy(isSyncing = false)
-                            )
-                        }
-                        postSideEffect(RegistrySideEffect.UpdateRequired(
-                            serverReleaseId = releaseIdResult.serverReleaseId,
-                            clientReleaseId = releaseIdResult.clientReleaseId
-                        ))
-                        // Skip chart sync - user needs to update the app
-                        return@intent
-                    }
-                    is ReleaseIdCheckResult.Compatible,
-                    is ReleaseIdCheckResult.DevModeBypass -> {
-                        // Continue with chart sync
-                    }
                 }
 
                 // Sync chart data after refresh

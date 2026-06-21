@@ -16,6 +16,22 @@ function teamRankColor(rank: number | null | undefined): string {
   return 'bg-red-600';
 }
 
+function playerRankColor(rank: number | null | undefined): string {
+  if (rank == null) return 'bg-[var(--muted)]';
+  if (rank <= 30) return 'bg-green-600';
+  if (rank <= 60) return 'bg-lime-600';
+  if (rank <= 100) return 'bg-orange-500';
+  return 'bg-red-600';
+}
+
+function rankingEntryLabel(entry: RankingEntry): string {
+  return entry.player?.trim() ? entry.player : rankingTeamCode(entry);
+}
+
+function entriesArePlayerRankings(entries: RankingEntry[]): boolean {
+  return entries.some(entry => !!entry.player?.trim());
+}
+
 function playoffProbColor(prob: number | null | undefined): string {
   if (prob == null) return 'bg-[var(--muted)]';
   const p = Math.max(0, Math.min(100, prob));
@@ -266,10 +282,19 @@ function buildMlbStandingsConferenceGroups(entries: PlayoffChanceEntry[]) {
     });
 }
 
-function RankBadge({ rank, display }: { rank: number; display?: string | null }) {
+function RankBadge({
+  rank,
+  display,
+  playerRankings = false,
+}: {
+  rank: number;
+  display?: string | null;
+  playerRankings?: boolean;
+}) {
+  const colorFn = playerRankings ? playerRankColor : teamRankColor;
   return (
     <span
-      className={`inline-flex items-center justify-center min-w-8 h-5 px-1 rounded text-[10px] font-bold text-white ${teamRankColor(rank)}`}
+      className={`inline-flex items-center justify-center min-w-8 h-5 px-1 rounded text-[10px] font-bold text-white ${colorFn(rank)}`}
     >
       {display ?? rank}
     </span>
@@ -324,6 +349,12 @@ export function StatRankingsSheet({
     });
   };
 
+  const isPlayerRankings = entriesArePlayerRankings(entries);
+  const nameHeader = isPlayerRankings ? 'Player' : 'Team';
+  const gridCols = isPlayerRankings
+    ? 'grid-cols-[2rem_1fr_4.5rem]'
+    : 'grid-cols-[2rem_2.5rem_1fr]';
+
   return (
     <BottomSheet
       open={open}
@@ -332,28 +363,43 @@ export function StatRankingsSheet({
       subtitle={subtitle}
       source={source}
     >
-      <div className="grid grid-cols-[2rem_2.5rem_1fr] gap-x-2 pl-3 pr-1 py-1 text-[10px] font-bold uppercase text-[var(--muted)] border-b border-[var(--border)]">
+      <div
+        className={`grid ${gridCols} gap-x-2 pl-3 pr-1 py-1 text-[10px] font-bold uppercase text-[var(--muted)] border-b border-[var(--border)]`}
+      >
         <div className="text-center pl-1">RK</div>
-        <div>Team</div>
+        <div>{nameHeader}</div>
         <div className="text-right">Value</div>
       </div>
 
-      {entries.map(entry => {
+      {entries.map((entry, index) => {
         const team = rankingTeamCode(entry);
         const selected = selectedTeams.has(team);
+        const nameLabel = isPlayerRankings
+          ? `${rankingEntryLabel(entry)} (${team})`
+          : team;
         return (
           <button
-            key={team}
+            key={`${team}-${entry.player ?? ''}-${entry.rank}-${index}`}
             type="button"
             onClick={() => toggleTeam(team)}
-            className={`w-full grid grid-cols-[2rem_2.5rem_1fr] gap-x-2 items-center pl-3 pr-1 py-1.5 text-sm text-left border-b border-[var(--border)] last:border-b-0 transition-colors ${
+            className={`w-full grid ${gridCols} gap-x-2 items-center pl-3 pr-1 py-1.5 text-sm text-left border-b border-[var(--border)] last:border-b-0 transition-colors ${
               selected ? 'bg-[var(--foreground)]/8' : 'hover:bg-[var(--foreground)]/5'
             }`}
           >
             <div className="flex justify-center pl-1">
-              <RankBadge rank={entry.rank} display={entry.rankDisplay} />
+              <RankBadge
+                rank={entry.rank}
+                display={entry.rankDisplay}
+                playerRankings={isPlayerRankings}
+              />
             </div>
-            <span className={`font-mono ${selected ? 'font-bold' : 'font-medium'}`}>{team}</span>
+            <span
+              className={`truncate ${isPlayerRankings ? '' : 'font-mono'} ${
+                selected ? 'font-bold' : 'font-medium'
+              }`}
+            >
+              {nameLabel}
+            </span>
             <span className={`font-mono text-right ${selected ? 'font-bold' : ''}`}>
               {formatRankingValue(entry.value, isPct)}
             </span>
@@ -659,7 +705,44 @@ export function ChartInfoSheet({
   );
 }
 
+export function isReportCardPlayerRankingKey(key: string): boolean {
+  return key.includes('.player.');
+}
+
+function parseReportCardRankingKey(key: string): {
+  categoryKey: string;
+  statKey: string;
+  isPlayer: boolean;
+} | null {
+  const playerMarker = '.player.';
+  const playerIndex = key.indexOf(playerMarker);
+  if (playerIndex > 0) {
+    return {
+      categoryKey: key.slice(0, playerIndex),
+      statKey: key.slice(playerIndex + playerMarker.length),
+      isPlayer: true,
+    };
+  }
+  const dotIndex = key.indexOf('.');
+  if (dotIndex > 0) {
+    return {
+      categoryKey: key.slice(0, dotIndex),
+      statKey: key.slice(dotIndex + 1),
+      isPlayer: false,
+    };
+  }
+  return null;
+}
+
 export function formatReportCardRankingLabel(seasonLabel: string, key: string): string {
+  const parsed = parseReportCardRankingKey(key);
+  if (parsed) {
+    const categoryLabel = formatReportCardCategoryLabel(parsed.categoryKey);
+    const statLabel = formatReportCardStatLabel(parsed.categoryKey, parsed.statKey);
+    const suffix = parsed.isPlayer ? ' / Players' : '';
+    return `${seasonLabel} / ${categoryLabel} / ${statLabel}${suffix}`;
+  }
+
   switch (key) {
     case 'record':
       return `${seasonLabel} / Record`;
@@ -678,4 +761,93 @@ export function formatReportCardRankingLabel(seasonLabel: string, key: string): 
     default:
       return `${seasonLabel} / ${key}`;
   }
+}
+
+function formatReportCardCategoryLabel(categoryKey: string): string {
+  switch (categoryKey) {
+    case 'hitters':
+      return 'Hitters';
+    case 'starters':
+      return 'Starting Pitchers';
+    case 'relievers':
+      return 'Bullpen';
+    case 'fielders':
+      return 'Fielders';
+    case 'injuries':
+      return 'Injury Report';
+    default:
+      return categoryKey;
+  }
+}
+
+function formatReportCardStatLabel(categoryKey: string, statKey: string): string {
+  switch (categoryKey) {
+    case 'hitters':
+      switch (statKey) {
+        case 'wRC_plus':
+          return 'wRC+';
+        case 'xwOBA':
+          return 'xwOBA';
+        case 'xBA':
+          return 'xBA';
+        case 'Barrel_pct':
+          return 'Barrel%';
+        default:
+          return statKey;
+      }
+    case 'starters':
+      switch (statKey) {
+        case 'K-BB_pct':
+          return 'K-BB%';
+        case 'xFIP':
+          return 'xFIP';
+        case 'SIERA':
+          return 'SIERA';
+        case 'ERA':
+          return 'ERA';
+        default:
+          return statKey;
+      }
+    case 'relievers':
+      switch (statKey) {
+        case 'K-BB_pct':
+          return 'K-BB%';
+        case 'FIP':
+          return 'FIP';
+        case 'SV_per_G':
+          return 'SV/G';
+        case 'SIERA':
+          return 'SIERA';
+        case 'ERA':
+          return 'ERA';
+        default:
+          return statKey;
+      }
+    case 'fielders':
+      switch (statKey) {
+        case 'OAA':
+          return 'OAA';
+        case 'DRS':
+          return 'DRS';
+        case 'FRP':
+          return 'FRP';
+        default:
+          return statKey;
+      }
+    case 'injuries':
+      switch (statKey) {
+        case 'injured_count':
+          return 'Injured';
+        case 'injury_war':
+          return 'WAR Lost';
+        default:
+          return statKey;
+      }
+    default:
+      return statKey;
+  }
+}
+
+export function isReportCardRankingPct(key: string): boolean {
+  return key === 'record' || key.endsWith('.K-BB_pct') || key.endsWith('.Barrel_pct');
 }

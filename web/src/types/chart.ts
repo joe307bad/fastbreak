@@ -567,6 +567,7 @@ export interface ReportCardPlayer {
   playerId: string;
   name: string;
   position?: string;
+  status?: string;
   war?: number | null;
   stats: Record<string, ReportCardStatValue>;
 }
@@ -608,6 +609,7 @@ export interface RankingEntry {
   team?: string;
   teamCode?: string;
   teamName?: string;
+  player?: string;
   value: number;
   rank: number;
   rankDisplay?: string;

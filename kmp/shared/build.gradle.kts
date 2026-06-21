@@ -12,7 +12,6 @@ plugins {
 
 // Generate AppConfig from gradle.properties
 val devMode = project.findProperty("dev_mode")?.toString()?.toBoolean() ?: true
-val builtInReleaseId = project.findProperty("built_in_release_id")?.toString() ?: "fb-dev"
 val otelEndpoint = project.findProperty("otel_endpoint")?.toString() ?: ""
 val otelAuthToken = project.findProperty("otel_auth_token")?.toString() ?: ""
 val otelServiceName = project.findProperty("otel_service_name")?.toString() ?: "fastbreak-mobile"
@@ -21,7 +20,6 @@ val generateAppConfig = tasks.register("generateAppConfig") {
     val outputDir = layout.buildDirectory.dir("generated/appconfig")
     // Declare inputs so Gradle re-runs task when properties change
     inputs.property("devMode", devMode)
-    inputs.property("builtInReleaseId", builtInReleaseId)
     inputs.property("otelEndpoint", otelEndpoint)
     inputs.property("otelAuthToken", otelAuthToken)
     inputs.property("otelServiceName", otelServiceName)
@@ -34,7 +32,6 @@ val generateAppConfig = tasks.register("generateAppConfig") {
 
             object AppConfig {
                 const val DEV_MODE: Boolean = $devMode
-                const val BUILT_IN_RELEASE_ID: String = "$builtInReleaseId"
                 const val OTEL_ENDPOINT: String = "$otelEndpoint"
                 const val OTEL_AUTH_TOKEN: String = "$otelAuthToken"
                 const val OTEL_SERVICE_NAME: String = "$otelServiceName"

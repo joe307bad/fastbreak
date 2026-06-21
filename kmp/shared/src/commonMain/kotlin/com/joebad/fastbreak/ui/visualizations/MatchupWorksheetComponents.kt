@@ -1170,9 +1170,11 @@ private fun buildMlbDivisionShareFabOptions(
     }
 }
 
-/**
- * Static share image for stat rankings (rendered off-screen for capture)
- */
+private fun rankingEntryLabel(entry: RankingEntry): String =
+    entry.player?.takeIf { it.isNotBlank() } ?: entry.team
+
+private fun entriesArePlayerRankings(entries: List<RankingEntry>): Boolean =
+    entries.any { !it.player.isNullOrBlank() }
 @Composable
 private fun StatRankingsShareImage(
     statLabel: String,
@@ -1187,6 +1189,8 @@ private fun StatRankingsShareImage(
     val onBg = MaterialTheme.colorScheme.onSurface
     val dimColor = onBg.copy(alpha = 0.5f)
     val highlightColor = MaterialTheme.colorScheme.primary
+    val isPlayerRankings = entriesArePlayerRankings(entries)
+    val nameHeader = if (isPlayerRankings) "PLAYER" else "TEAM"
 
     Column(
         modifier = Modifier
@@ -1204,7 +1208,7 @@ private fun StatRankingsShareImage(
             Spacer(modifier = Modifier.width(8.dp))
             Text("RK", style = MaterialTheme.typography.labelSmall, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = dimColor, modifier = Modifier.width(32.dp), textAlign = TextAlign.Center)
             Spacer(modifier = Modifier.width(4.dp))
-            Text("TEAM", style = MaterialTheme.typography.labelSmall, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = dimColor, modifier = Modifier.weight(1f))
+            Text(nameHeader, style = MaterialTheme.typography.labelSmall, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = dimColor, modifier = Modifier.weight(1f))
             Text("VALUE", style = MaterialTheme.typography.labelSmall, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = dimColor, textAlign = TextAlign.End, modifier = Modifier.width(56.dp))
         }
         entries.forEach { entry ->
@@ -1244,12 +1248,17 @@ private fun StatRankingsShareImage(
                 }
                 Spacer(modifier = Modifier.width(4.dp))
                 Text(
-                    entry.team,
-                    fontSize = 12.sp,
+                    if (isPlayerRankings) {
+                        "${rankingEntryLabel(entry)} (${entry.team})"
+                    } else {
+                        entry.team
+                    },
+                    fontSize = if (isPlayerRankings) 11.sp else 12.sp,
                     fontWeight = if (isHighlighted) FontWeight.ExtraBold else FontWeight.Medium,
-                    fontFamily = FontFamily.Monospace,
+                    fontFamily = if (isPlayerRankings) FontFamily.Default else FontFamily.Monospace,
                     color = if (isHighlighted) highlightColor else onBg,
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(1f),
+                    maxLines = 1
                 )
                 Text(
                     if (isPct) formatPctValue(entry.value) else formatStatValue(entry.value),
@@ -1552,6 +1561,7 @@ fun StatRankingsBottomSheet(
     val displayEntries = if (isReversed) entries.reversed() else entries
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var selectedTeams by remember { mutableStateOf(highlightedTeams) }
+    val isPlayerRankings = entriesArePlayerRankings(entries)
 
     // Share capture state
     var shareRange by remember { mutableStateOf<ShareRange?>(null) }
@@ -1679,12 +1689,16 @@ fun StatRankingsBottomSheet(
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = "TEAM",
+                            text = if (isPlayerRankings) "PLAYER" else "TEAM",
                             style = MaterialTheme.typography.labelSmall,
                             fontSize = 9.sp,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
-                            modifier = Modifier.width(40.dp)
+                            modifier = if (isPlayerRankings) {
+                                Modifier.weight(1f)
+                            } else {
+                                Modifier.width(40.dp)
+                            }
                         )
                         Spacer(modifier = Modifier.width(12.dp))
                         Text(
@@ -1750,14 +1764,23 @@ fun StatRankingsBottomSheet(
 
                             Spacer(modifier = Modifier.width(6.dp))
 
-                            // Team abbreviation
+                            // Team or player label
                             Text(
-                                text = entry.team,
+                                text = if (isPlayerRankings) {
+                                    "${rankingEntryLabel(entry)} (${entry.team})"
+                                } else {
+                                    entry.team
+                                },
                                 style = MaterialTheme.typography.bodySmall,
                                 fontSize = 11.sp,
                                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                fontFamily = FontFamily.Monospace,
-                                modifier = Modifier.width(40.dp)
+                                fontFamily = if (isPlayerRankings) FontFamily.Default else FontFamily.Monospace,
+                                modifier = if (isPlayerRankings) {
+                                    Modifier.weight(1f)
+                                } else {
+                                    Modifier.width(40.dp)
+                                },
+                                maxLines = 1
                             )
 
                             Spacer(modifier = Modifier.width(12.dp))

@@ -179,7 +179,7 @@ private fun reportCardStatLabel(categoryKey: String, statKey: String): String {
 }
 
 private fun formatReportCardCategoryLabel(categoryKey: String): String = when (categoryKey) {
-    "recentTrend" -> "10 Week Trend"
+    "recentTrend" -> "4 Week Trend"
     "hitters" -> "Hitters"
     "starters" -> "Starting Pitchers"
     "relievers" -> "Bullpen"
@@ -258,7 +258,7 @@ private fun mergeReportCardRankings(
 }
 
 private enum class ReportCardShareTarget(val categoryKey: String?, val shareLabel: String) {
-    RECENT_TREND("recentTrend", "10 Week Trend"),
+    RECENT_TREND("recentTrend", "4 Week Trend"),
     HITTERS("hitters", "Hitters"),
     STARTERS("starters", "Starting Pitchers"),
     RELIEVERS("relievers", "Bullpen"),

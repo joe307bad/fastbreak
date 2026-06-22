@@ -2,6 +2,7 @@ package com.joebad.fastbreak
 
 import android.content.Context
 import android.content.Intent
+import android.util.Log
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -23,6 +24,133 @@ class DemoUITests {
     private lateinit var device: UiDevice
     private val packageName = "com.joebad.fastbreak"
     private val launchTimeout = 10000L
+
+    private fun signalRecordingReady(message: String) {
+        Log.i("DemoUITest", "RECORDING_READY - $message")
+        println("🎬 RECORDING_READY - $message")
+    }
+
+    private fun signalChartsSynced(message: String) {
+        Log.i("DemoUITest", "CHARTS_SYNCED - $message")
+        println("✅ CHARTS_SYNCED - $message")
+    }
+
+    private fun hasAnyChartVisible(): Boolean {
+        val patterns = listOf(
+            "Team Report Card",
+            "Matchup",
+            "Efficiency",
+            "Rating",
+            "Trend",
+            "Bracket",
+            "Playoff"
+        )
+        return patterns.any { pattern ->
+            device.findObject(By.textContains(pattern)) != null
+        }
+    }
+
+    private fun waitForChartsSynced(maxWaitMs: Long = 180_000): Boolean {
+        println("⏱ Waiting for chart registry to sync...")
+        val deadline = System.currentTimeMillis() + maxWaitMs
+
+        Thread.sleep(3000)
+
+        while (System.currentTimeMillis() < deadline) {
+            val syncing = device.findObject(By.textContains("Syncing charts"))
+            val noCharts = device.findObject(By.text("no charts available"))
+
+            if (noCharts != null) {
+                println("  → Chart list empty, tapping refresh...")
+                device.findObject(By.desc("Refresh"))?.click()
+                Thread.sleep(5000)
+                continue
+            }
+
+            if (syncing != null) {
+                println("  → Sync in progress...")
+                Thread.sleep(3000)
+                continue
+            }
+
+            if (hasAnyChartVisible()) {
+                println("✓ Charts visible in registry")
+                return true
+            }
+
+            val refresh = device.findObject(By.desc("Refresh"))
+            if (refresh != null) {
+                println("  → No charts visible yet, tapping refresh...")
+                refresh.click()
+                Thread.sleep(5000)
+                continue
+            }
+
+            Thread.sleep(2000)
+        }
+
+        println("⚠ Timed out waiting for charts to sync")
+        return false
+    }
+
+    private fun openMlbTab(): Boolean {
+        println("🔍 Looking for 'MLB' tab...")
+        val mlbTab = device.wait(
+            Until.findObject(By.text("MLB")),
+            10000
+        ) ?: return false
+
+        println("✓ Found MLB tab, tapping...")
+        mlbTab.click()
+        Thread.sleep(1000)
+        return true
+    }
+
+    private fun findReportCardChartItem(): androidx.test.uiautomator.UiObject2? {
+        return device.findObject(By.textContains("Team Report Card"))
+            ?: device.findObject(By.textContains("Report Card"))
+    }
+
+    private fun scrollChartListDown() {
+        val screenWidth = device.displayWidth
+        val screenHeight = device.displayHeight
+        device.swipe(
+            screenWidth / 2,
+            screenHeight * 2 / 3,
+            screenWidth / 2,
+            screenHeight / 4,
+            15
+        )
+        Thread.sleep(500)
+    }
+
+    private fun findReportCardChartWithScroll(maxScrolls: Int = 20): androidx.test.uiautomator.UiObject2? {
+        repeat(maxScrolls) { attempt ->
+            findReportCardChartItem()?.let { return it }
+            println("  → Scrolling chart list (attempt ${attempt + 1})...")
+            scrollChartListDown()
+        }
+        return findReportCardChartItem()
+    }
+
+    private fun ensureReportCardChartAvailable(): Boolean {
+        if (!waitForChartsSynced()) {
+            return false
+        }
+
+        if (!openMlbTab()) {
+            println("⚠ MLB tab not found")
+            return false
+        }
+
+        findReportCardChartWithScroll(maxScrolls = 20)?.let {
+            println("✓ Report card chart available")
+            return true
+        }
+
+        println("⚠ Report card chart not found after sync")
+        return false
+    }
 
     @Before
     fun setUp() {
@@ -1328,6 +1456,162 @@ class DemoUITests {
 
         println("✓ Full bracket should be visible")
         Thread.sleep(2000)
+
+        println("✓ Demo complete!")
+    }
+
+    /**
+     * Helper test used by provision-android-demo-emulator.sh to cache chart data
+     * before saving the demo snapshot.
+     */
+    @Test
+    fun testHelper_SyncChartsForDemo() {
+        println("⏱ Waiting for app to load...")
+        Thread.sleep(2000)
+
+        if (!waitForChartsSynced()) {
+            throw AssertionError("Chart registry failed to sync")
+        }
+
+        signalChartsSynced("Registry ready for demo snapshot")
+    }
+
+    /**
+     * Demo test: MLB Team Report Card walkthrough
+     * Shows: MLB tab > open report card > overall/playoff rankings > scroll categories >
+     *        switch team > player tables > category stat rankings
+     */
+    @Test
+    fun testDemo_MLBReportCardWalkthrough() {
+        println("⏱ Waiting for app to load...")
+        Thread.sleep(2000)
+
+        val screenWidth = device.displayWidth
+        val screenHeight = device.displayHeight
+
+        if (!ensureReportCardChartAvailable()) {
+            return
+        }
+
+        val reportCardItem = findReportCardChartItem()
+        if (reportCardItem == null) {
+            println("⚠ MLB Team Report Card not found")
+            return
+        }
+
+        println("✓ Found '${reportCardItem.text}', tapping...")
+        reportCardItem.click()
+        Thread.sleep(1500)
+
+        println("⏱ Waiting for report card to load...")
+        var loaded = device.wait(Until.findObject(By.text("Hitters")), 20000)
+        if (loaded == null) {
+            loaded = device.wait(Until.findObject(By.text("Overall")), 5000)
+        }
+        if (loaded == null) {
+            loaded = device.wait(Until.findObject(By.textContains("Week Trend")), 5000)
+        }
+        if (loaded == null) {
+            println("⚠ Report card content not detected")
+            return
+        }
+
+        println("✓ Report card loaded")
+        Thread.sleep(500)
+        signalRecordingReady("Starting MLB report card walkthrough...")
+
+        val overall = device.wait(Until.findObject(By.text("Overall")), 2000)
+        if (overall != null) {
+            println("📊 Opening overall composite rankings...")
+            overall.click()
+            Thread.sleep(1500)
+            device.pressBack()
+            Thread.sleep(500)
+        }
+
+        val playoffs = device.wait(Until.findObject(By.text("Playoffs")), 2000)
+        if (playoffs != null) {
+            println("📊 Opening playoff chances...")
+            playoffs.click()
+            Thread.sleep(1500)
+            device.pressBack()
+            Thread.sleep(500)
+        }
+
+        println("📜 Scrolling through report card categories...")
+        repeat(2) {
+            device.swipe(
+                screenWidth / 2,
+                screenHeight * 2 / 3,
+                screenWidth / 2,
+                screenHeight / 3,
+                18
+            )
+            Thread.sleep(800)
+        }
+
+        val hittersComposite = device.wait(Until.findObject(By.text("Composite")), 2000)
+        if (hittersComposite != null) {
+            println("📊 Opening category composite rankings...")
+            hittersComposite.click()
+            Thread.sleep(1500)
+            device.pressBack()
+            Thread.sleep(500)
+        }
+
+        println("📜 Scrolling player tables horizontally...")
+        device.swipe(
+            screenWidth * 3 / 4,
+            screenHeight / 2,
+            screenWidth / 4,
+            screenHeight / 2,
+            15
+        )
+        Thread.sleep(700)
+        device.swipe(
+            screenWidth / 4,
+            screenHeight / 2,
+            screenWidth * 3 / 4,
+            screenHeight / 2,
+            15
+        )
+        Thread.sleep(700)
+
+        println("🔍 Opening team picker...")
+        val teamPicker = device.wait(
+            Until.findObject(By.desc("Select team")),
+            2000
+        )
+        if (teamPicker != null) {
+            teamPicker.click()
+        } else {
+            val teamName = device.findObjects(By.clickable(true))
+                .firstOrNull { it.text != null && it.text.length > 3 && it.visibleBounds.top < screenHeight / 3 }
+            teamName?.click()
+        }
+        Thread.sleep(1000)
+
+        val teamOptions = device.findObjects(By.clickable(true))
+            .filter { it.text != null && it.text.length > 3 }
+        val alternateTeam = teamOptions.getOrNull(1) ?: teamOptions.firstOrNull()
+        if (alternateTeam != null) {
+            println("✓ Selecting alternate team '${alternateTeam.text}'...")
+            alternateTeam.click()
+            Thread.sleep(1200)
+        } else {
+            device.pressBack()
+            Thread.sleep(300)
+        }
+
+        println("📜 Final scroll through updated report card...")
+        device.swipe(
+            screenWidth / 2,
+            screenHeight * 2 / 3,
+            screenWidth / 2,
+            screenHeight / 3,
+            18
+        )
+        Thread.sleep(800)
 
         println("✓ Demo complete!")
     }

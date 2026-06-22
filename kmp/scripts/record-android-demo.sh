@@ -8,6 +8,11 @@ set -e
 
 # Configuration
 EMULATOR_NAME="${EMULATOR_NAME:-Pixel_9_Pro_API_36}"
+SNAPSHOT_NAME="${SNAPSHOT_NAME:-demo-clean}"
+USE_SNAPSHOT="${USE_SNAPSHOT:-1}"
+WIPE_ON_START="${WIPE_ON_START:-0}"
+RECORD_START_DELAY="${RECORD_START_DELAY:-10}"
+RECORD_ON_READY_ONLY="${RECORD_ON_READY_ONLY:-0}"
 OUTPUT_DIR="${OUTPUT_DIR:-$(dirname "$0")/../screenshots/demos}"
 TEST_CLASS="${TEST_CLASS:-com.joebad.fastbreak.DemoUITests}"
 TEST_METHOD="${TEST_METHOD:-testDemo_PinchToZoomAndPan}"
@@ -47,6 +52,19 @@ echo ""
 mkdir -p "$OUTPUT_DIR"
 OUTPUT_DIR="$(cd "$OUTPUT_DIR" && pwd)"
 
+snapshot_exists() {
+    local avd_name="$1"
+    local snapshot_name="$2"
+    local avd_home
+    for avd_home in "${ANDROID_AVD_HOME:-}" "$HOME/.android/avd" "$HOME/Library/Android/avd"; do
+        [ -n "$avd_home" ] || continue
+        if [ -d "$avd_home/${avd_name}.avd/snapshots/${snapshot_name}" ]; then
+            return 0
+        fi
+    done
+    return 1
+}
+
 # Check for running emulator or start one
 echo -e "${GREEN}Checking for Android emulator...${NC}"
 DEVICE_ID=$(adb devices | grep -E "emulator-[0-9]+" | awk '{print $1}' | head -1)
@@ -68,8 +86,20 @@ if [ -z "$DEVICE_ID" ]; then
     fi
 
     # Start emulator in background
-    echo -e "  → Starting $EMULATOR_NAME..."
-    emulator -avd "$EMULATOR_NAME" -no-snapshot-load -wipe-data > /dev/null 2>&1 &
+    EMULATOR_ARGS=(-avd "$EMULATOR_NAME" -no-snapshot-load -dns-server 8.8.8.8,8.8.4.4)
+    if [ "$USE_SNAPSHOT" = "1" ] && snapshot_exists "$EMULATOR_NAME" "$SNAPSHOT_NAME"; then
+        echo -e "  → Starting $EMULATOR_NAME from snapshot '$SNAPSHOT_NAME'..."
+        EMULATOR_ARGS+=(-snapshot "$SNAPSHOT_NAME")
+    elif [ "$WIPE_ON_START" = "1" ]; then
+        echo -e "  → Starting $EMULATOR_NAME with a fresh data partition..."
+        if [ "$USE_SNAPSHOT" = "1" ]; then
+            echo -e "${YELLOW}  ⚠ Snapshot '$SNAPSHOT_NAME' not found. Run ./scripts/provision-android-demo-emulator.sh first for a clean demo home screen.${NC}"
+        fi
+        EMULATOR_ARGS+=(-wipe-data)
+    else
+        echo -e "  → Starting $EMULATOR_NAME (keeping existing emulator data)..."
+    fi
+    emulator "${EMULATOR_ARGS[@]}" > /dev/null 2>&1 &
     EMULATOR_PID=$!
 
     # Wait for emulator to boot
@@ -92,7 +122,7 @@ fi
 echo ""
 
 # Extract demo name from test method
-DEMO_NAME=$(echo "$TEST_METHOD" | sed 's/testDemo_//' | sed 's/\([A-Z]\)/-\1/g' | tr '[:upper:]' '[:lower:]' | sed 's/^-//')
+DEMO_NAME="${DEMO_NAME:-$(echo "$TEST_METHOD" | sed 's/testDemo_//' | sed 's/\([a-z]\)\([A-Z]\)/\1-\2/g' | tr '[:upper:]' '[:lower:]')}"
 VIDEO_FILE="$OUTPUT_DIR/${DEMO_NAME}.mp4"
 
 # Build the app and test APK
@@ -127,6 +157,10 @@ echo ""
 
 # Run the UI Automator test in background
 echo -e "${GREEN}Starting UI Automator test...${NC}"
+LOGCAT_FILE="$OUTPUT_DIR/demo-logcat.log"
+adb -s "$DEVICE_ID" logcat -c >/dev/null 2>&1 || true
+adb -s "$DEVICE_ID" logcat -s DemoUITest:I > "$LOGCAT_FILE" 2>/dev/null &
+LOGCAT_PID=$!
 adb -s "$DEVICE_ID" shell am instrument -w -r \
     -e class "${TEST_CLASS}#${TEST_METHOD}" \
     com.joebad.fastbreak.test/androidx.test.runner.AndroidJUnitRunner \
@@ -134,33 +168,64 @@ adb -s "$DEVICE_ID" shell am instrument -w -r \
 TEST_PID=$!
 echo -e "${GREEN}✓ Test started (PID: $TEST_PID)${NC}"
 
-# Wait for the "RECORDING_READY" marker in the test output, or fallback to delay
-echo -e "  → Waiting for chart to load (max ${RECORD_DELAY}s)..."
+recording_ready_detected() {
+    grep -q "RECORDING_READY" "$OUTPUT_DIR/test-output.log" 2>/dev/null \
+        || grep -q "RECORDING_READY" "$LOGCAT_FILE" 2>/dev/null
+}
+
+# Start recording once the demo is ready, or after a short startup delay.
+if [ "$RECORD_ON_READY_ONLY" = "1" ]; then
+    echo -e "  → Waiting up to ${RECORD_DELAY}s for demo ready signal..."
+else
+    echo -e "  → Waiting up to ${RECORD_DELAY}s to start recording (ready signal or ${RECORD_START_DELAY}s)..."
+fi
 WAIT_COUNT=0
-while [ $WAIT_COUNT -lt $RECORD_DELAY ]; do
-    if grep -q "RECORDING_READY" "$OUTPUT_DIR/test-output.log" 2>/dev/null; then
-        echo -e "${GREEN}  ✓ Chart ready signal detected${NC}"
-        sleep 1  # Small additional delay to ensure screen is stable
+RECORDING_STARTED=0
+while [ $WAIT_COUNT -lt "$RECORD_DELAY" ]; do
+    if [ $RECORDING_STARTED -eq 0 ]; then
+        if recording_ready_detected; then
+            echo -e "${GREEN}  ✓ Demo ready signal detected${NC}"
+            sleep 1
+            echo -e "${GREEN}Starting screen recording...${NC}"
+            adb -s "$DEVICE_ID" shell screenrecord --size 720x1280 --bit-rate 8000000 /sdcard/demo-recording.mp4 &
+            RECORD_PID=$!
+            RECORDING_STARTED=1
+            echo -e "${GREEN}✓ Recording started (PID: $RECORD_PID)${NC}"
+            echo ""
+        elif [ "$RECORD_ON_READY_ONLY" != "1" ] && [ "$WAIT_COUNT" -ge "$RECORD_START_DELAY" ]; then
+            echo -e "${YELLOW}  → Starting recording after ${RECORD_START_DELAY}s startup delay${NC}"
+            sleep 1
+            echo -e "${GREEN}Starting screen recording...${NC}"
+            adb -s "$DEVICE_ID" shell screenrecord --size 720x1280 --bit-rate 8000000 /sdcard/demo-recording.mp4 &
+            RECORD_PID=$!
+            RECORDING_STARTED=1
+            echo -e "${GREEN}✓ Recording started (PID: $RECORD_PID)${NC}"
+            echo ""
+        fi
+    fi
+
+    if ! kill -0 "$TEST_PID" 2>/dev/null; then
         break
     fi
+
     sleep 1
     WAIT_COUNT=$((WAIT_COUNT + 1))
 done
 
-if [ $WAIT_COUNT -ge $RECORD_DELAY ]; then
-    echo -e "${YELLOW}  ⚠ Timeout waiting for ready signal, starting recording anyway${NC}"
-fi
+kill "$LOGCAT_PID" 2>/dev/null || true
 
-# Start screen recording (without --bugreport to remove FPS stats overlay)
-echo -e "${GREEN}Starting screen recording...${NC}"
-adb -s "$DEVICE_ID" shell screenrecord --bit-rate 8000000 /sdcard/demo-recording.mp4 &
-RECORD_PID=$!
-echo -e "${GREEN}✓ Recording started (PID: $RECORD_PID)${NC}"
-echo ""
+if [ $RECORDING_STARTED -eq 0 ]; then
+    echo -e "${YELLOW}  ⚠ Timed out before recording could start${NC}"
+fi
 
 # Wait for the test to complete
 echo -e "  → Waiting for test to complete...${NC}"
 wait $TEST_PID 2>/dev/null || true
+
+if [ $RECORDING_STARTED -eq 0 ]; then
+    echo -e "${RED}✗ Error: screen recording never started${NC}"
+    exit 1
+fi
 
 # Stop recording (screenrecord stops when Ctrl+C is sent)
 echo -e "${GREEN}Stopping recording...${NC}"
@@ -247,4 +312,5 @@ echo -e "  • Run specific test: TEST_METHOD=testDemo_PinchToZoomAndPan ./scrip
 echo -e "  • Change quality: FPS=15 SCALE=800 ./scripts/record-android-demo.sh"
 echo -e "  • Use different emulator: EMULATOR_NAME=\"Pixel_5_API_34\" ./scripts/record-android-demo.sh"
 echo -e "  • Delay recording start: RECORD_DELAY=5 ./scripts/record-android-demo.sh"
+echo -e "  • Provision clean demo emulator: ./scripts/provision-android-demo-emulator.sh"
 echo ""

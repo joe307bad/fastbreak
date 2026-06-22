@@ -930,9 +930,9 @@ cat(
 )
 
 # ============================================================================
-# 10-week trend (ESPN completed games)
+# 4-week trend (ESPN completed games)
 # ============================================================================
-TREND_WEEKS <- 10
+TREND_WEEKS <- 4
 TREND_DAYS <- TREND_WEEKS * 7
 
 safe_num <- function(x) {
@@ -1000,7 +1000,7 @@ fetch_game_batting_home_runs <- function(event_id) {
 }
 
 fetch_recent_trend_games <- function() {
-  cat("Fetching ESPN completed games for 10-week trend...\n")
+  cat("Fetching ESPN completed games for 4-week trend...\n")
   fetch_end <- Sys.Date() - 1
   fetch_start <- fetch_end - TREND_DAYS + 1
   trend_games <- list()
@@ -1066,7 +1066,7 @@ fetch_recent_trend_games <- function() {
 }
 
 trend_games_list <- fetch_recent_trend_games()
-cat("Fetched", length(trend_games_list), "team-game entries for 10-week trend\n")
+cat("Fetched", length(trend_games_list), "team-game entries for 4-week trend\n")
 
 team_trend <- tibble(team_code = ALL_TEAMS)
 if (length(trend_games_list) > 0) {
@@ -1094,7 +1094,7 @@ if (length(trend_games_list) > 0) {
   team_trend <- team_trend %>%
     left_join(trend_df, by = "team_code")
 
-  cat("Calculated 10-week trend rankings for", sum(!is.na(team_trend$win_pct)), "teams\n")
+  cat("Calculated 4-week trend rankings for", sum(!is.na(team_trend$win_pct)), "teams\n")
 }
 
 trend_labels <- list(
@@ -1438,7 +1438,7 @@ teams_json <- lapply(ALL_TEAMS, function(team) {
     playoffProb = team_playoff_prob,
     categories = list(
       recentTrend = list(
-        label = "10 Week Trend",
+        label = "4 Week Trend",
         description = paste0(
           "Recent team performance over the last ", TREND_WEEKS,
           " weeks from ESPN completed games. Includes record, run differential, ",
@@ -1620,8 +1620,8 @@ output_data <- list(
     " • WAR Lost: Sum of max(WAR, 0) × status weight for injured players. ",
     "Higher means more impact.\n\n",
     " • Impact: Per-player weighted WAR lost from that injury.\n\n",
-    " • 10 Week Trend: Recent team performance from ESPN completed games ",
-    "over the last 10 weeks. Includes record, run differential per game, ",
+    " • 4 Week Trend: Recent team performance from ESPN completed games ",
+    "over the last 4 weeks. Includes record, run differential per game, ",
     "runs scored/allowed per game, hits per game, and home runs per game."
   ),
   lastUpdated = format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC"),

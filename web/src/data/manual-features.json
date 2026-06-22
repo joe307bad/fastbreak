@@ -179,5 +179,24 @@
         { "type": "text", "value": " to see how Fastbreak stacks up against Google, CBS Sports, NCAA, Yahoo, and more." }
       ]
     }
+  },
+  {
+    "id": "mlb-report-card",
+    "title": "Team Report Cards",
+    "sortOrder": 10,
+    "demoGif": "/02-manual-screenshots/10-mlb-report-card-walkthrough.gif",
+    "demoAlt": "Team Report Cards walkthrough showing rankings, categories, and team switching",
+    "platforms": {
+      "ios": true,
+      "android": true,
+      "web": true
+    },
+    "dateReleased": "2026-06-22",
+    "version": "1.7.0",
+    "sections": {
+      "howToUse": "Open the MLB tab and tap the Team Report Card chart. Scroll through categories like Recent Trend, Hitters, Starters, Relievers, Fielders, and Injuries. Tap Overall or Playoffs to open league-wide ranking sheets. Tap Composite on a category to see how teams rank across that group's stats. Swipe horizontally on player tables to browse additional columns. Use the team picker at the top to switch teams and compare rosters side by side.",
+      "whatItDoes": "The MLB Team Report Card is a season-long dashboard for one team at a time. It combines recent form, playoff odds, and category breakdowns for hitting, pitching, defense, and injuries. Each stat shows the value plus a color-coded league rank, and ranking sheets let you see where every team stands for overall composite scores, playoff chances, or individual metrics.",
+      "whyUseful": "Instead of jumping between separate leaderboards and roster pages, the report card puts a team's full statistical profile in one scrollable view. Rank badges make it easy to spot strengths and weaknesses at a glance, and switching teams lets you quickly compare contenders without losing your place in the worksheet."
+    }
   }
 ]

@@ -35,53 +35,55 @@ class DemoUITests {
         println("✅ CHARTS_SYNCED - $message")
     }
 
-    private fun hasAnyChartVisible(): Boolean {
-        val patterns = listOf(
-            "Team Report Card",
-            "Matchup",
-            "Efficiency",
-            "Rating",
-            "Trend",
-            "Bracket",
-            "Playoff"
-        )
-        return patterns.any { pattern ->
-            device.findObject(By.textContains(pattern)) != null
-        }
+    private fun hasCachedChartVisible(): Boolean {
+        if (device.findObject(By.text("no charts available")) != null) return false
+        if (device.findObject(By.textContains("loading registry")) != null) return false
+        if (device.findObject(By.textContains("Syncing charts")) != null) return false
+        return device.findObject(By.textContains(" ago")) != null
+            || device.findObject(By.textContains("just now")) != null
+    }
+
+    private fun tapRefreshIfNeeded() {
+        device.findObject(By.desc("Refresh"))?.click()
+            ?: device.findObject(By.text("Retry"))?.click()
     }
 
     private fun waitForChartsSynced(maxWaitMs: Long = 180_000): Boolean {
-        println("⏱ Waiting for chart registry to sync...")
+        println("⏱ Waiting for chart data to finish caching...")
         val deadline = System.currentTimeMillis() + maxWaitMs
 
         Thread.sleep(3000)
 
         while (System.currentTimeMillis() < deadline) {
-            val syncing = device.findObject(By.textContains("Syncing charts"))
-            val noCharts = device.findObject(By.text("no charts available"))
+            if (hasCachedChartVisible()) {
+                println("✓ Cached charts visible")
+                return true
+            }
 
-            if (noCharts != null) {
+            if (device.findObject(By.text("no charts available")) != null) {
                 println("  → Chart list empty, tapping refresh...")
-                device.findObject(By.desc("Refresh"))?.click()
+                tapRefreshIfNeeded()
                 Thread.sleep(5000)
                 continue
             }
 
-            if (syncing != null) {
+            if (device.findObject(By.textContains("Syncing charts")) != null
+                || device.findObject(By.textContains("loading registry")) != null
+            ) {
                 println("  → Sync in progress...")
-                Thread.sleep(3000)
+                Thread.sleep(5000)
                 continue
             }
 
-            if (hasAnyChartVisible()) {
-                println("✓ Charts visible in registry")
-                return true
+            val cachedCount = if (hasCachedChartVisible()) 1 else 0
+            if (cachedCount > 0) {
+                println("  → Charts visible in UI, waiting for list to settle...")
             }
 
             val refresh = device.findObject(By.desc("Refresh"))
             if (refresh != null) {
-                println("  → No charts visible yet, tapping refresh...")
-                refresh.click()
+                println("  → Waiting for cached charts, tapping refresh...")
+                tapRefreshIfNeeded()
                 Thread.sleep(5000)
                 continue
             }
@@ -89,7 +91,7 @@ class DemoUITests {
             Thread.sleep(2000)
         }
 
-        println("⚠ Timed out waiting for charts to sync")
+        println("⚠ Timed out waiting for cached charts")
         return false
     }
 
@@ -150,6 +152,25 @@ class DemoUITests {
 
         println("⚠ Report card chart not found after sync")
         return false
+    }
+
+    /** Horizontal swipe on player stat rows — inset from edges to avoid opening the nav drawer. */
+    private fun swipeReportCardTableHorizontal(revealRightColumns: Boolean) {
+        val w = device.displayWidth
+        val h = device.displayHeight
+        val y = h * 58 / 100
+        val startX = if (revealRightColumns) w * 68 / 100 else w * 42 / 100
+        val endX = if (revealRightColumns) w * 42 / 100 else w * 68 / 100
+        device.swipe(startX, y, endX, y, 12)
+    }
+
+    private fun openRankingSheetAndDismiss(sheetLabel: String, selector: () -> androidx.test.uiautomator.UiObject2?) {
+        val sheetEntry = selector() ?: return
+        println("📊 Opening $sheetLabel...")
+        sheetEntry.click()
+        Thread.sleep(2200)
+        device.pressBack()
+        Thread.sleep(900)
     }
 
     @Before
@@ -1520,22 +1541,12 @@ class DemoUITests {
         Thread.sleep(500)
         signalRecordingReady("Starting MLB report card walkthrough...")
 
-        val overall = device.wait(Until.findObject(By.text("Overall")), 2000)
-        if (overall != null) {
-            println("📊 Opening overall composite rankings...")
-            overall.click()
-            Thread.sleep(1500)
-            device.pressBack()
-            Thread.sleep(500)
+        openRankingSheetAndDismiss("overall composite rankings") {
+            device.wait(Until.findObject(By.text("Overall")), 2000)
         }
 
-        val playoffs = device.wait(Until.findObject(By.text("Playoffs")), 2000)
-        if (playoffs != null) {
-            println("📊 Opening playoff chances...")
-            playoffs.click()
-            Thread.sleep(1500)
-            device.pressBack()
-            Thread.sleep(500)
+        openRankingSheetAndDismiss("playoff chances") {
+            device.wait(Until.findObject(By.text("Playoffs")), 2000)
         }
 
         println("📜 Scrolling through report card categories...")
@@ -1550,31 +1561,14 @@ class DemoUITests {
             Thread.sleep(800)
         }
 
-        val hittersComposite = device.wait(Until.findObject(By.text("Composite")), 2000)
-        if (hittersComposite != null) {
-            println("📊 Opening category composite rankings...")
-            hittersComposite.click()
-            Thread.sleep(1500)
-            device.pressBack()
-            Thread.sleep(500)
+        openRankingSheetAndDismiss("category composite rankings") {
+            device.wait(Until.findObject(By.text("Composite")), 2000)
         }
 
         println("📜 Scrolling player tables horizontally...")
-        device.swipe(
-            screenWidth * 3 / 4,
-            screenHeight / 2,
-            screenWidth / 4,
-            screenHeight / 2,
-            15
-        )
+        swipeReportCardTableHorizontal(revealRightColumns = true)
         Thread.sleep(700)
-        device.swipe(
-            screenWidth / 4,
-            screenHeight / 2,
-            screenWidth * 3 / 4,
-            screenHeight / 2,
-            15
-        )
+        swipeReportCardTableHorizontal(revealRightColumns = false)
         Thread.sleep(700)
 
         println("🔍 Opening team picker...")

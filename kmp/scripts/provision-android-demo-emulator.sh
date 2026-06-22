@@ -18,7 +18,8 @@ set -e
 EMULATOR_NAME="${EMULATOR_NAME:-Pixel_9_Pro_API_36}"
 SNAPSHOT_NAME="${SNAPSHOT_NAME:-demo-clean}"
 WIPE_DATA="${WIPE_DATA:-1}"
-SAVE_SNAPSHOT="${SAVE_SNAPSHOT:-1}"
+SAVE_SNAPSHOT="${SAVE_SNAPSHOT:-0}"
+MIN_CACHED_CHARTS="${MIN_CACHED_CHARTS:-10}"
 INTERACTIVE_HOME_SETUP="${INTERACTIVE_HOME_SETUP:-0}"
 SKIP_BUILD="${SKIP_BUILD:-0}"
 PACKAGE_NAME="${PACKAGE_NAME:-com.joebad.fastbreak}"
@@ -232,6 +233,60 @@ build_and_install_app() {
     adb install -r "$apk_path" >/dev/null
 }
 
+get_cached_chart_count() {
+    local db_copy="$TMP_DIR/fastbreak-chart-cache.db"
+    adb exec-out run-as "$PACKAGE_NAME" cat databases/fastbreak.db > "$db_copy" 2>/dev/null || return 1
+    if command -v sqlite3 >/dev/null 2>&1; then
+        sqlite3 "$db_copy" "SELECT COUNT(*) FROM chart_cache;" 2>/dev/null | tr -d '\r'
+    fi
+}
+
+has_registry_entries() {
+    adb shell run-as "$PACKAGE_NAME" sh -c \
+        'grep -l registry_entries shared_prefs/*.xml 2>/dev/null | head -1' \
+        2>/dev/null | grep -q .
+}
+
+verify_cached_data() {
+    log "Verifying cached chart data on device..."
+
+    adb shell am force-stop "$PACKAGE_NAME" >/dev/null 2>&1 || true
+    sleep 2
+    adb shell sync >/dev/null 2>&1 || true
+
+    local chart_count
+    chart_count="$(get_cached_chart_count)"
+    if [ -z "$chart_count" ] || [ "$chart_count" -lt "$MIN_CACHED_CHARTS" ]; then
+        err "✗ Expected at least $MIN_CACHED_CHARTS cached charts, found: ${chart_count:-0}"
+        return 1
+    fi
+
+    if ! has_registry_entries; then
+        err "✗ Registry entries were not persisted to app settings"
+        return 1
+    fi
+
+    log "✓ Verified $chart_count cached charts and registry entries"
+}
+
+cold_boot_verify() {
+    log "Cold booting emulator to verify chart cache persists..."
+    adb -s "$DEVICE_ID" emu kill >/dev/null 2>&1 || true
+    sleep 3
+
+    emulator -avd "$EMULATOR_NAME" -no-snapshot-load -dns-server 8.8.8.8,8.8.4.4 \
+        > "$TMP_DIR/emulator-cold.log" 2>&1 &
+    wait_for_boot
+
+    DEVICE_ID="$(adb devices | grep -E 'emulator-[0-9]+' | awk '{print $1}' | head -1)"
+    if [ -z "$DEVICE_ID" ]; then
+        err "✗ Emulator did not return after cold boot"
+        return 1
+    fi
+
+    verify_cached_data
+}
+
 launch_fastbreak() {
     log "Launching fastbreak once..."
     adb shell monkey -p "$PACKAGE_NAME" -c android.intent.category.LAUNCHER 1 >/dev/null 2>&1 || true
@@ -268,6 +323,8 @@ sync_chart_registry() {
         tail -30 "$TMP_DIR/sync-output.log"
         exit 1
     fi
+
+    verify_cached_data || exit 1
 
     if ! grep -q "CHARTS_SYNCED" "$TMP_DIR/sync-output.log" \
         && ! adb logcat -d -s DemoUITest:I 2>/dev/null | grep -q "CHARTS_SYNCED"; then
@@ -346,6 +403,7 @@ set_black_wallpaper
 hide_launcher_apps
 build_and_install_app
 sync_chart_registry
+cold_boot_verify || exit 1
 interactive_home_setup
 save_snapshot
 
@@ -355,11 +413,11 @@ echo -e "${BLUE}║         Provisioning Complete         ║${NC}"
 echo -e "${BLUE}╚════════════════════════════════════════╝${NC}"
 echo ""
 log "Emulator:  $EMULATOR_NAME ($DEVICE_ID)"
-log "Snapshot:  $SNAPSHOT_NAME"
+log "Cached charts verified after cold boot"
 echo ""
-warn "Next time, boot the demo emulator with:"
-echo -e "  ${BLUE}emulator -avd $EMULATOR_NAME -snapshot $SNAPSHOT_NAME${NC}"
+warn "Boot the demo emulator (keeps cached chart data in AVD userdata):"
+echo -e "  ${BLUE}emulator -avd $EMULATOR_NAME -no-snapshot-load -dns-server 8.8.8.8,8.8.4.4${NC}"
 echo ""
-warn "Or record a demo (uses snapshot automatically when available):"
+warn "Record a demo:"
 echo -e "  ${BLUE}cd kmp && ./scripts/record-android-demo.sh${NC}"
 echo ""

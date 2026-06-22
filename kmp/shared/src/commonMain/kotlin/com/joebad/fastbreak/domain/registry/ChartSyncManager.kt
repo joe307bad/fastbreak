@@ -5,6 +5,7 @@ import com.joebad.fastbreak.data.api.RegistryApi
 import com.joebad.fastbreak.data.model.BarGraphVisualization
 import com.joebad.fastbreak.data.model.CBBMatchupVisualization
 import com.joebad.fastbreak.data.model.CachedChartData
+import com.joebad.fastbreak.data.model.CachedChartMetadata
 import com.joebad.fastbreak.data.model.ChartDefinition
 import com.joebad.fastbreak.data.model.HelloWorldVisualization
 import com.joebad.fastbreak.data.model.LineChartVisualization
@@ -399,9 +400,9 @@ class ChartSyncManager(
 
         val charts = chartEntries.mapNotNull { (fileKey, entry) ->
             val chartId = fileKeyToChartId(fileKey)
-            val cached = chartCache.getChartData(chartId)
-            if (cached != null) {
-                buildChartDefinition(chartId, cached)
+            val metadata = chartCache.getChartMetadata(chartId)
+            if (metadata != null) {
+                buildChartDefinitionFromMetadata(chartId, entry, metadata)
             } else {
                 buildPlaceholderChartDefinition(chartId, entry)
             }
@@ -438,6 +439,28 @@ class ChartSyncManager(
         )
     }
 
+    private fun buildChartDefinitionFromMetadata(
+        chartId: String,
+        entry: RegistryEntry,
+        metadata: CachedChartMetadata
+    ): ChartDefinition? {
+        val sport = extractSportFromChartId(chartId) ?: return null
+        return ChartDefinition(
+            id = chartId,
+            sport = sport,
+            title = entry.title,
+            subtitle = metadata.subtitle,
+            lastUpdated = metadata.lastUpdated,
+            visualizationType = metadata.visualizationType,
+            url = "",
+            interval = metadata.interval ?: entry.interval,
+            cachedAt = metadata.cachedAt,
+            viewed = metadata.viewed,
+            tags = null,
+            sortOrder = null
+        )
+    }
+
     private fun buildPlaceholderChartDefinition(chartId: String, entry: RegistryEntry): ChartDefinition? {
         val sport = extractSportFromChartId(chartId) ?: return null
         return ChartDefinition(
@@ -470,7 +493,7 @@ class ChartSyncManager(
 
     fun hasChartData(chartId: String): Boolean = chartCache.hasChartData(chartId)
 
-    fun getChartCacheTime(chartId: String): Instant? = chartCache.getChartData(chartId)?.cachedAt
+    fun getChartCacheTime(chartId: String): Instant? = chartCache.getChartMetadata(chartId)?.cachedAt
 
     fun estimateCacheSize(): Long = chartCache.estimateTotalCacheSize()
 

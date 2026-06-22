@@ -218,11 +218,11 @@ fun SettingsScreen(
 
                 OutlinedButton(
                     onClick = onRefreshRegistry,
-                    enabled = !diagnostics.isSyncing || diagnostics.lastError != null,
+                    enabled = true,
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text(
-                        text = "refresh registry",
+                        text = if (diagnostics.isSyncing) "syncing..." else "refresh registry",
                         fontFamily = FontFamily.Monospace
                     )
                 }

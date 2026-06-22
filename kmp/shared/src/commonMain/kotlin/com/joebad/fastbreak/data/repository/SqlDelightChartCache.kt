@@ -1,6 +1,7 @@
 package com.joebad.fastbreak.data.repository
 
 import com.joebad.fastbreak.data.model.CachedChartData
+import com.joebad.fastbreak.data.model.CachedChartMetadata
 import com.joebad.fastbreak.data.model.VizType
 import com.joebad.fastbreak.db.FastbreakDatabase
 import kotlin.time.Instant
@@ -42,6 +43,19 @@ class SqlDelightChartCache(
             dataJson = row.data_json,
             interval = row.interval,
             viewed = row.viewed == 1L
+        )
+    }
+
+    override fun getChartMetadata(chartId: String): CachedChartMetadata? {
+        val row = queries.getChartMetadata(chartId).executeAsOneOrNull() ?: return null
+        return CachedChartMetadata(
+            chartId = row.id,
+            visualizationType = VizType.valueOf(row.visualization_type),
+            lastUpdated = Instant.fromEpochMilliseconds(row.last_updated),
+            cachedAt = Instant.fromEpochMilliseconds(row.cached_at),
+            interval = row.interval,
+            viewed = row.viewed == 1L,
+            subtitle = row.subtitle
         )
     }
 

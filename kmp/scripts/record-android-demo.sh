@@ -9,7 +9,7 @@ set -e
 # Configuration
 EMULATOR_NAME="${EMULATOR_NAME:-Pixel_9_Pro_API_36}"
 SNAPSHOT_NAME="${SNAPSHOT_NAME:-demo-clean}"
-USE_SNAPSHOT="${USE_SNAPSHOT:-1}"
+USE_SNAPSHOT="${USE_SNAPSHOT:-0}"
 WIPE_ON_START="${WIPE_ON_START:-0}"
 RECORD_START_DELAY="${RECORD_START_DELAY:-10}"
 RECORD_ON_READY_ONLY="${RECORD_ON_READY_ONLY:-0}"
@@ -19,6 +19,8 @@ TEST_METHOD="${TEST_METHOD:-testDemo_PinchToZoomAndPan}"
 FPS="${FPS:-10}"
 SCALE="${SCALE:-600}"
 RECORD_DELAY="${RECORD_DELAY:-8}"  # Seconds to wait after test starts before recording
+SKIP_CHART_SYNC="${SKIP_CHART_SYNC:-0}"
+MIN_CACHED_CHARTS="${MIN_CACHED_CHARTS:-10}"
 PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 PACKAGE_NAME="com.joebad.fastbreak"
 
@@ -63,6 +65,50 @@ snapshot_exists() {
         fi
     done
     return 1
+}
+
+get_cached_chart_count() {
+    local db_copy="${TMPDIR:-/tmp}/fastbreak-chart-cache.db"
+    adb -s "$DEVICE_ID" exec-out run-as "$PACKAGE_NAME" cat databases/fastbreak.db > "$db_copy" 2>/dev/null || return 1
+    if command -v sqlite3 >/dev/null 2>&1; then
+        sqlite3 "$db_copy" "SELECT COUNT(*) FROM chart_cache;" 2>/dev/null | tr -d '\r'
+    fi
+}
+
+sync_charts_if_needed() {
+    if [ "$SKIP_CHART_SYNC" = "1" ]; then
+        echo -e "${YELLOW}  → Skipping chart sync (SKIP_CHART_SYNC=1)${NC}"
+        return 0
+    fi
+
+    local chart_count
+    chart_count="$(get_cached_chart_count)"
+    if [ -n "$chart_count" ] && [ "$chart_count" -ge "$MIN_CACHED_CHARTS" ]; then
+        echo -e "${GREEN}✓ Found $chart_count cached charts${NC}"
+        return 0
+    fi
+
+    echo -e "${YELLOW}No cached charts found (count: ${chart_count:-0}). Syncing registry...${NC}"
+    adb -s "$DEVICE_ID" shell am instrument -w -r \
+        -e class "${TEST_CLASS}#testHelper_SyncChartsForDemo" \
+        com.joebad.fastbreak.test/androidx.test.runner.AndroidJUnitRunner \
+        > "$OUTPUT_DIR/sync-output.log" 2>&1 || true
+
+    if ! grep -q "OK (1 test)" "$OUTPUT_DIR/sync-output.log"; then
+        echo -e "${RED}✗ Chart sync failed${NC}"
+        echo -e "${YELLOW}Try provisioning the emulator first:${NC}"
+        echo -e "  ${BLUE}./scripts/provision-android-demo-emulator.sh${NC}"
+        tail -30 "$OUTPUT_DIR/sync-output.log"
+        exit 1
+    fi
+
+    chart_count="$(get_cached_chart_count)"
+    if [ -z "$chart_count" ] || [ "$chart_count" -lt "$MIN_CACHED_CHARTS" ]; then
+        echo -e "${RED}✗ Sync helper passed but only ${chart_count:-0} charts were cached${NC}"
+        exit 1
+    fi
+
+    echo -e "${GREEN}✓ Synced $chart_count charts${NC}"
 }
 
 # Check for running emulator or start one
@@ -153,6 +199,11 @@ fi
 adb -s "$DEVICE_ID" install -r "$APK_PATH" 2>&1 | tail -1
 adb -s "$DEVICE_ID" install -r "$TEST_APK_PATH" 2>&1 | tail -1
 echo -e "${GREEN}✓ App and test APK installed${NC}"
+echo ""
+
+# Ensure chart data is cached before running the demo
+echo -e "${GREEN}Checking chart cache...${NC}"
+sync_charts_if_needed
 echo ""
 
 # Run the UI Automator test in background
@@ -313,4 +364,5 @@ echo -e "  • Change quality: FPS=15 SCALE=800 ./scripts/record-android-demo.sh
 echo -e "  • Use different emulator: EMULATOR_NAME=\"Pixel_5_API_34\" ./scripts/record-android-demo.sh"
 echo -e "  • Delay recording start: RECORD_DELAY=5 ./scripts/record-android-demo.sh"
 echo -e "  • Provision clean demo emulator: ./scripts/provision-android-demo-emulator.sh"
+echo -e "  • Skip chart sync if already cached: SKIP_CHART_SYNC=1 ./scripts/record-android-demo.sh"
 echo ""

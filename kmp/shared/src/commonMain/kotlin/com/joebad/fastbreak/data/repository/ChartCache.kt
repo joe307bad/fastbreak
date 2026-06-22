@@ -1,6 +1,7 @@
 package com.joebad.fastbreak.data.repository
 
 import com.joebad.fastbreak.data.model.CachedChartData
+import com.joebad.fastbreak.data.model.CachedChartMetadata
 
 /**
  * Interface for chart data caching operations.
@@ -25,6 +26,11 @@ interface ChartCache {
      * @return The cached data, or null if not found
      */
     fun getChartData(chartId: String): CachedChartData?
+
+    /**
+     * Retrieves cached chart metadata without loading [CachedChartData.dataJson].
+     */
+    fun getChartMetadata(chartId: String): CachedChartMetadata?
 
     /**
      * Gets the list of all cached chart IDs.

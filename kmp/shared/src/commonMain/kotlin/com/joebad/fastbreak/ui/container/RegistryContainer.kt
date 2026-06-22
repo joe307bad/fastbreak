@@ -191,6 +191,7 @@ class RegistryContainer(
         reduce {
             state.copy(
                 isLoading = true,
+                isSyncing = true,
                 error = null,
                 syncProgress = null,
                 diagnostics = state.diagnostics.copy(
@@ -356,6 +357,7 @@ class RegistryContainer(
         // Guard: prevent concurrent refresh operations
         if (container.stateFlow.value.isSyncing) {
             println("⚠️  Refresh already in progress, ignoring duplicate request")
+            postSideEffect(RegistrySideEffect.ShowError("Sync already in progress"))
             return@intent
         }
 

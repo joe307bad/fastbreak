@@ -766,7 +766,7 @@ export function formatReportCardRankingLabel(seasonLabel: string, key: string): 
 function formatReportCardCategoryLabel(categoryKey: string): string {
   switch (categoryKey) {
     case 'recentTrend':
-      return '10 Week Trend';
+      return '4 Week Trend';
     case 'hitters':
       return 'Hitters';
     case 'starters':

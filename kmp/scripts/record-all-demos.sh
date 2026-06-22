@@ -20,7 +20,8 @@ DEMOS=(
     "testDemo_RefreshButton"
     "testDemo_NavigateChartsAndShowInfo"
     "testDemo_Week18MatchupWorksheet"
-    "testDemo_DivisionalRoundShareWalkthrough"
+    "testDemo_DivisionalRoundShareWalkthrough",
+    "testDemo_MLBReportCardWalkthrough"
 )
 
 # Colors for output

@@ -586,6 +586,7 @@ export interface ReportCardCategories {
   starters: ReportCardCategory;
   relievers: ReportCardCategory;
   fielders: ReportCardCategory;
+  belowReplacement?: ReportCardCategory;
   injuries?: ReportCardCategory;
 }
 

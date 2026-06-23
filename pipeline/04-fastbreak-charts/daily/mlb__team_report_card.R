@@ -389,12 +389,15 @@ stat_entry <- function(row, col, label, digits = NULL, display_value = NULL) {
   }
   value <- as.numeric(row[[col]])
   if (!is.null(digits)) value <- round(value, digits)
-  rank_val <- row[[paste0(col, "_rank")]]
+  rank_col <- paste0(col, "_rank")
+  rank_display_col <- paste0(col, "_rankDisplay")
+  rank_val <- if (rank_col %in% names(row)) row[[rank_col]] else NA
+  rank_display <- if (rank_display_col %in% names(row)) row[[rank_display_col]] else NA
   list(
     label = label,
     value = value,
-    rank = if (is.na(rank_val)) NULL else as.integer(rank_val),
-    rankDisplay = row[[paste0(col, "_rankDisplay")]],
+    rank = if (length(rank_val) == 0 || is.na(rank_val)) NULL else as.integer(rank_val[[1]]),
+    rankDisplay = if (length(rank_display) == 0 || is.na(rank_display)) NULL else as.character(rank_display[[1]]),
     displayValue = display_value
   )
 }
@@ -415,7 +418,7 @@ add_composite_score <- function(df, stat_cols) {
     pct
   }, numeric(n))
   if (length(stat_cols) == 1) {
-    df$composite_score <- score_matrix
+    df$composite_score <- as.numeric(score_matrix)
   } else {
     df$composite_score <- rowMeans(score_matrix, na.rm = TRUE)
   }
@@ -424,27 +427,30 @@ add_composite_score <- function(df, stat_cols) {
 }
 
 composite_stat_entry <- function(row) {
-  if (is.null(row) || is.na(row$composite_score)) {
+  composite <- if (!is.null(row) && "composite_score" %in% names(row)) row$composite_score else NA
+  if (is.null(row) || length(composite) == 0 || is.na(composite[[1]])) {
     return(list(label = "Composite", value = NULL, rank = NULL, rankDisplay = NULL))
   }
   list(
     label = "Composite",
-    value = round(row$composite_score, 1),
+    value = round(composite[[1]], 1),
     rank = NULL,
     rankDisplay = NULL
   )
 }
 
 team_composite_stat_entry <- function(row) {
-  if (is.null(row) || nrow(row) == 0 || is.na(row$composite_score)) {
+  composite <- if (!is.null(row) && "composite_score" %in% names(row)) as.numeric(row$composite_score) else NA_real_
+  if (is.null(row) || length(composite) == 0 || is.na(composite[[1]])) {
     return(list(label = "Composite", value = NULL, rank = NULL, rankDisplay = NULL))
   }
-  rank_val <- row$composite_score_rank
+  rank_val <- if ("composite_score_rank" %in% names(row)) as.integer(row$composite_score_rank[[1]]) else NA_integer_
+  rank_display <- if ("composite_score_rankDisplay" %in% names(row)) as.character(row$composite_score_rankDisplay[[1]]) else NA_character_
   list(
     label = "Composite",
-    value = round(row$composite_score, 1),
-    rank = if (is.na(rank_val)) NULL else as.integer(rank_val),
-    rankDisplay = row$composite_score_rankDisplay
+    value = round(composite[[1]], 1),
+    rank = if (is.na(rank_val)) NULL else rank_val,
+    rankDisplay = if (is.na(rank_display)) NULL else rank_display
   )
 }
 
@@ -471,6 +477,17 @@ top_team_players <- function(df, team, stat_cols, stat_labels, digits_map = list
   team_df <- df %>%
     filter(team_code == team) %>%
     arrange(desc(composite_score)) %>%
+    head(TOP_N)
+  if (nrow(team_df) == 0) return(list())
+  lapply(seq_len(nrow(team_df)), function(i) {
+    build_player(team_df[i, ], stat_cols, stat_labels, digits_map)
+  })
+}
+
+below_replacement_team_players <- function(df, team, stat_cols, stat_labels, digits_map = list()) {
+  team_df <- df %>%
+    filter(team_code == team) %>%
+    arrange(WAR, desc(PA)) %>%
     head(TOP_N)
   if (nrow(team_df) == 0) return(list())
   lapply(seq_len(nrow(team_df)), function(i) {
@@ -1353,10 +1370,58 @@ build_player_pool_rankings <- function(category, df, stat_cols) {
   )
 }
 
+below_replacement <- batter_stats %>%
+  mutate(
+    team_code = vapply(team_name_abb, normalize_team, character(1)),
+    PA = as.integer(PA),
+    WAR = as.numeric(WAR),
+    wRC_plus = as.numeric(wRC_plus),
+    Pos = coalesce(as.character(position), as.character(positionDB))
+  ) %>%
+  filter(
+    !is.na(team_code),
+    !is.na(PA), !is.na(WAR),
+    PA >= MIN_PA,
+    WAR < 0
+  )
+
+team_batter_pa <- batter_stats %>%
+  mutate(
+    team_code = vapply(team_name_abb, normalize_team, character(1)),
+    PA = as.integer(PA)
+  ) %>%
+  filter(!is.na(team_code), !is.na(PA)) %>%
+  group_by(team_code) %>%
+  summarise(team_pa = sum(PA), .groups = "drop")
+
+team_below_replacement_totals <- below_replacement %>%
+  group_by(team_code) %>%
+  summarise(below_replacement_pa = sum(PA), .groups = "drop")
+
+team_below_replacement <- tibble(team_code = ALL_TEAMS) %>%
+  left_join(team_batter_pa, by = "team_code") %>%
+  left_join(team_below_replacement_totals, by = "team_code") %>%
+  mutate(
+    below_replacement_pa = coalesce(as.integer(below_replacement_pa), 0L),
+    team_pa = coalesce(as.integer(team_pa), 0L),
+    below_replacement_pa_pct = if_else(
+      team_pa > 0,
+      below_replacement_pa / team_pa * 100,
+      0
+    )
+  )
+
+team_below_replacement <- rank_and_assign(
+  team_below_replacement, "below_replacement_pa_pct", lower_better = FALSE
+)
+team_below_replacement <- add_composite_score(team_below_replacement, c("below_replacement_pa_pct"))
+team_below_replacement <- rank_and_assign(team_below_replacement, "composite_score", lower_better = FALSE)
+
 cat("Qualified pools — hitters:", nrow(hitters),
     "| starters:", nrow(starters),
     "| relievers:", nrow(relievers),
-    "| fielders:", nrow(fielders), "\n")
+    "| fielders:", nrow(fielders),
+    "| below-replacement:", nrow(below_replacement), "\n")
 
 hitter_labels <- c(wRC_plus = "wRC+", xwOBA = "xwOBA", xBA = "xBA", Barrel_pct = "Barrel%")
 starter_labels <- c(`K-BB_pct` = "K-BB%", xFIP = "xFIP", SIERA = "SIERA", ERA = "ERA")
@@ -1371,6 +1436,10 @@ reliever_team_digits <- list(`K-BB_pct` = 1, FIP = 2, SV_per_G = 2, SIERA = 2, E
 fielder_digits <- list(OAA = 1, DRS = 1, FRP = 0)
 injury_labels <- c(injured_count = "Injured", injury_war = "WAR Lost")
 injury_digits <- list(injured_count = 0, injury_war = 2)
+below_replacement_labels <- c(PA = "PA", wRC_plus = "wRC+")
+below_replacement_digits <- list(PA = 0, wRC_plus = 0)
+below_replacement_team_labels <- c(below_replacement_pa_pct = "BR PA%")
+below_replacement_team_digits <- list(below_replacement_pa_pct = 1)
 
 # Scale K-BB% to percentage points for display consistency with other MLB charts.
 scale_k_bb <- function(df) {
@@ -1405,6 +1474,10 @@ teams_json <- lapply(ALL_TEAMS, function(team) {
     c("OAA", "DRS", "FRP"), fielder_labels, fielder_digits
   )
   injuries_list <- team_injured_players(injury_players, team)
+  below_replacement_list <- below_replacement_team_players(
+    below_replacement, team,
+    c("PA", "wRC_plus"), below_replacement_labels, below_replacement_digits
+  )
 
   record_row <- team_records %>% filter(team_code == team)
   overall_row <- team_overall %>% filter(team_code == team)
@@ -1483,6 +1556,20 @@ teams_json <- lapply(ALL_TEAMS, function(team) {
         ),
         players = fielders_list
       ),
+      belowReplacement = list(
+        label = "Below-replacement performers",
+        description = paste0(
+          "Regulars with negative FanGraphs WAR and at least ", MIN_PA,
+          " plate appearances, sorted by worst WAR. Team BR PA% is the share ",
+          "of team plate appearances from those hitters. Higher composite = ",
+          "more playing time to below-replacement regulars. Rank 1 = worst."
+        ),
+        team = build_team_category_stats(
+          team_below_replacement, team,
+          c("below_replacement_pa_pct"), below_replacement_team_labels, below_replacement_team_digits
+        ),
+        players = below_replacement_list
+      ),
       injuries = list(
         label = "Injury Report",
         description = paste0(
@@ -1548,6 +1635,13 @@ rankings_json <- c(
       "composite_score",
       "composite_score_rank",
       "composite_score_rankDisplay"
+    ),
+    belowReplacementComposite = build_rankings(
+      team_below_replacement,
+      "team_code",
+      "composite_score",
+      "composite_score_rank",
+      "composite_score_rankDisplay"
     )
   ),
   build_category_stat_rankings(
@@ -1564,6 +1658,9 @@ rankings_json <- c(
   ),
   build_category_stat_rankings(
     "injuries", team_injuries, c("injured_count", "injury_war")
+  ),
+  build_category_stat_rankings(
+    "belowReplacement", team_below_replacement, c("below_replacement_pa_pct")
   ),
   build_trend_rankings(team_trend),
   build_player_pool_rankings(
@@ -1620,6 +1717,10 @@ output_data <- list(
     " • WAR Lost: Sum of max(WAR, 0) × status weight for injured players. ",
     "Higher means more impact.\n\n",
     " • Impact: Per-player weighted WAR lost from that injury.\n\n",
+    " • Below-replacement performers: Hitters with negative WAR and at least ",
+    MIN_PA, " plate appearances. BR PA% is the share of team plate ",
+    "appearances from those regulars. Composite ranks teams by that share — ",
+    "rank 1 = most below-replacement playing time.\n\n",
     " • 4 Week Trend: Recent team performance from ESPN completed games ",
     "over the last 4 weeks. Includes record, run differential per game, ",
     "runs scored/allowed per game, hits per game, and home runs per game."

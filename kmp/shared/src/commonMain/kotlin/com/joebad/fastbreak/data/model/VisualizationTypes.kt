@@ -1223,6 +1223,7 @@ data class ReportCardCategories(
     val starters: ReportCardCategory,
     val relievers: ReportCardCategory,
     val fielders: ReportCardCategory,
+    val belowReplacement: ReportCardCategory? = null,
     val injuries: ReportCardCategory? = null
 )
 

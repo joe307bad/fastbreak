@@ -758,6 +758,8 @@ export function formatReportCardRankingLabel(seasonLabel: string, key: string): 
       return `${seasonLabel} / Fielders Composite`;
     case 'injuriesComposite':
       return `${seasonLabel} / Injury Report Composite`;
+    case 'belowReplacementComposite':
+      return `${seasonLabel} / Below-replacement performers Composite`;
     default:
       return `${seasonLabel} / ${key}`;
   }
@@ -777,6 +779,8 @@ function formatReportCardCategoryLabel(categoryKey: string): string {
       return 'Fielders';
     case 'injuries':
       return 'Injury Report';
+    case 'belowReplacement':
+      return 'Below-replacement performers';
     default:
       return categoryKey;
   }
@@ -845,6 +849,17 @@ function formatReportCardStatLabel(categoryKey: string, statKey: string): string
         default:
           return statKey;
       }
+    case 'belowReplacement':
+      switch (statKey) {
+        case 'below_replacement_pa_pct':
+          return 'BR PA%';
+        case 'PA':
+          return 'PA';
+        case 'wRC_plus':
+          return 'wRC+';
+        default:
+          return statKey;
+      }
     case 'recentTrend':
       switch (statKey) {
         case 'record':
@@ -868,5 +883,10 @@ function formatReportCardStatLabel(categoryKey: string, statKey: string): string
 }
 
 export function isReportCardRankingPct(key: string): boolean {
-  return key === 'record' || key.endsWith('.K-BB_pct') || key.endsWith('.Barrel_pct');
+  return (
+    key === 'record' ||
+    key.endsWith('.K-BB_pct') ||
+    key.endsWith('.Barrel_pct') ||
+    key.endsWith('.below_replacement_pa_pct')
+  );
 }

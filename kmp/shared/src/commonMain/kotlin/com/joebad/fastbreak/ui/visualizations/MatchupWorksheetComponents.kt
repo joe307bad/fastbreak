@@ -298,7 +298,11 @@ fun getMLBTeamRankColor(rank: Int?): Color {
         }
         rank <= 20 -> {
             val ratio = (rank - 11) / 9f
-            Color((255 - ratio * 55).toInt(), (160 - ratio * 60).toInt(), 0)
+            Color(
+                (200 - ratio * 45).toInt(),
+                (95 - ratio * 35).toInt(),
+                0
+            )
         }
         else -> {
             val ratio = ((rank - 21).coerceAtMost(9)) / 9f

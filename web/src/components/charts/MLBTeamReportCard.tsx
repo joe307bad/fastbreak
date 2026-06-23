@@ -18,9 +18,24 @@ import {
   StatRankingsSheet,
 } from '@/components/charts/MLBReportCardSheets';
 
-type CategoryKey = 'recentTrend' | 'hitters' | 'starters' | 'relievers' | 'fielders' | 'injuries';
+type CategoryKey =
+  | 'recentTrend'
+  | 'hitters'
+  | 'starters'
+  | 'relievers'
+  | 'fielders'
+  | 'belowReplacement'
+  | 'injuries';
 
-const CATEGORY_KEYS: CategoryKey[] = ['recentTrend', 'hitters', 'starters', 'relievers', 'fielders', 'injuries'];
+const CATEGORY_KEYS: CategoryKey[] = [
+  'recentTrend',
+  'hitters',
+  'starters',
+  'relievers',
+  'fielders',
+  'belowReplacement',
+  'injuries',
+];
 
 const CATEGORY_STAT_KEYS: Record<CategoryKey, string[]> = {
   recentTrend: ['record', 'runDiffPerGame', 'runsPerGame', 'runsAllowedPerGame', 'hitsPerGame', 'hrsPerGame'],
@@ -28,7 +43,12 @@ const CATEGORY_STAT_KEYS: Record<CategoryKey, string[]> = {
   starters: ['K-BB_pct', 'xFIP', 'SIERA', 'ERA'],
   relievers: ['K-BB_pct', 'FIP', 'SV', 'SIERA', 'ERA'],
   fielders: ['OAA', 'DRS', 'FRP'],
+  belowReplacement: ['below_replacement_pa_pct'],
   injuries: ['impact'],
+};
+
+const CATEGORY_PLAYER_STAT_KEYS: Partial<Record<CategoryKey, string[]>> = {
+  belowReplacement: ['PA', 'wRC_plus'],
 };
 
 const CATEGORY_COMPOSITE_RANKING_KEYS: Partial<Record<CategoryKey, string>> = {
@@ -36,6 +56,7 @@ const CATEGORY_COMPOSITE_RANKING_KEYS: Partial<Record<CategoryKey, string>> = {
   starters: 'startersComposite',
   relievers: 'relieversComposite',
   fielders: 'fieldersComposite',
+  belowReplacement: 'belowReplacementComposite',
   injuries: 'injuriesComposite',
 };
 
@@ -45,6 +66,7 @@ const CATEGORY_SHOW_STATUS_COLUMN: Partial<Record<CategoryKey, boolean>> = {
 
 const CATEGORY_SHOW_PLAYER_RANK_AND_COMPOSITE: Partial<Record<CategoryKey, boolean>> = {
   recentTrend: false,
+  belowReplacement: false,
   injuries: false,
 };
 
@@ -178,7 +200,8 @@ function CategoryPanel({
   categoryKey,
   title,
   category,
-  statKeys,
+  teamStatKeys,
+  playerStatKeys,
   positionColumnLabel = 'Pos',
   showPlayerRankAndComposite = true,
   showStatusColumn = false,
@@ -188,7 +211,8 @@ function CategoryPanel({
   categoryKey: CategoryKey;
   title: string;
   category: ReportCardCategory;
-  statKeys: string[];
+  teamStatKeys: string[];
+  playerStatKeys: string[];
   positionColumnLabel?: string;
   showPlayerRankAndComposite?: boolean;
   showStatusColumn?: boolean;
@@ -196,7 +220,10 @@ function CategoryPanel({
   onRankingClick: (key: string) => void;
 }) {
   const statLabels = Object.fromEntries(
-    statKeys.map(key => [key, category.players[0]?.stats[key]?.label ?? category.team?.stats[key]?.label ?? key])
+    [...teamStatKeys, ...playerStatKeys].map(key => [
+      key,
+      category.players[0]?.stats[key]?.label ?? category.team?.stats[key]?.label ?? key,
+    ])
   );
 
   const hasTeam = !!category.team;
@@ -216,7 +243,7 @@ function CategoryPanel({
 
       <div className="px-2">
         {hasTeam &&
-          statKeys.map(key => {
+          teamStatKeys.map(key => {
             const stat = category.team!.stats[key];
             if (!stat) return null;
             const rankingKey = reportCardStatRankingKey(categoryKey, key);
@@ -244,7 +271,7 @@ function CategoryPanel({
       {hasPlayers && (
         <PlayerTable
           players={category.players}
-          statKeys={statKeys}
+          statKeys={playerStatKeys}
           labels={statLabels}
           categoryKey={categoryKey}
           rankings={rankings}
@@ -542,9 +569,12 @@ export function MLBTeamReportCard({ data }: Props) {
       <div className="flex-1 min-h-0 w-full max-w-full overflow-y-auto overflow-x-hidden">
         <TwoColumnMasonry className="pb-8">
           {CATEGORY_KEYS.flatMap(key => {
-            const category = key === 'recentTrend'
-              ? team.categories.recentTrend
-              : team.categories[key];
+            const category =
+              key === 'recentTrend'
+                ? team.categories.recentTrend
+                : key === 'belowReplacement'
+                  ? team.categories.belowReplacement
+                  : team.categories[key];
             if (!category) return [];
             return [
               <CategoryPanel
@@ -552,7 +582,8 @@ export function MLBTeamReportCard({ data }: Props) {
                 categoryKey={key}
                 title={category.label}
                 category={category}
-                statKeys={CATEGORY_STAT_KEYS[key]}
+                teamStatKeys={CATEGORY_STAT_KEYS[key]}
+                playerStatKeys={CATEGORY_PLAYER_STAT_KEYS[key] ?? CATEGORY_STAT_KEYS[key]}
                 showPlayerRankAndComposite={CATEGORY_SHOW_PLAYER_RANK_AND_COMPOSITE[key] ?? true}
                 showStatusColumn={CATEGORY_SHOW_STATUS_COLUMN[key] ?? false}
                 rankings={data.rankings}

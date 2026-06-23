@@ -1412,7 +1412,7 @@ team_below_replacement <- tibble(team_code = ALL_TEAMS) %>%
   )
 
 team_below_replacement <- rank_and_assign(
-  team_below_replacement, "below_replacement_pa_pct", lower_better = FALSE
+  team_below_replacement, "below_replacement_pa_pct", lower_better = TRUE
 )
 team_below_replacement <- add_composite_score(team_below_replacement, c("below_replacement_pa_pct"))
 team_below_replacement <- rank_and_assign(team_below_replacement, "composite_score", lower_better = FALSE)
@@ -1562,7 +1562,7 @@ teams_json <- lapply(ALL_TEAMS, function(team) {
           "Regulars with negative FanGraphs WAR and at least ", MIN_PA,
           " plate appearances, sorted by worst WAR. Team BR PA% is the share ",
           "of team plate appearances from those hitters. Higher composite = ",
-          "more playing time to below-replacement regulars. Rank 1 = worst."
+          "fewer below-replacement regulars. Rank 1 = best."
         ),
         team = build_team_category_stats(
           team_below_replacement, team,
@@ -1720,7 +1720,7 @@ output_data <- list(
     " • Below-replacement performers: Hitters with negative WAR and at least ",
     MIN_PA, " plate appearances. BR PA% is the share of team plate ",
     "appearances from those regulars. Composite ranks teams by that share — ",
-    "rank 1 = most below-replacement playing time.\n\n",
+    "rank 1 = fewest below-replacement plate appearances.\n\n",
     " • 4 Week Trend: Recent team performance from ESPN completed games ",
     "over the last 4 weeks. Includes record, run differential per game, ",
     "runs scored/allowed per game, hits per game, and home runs per game."

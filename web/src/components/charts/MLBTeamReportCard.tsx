@@ -1,6 +1,6 @@
 'use client';
 
-import { Children, isValidElement, useMemo, useState } from 'react';
+import { Children, isValidElement, useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import {
   MLBTeamReportCardData,
   ReportCardCategory,
@@ -62,6 +62,10 @@ const CATEGORY_COMPOSITE_RANKING_KEYS: Partial<Record<CategoryKey, string>> = {
 
 const CATEGORY_SHOW_STATUS_COLUMN: Partial<Record<CategoryKey, boolean>> = {
   injuries: true,
+};
+
+const CATEGORY_SHOW_WAR_COLUMN: Partial<Record<CategoryKey, boolean>> = {
+  belowReplacement: true,
 };
 
 const CATEGORY_SHOW_PLAYER_RANK_AND_COMPOSITE: Partial<Record<CategoryKey, boolean>> = {
@@ -166,8 +170,40 @@ function reportCardStatRankingKey(categoryKey: CategoryKey, statKey: string): st
   return `${categoryKey}.${statKey}`;
 }
 
+function reportCardPlayerRowKey(player: ReportCardPlayer, index: number): string {
+  return `${player.playerId}-${player.position ?? ''}-${index}`;
+}
+
 function reportCardPlayerStatRankingKey(categoryKey: CategoryKey, statKey: string): string {
   return `${categoryKey}.player.${statKey}`;
+}
+
+function getHashTeamAbbrev(): string {
+  if (typeof window === 'undefined') return '';
+  return decodeURIComponent(window.location.hash.slice(1)).trim().toUpperCase();
+}
+
+function resolveTeamCode(
+  teams: ReportCardTeam[],
+  pinnedCodes: string[],
+  hashAbbrev: string
+): string {
+  if (hashAbbrev) {
+    const fromHash = teams.find(t => t.teamCode.toUpperCase() === hashAbbrev);
+    if (fromHash) return fromHash.teamCode;
+  }
+  for (const code of pinnedCodes) {
+    const match = teams.find(t => t.teamCode.toUpperCase() === code.toUpperCase());
+    if (match) return match.teamCode;
+  }
+  return teams[0]?.teamCode ?? '';
+}
+
+function setHashTeamAbbrev(teamCode: string) {
+  const hash = teamCode.toUpperCase();
+  if (window.location.hash.slice(1).toUpperCase() !== hash) {
+    window.history.replaceState(null, '', `#${hash}`);
+  }
 }
 
 function TwoColumnMasonry({
@@ -205,6 +241,7 @@ function CategoryPanel({
   positionColumnLabel = 'Pos',
   showPlayerRankAndComposite = true,
   showStatusColumn = false,
+  showWarColumn = false,
   rankings,
   onRankingClick,
 }: {
@@ -216,6 +253,7 @@ function CategoryPanel({
   positionColumnLabel?: string;
   showPlayerRankAndComposite?: boolean;
   showStatusColumn?: boolean;
+  showWarColumn?: boolean;
   rankings: MLBTeamReportCardData['rankings'];
   onRankingClick: (key: string) => void;
 }) {
@@ -279,6 +317,7 @@ function CategoryPanel({
           positionColumnLabel={positionColumnLabel}
           showPlayerRankAndComposite={showPlayerRankAndComposite}
           showStatusColumn={showStatusColumn}
+          showWarColumn={showWarColumn}
         />
       )}
     </div>
@@ -316,6 +355,7 @@ function PlayerTable({
   positionColumnLabel = 'Pos',
   showPlayerRankAndComposite = true,
   showStatusColumn = false,
+  showWarColumn = false,
 }: {
   players: ReportCardPlayer[];
   statKeys: string[];
@@ -326,6 +366,7 @@ function PlayerTable({
   positionColumnLabel?: string;
   showPlayerRankAndComposite?: boolean;
   showStatusColumn?: boolean;
+  showWarColumn?: boolean;
 }) {
   return (
     <div className="min-w-0 max-w-full overflow-x-auto overscroll-x-contain">
@@ -339,6 +380,9 @@ function PlayerTable({
             {showStatusColumn && (
               <th className="py-1 px-2 text-left whitespace-nowrap min-w-[4.5rem]">Status</th>
             )}
+            {showWarColumn && (
+              <th className="py-1 px-2 text-right whitespace-nowrap w-9">WAR</th>
+            )}
             {statKeys.map(key => (
               <th key={key} className={`py-1 text-right ${STAT_COL}`}>
                 {labels[key] ?? key}
@@ -350,9 +394,9 @@ function PlayerTable({
           </tr>
         </thead>
         <tbody>
-          {players.map(player => (
+          {players.map((player, index) => (
             <tr
-              key={player.playerId}
+              key={reportCardPlayerRowKey(player, index)}
               className="group border-b border-[var(--border)] last:border-b-0 hover:bg-[var(--foreground)]/5"
             >
               <td className={`${STICKY_PLAYER_CELL} py-1 pl-2 pr-1 font-medium truncate`}>
@@ -364,6 +408,11 @@ function PlayerTable({
               {showStatusColumn && (
                 <td className="py-1 px-2 text-xs text-[var(--muted)] text-left whitespace-nowrap min-w-[4.5rem]">
                   {player.status ?? '-'}
+                </td>
+              )}
+              {showWarColumn && (
+                <td className="py-1 px-2 font-mono text-sm text-right whitespace-nowrap w-9">
+                  {player.war != null ? player.war.toFixed(1) : '-'}
                 </td>
               )}
               {statKeys.map(key => {
@@ -463,18 +512,36 @@ export function MLBTeamReportCard({ data }: Props) {
     return [...pinnedTeamsList, ...remainingTeams];
   }, [data.teams, pinnedCodes]);
 
-  const defaultTeamCode = useMemo(() => {
-    for (const code of pinnedCodes) {
-      const match = teams.find(t => t.teamCode.toUpperCase() === code.toUpperCase());
-      if (match) return match.teamCode;
+  const [selectedTeamCode, setSelectedTeamCode] = useState<string | null>(null);
+
+  useLayoutEffect(() => {
+    const hashAbbrev = getHashTeamAbbrev();
+    if (hashAbbrev) {
+      const fromHash = teams.find(t => t.teamCode.toUpperCase() === hashAbbrev);
+      if (fromHash) {
+        setSelectedTeamCode(fromHash.teamCode);
+        return;
+      }
     }
-    return teams[0]?.teamCode ?? '';
-  }, [teams, pinnedCodes]);
 
-  const [selectedTeamCode, setSelectedTeamCode] = useState('');
+    if (!mounted) return;
+    setSelectedTeamCode(resolveTeamCode(teams, pinnedCodes, ''));
+  }, [mounted, teams, pinnedCodes]);
 
-  const activeTeamCode = selectedTeamCode || defaultTeamCode;
-  const team = mounted ? data.teams[activeTeamCode] : undefined;
+  useEffect(() => {
+    const handleHashChange = () => {
+      const hashAbbrev = getHashTeamAbbrev();
+      if (!hashAbbrev) return;
+      const match = teams.find(t => t.teamCode.toUpperCase() === hashAbbrev);
+      if (match) setSelectedTeamCode(match.teamCode);
+    };
+
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, [teams]);
+
+  const activeTeamCode = selectedTeamCode ?? '';
+  const team = selectedTeamCode ? data.teams[activeTeamCode] : undefined;
   const playoffRank = team ? getPlayoffProbRank(data.playoffChances, team.teamCode) : null;
 
   const [rankingSheetKey, setRankingSheetKey] = useState<string | null>(null);
@@ -491,8 +558,13 @@ export function MLBTeamReportCard({ data }: Props) {
   const hasOverallRankings = (data.rankings.overallComposite?.length ?? 0) > 0;
   const hasPlayoffChances = data.playoffChances.length > 0;
 
-  if (!mounted || !team) {
-    if (mounted && !team) {
+  const handleTeamChange = (teamCode: string) => {
+    setSelectedTeamCode(teamCode);
+    setHashTeamAbbrev(teamCode);
+  };
+
+  if (!selectedTeamCode || !team) {
+    if (mounted && selectedTeamCode && !team) {
       return (
         <div className="h-full flex items-center justify-center text-[var(--muted)] text-sm">
           No team report card data available
@@ -509,7 +581,7 @@ export function MLBTeamReportCard({ data }: Props) {
         <div className="flex items-center gap-1">
           <select
             value={activeTeamCode}
-            onChange={e => setSelectedTeamCode(e.target.value)}
+            onChange={e => handleTeamChange(e.target.value)}
             className="text-sm rounded px-2 py-1 bg-[var(--muted)]/10"
           >
             {teams.map(t => (
@@ -586,6 +658,7 @@ export function MLBTeamReportCard({ data }: Props) {
                 playerStatKeys={CATEGORY_PLAYER_STAT_KEYS[key] ?? CATEGORY_STAT_KEYS[key]}
                 showPlayerRankAndComposite={CATEGORY_SHOW_PLAYER_RANK_AND_COMPOSITE[key] ?? true}
                 showStatusColumn={CATEGORY_SHOW_STATUS_COLUMN[key] ?? false}
+                showWarColumn={CATEGORY_SHOW_WAR_COLUMN[key] ?? false}
                 rankings={data.rankings}
                 onRankingClick={setRankingSheetKey}
               />,

@@ -5,8 +5,8 @@ import { ResponsiveLine, LineCustomSvgLayerProps, LineSeries } from '@nivo/line'
 import { LeagueCumRunDiffStats, MLBTeamStats } from '@/types/chart';
 
 interface Props {
-  homeTeamStats: MLBTeamStats;
-  awayTeamStats: MLBTeamStats;
+  homeTeamStats: MLBTeamStats | null;
+  awayTeamStats: MLBTeamStats | null;
   homeAbbrev: string;
   awayAbbrev: string;
   leagueStats?: LeagueCumRunDiffStats;
@@ -94,8 +94,8 @@ export function CumRunDiffChart({
   leagueStats,
 }: Props) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const homeData = parseWeekData(homeTeamStats.cumRunDiffByWeek);
-  const awayData = parseWeekData(awayTeamStats.cumRunDiffByWeek);
+  const homeData = parseWeekData(homeTeamStats?.cumRunDiffByWeek);
+  const awayData = parseWeekData(awayTeamStats?.cumRunDiffByWeek);
 
   if (homeData.length === 0 && awayData.length === 0) {
     return (

@@ -10,7 +10,7 @@ export function parseMLBStat(stat: unknown): MLBStatValue | null {
   };
 }
 
-export function getRunDiffPerGame(stats: MLBTeamStats | undefined): MLBStatValue | null {
+export function getRunDiffPerGame(stats: MLBTeamStats | null | undefined): MLBStatValue | null {
   const fromTrend = parseMLBStat(stats?.monthTrend?.runDiffPerGame);
   if (fromTrend?.value != null) return fromTrend;
 
@@ -23,7 +23,7 @@ export function getRunDiffPerGame(stats: MLBTeamStats | undefined): MLBStatValue
   return null;
 }
 
-export function getRecordRank(trend: MLBMonthTrend | undefined): number | null {
+export function getRecordRank(trend: MLBMonthTrend | null | undefined): number | null {
   return trend?.record?.rank ?? null;
 }
 

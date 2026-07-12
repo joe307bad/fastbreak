@@ -5,8 +5,8 @@ import { ResponsiveScatterPlot } from '@nivo/scatterplot';
 import { LeagueWeeklyStats, MLBTeamStats } from '@/types/chart';
 
 interface Props {
-  homeTeamStats: MLBTeamStats;
-  awayTeamStats: MLBTeamStats;
+  homeTeamStats: MLBTeamStats | null;
+  awayTeamStats: MLBTeamStats | null;
   homeAbbrev: string;
   awayAbbrev: string;
   leagueStats?: LeagueWeeklyStats;
@@ -18,8 +18,8 @@ interface WeeklyRuns {
   runsAllowed: number;
 }
 
-function parsePerformanceByWeek(stats: MLBTeamStats): WeeklyRuns[] {
-  if (!stats.performanceByWeek) return [];
+function parsePerformanceByWeek(stats: MLBTeamStats | null): WeeklyRuns[] {
+  if (!stats?.performanceByWeek) return [];
 
   return Object.entries(stats.performanceByWeek)
     .map(([key, value]) => ({

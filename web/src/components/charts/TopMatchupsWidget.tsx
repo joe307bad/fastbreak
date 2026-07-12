@@ -165,7 +165,7 @@ function MLBMatchupCard({ matchup, dayLabel }: { matchup: MLBMatchupDataPoint; d
         </div>
         <div className="flex items-center gap-2">
           <span className="text-[var(--muted)]">
-            #{getRecordRank(matchup.awayTeam.stats.monthTrend) ?? '-'}
+            #{getRecordRank(matchup.awayTeam.stats?.monthTrend) ?? '-'}
           </span>
           <span className={`font-mono w-10 text-right ${(awayRunDiff?.value ?? 0) >= 0 ? 'text-green-500' : 'text-red-500'}`}>
             {formatRunDiff(awayRunDiff?.value)}
@@ -182,7 +182,7 @@ function MLBMatchupCard({ matchup, dayLabel }: { matchup: MLBMatchupDataPoint; d
         </div>
         <div className="flex items-center gap-2">
           <span className="text-[var(--muted)]">
-            #{getRecordRank(matchup.homeTeam.stats.monthTrend) ?? '-'}
+            #{getRecordRank(matchup.homeTeam.stats?.monthTrend) ?? '-'}
           </span>
           <span className={`font-mono w-10 text-right ${(homeRunDiff?.value ?? 0) >= 0 ? 'text-green-500' : 'text-red-500'}`}>
             {formatRunDiff(homeRunDiff?.value)}

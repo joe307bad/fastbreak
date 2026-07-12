@@ -265,7 +265,7 @@ function MLBMatchupCard({ matchup, expanded, pinned }: { matchup: MLBMatchupData
             <span className="text-xs text-[var(--muted)]">({matchup.awayTeam.record})</span>
           </div>
           <div className="flex items-center gap-3 text-xs">
-            <span className="text-[var(--muted)]">#{getRecordRank(matchup.awayTeam.stats.monthTrend) ?? '-'}</span>
+            <span className="text-[var(--muted)]">#{getRecordRank(matchup.awayTeam.stats?.monthTrend) ?? '-'}</span>
             <span className={`font-mono w-10 text-right ${(awayRunDiff?.value ?? 0) >= 0 ? 'text-green-500' : 'text-red-500'}`}>
               {formatRunDiff(awayRunDiff?.value)}
             </span>
@@ -281,7 +281,7 @@ function MLBMatchupCard({ matchup, expanded, pinned }: { matchup: MLBMatchupData
             <span className="text-xs text-[var(--muted)]">({matchup.homeTeam.record})</span>
           </div>
           <div className="flex items-center gap-3 text-xs">
-            <span className="text-[var(--muted)]">#{getRecordRank(matchup.homeTeam.stats.monthTrend) ?? '-'}</span>
+            <span className="text-[var(--muted)]">#{getRecordRank(matchup.homeTeam.stats?.monthTrend) ?? '-'}</span>
             <span className={`font-mono w-10 text-right ${(homeRunDiff?.value ?? 0) >= 0 ? 'text-green-500' : 'text-red-500'}`}>
               {formatRunDiff(homeRunDiff?.value)}
             </span>
@@ -292,15 +292,15 @@ function MLBMatchupCard({ matchup, expanded, pinned }: { matchup: MLBMatchupData
       <div className="flex justify-between items-center mt-3 pt-2 border-t border-[var(--border)] text-xs text-[var(--muted)]">
         <div>
           <span>R/G: </span>
-          <span className="font-mono">{matchup.awayTeam.stats.runsPerGame?.value?.toFixed(2) ?? '-'}</span>
+          <span className="font-mono">{matchup.awayTeam.stats?.runsPerGame?.value?.toFixed(2) ?? '-'}</span>
           <span> vs </span>
-          <span className="font-mono">{matchup.homeTeam.stats.runsPerGame?.value?.toFixed(2) ?? '-'}</span>
+          <span className="font-mono">{matchup.homeTeam.stats?.runsPerGame?.value?.toFixed(2) ?? '-'}</span>
         </div>
         <div>
           <span>ERA: </span>
-          <span className="font-mono">{matchup.awayTeam.stats.era?.value?.toFixed(2) ?? '-'}</span>
+          <span className="font-mono">{matchup.awayTeam.stats?.era?.value?.toFixed(2) ?? '-'}</span>
           <span> vs </span>
-          <span className="font-mono">{matchup.homeTeam.stats.era?.value?.toFixed(2) ?? '-'}</span>
+          <span className="font-mono">{matchup.homeTeam.stats?.era?.value?.toFixed(2) ?? '-'}</span>
         </div>
       </div>
     </div>

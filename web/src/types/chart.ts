@@ -495,7 +495,7 @@ export interface MLBTeamInfo {
   record?: string;
   division?: string;
   league?: string;
-  stats: MLBTeamStats;
+  stats: MLBTeamStats | null;
 }
 
 export interface MLBMatchupOdds {

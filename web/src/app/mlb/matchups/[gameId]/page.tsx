@@ -88,7 +88,7 @@ function MatchupHeader({ game }: { game: MLBMatchupDataPoint }) {
 
         <div className="text-right text-xs text-[var(--muted)]">
           <div>{game.awayTeam.record}</div>
-          <div>{getLeagueAbbrev(game.awayTeam.league)} · #{getRecordRank(game.awayTeam.stats.monthTrend) ?? '-'}</div>
+          <div>{getLeagueAbbrev(game.awayTeam.league)} · #{getRecordRank(game.awayTeam.stats?.monthTrend) ?? '-'}</div>
           <div className={`font-mono ${(awayRunDiff?.value ?? 0) >= 0 ? 'text-green-500' : 'text-red-500'}`}>
             {formatRunDiff(awayRunDiff?.value)} RD/G
           </div>
@@ -106,7 +106,7 @@ function MatchupHeader({ game }: { game: MLBMatchupDataPoint }) {
 
         <div className="text-left text-xs text-[var(--muted)]">
           <div>{game.homeTeam.record}</div>
-          <div>{getLeagueAbbrev(game.homeTeam.league)} · #{getRecordRank(game.homeTeam.stats.monthTrend) ?? '-'}</div>
+          <div>{getLeagueAbbrev(game.homeTeam.league)} · #{getRecordRank(game.homeTeam.stats?.monthTrend) ?? '-'}</div>
           <div className={`font-mono ${(homeRunDiff?.value ?? 0) >= 0 ? 'text-green-500' : 'text-red-500'}`}>
             {formatRunDiff(homeRunDiff?.value)} RD/G
           </div>

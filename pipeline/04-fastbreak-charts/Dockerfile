@@ -13,11 +13,12 @@ RUN apt-get update && \
 
 # Install remaining R packages (tidyverse deps already installed)
 # Update rlang first (base image has older version)
-# hockeyR must be installed from GitHub for latest NHL API compatibility
+# hockeyR is GitHub-only; install from the archive tarball to avoid GitHub API rate limits
+# (devtools::install_github hits api.github.com and fails on shared builder IPs)
 RUN R -e "options(repos = c(CRAN = 'https://packagemanager.posit.co/cran/__linux__/jammy/latest')); \
     install.packages(c('rlang', 'vctrs', 'lifecycle')); \
-    install.packages(c('nflreadr', 'hoopR', 'baseballr', 'devtools', 'remotes')); \
-    devtools::install_github('danmorse314/hockeyR'); \
+    install.packages(c('nflreadr', 'hoopR', 'baseballr', 'remotes')); \
+    remotes::install_url('https://github.com/danmorse314/hockeyR/archive/refs/heads/main.tar.gz'); \
     if (!require('nflreadr')) stop('nflreadr installation failed'); \
     if (!require('hoopR')) stop('hoopR installation failed'); \
     if (!require('baseballr')) stop('baseballr installation failed'); \

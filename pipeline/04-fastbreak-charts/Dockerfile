@@ -13,16 +13,19 @@ RUN apt-get update && \
 
 # Install remaining R packages (tidyverse deps already installed)
 # Update rlang first (base image has older version)
-# hockeyR is GitHub-only; install from the archive tarball to avoid GitHub API rate limits
-# (devtools::install_github hits api.github.com and fails on shared builder IPs)
-RUN R -e "options(repos = c(CRAN = 'https://packagemanager.posit.co/cran/__linux__/jammy/latest')); \
+# hockeyR is GitHub-only (default branch: master). Download the tarball with curl
+# so we avoid both GitHub API rate limits and R download.file redirect failures.
+RUN curl -fsSL -o /tmp/hockeyR.tar.gz \
+      https://codeload.github.com/danmorse314/hockeyR/tar.gz/refs/heads/master && \
+    R -e "options(repos = c(CRAN = 'https://packagemanager.posit.co/cran/__linux__/jammy/latest')); \
     install.packages(c('rlang', 'vctrs', 'lifecycle')); \
     install.packages(c('nflreadr', 'hoopR', 'baseballr', 'remotes')); \
-    remotes::install_url('https://github.com/danmorse314/hockeyR/archive/refs/heads/main.tar.gz'); \
+    remotes::install_local('/tmp/hockeyR.tar.gz', dependencies = TRUE); \
     if (!require('nflreadr')) stop('nflreadr installation failed'); \
     if (!require('hoopR')) stop('hoopR installation failed'); \
     if (!require('baseballr')) stop('baseballr installation failed'); \
-    if (!require('hockeyR')) stop('hockeyR installation failed')"
+    if (!require('hockeyR')) stop('hockeyR installation failed')" && \
+    rm -f /tmp/hockeyR.tar.gz
 
 # Create app directory
 WORKDIR /app

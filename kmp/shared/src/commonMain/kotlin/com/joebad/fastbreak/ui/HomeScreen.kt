@@ -13,7 +13,9 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.Article
+import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.DisposableEffect
@@ -24,7 +26,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.arkivanov.decompose.extensions.compose.subscribeAsState
@@ -74,6 +79,8 @@ fun HomeScreen(
     component: HomeComponent,
     registryState: RegistryState,
     registryContainer: com.joebad.fastbreak.ui.container.RegistryContainer,
+    favoriteChartIds: List<String> = emptyList(),
+    onToggleFavoriteChart: (String) -> Unit = {},
     onRefresh: () -> Unit,
     onLoadRegistry: () -> Unit,
     onMenuClick: () -> Unit = {},
@@ -286,15 +293,21 @@ fun HomeScreen(
                 }
             }
 
-            // Filter charts for selected sport and sort by sortOrder (nulls last), then alphabetically by title
+            // Filter charts for selected sport; favorites float to the top (most recent first),
+            // then sortOrder (nulls last), then alphabetically by title.
             // Hide NFL Playoff Bracket until it's ready for production
+            val favoriteIndex = remember(favoriteChartIds) {
+                favoriteChartIds.withIndex().associate { it.value to it.index }
+            }
             val chartsForSport = registryState.registry?.charts
                 ?.filter { chart ->
                     chart.sport == selectedSport &&
                     !chart.title.contains("NFL Playoff Bracket", ignoreCase = true)
                 }
                 ?.sortedWith(
-                    compareBy<ChartDefinition> { it.sortOrder ?: Int.MAX_VALUE }.thenBy { it.title }
+                    compareBy<ChartDefinition> { favoriteIndex[it.id] ?: Int.MAX_VALUE }
+                        .thenBy { it.sortOrder ?: Int.MAX_VALUE }
+                        .thenBy { it.title }
                 )
                 ?: emptyList()
 
@@ -484,6 +497,8 @@ fun HomeScreen(
                                 isFailed = isFailed,
                                 failureMessage = failedChart?.second,
                                 tags = chart.tags ?: emptyList(),
+                                isFavorite = chart.id in favoriteIndex,
+                                onToggleFavorite = { onToggleFavoriteChart(chart.id) },
                                 onClick = {
                                     // Only navigate if chart is ready
                                     if (isReady) {
@@ -513,6 +528,8 @@ private fun VisualizationItem(
     isFailed: Boolean = false,
     failureMessage: String? = null,
     tags: List<com.joebad.fastbreak.data.model.Tag>,
+    isFavorite: Boolean = false,
+    onToggleFavorite: () -> Unit = {},
     onClick: () -> Unit
 ) {
     val alpha = if (isReady) 1f else 0.5f
@@ -524,32 +541,41 @@ private fun VisualizationItem(
 
     // Build the metadata line (interval + relative time)
     val metadataText = buildMetadataText(interval, lastUpdated)
+    val favoriteStarColor = if (isFavorite) {
+        MaterialTheme.colorScheme.primary
+    } else {
+        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f * alpha)
+    }
 
     Column(modifier = Modifier.fillMaxWidth()) {
-        Column(
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .then(clickableModifier)
                 .padding(
                     horizontal = HomeChartListHorizontalPadding,
                     vertical = 12.dp
-                )
-        ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
+                ),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Column(modifier = Modifier.weight(1f)) {
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .then(clickableModifier)
+            ) {
                 // Title row with unviewed indicator
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxWidth()
                 ) {
                     Text(
                         text = title,
                         style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = alpha)
+                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = alpha),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false)
                     )
                     // Show unread dot indicator for unviewed charts
                     if (!viewed && isReady) {
@@ -602,24 +628,48 @@ private fun VisualizationItem(
                 }
             }
 
-            // Show loading indicator if syncing, error icon if failed
-            when {
-                isSyncing -> {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(20.dp),
-                        strokeWidth = 2.dp
-                    )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                // Sync status (spinner / failed) sits left of the favorite star
+                when {
+                    isSyncing -> {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            strokeWidth = 2.dp
+                        )
+                    }
+                    isFailed && !isReady -> {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "Sync failed",
+                            tint = MaterialTheme.colorScheme.error.copy(alpha = alpha),
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
                 }
-                isFailed && !isReady -> {
+
+                IconButton(
+                    onClick = onToggleFavorite,
+                    modifier = Modifier
+                        .size(40.dp)
+                        .semantics {
+                            contentDescription = if (isFavorite) {
+                                "Remove $title from favorites"
+                            } else {
+                                "Add $title to favorites"
+                            }
+                        }
+                ) {
                     Icon(
-                        imageVector = Icons.Default.Close,
-                        contentDescription = "Sync failed",
-                        tint = MaterialTheme.colorScheme.error.copy(alpha = alpha),
-                        modifier = Modifier.size(20.dp)
+                        imageVector = if (isFavorite) Icons.Filled.Star else Icons.Outlined.Star,
+                        contentDescription = null,
+                        tint = favoriteStarColor,
+                        modifier = Modifier.size(22.dp)
                     )
                 }
             }
-        }
         }
         ChartListDottedDivider()
     }

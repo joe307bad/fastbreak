@@ -7,7 +7,10 @@ set -e
 # Usage:
 #   ./prod.sh                        # Run all scripts + Fastbreak.Daily
 #   ./prod.sh --only-fastbreak-daily # Run only Fastbreak.Daily
-#   ./prod.sh --scripts-only         # Run only R scripts
+#   ./prod.sh --scripts-only         # Run only R scripts (keeps cron running)
+#   ./prod.sh --scripts-only --sport mlb --once
+#                                    # MLB charts only, upload to prod/, then exit
+#   ./prod-mlb.sh                    # Convenience wrapper for the above
 #   ./prod.sh --help                 # Show help
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"

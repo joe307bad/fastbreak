@@ -1060,7 +1060,54 @@ data class MLBTeamBoxScore(
     val pitchingStrikeouts: Int? = null,
     val pitchingHomeRuns: Int? = null,
     val pitches: Int? = null,
-    val innings: String? = null
+    val innings: String? = null,
+    // Fielding
+    val errors: Int? = null
+)
+
+@Serializable
+data class MLBPlayerGameLine(
+    val playerId: String? = null,
+    val name: String,
+    val position: String? = null,
+    val starter: Boolean? = null,
+    val batOrder: Int? = null,
+    val decision: String? = null,
+    // Batting
+    val ab: Int? = null,
+    val r: Int? = null,
+    val h: Int? = null,
+    val doubles: Int? = null,
+    val hr: Int? = null,
+    val rbi: Int? = null,
+    val bb: Int? = null,
+    val so: Int? = null,
+    val avg: String? = null,
+    // Pitching
+    val ip: String? = null,
+    val pitchingH: Int? = null,
+    val pitchingR: Int? = null,
+    val er: Int? = null,
+    val pitchingBb: Int? = null,
+    val pitchingK: Int? = null,
+    val pitches: Int? = null,
+    // Fielding
+    val errors: Int? = null
+)
+
+@Serializable
+data class MLBGamePlayerHighlights(
+    val startingPitcher: MLBPlayerGameLine? = null,
+    val relievers: List<MLBPlayerGameLine> = emptyList(),
+    val topHitters: List<MLBPlayerGameLine> = emptyList(),
+    val fieldersWithErrors: List<MLBPlayerGameLine> = emptyList(),
+    val teamErrors: Int? = null
+)
+
+@Serializable
+data class MLBGamePlayerHighlightsWrapper(
+    val home: MLBGamePlayerHighlights? = null,
+    val away: MLBGamePlayerHighlights? = null
 )
 
 @Serializable
@@ -1074,9 +1121,20 @@ data class MLBVsSeasonAvgStat(
 data class MLBVsSeasonAvgTeam(
     val runs: MLBVsSeasonAvgStat? = null,
     val hits: MLBVsSeasonAvgStat? = null,
+    val doubles: MLBVsSeasonAvgStat? = null,
     val homeRuns: MLBVsSeasonAvgStat? = null,
+    val rbis: MLBVsSeasonAvgStat? = null,
+    val walksBatting: MLBVsSeasonAvgStat? = null,
     val strikeoutsBatting: MLBVsSeasonAvgStat? = null,
-    val walksBatting: MLBVsSeasonAvgStat? = null
+    val stolenBases: MLBVsSeasonAvgStat? = null,
+    val runnersLOB: MLBVsSeasonAvgStat? = null,
+    val avg: MLBVsSeasonAvgStat? = null,
+    val obp: MLBVsSeasonAvgStat? = null,
+    val slg: MLBVsSeasonAvgStat? = null,
+    val ops: MLBVsSeasonAvgStat? = null,
+    val pitchingStrikeouts: MLBVsSeasonAvgStat? = null,
+    val pitchingWalks: MLBVsSeasonAvgStat? = null,
+    val pitches: MLBVsSeasonAvgStat? = null
 )
 
 @Serializable
@@ -1088,7 +1146,8 @@ data class MLBGameResults(
     val homeWon: Boolean? = null,
     val teamBoxScore: MLBTeamBoxScoreWrapper? = null,
     val vsSeasonAvg: MLBVsSeasonAvgWrapper? = null,
-    val seasonHighs: SeasonHighsWrapper? = null
+    val seasonHighs: SeasonHighsWrapper? = null,
+    val playerHighlights: MLBGamePlayerHighlightsWrapper? = null
 )
 
 @Serializable

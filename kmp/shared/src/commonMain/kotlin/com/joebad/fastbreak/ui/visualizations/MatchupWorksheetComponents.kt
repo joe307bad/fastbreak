@@ -20,9 +20,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
@@ -30,6 +32,7 @@ import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.layer.drawLayer
 import androidx.compose.ui.graphics.rememberGraphicsLayer
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -37,6 +40,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.joebad.fastbreak.data.model.PlayoffChanceEntry
@@ -66,6 +70,10 @@ internal fun formatPlayoffGamesBack(gamesBack: Double?): String {
         "${parts[0]}.${parts.getOrElse(1) { "0" }.padEnd(1, '0').take(1)}"
     }
 }
+
+// Wide enough for values like "12.5" in monospace bodySmall
+private val PLAYOFF_GB_COLUMN_WIDTH = 32.dp
+private val PLAYOFF_GB_COLUMN_WITH_SPACER = 36.dp
 
 private fun mlbStandingsGamesBack(w: Int, l: Int, wRef: Int, lRef: Int): Double =
     ((wRef - w) + (l - lRef)) / 2.0
@@ -264,7 +272,7 @@ fun getNBAPlayerRankColor(rank: Int?): Color {
 
 /**
  * MLB player ranks (league-wide, hundreds of qualified players):
- * 1-30 green, 31-60 yellow-green, 61-100 orange, 101+ red
+ * 1-30 green, 31-60 dark amber/yellow, 61-100 orange, 101+ red
  */
 fun getMLBPlayerRankColor(rank: Int?): Color {
     if (rank == null || rank <= 0) return Color.Transparent
@@ -274,12 +282,13 @@ fun getMLBPlayerRankColor(rank: Int?): Color {
             Color((0 + ratio * 50).toInt(), (150 - ratio * 35).toInt(), 0)
         }
         rank <= 60 -> {
+            // Dark amber → burnt orange so white rank text stays readable
             val ratio = (rank - 31) / 29f
-            Color((170 + ratio * 85).toInt(), (190 - ratio * 50).toInt(), 0)
+            Color((175 + ratio * 55).toInt(), (125 - ratio * 45).toInt(), 0)
         }
         rank <= 100 -> {
             val ratio = (rank - 61) / 39f
-            Color((255 - ratio * 55).toInt(), (140 - ratio * 100).toInt(), 0)
+            Color((230 - ratio * 52).toInt(), (95 - ratio * 60).toInt(), 0)
         }
         else -> Color(178, 0, 0)
     }
@@ -1145,7 +1154,13 @@ private enum class ShareRange { FULL, TOP_HALF, BOTTOM_HALF }
 
 private sealed interface PlayoffShareTarget {
     data object Full : PlayoffShareTarget
-    data class Section(val label: String, val entries: List<PlayoffChanceEntry>) : PlayoffShareTarget
+    data class Section(
+        val label: String,
+        val entries: List<PlayoffChanceEntry>,
+        /** When set, share image renders this as a single standings section (e.g. Wild Card). */
+        val standingsConference: String? = null,
+        val standingsSection: String? = null
+    ) : PlayoffShareTarget
 }
 
 @Composable
@@ -1156,6 +1171,13 @@ private fun shareImageThemeTextColors(): Pair<Color, Color> {
     val dimColor = if (isDark) Color.LightGray else Color.DarkGray
     return textColor to dimColor
 }
+
+private fun mlbWildCardShareLabel(conference: String): String =
+    when (conference) {
+        "American" -> "AL Wild Card"
+        "National" -> "NL Wild Card"
+        else -> "$conference Wild Card"
+    }
 
 private fun buildMlbDivisionShareFabOptions(
     standingsConferenceGroups: List<Pair<String, List<Pair<String, List<PlayoffChanceEntry>>>>>,
@@ -1172,6 +1194,23 @@ private fun buildMlbDivisionShareFabOptions(
                 }
             }
         }
+        // Per-conference wild card races (after division options)
+        standingsConferenceGroups.forEach { (conference, sections) ->
+            val wildCardEntries = sections.firstOrNull { it.first == "Wild Card" }?.second
+            if (!wildCardEntries.isNullOrEmpty()) {
+                val label = mlbWildCardShareLabel(conference)
+                add(FabOption(Icons.Filled.Share, label) {
+                    onSelect(
+                        PlayoffShareTarget.Section(
+                            label = label,
+                            entries = wildCardEntries,
+                            standingsConference = conference,
+                            standingsSection = "Wild Card"
+                        )
+                    )
+                })
+            }
+        }
     }
 }
 
@@ -1180,6 +1219,7 @@ private fun rankingEntryLabel(entry: RankingEntry): String =
 
 private fun entriesArePlayerRankings(entries: List<RankingEntry>): Boolean =
     entries.any { !it.player.isNullOrBlank() }
+
 @Composable
 private fun StatRankingsShareImage(
     statLabel: String,
@@ -1258,12 +1298,15 @@ private fun StatRankingsShareImage(
                     } else {
                         entry.team
                     },
-                    fontSize = if (isPlayerRankings) 11.sp else 12.sp,
-                    fontWeight = if (isHighlighted) FontWeight.ExtraBold else FontWeight.Medium,
-                    fontFamily = if (isPlayerRankings) FontFamily.Default else FontFamily.Monospace,
+                    style = MaterialTheme.typography.bodySmall.copy(
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = if (isPlayerRankings) 11.sp else 12.sp,
+                        fontWeight = if (isHighlighted) FontWeight.ExtraBold else FontWeight.Medium
+                    ),
                     color = if (isHighlighted) highlightColor else onBg,
                     modifier = Modifier.weight(1f),
-                    maxLines = 1
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
                 Text(
                     if (isPct) formatPctValue(entry.value) else formatStatValue(entry.value),
@@ -1301,18 +1344,20 @@ private fun PlayoffChancesShareImage(
     showPlayoffColumn: Boolean = true,
     extraColumns: List<PlayoffExtraColumn> = emptyList(),
     useStandingsLayout: Boolean = false,
-    wildCardPlayoffCutoff: Int = 3
+    wildCardPlayoffCutoff: Int = 3,
+    forcedStandingsConferenceGroups: List<Pair<String, List<Pair<String, List<PlayoffChanceEntry>>>>>? = null
 ) {
     val bg = MaterialTheme.colorScheme.background
     val (textColor, dimColor) = shareImageThemeTextColors()
     val highlightColor = MaterialTheme.colorScheme.primary
 
     val uniqueEntries = dedupeMlbPlayoffChanceEntries(entries)
-    val standingsConferenceGroups = if (useStandingsLayout) {
-        buildMlbStandingsConferenceGroups(entries)
-    } else {
-        null
-    }
+    val standingsConferenceGroups = forcedStandingsConferenceGroups
+        ?: if (useStandingsLayout) {
+            buildMlbStandingsConferenceGroups(entries)
+        } else {
+            null
+        }
     val showGamesBackColumn = useStandingsLayout &&
         uniqueEntries.any { it.gamesBackFromPlayoff != null }
     val hasConferenceData = uniqueEntries.any { it.conference != null }
@@ -1329,7 +1374,7 @@ private fun PlayoffChancesShareImage(
     } else null
 
     val extraWidth = if (extraColumns.isNotEmpty()) (38 * extraColumns.size).dp else 0.dp
-    val gamesBackWidth = if (showGamesBackColumn) 28.dp else 0.dp
+    val gamesBackWidth = if (showGamesBackColumn) PLAYOFF_GB_COLUMN_WITH_SPACER else 0.dp
     Column(
         modifier = Modifier
             .requiredWidth(340.dp + extraWidth + gamesBackWidth)
@@ -1463,7 +1508,7 @@ private fun ShareImageHeaderRow(
             Spacer(modifier = Modifier.width(2.dp))
         }
         if (showGamesBackColumn) {
-            Text("GB", style = MaterialTheme.typography.labelSmall, fontSize = 9.sp, fontWeight = FontWeight.Bold, color = textColor, textAlign = TextAlign.End, modifier = Modifier.width(24.dp), maxLines = 1)
+            Text("GB", style = MaterialTheme.typography.labelSmall, fontSize = 9.sp, fontWeight = FontWeight.Bold, color = textColor, textAlign = TextAlign.End, modifier = Modifier.width(PLAYOFF_GB_COLUMN_WIDTH), maxLines = 1)
             Spacer(modifier = Modifier.width(2.dp))
         }
         Spacer(modifier = Modifier.width(12.dp))
@@ -1518,7 +1563,7 @@ private fun ShareImageTeamRow(
             Spacer(modifier = Modifier.width(2.dp))
         }
         if (showGamesBackColumn) {
-            Text(formatPlayoffGamesBack(gamesBack ?: entry.gamesBackFromPlayoff), fontSize = 10.sp, fontWeight = FontWeight.Medium, fontFamily = FontFamily.Monospace, color = textColor, textAlign = TextAlign.End, modifier = Modifier.width(24.dp), maxLines = 1)
+            Text(formatPlayoffGamesBack(gamesBack ?: entry.gamesBackFromPlayoff), fontSize = 10.sp, fontWeight = FontWeight.Medium, fontFamily = FontFamily.Monospace, color = textColor, textAlign = TextAlign.End, modifier = Modifier.width(PLAYOFF_GB_COLUMN_WIDTH), maxLines = 1)
             Spacer(modifier = Modifier.width(2.dp))
         }
         Spacer(modifier = Modifier.width(12.dp))
@@ -1568,61 +1613,82 @@ fun StatRankingsBottomSheet(
     var selectedTeams by remember { mutableStateOf(highlightedTeams) }
     val isPlayerRankings = entriesArePlayerRankings(entries)
 
-    // Share capture state
+    // Share capture state — wait for off-screen layout before capturing so
+    // top/bottom half don't share a stale full-list graphicsLayer frame.
     var shareRange by remember { mutableStateOf<ShareRange?>(null) }
+    var shareLayoutSize by remember { mutableStateOf(IntSize.Zero) }
     val graphicsLayer = rememberGraphicsLayer()
     val imageExporter = remember { getImageExporter() }
 
-    LaunchedEffect(shareRange) {
-        if (shareRange != null) {
-            kotlinx.coroutines.delay(100)
-            try {
-                val bitmap = graphicsLayer.toImageBitmap()
-                val rangeLabel = when (shareRange) {
-                    ShareRange.TOP_HALF -> "Top Half"
-                    ShareRange.BOTTOM_HALF -> "Bottom Half"
-                    else -> ""
-                }
-                val shareTitle = if (rangeLabel.isNotEmpty()) "$statLabel - $rangeLabel" else statLabel
-                imageExporter.shareImage(bitmap, shareTitle)
-            } catch (e: Exception) {
-                e.printStackTrace()
-            } finally {
-                shareRange = null
+    LaunchedEffect(shareRange, shareLayoutSize) {
+        val range = shareRange ?: return@LaunchedEffect
+        if (shareLayoutSize.width <= 0 || shareLayoutSize.height <= 0) return@LaunchedEffect
+        // Two frames: one for layout/draw of the sliced list, one to settle the layer.
+        withFrameNanos { }
+        withFrameNanos { }
+        try {
+            val bitmap = graphicsLayer.toImageBitmap()
+            val rangeLabel = when (range) {
+                ShareRange.TOP_HALF -> "Top Half"
+                ShareRange.BOTTOM_HALF -> "Bottom Half"
+                ShareRange.FULL -> ""
             }
+            val shareTitle = if (rangeLabel.isNotEmpty()) "$statLabel - $rangeLabel" else statLabel
+            imageExporter.shareImage(bitmap, shareTitle)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        } finally {
+            shareRange = null
+            shareLayoutSize = IntSize.Zero
         }
     }
 
-    // Off-screen share image
+    // Off-screen share image (keyed so half-list content fully replaces prior captures)
     shareRange?.let { range ->
-        val mid = displayEntries.size / 2
-        val shareEntries = when (range) {
-            ShareRange.FULL -> displayEntries
-            ShareRange.TOP_HALF -> displayEntries.take(mid)
-            ShareRange.BOTTOM_HALF -> displayEntries.drop(mid)
-        }
-        val rangeSubtitle = subtitle
-        CompositionLocalProvider(LocalDensity provides Density(4f, 1f)) {
-            Box(
-                modifier = Modifier
-                    .wrapContentSize(unbounded = true)
-                    .offset { IntOffset(-10000, 0) }
-                    .drawWithContent {
-                        graphicsLayer.record(
-                            size = androidx.compose.ui.unit.IntSize(size.width.toInt(), size.height.toInt())
-                        ) { this@drawWithContent.drawContent() }
-                        drawLayer(graphicsLayer)
-                    }
-            ) {
-                StatRankingsShareImage(
-                    statLabel = statLabel,
-                    subtitle = rangeSubtitle,
-                    source = source,
-                    entries = shareEntries,
-                    rankColorFn = rankColorFn,
-                    isPct = isPct,
-                    highlightedTeams = selectedTeams
-                )
+        key(range) {
+            val mid = displayEntries.size / 2
+            val shareEntries = when (range) {
+                ShareRange.FULL -> displayEntries
+                ShareRange.TOP_HALF -> displayEntries.take(mid.coerceAtLeast(1))
+                ShareRange.BOTTOM_HALF -> {
+                    val dropCount = mid.coerceAtMost(displayEntries.size - 1).coerceAtLeast(0)
+                    displayEntries.drop(dropCount).ifEmpty { displayEntries }
+                }
+            }
+            val rangeSubtitle = when (range) {
+                ShareRange.TOP_HALF -> listOfNotNull(subtitle.takeIf { it.isNotBlank() }, "Top Half")
+                    .joinToString(" • ")
+                ShareRange.BOTTOM_HALF -> listOfNotNull(subtitle.takeIf { it.isNotBlank() }, "Bottom Half")
+                    .joinToString(" • ")
+                ShareRange.FULL -> subtitle
+            }
+            CompositionLocalProvider(LocalDensity provides Density(4f, 1f)) {
+                Box(
+                    modifier = Modifier
+                        .wrapContentSize(unbounded = true)
+                        .offset { IntOffset(-10000, 0) }
+                        .onSizeChanged { size ->
+                            if (size.width > 0 && size.height > 0) {
+                                shareLayoutSize = size
+                            }
+                        }
+                        .drawWithContent {
+                            graphicsLayer.record(
+                                size = androidx.compose.ui.unit.IntSize(size.width.toInt(), size.height.toInt())
+                            ) { this@drawWithContent.drawContent() }
+                            drawLayer(graphicsLayer)
+                        }
+                ) {
+                    StatRankingsShareImage(
+                        statLabel = statLabel,
+                        subtitle = rangeSubtitle,
+                        source = source,
+                        entries = shareEntries,
+                        rankColorFn = rankColorFn,
+                        isPct = isPct,
+                        highlightedTeams = selectedTeams
+                    )
+                }
             }
         }
     }
@@ -1769,23 +1835,25 @@ fun StatRankingsBottomSheet(
 
                             Spacer(modifier = Modifier.width(6.dp))
 
-                            // Team or player label
+                            // Team or player label — same monospace as the value column
                             Text(
                                 text = if (isPlayerRankings) {
                                     "${rankingEntryLabel(entry)} (${entry.team})"
                                 } else {
                                     entry.team
                                 },
-                                style = MaterialTheme.typography.bodySmall,
-                                fontSize = 11.sp,
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                fontFamily = if (isPlayerRankings) FontFamily.Default else FontFamily.Monospace,
+                                style = MaterialTheme.typography.bodySmall.copy(
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = 11.sp,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                                ),
                                 modifier = if (isPlayerRankings) {
                                     Modifier.weight(1f)
                                 } else {
                                     Modifier.width(40.dp)
                                 },
-                                maxLines = 1
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
 
                             Spacer(modifier = Modifier.width(12.dp))
@@ -1809,9 +1877,18 @@ fun StatRankingsBottomSheet(
             // Share FAB
             MultiOptionFab(
                 options = listOf(
-                    FabOption(Icons.Filled.Share, "Full List") { shareRange = ShareRange.FULL },
-                    FabOption(Icons.Filled.Share, "Top Half") { shareRange = ShareRange.TOP_HALF },
-                    FabOption(Icons.Filled.Share, "Bottom Half") { shareRange = ShareRange.BOTTOM_HALF }
+                    FabOption(Icons.Filled.Share, "Full List") {
+                        shareLayoutSize = IntSize.Zero
+                        shareRange = ShareRange.FULL
+                    },
+                    FabOption(Icons.Filled.Share, "Top Half") {
+                        shareLayoutSize = IntSize.Zero
+                        shareRange = ShareRange.TOP_HALF
+                    },
+                    FabOption(Icons.Filled.Share, "Bottom Half") {
+                        shareLayoutSize = IntSize.Zero
+                        shareRange = ShareRange.BOTTOM_HALF
+                    }
                 ),
                 modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp)
             )
@@ -1951,6 +2028,18 @@ fun PlayoffChancesBottomSheet(
                 .joinToString(" • ")
             PlayoffShareTarget.Full -> subtitle
         }
+        val forcedStandingsGroups = when (target) {
+            is PlayoffShareTarget.Section -> {
+                val conference = target.standingsConference
+                val section = target.standingsSection
+                if (conference != null && section != null) {
+                    listOf(conference to listOf(section to target.entries))
+                } else {
+                    null
+                }
+            }
+            PlayoffShareTarget.Full -> null
+        }
         CompositionLocalProvider(LocalDensity provides Density(4f, 1f)) {
             Box(
                 modifier = Modifier
@@ -1977,7 +2066,8 @@ fun PlayoffChancesBottomSheet(
                     showPlayoffColumn = showPlayoffColumn,
                     extraColumns = extraColumns,
                     useStandingsLayout = useStandingsLayout,
-                    wildCardPlayoffCutoff = wildCardPlayoffCutoff
+                    wildCardPlayoffCutoff = wildCardPlayoffCutoff,
+                    forcedStandingsConferenceGroups = forcedStandingsGroups
                 )
             }
         }
@@ -2291,7 +2381,7 @@ private fun PlayoffChancesHeaderRow(
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
                 textAlign = TextAlign.End,
-                modifier = Modifier.width(24.dp)
+                modifier = Modifier.width(PLAYOFF_GB_COLUMN_WIDTH)
             )
         }
         Spacer(modifier = Modifier.width(12.dp))
@@ -2381,7 +2471,7 @@ private fun PlayoffChanceTeamRow(
 ) {
     val playoffColor = probColorFn(entry.playoffProb)
     val extraColumnsWidth = if (extraColumns.isNotEmpty()) (40 * extraColumns.size).dp else 0.dp
-    val gamesBackWidth = if (showGamesBackColumn) 28.dp else 0.dp
+    val gamesBackWidth = if (showGamesBackColumn) PLAYOFF_GB_COLUMN_WITH_SPACER else 0.dp
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -2460,7 +2550,7 @@ private fun PlayoffChanceTeamRow(
                 fontWeight = FontWeight.Medium,
                 fontFamily = FontFamily.Monospace,
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
-                modifier = Modifier.width(24.dp),
+                modifier = Modifier.width(PLAYOFF_GB_COLUMN_WIDTH),
                 textAlign = TextAlign.End,
                 maxLines = 1
             )

@@ -65,7 +65,8 @@ private data class CategoryConfig(
     val playerStatKeys: List<String> = statKeys,
     val positionColumnLabel: String = "Pos",
     val showPlayerRankAndComposite: Boolean = true,
-    val showStatusColumn: Boolean = false
+    val showStatusColumn: Boolean = false,
+    val showTeamComposite: Boolean = true
 )
 
 private val CATEGORY_CONFIGS = mapOf(
@@ -100,7 +101,8 @@ private val CATEGORY_CONFIGS = mapOf(
         statKeys = listOf("below_replacement_pa_pct"),
         playerStatKeys = listOf("PA", "wRC_plus"),
         teamRankColorFn = ::getMLBTeamRankColor,
-        showPlayerRankAndComposite = false
+        showPlayerRankAndComposite = false,
+        showTeamComposite = false
     )
 )
 
@@ -109,8 +111,7 @@ private val CATEGORY_COMPOSITE_RANKING_KEYS = mapOf(
     "starters" to "startersComposite",
     "relievers" to "relieversComposite",
     "fielders" to "fieldersComposite",
-    "injuries" to "injuriesComposite",
-    "belowReplacement" to "belowReplacementComposite"
+    "injuries" to "injuriesComposite"
 )
 
 private fun reportCardStatRankingKey(categoryKey: String, statKey: String): String =
@@ -502,7 +503,8 @@ fun MLBTeamReportCardWorksheet(
                     teamPickerOpen = false
                     teamSearchQuery = ""
                 },
-                title = "Select team"
+                title = "Select team",
+                fullScreen = true
             ) {
                 OutlinedTextField(
                     value = teamSearchQuery,
@@ -603,6 +605,7 @@ fun MLBTeamReportCardWorksheet(
                         positionColumnLabel = config.positionColumnLabel,
                         showPlayerRankAndComposite = config.showPlayerRankAndComposite,
                         showStatusColumn = config.showStatusColumn,
+                        showTeamComposite = config.showTeamComposite,
                         compositeRankingKey = CATEGORY_COMPOSITE_RANKING_KEYS[key],
                         rankings = reportCardRankings,
                         onRankingClick = { selectedRankingKey = it }
@@ -753,8 +756,12 @@ private fun reportCardSharePlayerContentWidth(
     categories: List<Pair<String, ReportCardCategory>>
 ): Dp {
     val nameAndStatsPadding = 20.dp
-    return categories.maxOfOrNull { (key, _) ->
-        val config = CATEGORY_CONFIGS[key] ?: return@maxOfOrNull 0.dp
+    // Only categories that actually render player rows contribute to width.
+    // Team-only sections (e.g. 4 Week Trend) have empty players and must not
+    // inflate width from phantom stat columns.
+    return categories.mapNotNull { (key, category) ->
+        if (category.players.isEmpty()) return@mapNotNull null
+        val config = CATEGORY_CONFIGS[key] ?: return@mapNotNull null
         PLAYER_NAME_COLUMN_WIDTH + nameAndStatsPadding +
             reportCardSharePlayerStatsWidth(
                 config.statKeys.size,
@@ -762,7 +769,7 @@ private fun reportCardSharePlayerContentWidth(
                 config.showPlayerRankAndComposite,
                 config.showStatusColumn
             )
-    } ?: (PLAYER_NAME_COLUMN_WIDTH + nameAndStatsPadding + reportCardSharePlayerStatsWidth(2, 2, true))
+    }.maxOrNull() ?: 0.dp
 }
 
 @Composable
@@ -779,14 +786,31 @@ private fun rememberReportCardShareImageWidth(
     val titleStyle = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
     val sourceStyle = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp)
 
+    // Year • place in division • record is typically the widest text on
+    // team-only shares (4 Week Trend). Measure as a single unwrapped line.
     val subtitleWidth = with(density) {
-        textMeasurer.measure(text = subtitleLine, style = titleStyle).size.width.toDp()
+        textMeasurer.measure(
+            text = subtitleLine,
+            style = titleStyle,
+            softWrap = false,
+            maxLines = 1
+        ).size.width.toDp()
     }
     val teamNameWidth = with(density) {
-        textMeasurer.measure(text = team.teamName, style = titleStyle).size.width.toDp()
+        textMeasurer.measure(
+            text = team.teamName,
+            style = titleStyle,
+            softWrap = false,
+            maxLines = 1
+        ).size.width.toDp()
     }
     val sourceWidth = with(density) {
-        textMeasurer.measure(text = source, style = sourceStyle).size.width.toDp()
+        textMeasurer.measure(
+            text = source,
+            style = sourceStyle,
+            softWrap = false,
+            maxLines = 1
+        ).size.width.toDp()
     }
     val playerRowWidth = reportCardSharePlayerContentWidth(categories)
 
@@ -803,7 +827,7 @@ private fun rememberReportCardShareImageWidth(
     ) {
         listOf(
             playerRowWidth + SHARE_REPORT_CARD_HORIZONTAL_PADDING,
-            subtitleWidth + SHARE_REPORT_CARD_HORIZONTAL_PADDING + 16.dp,
+            subtitleWidth + SHARE_REPORT_CARD_HORIZONTAL_PADDING,
             teamNameWidth + SHARE_REPORT_CARD_HORIZONTAL_PADDING,
             sourceWidth + 72.dp + SHARE_REPORT_CARD_HORIZONTAL_PADDING,
             if (showSummary) 260.dp else 0.dp
@@ -825,6 +849,7 @@ private fun ReportCardCategorySection(
     positionColumnLabel: String = "Pos",
     showPlayerRankAndComposite: Boolean = true,
     showStatusColumn: Boolean = false,
+    showTeamComposite: Boolean = true,
     compositeRankingKey: String? = null,
     rankings: Map<String, List<RankingEntry>> = emptyMap(),
     onRankingClick: ((String) -> Unit)? = null,
@@ -856,26 +881,28 @@ private fun ReportCardCategorySection(
             emptyRankPlaceholder = ""
         )
     }
-    teamStats["aggregate"]?.let { composite ->
-        val compositeRankingAvailable =
-            compositeRankingKey != null && hasReportCardRankings(rankings, compositeRankingKey)
-        FiveColumnRowWithRanks(
-            leftValue = formatReportCardStat(composite),
-            leftRank = composite.rank,
-            leftRankDisplay = composite.rankDisplay,
-            centerText = composite.label,
-            rightValue = "",
-            rightRank = null,
-            rightRankDisplay = null,
-            rankColorFn = teamRankColorFn,
-            useNBARanks = false,
-            onClick = if (compositeRankingAvailable) {
-                { onRankingClick?.invoke(compositeRankingKey!!) }
-            } else {
-                null
-            },
-            emptyRankPlaceholder = ""
-        )
+    if (showTeamComposite) {
+        teamStats["aggregate"]?.let { composite ->
+            val compositeRankingAvailable =
+                compositeRankingKey != null && hasReportCardRankings(rankings, compositeRankingKey)
+            FiveColumnRowWithRanks(
+                leftValue = formatReportCardStat(composite),
+                leftRank = composite.rank,
+                leftRankDisplay = composite.rankDisplay,
+                centerText = composite.label,
+                rightValue = "",
+                rightRank = null,
+                rightRankDisplay = null,
+                rankColorFn = teamRankColorFn,
+                useNBARanks = false,
+                onClick = if (compositeRankingAvailable) {
+                    { onRankingClick?.invoke(compositeRankingKey!!) }
+                } else {
+                    null
+                },
+                emptyRankPlaceholder = ""
+            )
+        }
     }
 
     if (category.players.isNotEmpty()) {
@@ -1545,7 +1572,8 @@ private fun MLBTeamReportCardShareImage(
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold,
             color = onBg,
-            maxLines = 1
+            maxLines = 1,
+            softWrap = false
         )
         Spacer(modifier = Modifier.height(4.dp))
         Text(
@@ -1553,7 +1581,8 @@ private fun MLBTeamReportCardShareImage(
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold,
             color = onBg,
-            maxLines = 1
+            maxLines = 1,
+            softWrap = false
         )
 
         if (showSummary) {
@@ -1591,6 +1620,7 @@ private fun MLBTeamReportCardShareImage(
                 positionColumnLabel = config.positionColumnLabel,
                 showPlayerRankAndComposite = config.showPlayerRankAndComposite,
                 showStatusColumn = config.showStatusColumn,
+                showTeamComposite = config.showTeamComposite,
                 expandStatsForShare = true
             )
         }

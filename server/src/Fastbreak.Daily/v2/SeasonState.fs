@@ -36,6 +36,7 @@ let leagueToString =
 
 // NFL: preseason in Aug, regular season Sep–early Jan, playoffs mid-Jan–early Feb,
 // Super Bowl ~2nd Sunday of Feb, draft late April.
+// PostChampionship lasts ~half a week after the championship window.
 let private nflState (date: DateTime) =
     match date.Month, date.Day with
     | 8, _ -> PreSeason
@@ -44,7 +45,7 @@ let private nflState (date: DateTime) =
     | 1, d when d <= 7 -> InSeason
     | 1, _ -> PostSeason
     | 2, d when d <= 14 -> Championship
-    | 2, d when d <= 21 -> PostChampionship
+    | 2, d when d <= 18 -> PostChampionship
     | 2, _ -> OffSeasonPreDraft
     | 3, _ -> OffSeasonPreDraft
     | 4, d when d < 24 -> OffSeasonPreDraft
@@ -54,6 +55,7 @@ let private nflState (date: DateTime) =
 
 // NBA: preseason early Oct, regular season ~Oct 22–mid-April, playoffs mid-April–mid-June,
 // Finals early-mid June, draft late June.
+// PostChampionship lasts ~half a week after the championship window.
 let private nbaState (date: DateTime) =
     match date.Month, date.Day with
     | 10, d when d < 18 -> PreSeason
@@ -64,7 +66,7 @@ let private nbaState (date: DateTime) =
     | 4, _ -> PostSeason
     | 5, _ -> PostSeason
     | 6, d when d < 20 -> Championship
-    | 6, d when d < 27 -> PostChampionship
+    | 6, d when d < 24 -> PostChampionship
     | 6, _ -> OffSeasonPreDraft
     | (7 | 8 | 9), _ -> OffSeasonPostDraft
     | _ -> OffSeasonPostDraft
@@ -72,6 +74,7 @@ let private nbaState (date: DateTime) =
 // MLB: spring training mid-Feb, regular season late March–late Sept,
 // playoffs Oct, World Series late Oct–early Nov. Draft is mid-July (in-season),
 // so the off-season is treated as pre-draft until the next year's draft window.
+// PostChampionship lasts ~half a week after the championship window.
 let private mlbState (date: DateTime) =
     match date.Month, date.Day with
     | 2, d when d < 15 -> OffSeasonPreDraft
@@ -84,13 +87,14 @@ let private mlbState (date: DateTime) =
     | 10, d when d < 25 -> PostSeason
     | 10, _ -> Championship
     | 11, d when d <= 5 -> Championship
-    | 11, d when d <= 12 -> PostChampionship
+    | 11, d when d <= 9 -> PostChampionship
     | 11, _ -> OffSeasonPreDraft
     | (12 | 1), _ -> OffSeasonPreDraft
     | _ -> OffSeasonPreDraft
 
 // NHL: preseason late Sept, regular season early Oct–mid-April, playoffs mid-April–mid-June,
 // Stanley Cup Final June, draft late June.
+// PostChampionship lasts ~half a week after the championship window.
 let private nhlState (date: DateTime) =
     match date.Month, date.Day with
     | 9, d when d < 20 -> OffSeasonPostDraft
@@ -102,9 +106,8 @@ let private nhlState (date: DateTime) =
     | 4, _ -> PostSeason
     | 5, _ -> PostSeason
     | 6, d when d < 25 -> Championship
-    | 6, _ -> PostChampionship
-    | 7, d when d <= 1 -> PostChampionship
-    | (7 | 8), _ -> OffSeasonPostDraft
+    | 6, d when d <= 28 -> PostChampionship
+    | (6 | 7 | 8), _ -> OffSeasonPostDraft
     | _ -> OffSeasonPostDraft
 
 // Lower number = higher priority (sorted to the top of the list).

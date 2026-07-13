@@ -8,6 +8,7 @@ import androidx.core.view.WindowCompat
 import com.arkivanov.decompose.defaultComponentContext
 import com.joebad.fastbreak.App
 import com.joebad.fastbreak.data.api.RegistryApi
+import com.joebad.fastbreak.data.repository.FavoriteChartsRepository
 import com.joebad.fastbreak.data.repository.RegistryRepository
 import com.joebad.fastbreak.data.repository.SqlDelightChartCache
 import com.joebad.fastbreak.data.repository.TeamRosterRepository
@@ -100,6 +101,7 @@ class MainActivity : ComponentActivity() {
         val teamRosterSynchronizer = TeamRosterSynchronizer(
             teamRosterRepository = teamRosterRepository
         )
+        val favoriteChartsRepository = FavoriteChartsRepository(database)
 
         // Create PinnedTeamsContainer
         val pinnedTeamsContainer = PinnedTeamsContainer(
@@ -120,6 +122,7 @@ class MainActivity : ComponentActivity() {
         val rootComponent = RootComponent(
             componentContext = defaultComponentContext(),
             themeRepository = themeRepository,
+            favoriteChartsRepository = favoriteChartsRepository,
             registryContainer = registryContainer,
             pinnedTeamsContainer = pinnedTeamsContainer,
             chartCache = chartCache

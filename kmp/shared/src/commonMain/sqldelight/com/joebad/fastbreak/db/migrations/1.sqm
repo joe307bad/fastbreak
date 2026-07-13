@@ -1,0 +1,4 @@
+CREATE TABLE favorite_charts (
+    chart_id TEXT NOT NULL PRIMARY KEY,
+    favorited_at INTEGER NOT NULL
+);

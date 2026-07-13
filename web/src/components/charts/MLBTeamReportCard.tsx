@@ -56,7 +56,6 @@ const CATEGORY_COMPOSITE_RANKING_KEYS: Partial<Record<CategoryKey, string>> = {
   starters: 'startersComposite',
   relievers: 'relieversComposite',
   fielders: 'fieldersComposite',
-  belowReplacement: 'belowReplacementComposite',
   injuries: 'injuriesComposite',
 };
 
@@ -72,6 +71,10 @@ const CATEGORY_SHOW_PLAYER_RANK_AND_COMPOSITE: Partial<Record<CategoryKey, boole
   recentTrend: false,
   belowReplacement: false,
   injuries: false,
+};
+
+const CATEGORY_SHOW_TEAM_COMPOSITE: Partial<Record<CategoryKey, boolean>> = {
+  belowReplacement: false,
 };
 
 const PLAYER_COMPOSITE_KEY = 'aggregate';
@@ -242,6 +245,7 @@ function CategoryPanel({
   showPlayerRankAndComposite = true,
   showStatusColumn = false,
   showWarColumn = false,
+  showTeamComposite = true,
   rankings,
   onRankingClick,
 }: {
@@ -254,6 +258,7 @@ function CategoryPanel({
   showPlayerRankAndComposite?: boolean;
   showStatusColumn?: boolean;
   showWarColumn?: boolean;
+  showTeamComposite?: boolean;
   rankings: MLBTeamReportCardData['rankings'];
   onRankingClick: (key: string) => void;
 }) {
@@ -266,7 +271,7 @@ function CategoryPanel({
 
   const hasTeam = !!category.team;
   const hasPlayers = category.players.length > 0;
-  const composite = category.team?.stats[PLAYER_COMPOSITE_KEY];
+  const composite = showTeamComposite ? category.team?.stats[PLAYER_COMPOSITE_KEY] : undefined;
   const compositeRankingKey = CATEGORY_COMPOSITE_RANKING_KEYS[categoryKey];
 
   if (!hasTeam && !hasPlayers) return null;
@@ -659,6 +664,7 @@ export function MLBTeamReportCard({ data }: Props) {
                 showPlayerRankAndComposite={CATEGORY_SHOW_PLAYER_RANK_AND_COMPOSITE[key] ?? true}
                 showStatusColumn={CATEGORY_SHOW_STATUS_COLUMN[key] ?? false}
                 showWarColumn={CATEGORY_SHOW_WAR_COLUMN[key] ?? false}
+                showTeamComposite={CATEGORY_SHOW_TEAM_COMPOSITE[key] ?? true}
                 rankings={data.rankings}
                 onRankingClick={setRankingSheetKey}
               />,

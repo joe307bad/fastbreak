@@ -112,6 +112,7 @@ for (abbrev in team_abbrevs) {
     # Batting
     runs = get_stat("batting", "runs"),
     hits = get_stat("batting", "hits"),
+    doubles = get_stat("batting", "doubles"),
     home_runs = get_stat("batting", "homeRuns"),
     rbis = get_stat("batting", "RBIs"),
     stolen_bases = get_stat("batting", "stolenBases"),
@@ -133,6 +134,8 @@ for (abbrev in team_abbrevs) {
     hits_allowed = get_stat("pitching", "hits"),
     runs_allowed = get_stat("pitching", "runs"),
     home_runs_allowed = get_stat("pitching", "homeRuns"),
+    pitches_per_start = get_stat("pitching", "pitchesPerStart"),
+    games_started = get_stat("pitching", "gamesStarted"),
     # Fielding
     errors = get_stat("fielding", "errors"),
     fielding_pct = get_stat("fielding", "fieldingPct")
@@ -147,11 +150,18 @@ team_stats <- bind_rows(team_stats_list) %>%
   mutate(
     runs_per_game = runs / games_played,
     hits_per_game = hits / games_played,
+    doubles_per_game = doubles / games_played,
     hr_per_game = home_runs / games_played,
     rbi_per_game = rbis / games_played,
     sb_per_game = stolen_bases / games_played,
+    k_batting_per_game = strikeouts_batting / games_played,
+    bb_batting_per_game = walks_batting / games_played,
     k_per_9 = strikeouts_pitching / (innings_pitched / 9),
     bb_per_9 = walks_pitching / (innings_pitched / 9),
+    k_pitching_per_game = strikeouts_pitching / games_played,
+    bb_pitching_per_game = walks_pitching / games_played,
+    # Starter pitch volume is the best ESPN season proxy for team pitches/game.
+    pitches_per_game = pitches_per_start,
     runs_allowed_per_game = runs_allowed / games_played,
     hits_allowed_per_game = hits_allowed / games_played,
     hr_allowed_per_game = home_runs_allowed / games_played,
@@ -760,6 +770,10 @@ build_comparisons <- function(home_stats, away_stats, home_abbrev, away_abbrev) 
 # ============================================================================
 # Helper: fetch MLB box score from ESPN summary endpoint
 # ============================================================================
+
+# Accumulator for LOB / pitches from fetched box scores (filled by build_mlb_game_results)
+mlb_box_accum <- list()
+
 build_mlb_game_results <- function(game, home_season_stats, away_season_stats) {
   game_id <- game$game_id
   cat("  Fetching box score for game", game_id, "...\n")
@@ -798,12 +812,13 @@ build_mlb_game_results <- function(game, home_season_stats, away_season_stats) {
 
   # Extract stats from a team's boxscore
   extract_box <- function(team_data) {
-    batting <- list(); pitching <- list()
+    batting <- list(); pitching <- list(); fielding <- list()
     for (sg in team_data$statistics) {
       stats <- list()
       for (s in sg$stats) stats[[s$name]] <- s$displayValue
       if (sg$name == "batting") batting <- stats
       else if (sg$name == "pitching") pitching <- stats
+      else if (sg$name == "fielding") fielding <- stats
     }
     list(
       # Batting
@@ -830,7 +845,9 @@ build_mlb_game_results <- function(game, home_season_stats, away_season_stats) {
       pitchingStrikeouts = safe_num(pitching[["strikeouts"]]),
       pitchingHomeRuns = safe_num(pitching[["homeRuns"]]),
       pitches = safe_num(pitching[["pitches"]]),
-      innings = pitching[["thirdInnings"]]
+      innings = pitching[["thirdInnings"]],
+      # Fielding
+      errors = safe_num(fielding[["errors"]])
     )
   }
 
@@ -842,32 +859,373 @@ build_mlb_game_results <- function(game, home_season_stats, away_season_stats) {
     away = away_box
   )
 
+  # --------------------------------------------------------------------------
+  # Player highlights: starting pitchers, top reliever, top hitters, errors
+  # --------------------------------------------------------------------------
+  parse_stat_map <- function(keys, values) {
+    out <- list()
+    if (is.null(keys) || is.null(values)) return(out)
+    n <- min(length(keys), length(values))
+    if (n <= 0) return(out)
+    for (i in seq_len(n)) out[[keys[[i]]]] <- values[[i]]
+    out
+  }
+
+  safe_int_stat <- function(x) {
+    v <- suppressWarnings(as.integer(safe_num(x)))
+    if (length(v) == 0 || is.na(v)) return(NULL)
+    v
+  }
+
+  ip_to_outs <- function(ip) {
+    if (is.null(ip) || !nzchar(as.character(ip))) return(0)
+    s <- as.character(ip)
+    parts <- strsplit(s, "\\.", fixed = FALSE)[[1]]
+    whole <- suppressWarnings(as.integer(parts[1]))
+    if (is.na(whole)) whole <- 0
+    frac <- if (length(parts) > 1) suppressWarnings(as.integer(parts[2])) else 0
+    if (is.na(frac)) frac <- 0
+    whole * 3 + frac
+  }
+
+  extract_decision <- function(notes) {
+    if (is.null(notes) || length(notes) == 0) return(NULL)
+    for (n in notes) {
+      if (!is.null(n$type) && identical(n$type, "pitchingDecision") && !is.null(n$text)) {
+        return(as.character(n$text))
+      }
+    }
+    NULL
+  }
+
+  build_batter_line <- function(athlete_row) {
+    ath <- athlete_row$athlete
+    if (is.null(ath)) return(NULL)
+    sm <- parse_stat_map(athlete_row$`_keys`, athlete_row$stats)
+    list(
+      playerId = if (!is.null(ath$id)) as.character(ath$id) else NULL,
+      name = ath$displayName %||% ath$shortName %||% "",
+      position = athlete_row$position$abbreviation %||% NULL,
+      starter = isTRUE(athlete_row$starter),
+      batOrder = safe_int_stat(athlete_row$batOrder),
+      ab = safe_int_stat(sm[["atBats"]]),
+      r = safe_int_stat(sm[["runs"]]),
+      h = safe_int_stat(sm[["hits"]]),
+      doubles = NULL,
+      hr = safe_int_stat(sm[["homeRuns"]]),
+      rbi = safe_int_stat(sm[["RBIs"]]),
+      bb = safe_int_stat(sm[["walks"]]),
+      so = safe_int_stat(sm[["strikeouts"]]),
+      avg = sm[["avg"]] %||% NULL,
+      errors = NULL
+    )
+  }
+
+  build_pitcher_line <- function(athlete_row) {
+    ath <- athlete_row$athlete
+    if (is.null(ath)) return(NULL)
+    sm <- parse_stat_map(athlete_row$`_keys`, athlete_row$stats)
+    ip <- sm[["fullInnings.partInnings"]] %||% NULL
+    pitches_raw <- sm[["pitches"]] %||% NULL
+    list(
+      playerId = if (!is.null(ath$id)) as.character(ath$id) else NULL,
+      name = ath$displayName %||% ath$shortName %||% "",
+      position = athlete_row$position$abbreviation %||% "P",
+      starter = isTRUE(athlete_row$starter),
+      decision = extract_decision(athlete_row$notes),
+      ip = if (!is.null(ip)) as.character(ip) else NULL,
+      pitchingH = safe_int_stat(sm[["hits"]]),
+      pitchingR = safe_int_stat(sm[["runs"]]),
+      er = safe_int_stat(sm[["earnedRuns"]]),
+      pitchingBb = safe_int_stat(sm[["walks"]]),
+      pitchingK = safe_int_stat(sm[["strikeouts"]]),
+      pitches = safe_int_stat(pitches_raw),
+      errors = NULL
+    )
+  }
+
+  parse_team_players <- function(team_players_entry) {
+    batters <- list(); pitchers <- list()
+    if (is.null(team_players_entry) || is.null(team_players_entry$statistics)) {
+      return(list(batters = batters, pitchers = pitchers))
+    }
+    for (sg in team_players_entry$statistics) {
+      keys <- sg$keys
+      athletes <- sg$athletes
+      if (is.null(athletes)) next
+      for (a in athletes) {
+        a$`_keys` <- keys
+        if (identical(sg$type, "batting")) {
+          line <- build_batter_line(a)
+          if (!is.null(line) && nzchar(line$name)) batters[[length(batters) + 1]] <- line
+        } else if (identical(sg$type, "pitching")) {
+          line <- build_pitcher_line(a)
+          if (!is.null(line) && nzchar(line$name)) pitchers[[length(pitchers) + 1]] <- line
+        }
+      }
+    }
+    list(batters = batters, pitchers = pitchers)
+  }
+
+  # Attribute errors from play-by-play text to last names on each roster
+  count_errors_from_plays <- function(plays, player_names) {
+    counts <- setNames(integer(length(player_names)), player_names)
+    if (is.null(plays) || length(plays) == 0 || length(player_names) == 0) return(counts)
+    last_names <- vapply(player_names, function(nm) {
+      parts <- strsplit(nm, "\\s+")[[1]]
+      if (length(parts) == 0) return("")
+      gsub("[^A-Za-z'.\\-]", "", parts[length(parts)])
+    }, character(1))
+    # Prefer longer last names first to avoid partial collisions
+    order_idx <- order(nchar(last_names), decreasing = TRUE)
+    seen_keys <- character(0)
+    for (p in plays) {
+      text <- p$text %||% ""
+      if (!nzchar(text) || !grepl("error", text, ignore.case = TRUE)) next
+      # Dedupe identical play text (ESPN often emits Pick Off + Play Result duplicates)
+      if (text %in% seen_keys) next
+      seen_keys <- c(seen_keys, text)
+      matches <- gregexpr(
+        "(?:fielding |throwing |pickoff |caught stealing |dropped foul ball )?error by (?:first baseman|second baseman|third baseman|shortstop|left fielder|center fielder|right fielder|catcher|pitcher)?\\s*([A-Za-z'.\\-]+)",
+        text,
+        ignore.case = TRUE,
+        perl = TRUE
+      )
+      found <- regmatches(text, matches)[[1]]
+      if (length(found) == 0) next
+      for (m in found) {
+        last <- sub("(?i)^.*error by (?:first baseman|second baseman|third baseman|shortstop|left fielder|center fielder|right fielder|catcher|pitcher)?\\s*", "", m, perl = TRUE)
+        last <- gsub("[^A-Za-z'.\\-]", "", last)
+        last <- sub("[.]+$", "", last)
+        if (!nzchar(last)) next
+        for (i in order_idx) {
+          ln <- last_names[[i]]
+          if (!nzchar(ln)) next
+          if (tolower(ln) == tolower(last)) {
+            counts[[player_names[[i]]]] <- counts[[player_names[[i]]]] + 1L
+            break
+          }
+        }
+      }
+    }
+    counts
+  }
+
+  select_highlights <- function(parsed, team_errors, error_counts) {
+    pitchers <- parsed$pitchers
+    batters <- parsed$batters
+
+    starter <- NULL
+    for (p in pitchers) {
+      if (isTRUE(p$starter)) { starter <- p; break }
+    }
+    if (is.null(starter) && length(pitchers) > 0) starter <- pitchers[[1]]
+
+    relievers <- Filter(function(p) !isTRUE(p$starter) && ip_to_outs(p$ip) > 0, pitchers)
+    if (length(relievers) > 0) {
+      # Prefer save/hold/blown save, then longest outing
+      score_rel <- function(p) {
+        raw <- p$decision
+        if (is.null(raw) || !nzchar(as.character(raw))) {
+          return(ip_to_outs(p$ip))
+        }
+        dec <- toupper(trimws(strsplit(as.character(raw), ",", fixed = TRUE)[[1]][1]))
+        if (is.na(dec) || !nzchar(dec)) return(ip_to_outs(p$ip))
+        bonus <- if (dec == "SV") 1000 else if (dec == "H") 500 else if (dec == "BS") 400 else 0
+        bonus + ip_to_outs(p$ip)
+      }
+      relievers <- relievers[order(vapply(relievers, score_rel, numeric(1)), decreasing = TRUE)]
+    }
+    top_reliever <- if (length(relievers) > 0) list(relievers[[1]]) else list()
+
+    scored_hitters <- Filter(function(b) {
+      ab <- b$ab %||% 0
+      h <- b$h %||% 0
+      (is.numeric(ab) && ab > 0) || (is.numeric(h) && h > 0)
+    }, batters)
+    if (length(scored_hitters) > 0) {
+      hitter_score <- function(b) {
+        (b$hr %||% 0) * 4 + (b$rbi %||% 0) * 2 + (b$h %||% 0) * 1 + (b$r %||% 0) * 0.5
+      }
+      scored_hitters <- scored_hitters[order(vapply(scored_hitters, hitter_score, numeric(1)), decreasing = TRUE)]
+      scored_hitters <- scored_hitters[seq_len(min(3L, length(scored_hitters)))]
+    }
+
+    # Attach error counts to any rostered player who committed one
+    name_of <- function(lines) {
+      if (length(lines) == 0) character(0) else vapply(lines, function(x) x$name %||% "", character(1))
+    }
+    all_names <- unique(c(name_of(batters), name_of(pitchers)))
+    fielders_with_errors <- list()
+    for (nm in all_names) {
+      err_n <- error_counts[[nm]]
+      if (is.null(err_n) || is.na(err_n) || err_n <= 0) next
+      # Prefer batter line (has position); fall back to pitcher
+      line <- NULL
+      for (b in batters) if (identical(b$name, nm)) { line <- b; break }
+      if (is.null(line)) {
+        for (p in pitchers) if (identical(p$name, nm)) {
+          line <- list(
+            playerId = p$playerId, name = p$name, position = p$position %||% "P",
+            starter = p$starter, ab = NULL, r = NULL, h = NULL, hr = NULL, rbi = NULL,
+            bb = NULL, so = NULL, avg = NULL, errors = as.integer(err_n)
+          )
+          break
+        }
+      } else {
+        line$errors <- as.integer(err_n)
+      }
+      if (!is.null(line)) fielders_with_errors[[length(fielders_with_errors) + 1]] <- line
+    }
+    if (length(fielders_with_errors) > 1) {
+      fielders_with_errors <- fielders_with_errors[
+        order(vapply(fielders_with_errors, function(f) f$errors %||% 0, numeric(1)), decreasing = TRUE)
+      ]
+    }
+
+    list(
+      startingPitcher = starter,
+      relievers = top_reliever,
+      topHitters = scored_hitters,
+      fieldersWithErrors = fielders_with_errors,
+      teamErrors = if (!is.null(team_errors) && !is.na(team_errors)) as.integer(team_errors) else 0L
+    )
+  }
+
+  players_raw <- bs$players
+  home_players_entry <- NULL
+  away_players_entry <- NULL
+  if (!is.null(players_raw)) {
+    for (pe in players_raw) {
+      ab <- pe$team$abbreviation
+      if (identical(ab, game$home_team_abbrev)) home_players_entry <- pe
+      else if (identical(ab, game$away_team_abbrev)) away_players_entry <- pe
+    }
+  }
+
+  home_parsed <- parse_team_players(home_players_entry)
+  away_parsed <- parse_team_players(away_players_entry)
+
+  player_names <- function(parsed) {
+    name_of <- function(lines) {
+      if (length(lines) == 0) character(0) else vapply(lines, function(x) x$name %||% "", character(1))
+    }
+    unique(c(name_of(parsed$batters), name_of(parsed$pitchers)))
+  }
+  all_home_names <- player_names(home_parsed)
+  all_away_names <- player_names(away_parsed)
+  home_err_counts <- count_errors_from_plays(data$plays, all_home_names)
+  away_err_counts <- count_errors_from_plays(data$plays, all_away_names)
+
+  result$playerHighlights <- list(
+    home = select_highlights(home_parsed, home_box$errors, home_err_counts),
+    away = select_highlights(away_parsed, away_box$errors, away_err_counts)
+  )
+
+  # Accumulate LOB / pitches from fetched box scores so we can derive
+  # season-sample averages (ESPN team stats endpoint does not expose LOB).
+  record_box_accum <- function(abbrev, box) {
+    if (is.null(abbrev) || !nzchar(abbrev)) return()
+    cur <- mlb_box_accum[[abbrev]]
+    if (is.null(cur)) cur <- list(lob = numeric(0), pitches = numeric(0))
+    if (!is.null(box$runnersLOB) && !is.na(box$runnersLOB)) {
+      cur$lob <- c(cur$lob, box$runnersLOB)
+    }
+    if (!is.null(box$pitches) && !is.na(box$pitches)) {
+      cur$pitches <- c(cur$pitches, box$pitches)
+    }
+    mlb_box_accum[[abbrev]] <<- cur
+  }
+  record_box_accum(game$home_team_abbrev, home_box)
+  record_box_accum(game$away_team_abbrev, away_box)
+
   # Compare key stats to season averages
   compare_stat <- function(game_val, season_val) {
     if (is.null(game_val) || is.null(season_val) || is.na(game_val) || is.na(season_val)) return(NULL)
     list(gameValue = round(game_val, 3), seasonAvg = round(season_val, 3), difference = round(game_val - season_val, 3))
   }
 
+  parse_rate <- function(x) {
+    if (is.null(x) || length(x) == 0 || is.na(x[1])) return(NA_real_)
+    if (is.numeric(x)) return(as.numeric(x))
+    s <- trimws(as.character(x[1]))
+    if (!nzchar(s) || s == "-") return(NA_real_)
+    if (startsWith(s, ".")) s <- paste0("0", s)
+    suppressWarnings(as.numeric(s))
+  }
+
+  build_vs_avg_side <- function(box, season_stats) {
+    if (is.null(season_stats)) return(NULL)
+    gp <- season_stats$games_played
+    list(
+      runs = compare_stat(box$runs, season_stats$runs_per_game),
+      hits = compare_stat(box$hits, season_stats$hits_per_game),
+      doubles = compare_stat(box$doubles, season_stats$doubles_per_game),
+      homeRuns = compare_stat(box$homeRuns, season_stats$hr_per_game),
+      rbis = compare_stat(box$rbis, season_stats$rbi_per_game),
+      walksBatting = compare_stat(box$walks, season_stats$bb_batting_per_game),
+      strikeoutsBatting = compare_stat(box$strikeouts, season_stats$k_batting_per_game),
+      stolenBases = compare_stat(box$stolenBases, season_stats$sb_per_game),
+      # Filled in after all box scores are fetched (see enrich_mlb_vs_avg_lob_pitches)
+      runnersLOB = NULL,
+      avg = compare_stat(parse_rate(box$avg), season_stats$batting_avg),
+      obp = compare_stat(parse_rate(box$obp), season_stats$on_base_pct),
+      slg = compare_stat(parse_rate(box$slg), season_stats$slugging_pct),
+      ops = compare_stat(parse_rate(box$ops), season_stats$ops),
+      pitchingStrikeouts = compare_stat(box$pitchingStrikeouts, season_stats$k_pitching_per_game),
+      pitchingWalks = compare_stat(box$pitchingWalks, season_stats$bb_pitching_per_game),
+      pitches = compare_stat(box$pitches, season_stats$pitches_per_game)
+    )
+  }
+
   if (!is.null(home_season_stats) && !is.null(away_season_stats)) {
     result$vsSeasonAvg <- list(
-      home = list(
-        runs = compare_stat(home_box$runs, home_season_stats$runs_per_game),
-        hits = compare_stat(home_box$hits, home_season_stats$hits_per_game * home_season_stats$games_played / home_season_stats$games_played),
-        homeRuns = compare_stat(home_box$homeRuns, home_season_stats$hr_per_game * home_season_stats$games_played / home_season_stats$games_played),
-        strikeoutsBatting = compare_stat(home_box$strikeouts, home_season_stats$strikeouts_batting / home_season_stats$games_played),
-        walksBatting = compare_stat(home_box$walks, home_season_stats$walks_batting / home_season_stats$games_played)
-      ),
-      away = list(
-        runs = compare_stat(away_box$runs, away_season_stats$runs_per_game),
-        hits = compare_stat(away_box$hits, away_season_stats$hits_per_game * away_season_stats$games_played / away_season_stats$games_played),
-        homeRuns = compare_stat(away_box$homeRuns, away_season_stats$hr_per_game * away_season_stats$games_played / away_season_stats$games_played),
-        strikeoutsBatting = compare_stat(away_box$strikeouts, away_season_stats$strikeouts_batting / away_season_stats$games_played),
-        walksBatting = compare_stat(away_box$walks, away_season_stats$walks_batting / away_season_stats$games_played)
-      )
+      home = build_vs_avg_side(home_box, home_season_stats),
+      away = build_vs_avg_side(away_box, away_season_stats)
     )
   }
 
   result
+}
+
+enrich_mlb_vs_avg_lob_pitches <- function(matchups) {
+  accum_mean <- function(abbrev, field) {
+    cur <- mlb_box_accum[[abbrev]]
+    if (is.null(cur)) return(NULL)
+    vals <- cur[[field]]
+    if (is.null(vals) || length(vals) == 0) return(NULL)
+    mean(vals, na.rm = TRUE)
+  }
+  compare_stat <- function(game_val, season_val) {
+    if (is.null(game_val) || is.null(season_val) || is.na(game_val) || is.na(season_val)) return(NULL)
+    list(gameValue = round(game_val, 3), seasonAvg = round(season_val, 3), difference = round(game_val - season_val, 3))
+  }
+  for (i in seq_along(matchups)) {
+    m <- matchups[[i]]
+    vs <- m$results$vsSeasonAvg
+    box <- m$results$teamBoxScore
+    if (is.null(vs) || is.null(box)) next
+    for (side in c("home", "away")) {
+      abbrev <- m[[paste0(side, "Team")]]$abbreviation
+      side_box <- box[[side]]
+      side_vs <- vs[[side]]
+      if (is.null(side_box) || is.null(side_vs)) next
+      lob_avg <- accum_mean(abbrev, "lob")
+      if (!is.null(lob_avg)) {
+        side_vs$runnersLOB <- compare_stat(side_box$runnersLOB, lob_avg)
+      }
+      # Prefer ESPN pitches/start season proxy when present; otherwise sample mean.
+      if (is.null(side_vs$pitches)) {
+        pitches_avg <- accum_mean(abbrev, "pitches")
+        if (!is.null(pitches_avg)) {
+          side_vs$pitches <- compare_stat(side_box$pitches, pitches_avg)
+        }
+      }
+      vs[[side]] <- side_vs
+    }
+    matchups[[i]]$results$vsSeasonAvg <- vs
+  }
+  matchups
 }
 
 # Sort games: most recent completed first, then future games
@@ -1152,6 +1510,9 @@ for (game in all_games) {
   matchups_json[[length(matchups_json) + 1]] <- matchup
 }
 
+# Fill LOB (and missing pitches) vs-avg from the box-score sample collected above
+matchups_json <- enrich_mlb_vs_avg_lob_pitches(matchups_json)
+
 cat("Built", length(matchups_json), "matchups\n")
 
 # ============================================================================
@@ -1166,7 +1527,9 @@ output_data <- list(
   subtitle = paste("Games from the past", DAYS_BEHIND, "days and next", DAYS_AHEAD, "days"),
   description = paste0(
     "MLB matchup statistics with team batting, pitching, and fielding ",
-    "comparisons. All stats are season totals through the current date.\n\n",
+    "comparisons. Completed games include team box scores plus post-game ",
+    "player highlights (starting pitchers, top reliever, top hitters, and ",
+    "fielding errors). All season stats are through the current date.\n\n",
     "BATTING:\n\n",
     " • Runs/Game: Average runs scored per game. Higher is better.\n\n",
     " • Batting Avg: Hits per at-bat. Higher is better.\n\n",

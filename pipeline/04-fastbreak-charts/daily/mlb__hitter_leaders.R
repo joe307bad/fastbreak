@@ -3,18 +3,17 @@ library(dplyr)
 library(jsonlite)
 
 # ============================================================================
-# MLB Hitting Leaders — scatter of wRC+ vs xwOBA for qualified hitters
+# MLB Hitting Leaders — scatter of wRC+ vs Barrel% for qualified hitters
 #
 # Why these two stats:
-#  - wRC+   = Weighted Runs Created Plus. The single best "all in one"
-#             offensive stat: it combines every batting event (BB, HBP,
-#             1B, 2B, 3B, HR) weighted by run value, then adjusts for
-#             park and league. 100 = league average, 150 = elite.
-#  - xwOBA  = Expected Weighted On-Base Average. Statcast-derived
-#             expected wOBA based on quality of contact (exit velocity
-#             and launch angle), so it strips out luck on balls in play
-#             and isolates a hitter's true contact-quality skill — the
-#             hitting analogue of xFIP for pitchers.
+#  - wRC+     = Weighted Runs Created Plus. The single best "all in one"
+#               offensive stat: it combines every batting event (BB, HBP,
+#               1B, 2B, 3B, HR) weighted by run value, then adjusts for
+#               park and league. 100 = league average, 150 = elite.
+#  - Barrel%  = Percent of batted balls with Statcast "barrel" exit
+#               velocity + launch angle. Isolates elite contact quality
+#               without being another run-value metric (unlike xwOBA,
+#               which overlaps heavily with wRC+).
 #
 # Output is a SCATTER_PLOT visualization; the existing KMP renderer reads it
 # without any client changes.
@@ -93,10 +92,11 @@ qualified_hitters <- batter_stats %>%
     PA = as.integer(PA),
     G = as.integer(G),
     wRC_plus = as.numeric(wRC_plus),
-    xwOBA = as.numeric(xwOBA)
+    # FanGraphs returns Barrel% as a proportion (e.g. 0.12); show as percent.
+    Barrel_pct = round(as.numeric(Barrel_pct) * 100, 1)
   ) %>%
   filter(
-    !is.na(PA), !is.na(G), !is.na(wRC_plus), !is.na(xwOBA),
+    !is.na(PA), !is.na(G), !is.na(wRC_plus), !is.na(Barrel_pct),
     PA >= min_pa,
     G >= min_g,
     !grepl("Tms", team, fixed = TRUE)
@@ -109,13 +109,13 @@ cat("Qualified hitters (PA >=", min_pa, ", G >=", min_g, "):",
 top_hitters <- qualified_hitters %>%
   arrange(desc(wRC_plus)) %>%
   head(50) %>%
-  select(player, team, PA, G, wRC_plus, xwOBA)
+  select(player, team, PA, G, wRC_plus, Barrel_pct)
 
 cat("\nTop 10 by wRC+:\n")
 print(head(top_hitters, 10))
 
-# wRC+ is already an integer-style index (100 = avg). xwOBA is a rate around
-# .300-.400; round to 3 decimals so the axis renders cleanly.
+# wRC+ is an integer-style index (100 = avg). Barrel% is a percent around
+# ~5–15 for qualified hitters; one decimal keeps the axis readable.
 data_points <- top_hitters %>%
   rowwise() %>%
   mutate(
@@ -123,7 +123,7 @@ data_points <- top_hitters %>%
     data_point = list(scatter_plot_point(
       label = player,
       x = round(wRC_plus, 0),
-      y = round(xwOBA, 3),
+      y = Barrel_pct,
       sum = round(wRC_plus, 0),
       team_code = team,
       division = if (is.na(primary_team)) NULL else team_divisions[[primary_team]],
@@ -138,29 +138,29 @@ output_data <- list(
   sport = "MLB",
   visualizationType = "SCATTER_PLOT",
   title = paste0("MLB Hitting Leaders - ", mlb_season, "-", substr(mlb_season + 1, 3, 4)),
-  subtitle = "wRC+ vs xwOBA",
+  subtitle = paste0("At least ", min_pa, " plate appearances"),
   description = paste0(
     "Top 50 hitters (min ", min_pa, " PA, ", min_g,
-    " G) plotted by run production against contact quality. Up and to ",
-    "the right is elite: real production backed by sustainable contact.\n\n",
+    " G) plotted by run production (wRC+) against elite contact rate (Barrel%). ",
+    "Up and to the right is elite: real production backed by barrels.\n\n",
     "STATS:\n\n",
     " • wRC+: Weighted Runs Created Plus — park- and league-adjusted total ",
     "offensive value, where 100 is league average. Higher is better.\n\n",
-    " • xwOBA: Expected Weighted On-Base Average — expected offensive value ",
-    "from Statcast quality of contact, stripping out luck on balls in play. ",
-    "Higher is better."
+    " • Barrel%: Percent of batted balls hit with optimal exit velocity and ",
+    "launch angle (Statcast). Isolates contact quality without overlapping ",
+    "wRC+ as another run-value metric. Higher is better."
   ),
   lastUpdated = format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC"),
   source = "FanGraphs",
   xAxisLabel = "wRC+",
-  yAxisLabel = "xwOBA",
+  yAxisLabel = "Barrel%",
   xColumnLabel = "wRC+",
-  yColumnLabel = "xwOBA",
+  yColumnLabel = "Barrel%",
   invertYAxis = FALSE,
-  quadrantTopRight    = list(color = "#4CAF50", label = "Elite, Sustainable"),
-  quadrantTopLeft     = list(color = "#2196F3", label = "Unlucky, Due to Improve"),
+  quadrantTopRight    = list(color = "#4CAF50", label = "Elite Production + Contact"),
+  quadrantTopLeft     = list(color = "#2196F3", label = "Hard Contact, Waiting on Results"),
   quadrantBottomLeft  = list(color = "#9E9E9E", label = "Struggling"),
-  quadrantBottomRight = list(color = "#FF9800", label = "Outperforming Contact"),
+  quadrantBottomRight = list(color = "#FF9800", label = "Producing Without Barrels"),
   subject = "PLAYER",
   tags = list(
     list(label = "player", layout = "left", color = "#2196F3"),
@@ -206,7 +206,7 @@ if (system(ddb_cmd) != 0) {
 
 cat("\n=== MLB Hitting Leaders generation complete ===\n")
 cat("Hitters shown:", length(data_points), "\n")
-cat("\nTop 5 by xwOBA (best):\n")
-print(head(top_hitters %>% arrange(desc(xwOBA)), 5))
+cat("\nTop 5 by Barrel% (best):\n")
+print(head(top_hitters %>% arrange(desc(Barrel_pct)), 5))
 cat("\nTop 5 by wRC+:\n")
 print(head(top_hitters %>% arrange(desc(wRC_plus)), 5))

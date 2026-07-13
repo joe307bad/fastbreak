@@ -10,6 +10,7 @@ import com.arkivanov.decompose.value.MutableValue
 import com.arkivanov.decompose.value.Value
 import com.joebad.fastbreak.data.model.Sport
 import com.joebad.fastbreak.data.model.VizType
+import com.joebad.fastbreak.data.repository.FavoriteChartsRepository
 import com.joebad.fastbreak.ui.container.PinnedTeamsContainer
 import com.joebad.fastbreak.ui.container.RegistryContainer
 import com.joebad.fastbreak.ui.theme.ColorSlot
@@ -27,6 +28,7 @@ import kotlinx.serialization.Serializable
 class RootComponent(
     componentContext: ComponentContext,
     private val themeRepository: ThemeRepository,
+    private val favoriteChartsRepository: FavoriteChartsRepository,
     val registryContainer: RegistryContainer,
     val pinnedTeamsContainer: PinnedTeamsContainer,
     private val chartCache: com.joebad.fastbreak.data.repository.ChartCache
@@ -49,9 +51,22 @@ class RootComponent(
     private val _useSecondaryBackground = MutableValue(themeRepository.getUseSecondaryBackground())
     val useSecondaryBackground: Value<UseSecondaryBackground> = _useSecondaryBackground
 
+    /** Ordered favorite chart IDs (most recently favorited first). */
+    private val _favoriteChartIds = MutableValue(favoriteChartsRepository.getFavoriteChartIds())
+    val favoriteChartIds: Value<List<String>> = _favoriteChartIds
+
     fun toggleTheme(mode: ThemeMode) {
         _themeMode.value = mode
         themeRepository.saveTheme(mode)
+    }
+
+    fun toggleFavoriteChart(chartId: String) {
+        _favoriteChartIds.value = favoriteChartsRepository.toggleFavorite(chartId)
+    }
+
+    fun clearFavoriteCharts() {
+        favoriteChartsRepository.clearAllFavorites()
+        _favoriteChartIds.value = emptyList()
     }
 
     fun setTeamTheme(theme: SelectedTeamTheme?) {

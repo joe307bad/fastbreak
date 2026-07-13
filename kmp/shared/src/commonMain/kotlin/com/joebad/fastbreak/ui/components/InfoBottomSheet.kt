@@ -12,6 +12,8 @@ import androidx.compose.ui.unit.dp
 /**
  * Shared bottom sheet layout used for all info/detail sheets.
  * Matches the TeamSelectorBottomSheet visual style.
+ *
+ * @param fullScreen When true, expands to the full screen height (e.g. team pickers).
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -19,20 +21,22 @@ fun InfoBottomSheet(
     onDismiss: () -> Unit,
     title: String,
     modifier: Modifier = Modifier,
+    fullScreen: Boolean = false,
     content: @Composable ColumnScope.() -> Unit
 ) {
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = fullScreen)
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
         containerColor = MaterialTheme.colorScheme.background,
         dragHandle = { BottomSheetDefaults.DragHandle() },
-        modifier = modifier
+        modifier = modifier.then(if (fullScreen) Modifier.fillMaxHeight() else Modifier)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .then(if (fullScreen) Modifier.fillMaxHeight() else Modifier)
                 .padding(horizontal = 24.dp)
         ) {
             // Header
@@ -44,11 +48,17 @@ fun InfoBottomSheet(
             )
 
             // Content area (scrollable)
-            Column(
-                modifier = Modifier
+            val contentModifier = if (fullScreen) {
+                Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+                    .verticalScroll(rememberScrollState())
+            } else {
+                Modifier
                     .fillMaxWidth()
                     .verticalScroll(rememberScrollState())
-            ) {
+            }
+            Column(modifier = contentModifier) {
                 content()
             }
 

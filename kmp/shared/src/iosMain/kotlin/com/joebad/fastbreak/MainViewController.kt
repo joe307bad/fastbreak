@@ -4,6 +4,7 @@ import androidx.compose.ui.window.ComposeUIViewController
 import com.arkivanov.decompose.DefaultComponentContext
 import com.arkivanov.essenty.lifecycle.LifecycleRegistry
 import com.joebad.fastbreak.data.api.RegistryApi
+import com.joebad.fastbreak.data.repository.FavoriteChartsRepository
 import com.joebad.fastbreak.data.repository.RegistryRepository
 import com.joebad.fastbreak.data.repository.SqlDelightChartCache
 import com.joebad.fastbreak.data.repository.TeamRosterRepository
@@ -75,6 +76,7 @@ fun MainViewController(): UIViewController {
     val teamRosterSynchronizer = TeamRosterSynchronizer(
         teamRosterRepository = teamRosterRepository
     )
+    val favoriteChartsRepository = FavoriteChartsRepository(database)
 
     // Create PinnedTeamsContainer
     val pinnedTeamsContainer = PinnedTeamsContainer(
@@ -95,6 +97,7 @@ fun MainViewController(): UIViewController {
     val rootComponent = RootComponent(
         componentContext = DefaultComponentContext(lifecycle = LifecycleRegistry()),
         themeRepository = themeRepository,
+        favoriteChartsRepository = favoriteChartsRepository,
         registryContainer = registryContainer,
         pinnedTeamsContainer = pinnedTeamsContainer,
         chartCache = chartCache

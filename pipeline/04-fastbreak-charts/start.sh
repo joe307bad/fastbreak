@@ -17,6 +17,12 @@ NC='\033[0m' # No Color
 #   cron-only     - Skip startup, just start cron daemon
 RUN_MODE="${RUN_MODE:-all}"
 
+# Optional sport filter (e.g. mlb) — only run {sport}__*.R scripts
+SPORT="${SPORT:-}"
+
+# When set, exit after running scripts (do not start cron daemon)
+EXIT_AFTER_SCRIPTS=0
+
 # Parse command-line arguments
 while [[ $# -gt 0 ]]; do
   case $1 in
@@ -32,17 +38,37 @@ while [[ $# -gt 0 ]]; do
       RUN_MODE="cron-only"
       shift
       ;;
+    --sport)
+      if [ -z "${2:-}" ]; then
+        echo "Error: --sport requires a value (e.g. mlb)"
+        exit 1
+      fi
+      SPORT="$2"
+      shift 2
+      ;;
+    --sport=*)
+      SPORT="${1#*=}"
+      shift
+      ;;
+    --once|--exit)
+      EXIT_AFTER_SCRIPTS=1
+      shift
+      ;;
     --help|-h)
       echo "Usage: $0 [OPTIONS]"
       echo ""
       echo "Options:"
       echo "  --only-fastbreak-daily  Run only Fastbreak.Daily and exit"
       echo "  --scripts-only          Run only R scripts, skip Fastbreak.Daily"
+      echo "  --sport <name>          Only run <name>__*.R scripts (e.g. mlb)"
+      echo "  --once, --exit          Exit after scripts (do not start cron)"
       echo "  --cron-only             Skip startup scripts, just run cron"
       echo "  --help, -h              Show this help message"
       echo ""
       echo "Environment variables:"
       echo "  RUN_MODE=all|daily-only|scripts-only|cron-only"
+      echo "  SPORT=mlb|nba|nfl|nhl|cbb"
+      echo "  ENV=PROD|DEV             Controls S3 prefix (prod/ vs dev/)"
       exit 0
       ;;
     *)
@@ -58,6 +84,12 @@ echo -e "${BOLD}${BLUE}═══════════════════
 echo -e "${BOLD}${BLUE}                  R Cron Scheduler Starting                  ${NC}"
 echo -e "${BOLD}${BLUE}════════════════════════════════════════════════════════════${NC}"
 echo -e "  ${CYAN}Run mode: ${BOLD}$RUN_MODE${NC}"
+if [ -n "$SPORT" ]; then
+  echo -e "  ${CYAN}Sport filter: ${BOLD}${SPORT}__*.R${NC}"
+fi
+if [ "$EXIT_AFTER_SCRIPTS" -eq 1 ]; then
+  echo -e "  ${CYAN}Exit after scripts: ${BOLD}yes${NC}"
+fi
 echo ""
 
 # Export environment variables for cron jobs (restricted permissions)
@@ -96,11 +128,20 @@ run_scripts() {
   local count=0
   local success=0
   local failed=0
+  local pattern="*.R"
+
+  if [ -n "$SPORT" ]; then
+    pattern="${SPORT}__*.R"
+  fi
 
   echo -e "${BOLD}${CYAN}▶ Running $label scripts...${NC}"
+  if [ -n "$SPORT" ]; then
+    echo -e "${CYAN}  (filter: $pattern)${NC}"
+  fi
   echo -e "${CYAN}────────────────────────────────────────${NC}"
 
-  for script in "$dir"/*.R; do
+  # shellcheck disable=SC2086
+  for script in "$dir"/$pattern; do
     if [ -f "$script" ]; then
       count=$((count + 1))
       script_name=$(basename "$script")
@@ -128,7 +169,7 @@ run_scripts() {
   done
 
   if [ $count -eq 0 ]; then
-    echo -e "  ${YELLOW}No scripts found in $dir${NC}"
+    echo -e "  ${YELLOW}No scripts found in $dir matching $pattern${NC}"
   else
     echo -e "${CYAN}────────────────────────────────────────${NC}"
     echo -e "  ${BOLD}Results:${NC} ${GREEN}$success passed${NC} | ${RED}$failed failed${NC} | Total: $count"
@@ -160,6 +201,12 @@ echo -e "${BOLD}${BLUE}═══════════════════
 echo -e "${BOLD}${BLUE}                    Startup Complete                         ${NC}"
 echo -e "${BOLD}${BLUE}════════════════════════════════════════════════════════════${NC}"
 echo ""
+
+if [ "$EXIT_AFTER_SCRIPTS" -eq 1 ]; then
+  echo -e "${GREEN}Scripts finished. Exiting (--once).${NC}"
+  exit 0
+fi
+
 echo -e "  ${BOLD}Schedule:${NC}"
 echo -e "  • Daily scripts:  ${CYAN}Every day at midnight${NC}"
 echo -e "  • Weekly scripts: ${CYAN}Every Sunday at midnight${NC}"

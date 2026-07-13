@@ -1,0 +1,24 @@
+-- User favorite charts (separate from chart_cache payload storage).
+-- Survives chart re-downloads; cleared only via explicit clear / reset-all-data.
+CREATE TABLE favorite_charts (
+    chart_id TEXT NOT NULL PRIMARY KEY,
+    favorited_at INTEGER NOT NULL
+);
+
+getAllFavoriteIdsOrdered:
+SELECT chart_id
+FROM favorite_charts
+ORDER BY favorited_at DESC;
+
+isFavorite:
+SELECT EXISTS(SELECT 1 FROM favorite_charts WHERE chart_id = ?);
+
+addFavorite:
+INSERT OR REPLACE INTO favorite_charts(chart_id, favorited_at)
+VALUES (?, ?);
+
+removeFavorite:
+DELETE FROM favorite_charts WHERE chart_id = ?;
+
+clearAllFavorites:
+DELETE FROM favorite_charts;

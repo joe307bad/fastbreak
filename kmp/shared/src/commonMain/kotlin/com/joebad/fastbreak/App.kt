@@ -28,6 +28,7 @@ fun App(rootComponent: RootComponent) {
     val selectedTeamTheme by rootComponent.selectedTeamTheme.subscribeAsState()
     val themeBrightness by rootComponent.themeBrightness.subscribeAsState()
     val useSecondaryBackground by rootComponent.useSecondaryBackground.subscribeAsState()
+    val favoriteChartIds by rootComponent.favoriteChartIds.subscribeAsState()
 
     // Collect Orbit MVI state (Phase 6)
     val registryState by rootComponent.registryContainer.container.stateFlow.collectAsState()
@@ -91,6 +92,10 @@ fun App(rootComponent: RootComponent) {
                         component = child.component,
                         registryState = registryState,
                         registryContainer = rootComponent.registryContainer,
+                        favoriteChartIds = favoriteChartIds,
+                        onToggleFavoriteChart = { chartId ->
+                            rootComponent.toggleFavoriteChart(chartId)
+                        },
                         onRefresh = { rootComponent.refreshRegistry() },
                         onLoadRegistry = { rootComponent.loadRegistry() },
                         onMenuClick = { scope.launch { drawerState.open() } },
@@ -113,7 +118,10 @@ fun App(rootComponent: RootComponent) {
                         },
                         diagnostics = registryState.diagnostics,
                         onRefreshRegistry = { rootComponent.refreshRegistry() },
-                        onResetData = { rootComponent.registryContainer.resetAllData() },
+                        onResetData = {
+                            rootComponent.registryContainer.resetAllData()
+                            rootComponent.clearFavoriteCharts()
+                        },
                         onMarkAllAsRead = { rootComponent.markAllAsRead() },
                         teamRosters = pinnedTeamsState.teamRosters,
                         pinnedTeams = pinnedTeamsState.pinnedTeams,

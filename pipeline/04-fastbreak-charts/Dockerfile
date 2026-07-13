@@ -4,9 +4,9 @@ FROM --platform=linux/amd64 rocker/tidyverse:latest
 ENV TZ=America/New_York
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
-# Install cron and AWS CLI
+# Install cron, curl (for GitHub tarball downloads), and AWS CLI
 RUN apt-get update && \
-    apt-get install -y cron python3-pip tzdata && \
+    apt-get install -y cron curl python3-pip tzdata && \
     pip3 install awscli --break-system-packages && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*

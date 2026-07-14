@@ -1170,7 +1170,7 @@ private fun MLBWeeklyPerformanceChart(
                 // Top = good defense (low runs allowed), Bottom = poor defense (high runs allowed)
                 quadrantTopRight = QuadrantConfig(label = "Dominant", color = "#4CAF50", lightModeColor = "#4CAF50"),
                 quadrantTopLeft = QuadrantConfig(label = "Defensive", color = "#2196F3", lightModeColor = "#2196F3"),
-                quadrantBottomLeft = QuadrantConfig(label = "Struggling", color = "#F44336", lightModeColor = "#F44336"),
+                quadrantBottomLeft = QuadrantConfig(label = "Behind Both Ends", color = "#F44336", lightModeColor = "#F44336"),
                 quadrantBottomRight = QuadrantConfig(label = "Offensive", color = "#FF9800", lightModeColor = "#FF9800"),
                 // Use league-wide stats for consistent scaling across all matchups
                 customCenterX = leagueWeeklyStats?.avgRunsScored,

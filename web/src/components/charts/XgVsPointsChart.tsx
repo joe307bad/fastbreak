@@ -36,7 +36,7 @@ const QUADRANTS: Record<QuadrantKey, QuadrantConfig> = {
   topRight: { color: '#22c55e', label: 'Elite' },
   topLeft: { color: '#f59e0b', label: 'Lucky' },
   bottomRight: { color: '#3b82f6', label: 'Unlucky' },
-  bottomLeft: { color: '#ef4444', label: 'Struggling' },
+  bottomLeft: { color: '#ef4444', label: 'Back of the Pack' },
 };
 
 function getQuadrantForPoint(

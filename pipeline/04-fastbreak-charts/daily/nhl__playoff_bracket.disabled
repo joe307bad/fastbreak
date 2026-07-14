@@ -1338,7 +1338,7 @@ output_data <- list(
   scatterPlotQuadrants = list(
     topRight = list(label = "Elite", color = "#4CAF50", lightModeColor = "#4CAF50"),
     topLeft = list(label = "Lucky", color = "#2196F3", lightModeColor = "#2196F3"),
-    bottomLeft = list(label = "Struggling", color = "#F44336", lightModeColor = "#F44336"),
+    bottomLeft = list(label = "Behind Both Ends", color = "#F44336", lightModeColor = "#F44336"),
     bottomRight = list(label = "Unlucky", color = "#FF9800", lightModeColor = "#FF9800")
   ),
   conferences = conferences_out,

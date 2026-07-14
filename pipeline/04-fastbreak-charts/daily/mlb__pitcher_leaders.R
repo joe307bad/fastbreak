@@ -152,7 +152,7 @@ output_data <- list(
   invertYAxis = TRUE,
   quadrantTopRight    = list(color = "#4CAF50", label = "Elite Stuff + Command"),
   quadrantTopLeft     = list(color = "#2196F3", label = "Contact Managers"),
-  quadrantBottomLeft  = list(color = "#9E9E9E", label = "Struggling"),
+  quadrantBottomLeft  = list(color = "#9E9E9E", label = "Modest Stuff + Command"),
   quadrantBottomRight = list(color = "#FF9800", label = "K Artists, HR-Prone"),
   subject = "PLAYER",
   tags = list(

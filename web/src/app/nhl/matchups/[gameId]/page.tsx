@@ -356,7 +356,7 @@ export default async function NHLMatchupPage({ params }: Props) {
                 { label: 'Elite', color: '#22c55e' },
                 { label: 'Lucky', color: '#f59e0b' },
                 { label: 'Unlucky', color: '#3b82f6' },
-                { label: 'Struggling', color: '#ef4444' },
+                { label: 'Behind Both Ends', color: '#ef4444' },
               ]}>
                 <XgVsPointsChart
                   homeTeamStats={game.homeTeam.stats}

@@ -322,7 +322,7 @@ fun QuadrantScatterPlot(
     // Quadrant labels
     val topRightLabel = quadrantTopRight?.label ?: "Elite"
     val topLeftLabel = quadrantTopLeft?.label ?: "Efficient"
-    val bottomLeftLabel = quadrantBottomLeft?.label ?: "Struggling"
+    val bottomLeftLabel = quadrantBottomLeft?.label ?: "Back of the Pack"
     val bottomRightLabel = quadrantBottomRight?.label ?: "Inefficient"
 
     // Y multiplier for axis inversion

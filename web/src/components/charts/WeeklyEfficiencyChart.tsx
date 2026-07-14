@@ -40,7 +40,7 @@ function getQuadrantForPoint(
 
   if (isHighOff && isLowDef) return 'topRight';      // Elite
   if (!isHighOff && isLowDef) return 'topLeft';      // Defensive
-  if (!isHighOff && !isLowDef) return 'bottomLeft';  // Struggling
+  if (!isHighOff && !isLowDef) return 'bottomLeft';  // Behind Both Ends
   return 'bottomRight';                               // Offensive
 }
 
@@ -257,7 +257,7 @@ function createQuadrantLayer(
 
     // Note: Y-axis is reversed (lower def rating is better, shown at top)
     // So topRight visually is high offense (right) + low defense (top) = Elite
-    // bottomLeft visually is low offense (left) + high defense (bottom) = Struggling
+    // bottomLeft visually is low offense (left) + high defense (bottom) = Behind Both Ends
     const regions = [
       {
         x: xMidPx,

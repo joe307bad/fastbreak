@@ -79,7 +79,7 @@ fun FourQuadrantScatterPlot(
     // Resolve quadrant labels (use config or defaults)
     val topRightLabel = quadrantTopRight?.label ?: "Elite"
     val topLeftLabel = quadrantTopLeft?.label ?: "Efficient"
-    val bottomLeftLabel = quadrantBottomLeft?.label ?: "Struggling"
+    val bottomLeftLabel = quadrantBottomLeft?.label ?: "Back of the Pack"
     val bottomRightLabel = quadrantBottomRight?.label ?: "Inefficient"
 
     // Zoom and pan state - start zoomed out for better overview

@@ -198,7 +198,7 @@ output_data <- list(
   ),
   bottomReferenceLine = list(
     value = 110,
-    label = "Struggling Offense",
+    label = "Modest Offense",
     color = "#F44336"
   )
 )

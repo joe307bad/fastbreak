@@ -2529,7 +2529,7 @@ internal fun WeeklyEfficiencyScatterPlot(
             // Use quadrant config from data, with defaults as fallback
             val topRight = quadrantConfig?.topRight ?: QuadrantConfig(label = "Elite", color = "#4CAF50", lightModeColor = "#4CAF50")
             val topLeft = quadrantConfig?.topLeft ?: QuadrantConfig(label = "Defensive", color = "#2196F3", lightModeColor = "#2196F3")
-            val bottomLeft = quadrantConfig?.bottomLeft ?: QuadrantConfig(label = "Struggling", color = "#F44336", lightModeColor = "#F44336")
+            val bottomLeft = quadrantConfig?.bottomLeft ?: QuadrantConfig(label = "Behind Both Ends", color = "#F44336", lightModeColor = "#F44336")
             val bottomRight = quadrantConfig?.bottomRight ?: QuadrantConfig(label = "Offensive", color = "#FF9800", lightModeColor = "#FF9800")
 
             QuadrantScatterPlot(

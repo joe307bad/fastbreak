@@ -159,7 +159,7 @@ output_data <- list(
   invertYAxis = FALSE,
   quadrantTopRight    = list(color = "#4CAF50", label = "Elite Production + Contact"),
   quadrantTopLeft     = list(color = "#2196F3", label = "Hard Contact, Waiting on Results"),
-  quadrantBottomLeft  = list(color = "#9E9E9E", label = "Struggling"),
+  quadrantBottomLeft  = list(color = "#9E9E9E", label = "Modest Production + Contact"),
   quadrantBottomRight = list(color = "#FF9800", label = "Producing Without Barrels"),
   subject = "PLAYER",
   tags = list(

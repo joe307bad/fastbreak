@@ -141,7 +141,7 @@ output_data <- list(
   invertYAxis = TRUE,
   quadrantTopRight = list(color = "#4CAF50", label = "Elite"),
   quadrantTopLeft = list(color = "#2196F3", label = "Defense First"),
-  quadrantBottomLeft = list(color = "#F44336", label = "Struggling"),
+  quadrantBottomLeft = list(color = "#F44336", label = "Behind Both Ends"),
   quadrantBottomRight = list(color = "#FFEB3B", label = "Offense First"),
   subject = "TEAM",
   tags = list(

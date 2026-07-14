@@ -2777,7 +2777,7 @@ internal fun XgVsPointsPctScatter(
                 highlightedTeamCodes = setOf(awayTeam, homeTeam),
                 quadrantTopRight = QuadrantConfig(label = "Elite", color = "#4CAF50", lightModeColor = "#4CAF50"),
                 quadrantTopLeft = QuadrantConfig(label = "Unlucky", color = "#2196F3", lightModeColor = "#2196F3"),
-                quadrantBottomLeft = QuadrantConfig(label = "Struggling", color = "#F44336", lightModeColor = "#F44336"),
+                quadrantBottomLeft = QuadrantConfig(label = "Behind Both Ends", color = "#F44336", lightModeColor = "#F44336"),
                 quadrantBottomRight = QuadrantConfig(label = "Overperforming", color = "#FF9800", lightModeColor = "#FF9800"),
                 customCenterX = leagueStats?.avgPointsPct ?: 50.0,
                 customCenterY = leagueStats?.avgXgPct ?: 50.0,

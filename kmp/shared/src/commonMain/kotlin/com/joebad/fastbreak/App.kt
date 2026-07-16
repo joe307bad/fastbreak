@@ -27,6 +27,7 @@ fun App(rootComponent: RootComponent) {
     val themeMode by rootComponent.themeMode.subscribeAsState()
     val selectedTeamTheme by rootComponent.selectedTeamTheme.subscribeAsState()
     val themeBrightness by rootComponent.themeBrightness.subscribeAsState()
+    val themeColorOverrides by rootComponent.themeColorOverrides.subscribeAsState()
     val useSecondaryBackground by rootComponent.useSecondaryBackground.subscribeAsState()
     val favoriteChartIds by rootComponent.favoriteChartIds.subscribeAsState()
 
@@ -51,7 +52,7 @@ fun App(rootComponent: RootComponent) {
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
 
-    AppTheme(themeMode = themeMode, teamColors = teamColors, brightness = themeBrightness, useSecondaryBackground = useSecondaryBackground) {
+    AppTheme(themeMode = themeMode, teamColors = teamColors, brightness = themeBrightness, colorOverrides = themeColorOverrides, useSecondaryBackground = useSecondaryBackground) {
         ModalNavigationDrawer(
             drawerState = drawerState,
             drawerContent = {
@@ -138,6 +139,10 @@ fun App(rootComponent: RootComponent) {
                         themeBrightness = themeBrightness,
                         onBrightnessChange = { slot, value ->
                             rootComponent.setBrightness(slot, value)
+                        },
+                        themeColorOverrides = themeColorOverrides,
+                        onColorOverrideChange = { slot, hex ->
+                            rootComponent.setColorOverride(slot, hex)
                         },
                         useSecondaryBackground = useSecondaryBackground,
                         onToggleSecondaryBackground = { mode ->

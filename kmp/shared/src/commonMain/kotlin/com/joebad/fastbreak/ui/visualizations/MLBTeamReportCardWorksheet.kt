@@ -225,8 +225,7 @@ private fun isReportCardRankingPct(key: String): Boolean {
 
 private fun formatReportCardRankingLabel(seasonLabel: String, key: String): String {
     parseReportCardRankingKey(key)?.let { parsed ->
-        val suffix = if (parsed.isPlayer) " / Players" else ""
-        return "$seasonLabel / ${formatReportCardCategoryLabel(parsed.categoryKey)} / ${reportCardStatLabel(parsed.categoryKey, parsed.statKey)}$suffix"
+        return "$seasonLabel / ${formatReportCardCategoryLabel(parsed.categoryKey)} / ${reportCardStatLabel(parsed.categoryKey, parsed.statKey)}"
     }
     return when (key) {
         "record" -> "$seasonLabel / Record"
@@ -668,7 +667,11 @@ fun MLBTeamReportCardWorksheet(
                     highlightedTeams = setOf(team.teamCode),
                     isPct = isReportCardRankingPct(key),
                     subtitle = if (isReportCardPlayerRankingKey(key)) "Player Rankings" else "Season Rankings",
-                    source = visualization.source ?: "FanGraphs"
+                    source = parseReportCardSources(visualization.source ?: "FanGraphs")
+                        .filterNot { it.equals("ESPN", ignoreCase = true) }
+                        .distinct()
+                        .joinToString(" • ")
+                        .ifBlank { "FanGraphs" }
                 )
             }
         }

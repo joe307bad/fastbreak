@@ -248,6 +248,7 @@ fun AppTheme(
     themeMode: ThemeMode = ThemeMode.LIGHT,
     teamColors: TeamThemeColors? = null,
     brightness: ThemeBrightness = ThemeBrightness(),
+    colorOverrides: ThemeColorOverrides = ThemeColorOverrides(),
     useSecondaryBackground: UseSecondaryBackground = UseSecondaryBackground(),
     content: @Composable () -> Unit
 ) {
@@ -260,8 +261,10 @@ fun AppTheme(
     val colorScheme = if (teamColors != null) {
         when (themeMode) {
             ThemeMode.LIGHT -> {
-                val primary = parseHexColor(teamColors.lightPrimary)?.adjustBrightness(brightness.lightPrimary)
-                val secondary = parseHexColor(teamColors.lightSecondary)?.adjustBrightness(brightness.lightSecondary)
+                val primary = colorOverrides.lightPrimary?.let { parseHexColor(it) }
+                    ?: parseHexColor(teamColors.lightPrimary)?.adjustBrightness(brightness.lightPrimary)
+                val secondary = colorOverrides.lightSecondary?.let { parseHexColor(it) }
+                    ?: parseHexColor(teamColors.lightSecondary)?.adjustBrightness(brightness.lightSecondary)
                 val isSecondaryBg = useSecondaryBackground.light && secondary != null
                 // Use secondary color as background if enabled
                 val background = if (isSecondaryBg) secondary else baseColorScheme.background
@@ -303,8 +306,10 @@ fun AppTheme(
                 )
             }
             ThemeMode.DARK -> {
-                val primary = parseHexColor(teamColors.darkPrimary)?.adjustBrightness(brightness.darkPrimary)
-                val secondary = parseHexColor(teamColors.darkSecondary)?.adjustBrightness(brightness.darkSecondary)
+                val primary = colorOverrides.darkPrimary?.let { parseHexColor(it) }
+                    ?: parseHexColor(teamColors.darkPrimary)?.adjustBrightness(brightness.darkPrimary)
+                val secondary = colorOverrides.darkSecondary?.let { parseHexColor(it) }
+                    ?: parseHexColor(teamColors.darkSecondary)?.adjustBrightness(brightness.darkSecondary)
                 val isSecondaryBg = useSecondaryBackground.dark && secondary != null
                 // Use secondary color as background if enabled
                 val background = if (isSecondaryBg) secondary else baseColorScheme.background

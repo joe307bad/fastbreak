@@ -24,8 +24,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.joebad.fastbreak.data.model.Team
 import com.joebad.fastbreak.data.model.TeamRoster
+import com.joebad.fastbreak.ui.components.ColorPickerDialog
+import com.joebad.fastbreak.ui.components.toHexString
 import com.joebad.fastbreak.ui.theme.ColorSlot
 import com.joebad.fastbreak.ui.theme.ThemeBrightness
+import com.joebad.fastbreak.ui.theme.ThemeColorOverrides
 import com.joebad.fastbreak.ui.theme.ThemeMode
 import com.joebad.fastbreak.ui.theme.UseSecondaryBackground
 
@@ -278,6 +281,8 @@ fun ThemeSelectorBottomSheet(
     selectedTeamColors: Team? = null,  // The selected team's color data
     themeBrightness: ThemeBrightness = ThemeBrightness(),
     onBrightnessChange: (ColorSlot, Float) -> Unit = { _, _ -> },
+    themeColorOverrides: ThemeColorOverrides = ThemeColorOverrides(),
+    onColorOverrideChange: (ColorSlot, String?) -> Unit = { _, _ -> },
     onTeamSelect: (sport: String?, teamCode: String?) -> Unit,  // null to clear selection
     onDismiss: () -> Unit,
     currentTheme: ThemeMode = ThemeMode.LIGHT,
@@ -397,7 +402,7 @@ fun ThemeSelectorBottomSheet(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                text = "adjust brightness",
+                                text = "customize colors",
                                 style = MaterialTheme.typography.labelMedium,
                                 fontFamily = FontFamily.Monospace,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -414,7 +419,7 @@ fun ThemeSelectorBottomSheet(
                         if (isBrightnessExpanded) {
                             Spacer(modifier = Modifier.height(8.dp))
 
-                            // Selectable color swatches
+                            // Selectable color swatches — tap one to open the color picker
                             Row(
                                 modifier = Modifier.fillMaxWidth().padding(start = 8.dp),
                                 horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -423,27 +428,23 @@ fun ThemeSelectorBottomSheet(
                                 // Light Primary
                                 if (selectedTeamColors.lightPrimary != null) {
                                     SelectableColorSwatch(
-                                        color = parseHexColor(selectedTeamColors.lightPrimary),
-                                        brightness = themeBrightness.lightPrimary,
+                                        color = themeColorOverrides.lightPrimary?.let { parseHexColor(it) }
+                                            ?: parseHexColor(selectedTeamColors.lightPrimary).adjustBrightness(themeBrightness.lightPrimary),
+                                        brightness = 0f,
                                         isSelected = selectedColorSlot == ColorSlot.LIGHT_PRIMARY,
                                         label = "L1",
-                                        onClick = {
-                                            selectedColorSlot = if (selectedColorSlot == ColorSlot.LIGHT_PRIMARY) null
-                                            else ColorSlot.LIGHT_PRIMARY
-                                        }
+                                        onClick = { selectedColorSlot = ColorSlot.LIGHT_PRIMARY }
                                     )
                                 }
                                 // Light Secondary
                                 if (selectedTeamColors.lightSecondary != null) {
                                     SelectableColorSwatch(
-                                        color = parseHexColor(selectedTeamColors.lightSecondary),
-                                        brightness = themeBrightness.lightSecondary,
+                                        color = themeColorOverrides.lightSecondary?.let { parseHexColor(it) }
+                                            ?: parseHexColor(selectedTeamColors.lightSecondary).adjustBrightness(themeBrightness.lightSecondary),
+                                        brightness = 0f,
                                         isSelected = selectedColorSlot == ColorSlot.LIGHT_SECONDARY,
                                         label = "L2",
-                                        onClick = {
-                                            selectedColorSlot = if (selectedColorSlot == ColorSlot.LIGHT_SECONDARY) null
-                                            else ColorSlot.LIGHT_SECONDARY
-                                        }
+                                        onClick = { selectedColorSlot = ColorSlot.LIGHT_SECONDARY }
                                     )
                                 }
 
@@ -460,63 +461,76 @@ fun ThemeSelectorBottomSheet(
                                 // Dark Primary
                                 if (selectedTeamColors.darkPrimary != null) {
                                     SelectableColorSwatch(
-                                        color = parseHexColor(selectedTeamColors.darkPrimary),
-                                        brightness = themeBrightness.darkPrimary,
+                                        color = themeColorOverrides.darkPrimary?.let { parseHexColor(it) }
+                                            ?: parseHexColor(selectedTeamColors.darkPrimary).adjustBrightness(themeBrightness.darkPrimary),
+                                        brightness = 0f,
                                         isSelected = selectedColorSlot == ColorSlot.DARK_PRIMARY,
                                         label = "D1",
-                                        onClick = {
-                                            selectedColorSlot = if (selectedColorSlot == ColorSlot.DARK_PRIMARY) null
-                                            else ColorSlot.DARK_PRIMARY
-                                        }
+                                        onClick = { selectedColorSlot = ColorSlot.DARK_PRIMARY }
                                     )
                                 }
                                 // Dark Secondary
                                 if (selectedTeamColors.darkSecondary != null) {
                                     SelectableColorSwatch(
-                                        color = parseHexColor(selectedTeamColors.darkSecondary),
-                                        brightness = themeBrightness.darkSecondary,
+                                        color = themeColorOverrides.darkSecondary?.let { parseHexColor(it) }
+                                            ?: parseHexColor(selectedTeamColors.darkSecondary).adjustBrightness(themeBrightness.darkSecondary),
+                                        brightness = 0f,
                                         isSelected = selectedColorSlot == ColorSlot.DARK_SECONDARY,
                                         label = "D2",
-                                        onClick = {
-                                            selectedColorSlot = if (selectedColorSlot == ColorSlot.DARK_SECONDARY) null
-                                            else ColorSlot.DARK_SECONDARY
-                                        }
+                                        onClick = { selectedColorSlot = ColorSlot.DARK_SECONDARY }
                                     )
                                 }
                             }
 
-                            // Brightness slider when a color is selected
-                            if (selectedColorSlot != null) {
-                            Spacer(modifier = Modifier.height(12.dp))
-
-                            val currentBrightness = when (selectedColorSlot) {
-                                ColorSlot.LIGHT_PRIMARY -> themeBrightness.lightPrimary
-                                ColorSlot.LIGHT_SECONDARY -> themeBrightness.lightSecondary
-                                ColorSlot.DARK_PRIMARY -> themeBrightness.darkPrimary
-                                ColorSlot.DARK_SECONDARY -> themeBrightness.darkSecondary
-                                null -> 0f
-                            }
-
+                            Spacer(modifier = Modifier.height(8.dp))
                             Text(
-                                text = "brightness: ${(currentBrightness * 100).toInt()}%",
+                                text = "tap a color to customize it",
                                 style = MaterialTheme.typography.labelSmall,
                                 fontFamily = FontFamily.Monospace,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                             )
-
-                            Slider(
-                                value = currentBrightness,
-                                onValueChange = { value ->
-                                    selectedColorSlot?.let { slot ->
-                                        onBrightnessChange(slot, value)
-                                    }
-                                },
-                                valueRange = -0.5f..0.5f,
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                        }
                         }
                     }
+                }
+
+                // Color picker modal for the selected slot
+                selectedColorSlot?.let { slot ->
+                    val teamHex = when (slot) {
+                        ColorSlot.LIGHT_PRIMARY -> selectedTeamColors.lightPrimary
+                        ColorSlot.LIGHT_SECONDARY -> selectedTeamColors.lightSecondary
+                        ColorSlot.DARK_PRIMARY -> selectedTeamColors.darkPrimary
+                        ColorSlot.DARK_SECONDARY -> selectedTeamColors.darkSecondary
+                    }
+                    val overrideHex = when (slot) {
+                        ColorSlot.LIGHT_PRIMARY -> themeColorOverrides.lightPrimary
+                        ColorSlot.LIGHT_SECONDARY -> themeColorOverrides.lightSecondary
+                        ColorSlot.DARK_PRIMARY -> themeColorOverrides.darkPrimary
+                        ColorSlot.DARK_SECONDARY -> themeColorOverrides.darkSecondary
+                    }
+                    val brightnessValue = when (slot) {
+                        ColorSlot.LIGHT_PRIMARY -> themeBrightness.lightPrimary
+                        ColorSlot.LIGHT_SECONDARY -> themeBrightness.lightSecondary
+                        ColorSlot.DARK_PRIMARY -> themeBrightness.darkPrimary
+                        ColorSlot.DARK_SECONDARY -> themeBrightness.darkSecondary
+                    }
+                    val seedColor = overrideHex?.let { parseHexColor(it) }
+                        ?: teamHex?.let { parseHexColor(it).adjustBrightness(brightnessValue) }
+                        ?: Color.Gray
+                    ColorPickerDialog(
+                        initialColor = seedColor,
+                        title = "customize color",
+                        onReset = if (overrideHex != null) {
+                            {
+                                onColorOverrideChange(slot, null)
+                                selectedColorSlot = null
+                            }
+                        } else null,
+                        onDismiss = { selectedColorSlot = null },
+                        onConfirm = { color ->
+                            onColorOverrideChange(slot, color.toHexString())
+                            selectedColorSlot = null
+                        }
+                    )
                 }
             }
 

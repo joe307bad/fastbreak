@@ -41,6 +41,17 @@ enum class ColorSlot {
 }
 
 /**
+ * Absolute per-slot color overrides picked via the color picker.
+ * A non-null hex string ("#RRGGBB") replaces the team's color for that slot.
+ */
+data class ThemeColorOverrides(
+    val lightPrimary: String? = null,
+    val lightSecondary: String? = null,
+    val darkPrimary: String? = null,
+    val darkSecondary: String? = null
+)
+
+/**
  * Whether to use the team's secondary color as background instead of default white/black.
  */
 data class UseSecondaryBackground(
@@ -59,6 +70,10 @@ class ThemeRepository(
         private const val KEY_BRIGHTNESS_LIGHT_SECONDARY = "brightness_light_secondary"
         private const val KEY_BRIGHTNESS_DARK_PRIMARY = "brightness_dark_primary"
         private const val KEY_BRIGHTNESS_DARK_SECONDARY = "brightness_dark_secondary"
+        private const val KEY_COLOR_OVERRIDE_LIGHT_PRIMARY = "color_override_light_primary"
+        private const val KEY_COLOR_OVERRIDE_LIGHT_SECONDARY = "color_override_light_secondary"
+        private const val KEY_COLOR_OVERRIDE_DARK_PRIMARY = "color_override_dark_primary"
+        private const val KEY_COLOR_OVERRIDE_DARK_SECONDARY = "color_override_dark_secondary"
         private const val KEY_USE_SECONDARY_BG_LIGHT = "use_secondary_bg_light"
         private const val KEY_USE_SECONDARY_BG_DARK = "use_secondary_bg_dark"
         private const val VALUE_LIGHT = "light"
@@ -145,6 +160,47 @@ class ThemeRepository(
         settings.remove(KEY_BRIGHTNESS_LIGHT_SECONDARY)
         settings.remove(KEY_BRIGHTNESS_DARK_PRIMARY)
         settings.remove(KEY_BRIGHTNESS_DARK_SECONDARY)
+    }
+
+    private fun colorOverrideKey(slot: ColorSlot): String = when (slot) {
+        ColorSlot.LIGHT_PRIMARY -> KEY_COLOR_OVERRIDE_LIGHT_PRIMARY
+        ColorSlot.LIGHT_SECONDARY -> KEY_COLOR_OVERRIDE_LIGHT_SECONDARY
+        ColorSlot.DARK_PRIMARY -> KEY_COLOR_OVERRIDE_DARK_PRIMARY
+        ColorSlot.DARK_SECONDARY -> KEY_COLOR_OVERRIDE_DARK_SECONDARY
+    }
+
+    /**
+     * Get the saved absolute color overrides for team theme colors.
+     */
+    fun getThemeColorOverrides(): ThemeColorOverrides {
+        return ThemeColorOverrides(
+            lightPrimary = settings.getStringOrNull(KEY_COLOR_OVERRIDE_LIGHT_PRIMARY),
+            lightSecondary = settings.getStringOrNull(KEY_COLOR_OVERRIDE_LIGHT_SECONDARY),
+            darkPrimary = settings.getStringOrNull(KEY_COLOR_OVERRIDE_DARK_PRIMARY),
+            darkSecondary = settings.getStringOrNull(KEY_COLOR_OVERRIDE_DARK_SECONDARY)
+        )
+    }
+
+    /**
+     * Save (or clear, when [hex] is null) an absolute color override for a slot.
+     */
+    fun saveColorOverride(slot: ColorSlot, hex: String?) {
+        val key = colorOverrideKey(slot)
+        if (hex == null) {
+            settings.remove(key)
+        } else {
+            settings[key] = hex
+        }
+    }
+
+    /**
+     * Clear all color overrides (when selecting a new team).
+     */
+    fun clearColorOverrides() {
+        settings.remove(KEY_COLOR_OVERRIDE_LIGHT_PRIMARY)
+        settings.remove(KEY_COLOR_OVERRIDE_LIGHT_SECONDARY)
+        settings.remove(KEY_COLOR_OVERRIDE_DARK_PRIMARY)
+        settings.remove(KEY_COLOR_OVERRIDE_DARK_SECONDARY)
     }
 
     /**

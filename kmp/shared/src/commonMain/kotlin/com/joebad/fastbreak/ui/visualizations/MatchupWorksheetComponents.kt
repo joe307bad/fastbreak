@@ -1150,7 +1150,27 @@ fun <T> PlayerComparisonSection(
     Spacer(modifier = Modifier.height(4.dp))
 }
 
-private enum class ShareRange { FULL, TOP_HALF, BOTTOM_HALF }
+private enum class ShareRange { FULL, TOP_HALF, BOTTOM_HALF, SPOTLIGHT }
+
+/**
+ * Window of entries centered on [anchor] used by the Spotlight share — the anchor
+ * plus up to [radius] entries on each side, shifted to stay in bounds.
+ */
+private fun spotlightWindow(
+    entries: List<RankingEntry>,
+    anchor: Int,
+    radius: Int = 5
+): List<RankingEntry> {
+    if (entries.isEmpty()) return entries
+    val size = entries.size
+    val center = anchor.coerceIn(0, size - 1)
+    var start = center - radius
+    var end = center + radius
+    if (start < 0) { end -= start; start = 0 }
+    if (end > size - 1) { start -= (end - (size - 1)); end = size - 1 }
+    start = start.coerceAtLeast(0)
+    return entries.subList(start, (end + 1).coerceAtMost(size))
+}
 
 private sealed interface PlayoffShareTarget {
     data object Full : PlayoffShareTarget
@@ -1245,6 +1265,7 @@ private fun StatRankingsShareImage(
     ) {
         Text(statLabel, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, color = onBg, maxLines = 1)
         if (subtitle.isNotBlank()) {
+            Spacer(modifier = Modifier.height(3.dp))
             Text(subtitle, style = MaterialTheme.typography.bodySmall, fontSize = 12.sp, color = dimColor, maxLines = 1)
         }
         Spacer(modifier = Modifier.height(8.dp))
@@ -1613,39 +1634,21 @@ fun StatRankingsBottomSheet(
     var selectedTeams by remember { mutableStateOf(highlightedTeams) }
     val isPlayerRankings = entriesArePlayerRankings(entries)
 
-    // Share capture state — wait for off-screen layout before capturing so
-    // top/bottom half don't share a stale full-list graphicsLayer frame.
+    // Share capture state. Each range renders its own off-screen image into its
+    // own graphics layer (keyed by range) so a half/spotlight capture can never
+    // reuse a stale full-list frame left over in a shared layer.
     var shareRange by remember { mutableStateOf<ShareRange?>(null) }
-    var shareLayoutSize by remember { mutableStateOf(IntSize.Zero) }
-    val graphicsLayer = rememberGraphicsLayer()
     val imageExporter = remember { getImageExporter() }
+    // Anchor for the Spotlight share: the first highlighted entry, else the middle.
+    val spotlightAnchor = displayEntries.indexOfFirst { it.team in selectedTeams }
+        .let { if (it >= 0) it else displayEntries.size / 2 }
 
-    LaunchedEffect(shareRange, shareLayoutSize) {
-        val range = shareRange ?: return@LaunchedEffect
-        if (shareLayoutSize.width <= 0 || shareLayoutSize.height <= 0) return@LaunchedEffect
-        // Two frames: one for layout/draw of the sliced list, one to settle the layer.
-        withFrameNanos { }
-        withFrameNanos { }
-        try {
-            val bitmap = graphicsLayer.toImageBitmap()
-            val rangeLabel = when (range) {
-                ShareRange.TOP_HALF -> "Top Half"
-                ShareRange.BOTTOM_HALF -> "Bottom Half"
-                ShareRange.FULL -> ""
-            }
-            val shareTitle = if (rangeLabel.isNotEmpty()) "$statLabel - $rangeLabel" else statLabel
-            imageExporter.shareImage(bitmap, shareTitle)
-        } catch (e: Exception) {
-            e.printStackTrace()
-        } finally {
-            shareRange = null
-            shareLayoutSize = IntSize.Zero
-        }
-    }
-
-    // Off-screen share image (keyed so half-list content fully replaces prior captures)
+    // Off-screen share image — one graphics layer per range (via key + remember)
+    // so a slice never captures the full list's previously recorded frame.
     shareRange?.let { range ->
         key(range) {
+            val rangeLayer = rememberGraphicsLayer()
+            var layoutSize by remember { mutableStateOf(IntSize.Zero) }
             val mid = displayEntries.size / 2
             val shareEntries = when (range) {
                 ShareRange.FULL -> displayEntries
@@ -1654,14 +1657,36 @@ fun StatRankingsBottomSheet(
                     val dropCount = mid.coerceAtMost(displayEntries.size - 1).coerceAtLeast(0)
                     displayEntries.drop(dropCount).ifEmpty { displayEntries }
                 }
+                ShareRange.SPOTLIGHT -> spotlightWindow(displayEntries, spotlightAnchor)
             }
-            val rangeSubtitle = when (range) {
-                ShareRange.TOP_HALF -> listOfNotNull(subtitle.takeIf { it.isNotBlank() }, "Top Half")
-                    .joinToString(" • ")
-                ShareRange.BOTTOM_HALF -> listOfNotNull(subtitle.takeIf { it.isNotBlank() }, "Bottom Half")
-                    .joinToString(" • ")
-                ShareRange.FULL -> subtitle
+            val rangeLabel = when (range) {
+                ShareRange.TOP_HALF -> "Top Half"
+                ShareRange.BOTTOM_HALF -> "Bottom Half"
+                ShareRange.SPOTLIGHT -> "Spotlight"
+                ShareRange.FULL -> ""
             }
+            val rangeSubtitle = if (rangeLabel.isEmpty()) {
+                subtitle
+            } else {
+                listOfNotNull(subtitle.takeIf { it.isNotBlank() }, rangeLabel).joinToString(" • ")
+            }
+            val shareTitle = if (rangeLabel.isNotEmpty()) "$statLabel - $rangeLabel" else statLabel
+
+            LaunchedEffect(layoutSize) {
+                if (layoutSize.width <= 0 || layoutSize.height <= 0) return@LaunchedEffect
+                // Two frames: one for layout/draw of the sliced list, one to settle the layer.
+                withFrameNanos { }
+                withFrameNanos { }
+                try {
+                    val bitmap = rangeLayer.toImageBitmap()
+                    imageExporter.shareImage(bitmap, shareTitle)
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                } finally {
+                    shareRange = null
+                }
+            }
+
             CompositionLocalProvider(LocalDensity provides Density(4f, 1f)) {
                 Box(
                     modifier = Modifier
@@ -1669,14 +1694,14 @@ fun StatRankingsBottomSheet(
                         .offset { IntOffset(-10000, 0) }
                         .onSizeChanged { size ->
                             if (size.width > 0 && size.height > 0) {
-                                shareLayoutSize = size
+                                layoutSize = size
                             }
                         }
                         .drawWithContent {
-                            graphicsLayer.record(
+                            rangeLayer.record(
                                 size = androidx.compose.ui.unit.IntSize(size.width.toInt(), size.height.toInt())
                             ) { this@drawWithContent.drawContent() }
-                            drawLayer(graphicsLayer)
+                            drawLayer(rangeLayer)
                         }
                 ) {
                     StatRankingsShareImage(
@@ -1875,21 +1900,26 @@ fun StatRankingsBottomSheet(
             }
 
             // Share FAB
+            val shareOptions = buildList {
+                add(FabOption(Icons.Filled.Share, "Full List") {
+                    shareRange = ShareRange.FULL
+                })
+                add(FabOption(Icons.Filled.Share, "Top Half") {
+                    shareRange = ShareRange.TOP_HALF
+                })
+                add(FabOption(Icons.Filled.Share, "Bottom Half") {
+                    shareRange = ShareRange.BOTTOM_HALF
+                })
+                // Spotlight the highlighted entry and the ten players around it —
+                // only useful when there's a highlight and more entries than the window.
+                if (displayEntries.any { it.team in selectedTeams } && displayEntries.size > 11) {
+                    add(FabOption(Icons.Filled.Star, "Spotlight") {
+                        shareRange = ShareRange.SPOTLIGHT
+                    })
+                }
+            }
             MultiOptionFab(
-                options = listOf(
-                    FabOption(Icons.Filled.Share, "Full List") {
-                        shareLayoutSize = IntSize.Zero
-                        shareRange = ShareRange.FULL
-                    },
-                    FabOption(Icons.Filled.Share, "Top Half") {
-                        shareLayoutSize = IntSize.Zero
-                        shareRange = ShareRange.TOP_HALF
-                    },
-                    FabOption(Icons.Filled.Share, "Bottom Half") {
-                        shareLayoutSize = IntSize.Zero
-                        shareRange = ShareRange.BOTTOM_HALF
-                    }
-                ),
+                options = shareOptions,
                 modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp)
             )
         }

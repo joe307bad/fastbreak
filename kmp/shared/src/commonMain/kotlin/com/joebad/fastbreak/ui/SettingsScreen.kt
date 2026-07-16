@@ -25,6 +25,7 @@ import com.joebad.fastbreak.ui.teams.ThemeSelectorBottomSheet
 import com.joebad.fastbreak.ui.theme.ColorSlot
 import com.joebad.fastbreak.ui.theme.SelectedTeamTheme
 import com.joebad.fastbreak.ui.theme.ThemeBrightness
+import com.joebad.fastbreak.ui.theme.ThemeColorOverrides
 import com.joebad.fastbreak.ui.theme.ThemeMode
 import com.joebad.fastbreak.ui.theme.UseSecondaryBackground
 
@@ -46,6 +47,8 @@ fun SettingsScreen(
     onTeamThemeChange: (SelectedTeamTheme?) -> Unit = {},
     themeBrightness: ThemeBrightness = ThemeBrightness(),
     onBrightnessChange: (ColorSlot, Float) -> Unit = { _, _ -> },
+    themeColorOverrides: ThemeColorOverrides = ThemeColorOverrides(),
+    onColorOverrideChange: (ColorSlot, String?) -> Unit = { _, _ -> },
     useSecondaryBackground: UseSecondaryBackground = UseSecondaryBackground(),
     onToggleSecondaryBackground: (ThemeMode) -> Unit = {}
 ) {
@@ -328,6 +331,8 @@ fun SettingsScreen(
             selectedTeamColors = selectedTeamColors,
             themeBrightness = themeBrightness,
             onBrightnessChange = onBrightnessChange,
+            themeColorOverrides = themeColorOverrides,
+            onColorOverrideChange = onColorOverrideChange,
             onTeamSelect = { sport, teamCode ->
                 if (sport != null && teamCode != null) {
                     onTeamThemeChange(SelectedTeamTheme(sport, teamCode))

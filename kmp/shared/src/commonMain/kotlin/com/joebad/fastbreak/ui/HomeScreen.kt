@@ -551,44 +551,24 @@ private fun VisualizationItem(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
+                // Ripple fills the entire list item (padding included).
+                .then(clickableModifier)
                 .padding(
                     horizontal = HomeChartListHorizontalPadding,
                     vertical = 12.dp
                 ),
-            horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .then(clickableModifier)
-            ) {
-                // Title row with unviewed indicator
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+            // Column 1: headline, subtitle, and "Daily - updated <time>" metadata
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = alpha),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text(
-                        text = title,
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = alpha),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f, fill = false)
-                    )
-                    // Show unread dot indicator for unviewed charts
-                    if (!viewed && isReady) {
-                        Box(
-                            modifier = Modifier
-                                .size(8.dp)
-                                .background(
-                                    color = unreadDotColor(),
-                                    shape = CircleShape
-                                )
-                        )
-                    }
-                }
+                )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = description,
@@ -628,6 +608,26 @@ private fun VisualizationItem(
                 }
             }
 
+            // Column 2: unread dot — fixed-width slot, vertically centered, so
+            // whether the dot shows never shifts the star column's alignment.
+            Box(
+                modifier = Modifier.width(20.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                if (!viewed && isReady) {
+                    Box(
+                        modifier = Modifier
+                            .size(8.dp)
+                            .background(
+                                color = unreadDotColor(),
+                                shape = CircleShape
+                            )
+                    )
+                }
+            }
+
+            // Column 3: sync status + favorite star. The 40.dp IconButton keeps a
+            // fixed footprint, so the favorited/unfavorited state never shifts layout.
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(4.dp)

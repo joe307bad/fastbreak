@@ -17,6 +17,7 @@ import com.joebad.fastbreak.ui.theme.ColorSlot
 import com.joebad.fastbreak.ui.theme.OptionalTeamTheme
 import com.joebad.fastbreak.ui.theme.SelectedTeamTheme
 import com.joebad.fastbreak.ui.theme.ThemeBrightness
+import com.joebad.fastbreak.ui.theme.ThemeColorOverrides
 import com.joebad.fastbreak.ui.theme.ThemeMode
 import com.joebad.fastbreak.ui.theme.ThemeRepository
 import com.joebad.fastbreak.ui.theme.UseSecondaryBackground
@@ -48,6 +49,9 @@ class RootComponent(
     private val _themeBrightness = MutableValue(themeRepository.getThemeBrightness())
     val themeBrightness: Value<ThemeBrightness> = _themeBrightness
 
+    private val _themeColorOverrides = MutableValue(themeRepository.getThemeColorOverrides())
+    val themeColorOverrides: Value<ThemeColorOverrides> = _themeColorOverrides
+
     private val _useSecondaryBackground = MutableValue(themeRepository.getUseSecondaryBackground())
     val useSecondaryBackground: Value<UseSecondaryBackground> = _useSecondaryBackground
 
@@ -75,6 +79,9 @@ class RootComponent(
         // Clear brightness when selecting a new team
         _themeBrightness.value = ThemeBrightness()
         themeRepository.clearBrightness()
+        // Clear color overrides when selecting a new team
+        _themeColorOverrides.value = ThemeColorOverrides()
+        themeRepository.clearColorOverrides()
         // Clear secondary background when selecting a new team
         _useSecondaryBackground.value = UseSecondaryBackground()
         themeRepository.clearSecondaryBackground()
@@ -94,6 +101,20 @@ class RootComponent(
             ColorSlot.DARK_SECONDARY -> current.copy(darkSecondary = value)
         }
         themeRepository.saveBrightness(slot, value)
+    }
+
+    /**
+     * Set (or clear, when [hex] is null) an absolute color override for a slot.
+     */
+    fun setColorOverride(slot: ColorSlot, hex: String?) {
+        val current = _themeColorOverrides.value
+        _themeColorOverrides.value = when (slot) {
+            ColorSlot.LIGHT_PRIMARY -> current.copy(lightPrimary = hex)
+            ColorSlot.LIGHT_SECONDARY -> current.copy(lightSecondary = hex)
+            ColorSlot.DARK_PRIMARY -> current.copy(darkPrimary = hex)
+            ColorSlot.DARK_SECONDARY -> current.copy(darkSecondary = hex)
+        }
+        themeRepository.saveColorOverride(slot, hex)
     }
 
     /**

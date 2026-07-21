@@ -792,8 +792,8 @@ function formatReportCardStatLabel(categoryKey: string, statKey: string): string
       switch (statKey) {
         case 'wRC_plus':
           return 'wRC+';
-        case 'xwOBA':
-          return 'xwOBA';
+        case 'AVG':
+          return 'AVG';
         case 'xBA':
           return 'xBA';
         case 'Barrel_pct':

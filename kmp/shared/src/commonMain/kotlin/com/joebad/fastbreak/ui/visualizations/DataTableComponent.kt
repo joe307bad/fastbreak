@@ -69,8 +69,17 @@ private fun formatConferenceRank(rank: Int?, conference: String?): String {
     return "${formatOrdinal(rank)} / $confName"
 }
 
+// Helper to parse hex color string to Compose Color
+private fun parseHexColor(hex: String): Color {
+    val cleanHex = hex.removePrefix("#")
+    return Color(("FF$cleanHex").toLong(16))
+}
+
 /**
  * Generic data table component that displays data from any visualization type.
+ *
+ * Sort state is hoisted into [sortState] so share images can reproduce the list
+ * in the order the user is currently looking at.
  */
 @Composable
 fun DataTableComponent(
@@ -78,7 +87,8 @@ fun DataTableComponent(
     modifier: Modifier = Modifier,
     onTeamClick: (String) -> Unit = {},
     highlightedTeamCodes: Set<String> = emptySet(),
-    highlightedPlayerLabels: Set<String> = emptySet()
+    highlightedPlayerLabels: Set<String> = emptySet(),
+    sortState: ChartTableSortState = rememberChartTableSortState()
 ) {
     Column(
         modifier = modifier
@@ -98,12 +108,14 @@ fun DataTableComponent(
                 subject = visualization.subject,
                 onTeamClick = onTeamClick,
                 highlightedTeamCodes = highlightedTeamCodes,
-                highlightedPlayerLabels = highlightedPlayerLabels
+                highlightedPlayerLabels = highlightedPlayerLabels,
+                sortState = sortState
             )
             is BarGraphVisualization -> BarDataTable(
                 data = visualization.dataPoints,
                 onTeamClick = onTeamClick,
-                highlightedTeamCodes = highlightedTeamCodes
+                highlightedTeamCodes = highlightedTeamCodes,
+                sortState = sortState
             )
             is LineChartVisualization -> LineDataTable(
                 series = visualization.series,
@@ -150,12 +162,6 @@ fun DataTableComponent(
     }
 }
 
-// Helper to parse hex color string to Compose Color
-private fun parseHexColor(hex: String): Color {
-    val cleanHex = hex.removePrefix("#")
-    return Color(("FF$cleanHex").toLong(16))
-}
-
 @Composable
 private fun ScatterDataTable(
     data: List<ScatterPlotDataPoint>,
@@ -169,13 +175,14 @@ private fun ScatterDataTable(
     subject: String? = null,
     onTeamClick: (String) -> Unit = {},
     highlightedTeamCodes: Set<String> = emptySet(),
-    highlightedPlayerLabels: Set<String> = emptySet()
+    highlightedPlayerLabels: Set<String> = emptySet(),
+    sortState: ChartTableSortState
 ) {
     val horizontalScrollState = rememberScrollState()
 
     // Sort state - null sortColumn means default sort (score)
-    var sortColumn by remember { mutableStateOf<String?>(null) }
-    var sortAscending by remember { mutableStateOf(false) }
+    val sortColumn = sortState.column
+    val sortAscending = sortState.ascending
 
     // Calculate averages for quadrant determination (using all data)
     val avgX = data.map { it.x }.average()
@@ -188,53 +195,11 @@ private fun ScatterDataTable(
     val bottomRightColor = quadrantBottomRight?.let { parseHexColor(it.color) } ?: Color(0xFFF44336)
 
     // Calculate rank based on default score sort (always descending)
-    val scoreRankMap = remember(data, invertYAxis) {
-        val sortedByScore = if (invertYAxis) {
-            data.sortedByDescending { it.x - it.y }
-        } else {
-            data.sortedByDescending { it.sum }
-        }
-        sortedByScore.mapIndexed { index, point -> point to (index + 1) }.toMap()
-    }
+    val scoreRankMap = remember(data, invertYAxis) { scatterScoreRanks(data, invertYAxis) }
 
     // Sort data based on selected column
-    val sortedData = remember(data, sortColumn, sortAscending) {
-        val sorted = when (sortColumn) {
-            "label" -> if (sortAscending) data.sortedBy { it.label } else data.sortedByDescending { it.label }
-            "winPct" -> if (sortAscending) {
-                data.sortedBy { point ->
-                    if (point.wins != null && point.losses != null) {
-                        val total = point.wins + point.losses
-                        if (total > 0) point.wins.toDouble() / total else 0.0
-                    } else 0.0
-                }
-            } else {
-                data.sortedByDescending { point ->
-                    if (point.wins != null && point.losses != null) {
-                        val total = point.wins + point.losses
-                        if (total > 0) point.wins.toDouble() / total else 0.0
-                    } else 0.0
-                }
-            }
-            "confRank" -> if (sortAscending) {
-                data.sortedBy { it.conferenceRank ?: Int.MAX_VALUE }
-            } else {
-                data.sortedByDescending { it.conferenceRank ?: Int.MIN_VALUE }
-            }
-            "team" -> if (sortAscending) data.sortedBy { it.teamCode ?: "" } else data.sortedByDescending { it.teamCode ?: "" }
-            "x" -> if (sortAscending) data.sortedBy { it.x } else data.sortedByDescending { it.x }
-            "y" -> if (sortAscending) data.sortedBy { it.y } else data.sortedByDescending { it.y }
-            "score", null -> {
-                // Default sort by score (descending)
-                if (invertYAxis) {
-                    if (sortAscending) data.sortedBy { it.x - it.y } else data.sortedByDescending { it.x - it.y }
-                } else {
-                    if (sortAscending) data.sortedBy { it.sum } else data.sortedByDescending { it.sum }
-                }
-            }
-            else -> data
-        }
-        sorted
+    val sortedData = remember(data, sortColumn, sortAscending, invertYAxis) {
+        sortScatterPoints(data, sortColumn, sortAscending, invertYAxis)
     }
 
     // Helper to get quadrant color for a point
@@ -276,9 +241,9 @@ private fun ScatterDataTable(
                 sortAscending = sortAscending,
                 onClick = {
                     when {
-                        sortColumn == null && !sortAscending -> sortAscending = true
-                        sortColumn == null && sortAscending -> { sortColumn = null; sortAscending = false }
-                        else -> { sortColumn = null; sortAscending = false }
+                        sortColumn == null && !sortAscending -> sortState.ascending = true
+                        sortColumn == null && sortAscending -> { sortState.column = null; sortState.ascending = false }
+                        else -> { sortState.column = null; sortState.ascending = false }
                     }
                 }
             )
@@ -290,9 +255,9 @@ private fun ScatterDataTable(
                 sortAscending = sortAscending,
                 onClick = {
                     when {
-                        sortColumn == "label" && !sortAscending -> sortAscending = true
-                        sortColumn == "label" && sortAscending -> { sortColumn = null; sortAscending = false }
-                        else -> { sortColumn = "label"; sortAscending = false }
+                        sortColumn == "label" && !sortAscending -> sortState.ascending = true
+                        sortColumn == "label" && sortAscending -> { sortState.column = null; sortState.ascending = false }
+                        else -> { sortState.column = "label"; sortState.ascending = false }
                     }
                 }
             )
@@ -305,9 +270,9 @@ private fun ScatterDataTable(
                     sortAscending = sortAscending,
                     onClick = {
                         when {
-                            sortColumn == "winPct" && !sortAscending -> sortAscending = true
-                            sortColumn == "winPct" && sortAscending -> { sortColumn = null; sortAscending = false }
-                            else -> { sortColumn = "winPct"; sortAscending = false }
+                            sortColumn == "winPct" && !sortAscending -> sortState.ascending = true
+                            sortColumn == "winPct" && sortAscending -> { sortState.column = null; sortState.ascending = false }
+                            else -> { sortState.column = "winPct"; sortState.ascending = false }
                         }
                     }
                 )
@@ -321,9 +286,9 @@ private fun ScatterDataTable(
                     sortAscending = sortAscending,
                     onClick = {
                         when {
-                            sortColumn == "confRank" && !sortAscending -> sortAscending = true
-                            sortColumn == "confRank" && sortAscending -> { sortColumn = null; sortAscending = false }
-                            else -> { sortColumn = "confRank"; sortAscending = false }
+                            sortColumn == "confRank" && !sortAscending -> sortState.ascending = true
+                            sortColumn == "confRank" && sortAscending -> { sortState.column = null; sortState.ascending = false }
+                            else -> { sortState.column = "confRank"; sortState.ascending = false }
                         }
                     }
                 )
@@ -337,9 +302,9 @@ private fun ScatterDataTable(
                     sortAscending = sortAscending,
                     onClick = {
                         when {
-                            sortColumn == "team" && !sortAscending -> sortAscending = true
-                            sortColumn == "team" && sortAscending -> { sortColumn = null; sortAscending = false }
-                            else -> { sortColumn = "team"; sortAscending = false }
+                            sortColumn == "team" && !sortAscending -> sortState.ascending = true
+                            sortColumn == "team" && sortAscending -> { sortState.column = null; sortState.ascending = false }
+                            else -> { sortState.column = "team"; sortState.ascending = false }
                         }
                     }
                 )
@@ -352,9 +317,9 @@ private fun ScatterDataTable(
                 sortAscending = sortAscending,
                 onClick = {
                     when {
-                        sortColumn == "x" && !sortAscending -> sortAscending = true
-                        sortColumn == "x" && sortAscending -> { sortColumn = null; sortAscending = false }
-                        else -> { sortColumn = "x"; sortAscending = false }
+                        sortColumn == "x" && !sortAscending -> sortState.ascending = true
+                        sortColumn == "x" && sortAscending -> { sortState.column = null; sortState.ascending = false }
+                        else -> { sortState.column = "x"; sortState.ascending = false }
                     }
                 }
             )
@@ -366,9 +331,9 @@ private fun ScatterDataTable(
                 sortAscending = sortAscending,
                 onClick = {
                     when {
-                        sortColumn == "y" && !sortAscending -> sortAscending = true
-                        sortColumn == "y" && sortAscending -> { sortColumn = null; sortAscending = false }
-                        else -> { sortColumn = "y"; sortAscending = false }
+                        sortColumn == "y" && !sortAscending -> sortState.ascending = true
+                        sortColumn == "y" && sortAscending -> { sortState.column = null; sortState.ascending = false }
+                        else -> { sortState.column = "y"; sortState.ascending = false }
                     }
                 }
             )
@@ -380,9 +345,9 @@ private fun ScatterDataTable(
                 sortAscending = sortAscending,
                 onClick = {
                     when {
-                        (sortColumn == "score" || sortColumn == null) && !sortAscending -> sortAscending = true
-                        (sortColumn == "score" || sortColumn == null) && sortAscending -> { sortColumn = null; sortAscending = false }
-                        else -> { sortColumn = "score"; sortAscending = false }
+                        (sortColumn == "score" || sortColumn == null) && !sortAscending -> sortState.ascending = true
+                        (sortColumn == "score" || sortColumn == null) && sortAscending -> { sortState.column = null; sortState.ascending = false }
+                        else -> { sortState.column = "score"; sortState.ascending = false }
                     }
                 }
             )
@@ -492,13 +457,14 @@ private fun ScatterDataTable(
 private fun BarDataTable(
     data: List<BarGraphDataPoint>,
     onTeamClick: (String) -> Unit = {},
-    highlightedTeamCodes: Set<String> = emptySet()
+    highlightedTeamCodes: Set<String> = emptySet(),
+    sortState: ChartTableSortState
 ) {
     val horizontalScrollState = rememberScrollState()
 
     // Sort state - null sortColumn means default sort (value)
-    var sortColumn by remember { mutableStateOf<String?>(null) }
-    var sortAscending by remember { mutableStateOf(false) }
+    val sortColumn = sortState.column
+    val sortAscending = sortState.ascending
 
     // Check if any data point has win/loss records
     val hasRecords = data.any { it.wins != null && it.losses != null }
@@ -507,38 +473,11 @@ private fun BarDataTable(
     val hasConfRanks = data.any { it.conferenceRank != null }
 
     // Calculate rank based on default value sort (always descending)
-    val valueRankMap = remember(data) {
-        val sortedByValue = data.sortedByDescending { it.value }
-        sortedByValue.mapIndexed { index, point -> point to (index + 1) }.toMap()
-    }
+    val valueRankMap = remember(data) { barValueRanks(data) }
 
     // Sort data based on selected column
     val sortedData = remember(data, sortColumn, sortAscending) {
-        when (sortColumn) {
-            "label" -> if (sortAscending) data.sortedBy { it.label } else data.sortedByDescending { it.label }
-            "winPct" -> if (sortAscending) {
-                data.sortedBy { point ->
-                    if (point.wins != null && point.losses != null) {
-                        val total = point.wins + point.losses
-                        if (total > 0) point.wins.toDouble() / total else 0.0
-                    } else 0.0
-                }
-            } else {
-                data.sortedByDescending { point ->
-                    if (point.wins != null && point.losses != null) {
-                        val total = point.wins + point.losses
-                        if (total > 0) point.wins.toDouble() / total else 0.0
-                    } else 0.0
-                }
-            }
-            "confRank" -> if (sortAscending) {
-                data.sortedBy { it.conferenceRank ?: Int.MAX_VALUE }
-            } else {
-                data.sortedByDescending { it.conferenceRank ?: Int.MIN_VALUE }
-            }
-            "value", null -> if (sortAscending) data.sortedBy { it.value } else data.sortedByDescending { it.value }
-            else -> data
-        }
+        sortBarPoints(data, sortColumn, sortAscending)
     }
 
     Column(
@@ -559,9 +498,9 @@ private fun BarDataTable(
                 sortAscending = sortAscending,
                 onClick = {
                     when {
-                        sortColumn == null && !sortAscending -> sortAscending = true
-                        sortColumn == null && sortAscending -> { sortColumn = null; sortAscending = false }
-                        else -> { sortColumn = null; sortAscending = false }
+                        sortColumn == null && !sortAscending -> sortState.ascending = true
+                        sortColumn == null && sortAscending -> { sortState.column = null; sortState.ascending = false }
+                        else -> { sortState.column = null; sortState.ascending = false }
                     }
                 }
             )
@@ -573,9 +512,9 @@ private fun BarDataTable(
                 sortAscending = sortAscending,
                 onClick = {
                     when {
-                        sortColumn == "label" && !sortAscending -> sortAscending = true
-                        sortColumn == "label" && sortAscending -> { sortColumn = null; sortAscending = false }
-                        else -> { sortColumn = "label"; sortAscending = false }
+                        sortColumn == "label" && !sortAscending -> sortState.ascending = true
+                        sortColumn == "label" && sortAscending -> { sortState.column = null; sortState.ascending = false }
+                        else -> { sortState.column = "label"; sortState.ascending = false }
                     }
                 }
             )
@@ -588,9 +527,9 @@ private fun BarDataTable(
                     sortAscending = sortAscending,
                     onClick = {
                         when {
-                            sortColumn == "winPct" && !sortAscending -> sortAscending = true
-                            sortColumn == "winPct" && sortAscending -> { sortColumn = null; sortAscending = false }
-                            else -> { sortColumn = "winPct"; sortAscending = false }
+                            sortColumn == "winPct" && !sortAscending -> sortState.ascending = true
+                            sortColumn == "winPct" && sortAscending -> { sortState.column = null; sortState.ascending = false }
+                            else -> { sortState.column = "winPct"; sortState.ascending = false }
                         }
                     }
                 )
@@ -604,9 +543,9 @@ private fun BarDataTable(
                     sortAscending = sortAscending,
                     onClick = {
                         when {
-                            sortColumn == "confRank" && !sortAscending -> sortAscending = true
-                            sortColumn == "confRank" && sortAscending -> { sortColumn = null; sortAscending = false }
-                            else -> { sortColumn = "confRank"; sortAscending = false }
+                            sortColumn == "confRank" && !sortAscending -> sortState.ascending = true
+                            sortColumn == "confRank" && sortAscending -> { sortState.column = null; sortState.ascending = false }
+                            else -> { sortState.column = "confRank"; sortState.ascending = false }
                         }
                     }
                 )
@@ -619,9 +558,9 @@ private fun BarDataTable(
                 sortAscending = sortAscending,
                 onClick = {
                     when {
-                        (sortColumn == "value" || sortColumn == null) && !sortAscending -> sortAscending = true
-                        (sortColumn == "value" || sortColumn == null) && sortAscending -> { sortColumn = null; sortAscending = false }
-                        else -> { sortColumn = "value"; sortAscending = false }
+                        (sortColumn == "value" || sortColumn == null) && !sortAscending -> sortState.ascending = true
+                        (sortColumn == "value" || sortColumn == null) && sortAscending -> { sortState.column = null; sortState.ascending = false }
+                        else -> { sortState.column = "value"; sortState.ascending = false }
                     }
                 }
             )
@@ -734,13 +673,8 @@ private fun LineDataTable(
 
         // Data rows - show values for each week/game
         val maxPoints = series.maxOfOrNull { it.dataPoints.size } ?: 0
-        val sampledIndices = if (maxPoints > 20) {
-            // Sample every Nth point to keep table manageable
-            val step = maxPoints / 20
-            (0 until maxPoints step step).toList()
-        } else {
-            (0 until maxPoints).toList()
-        }
+        // Sample every Nth point to keep table manageable
+        val sampledIndices = lineChartSampledIndices(maxPoints)
 
         sampledIndices.forEach { pointIndex ->
             Row(

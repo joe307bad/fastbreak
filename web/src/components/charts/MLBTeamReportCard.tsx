@@ -39,7 +39,7 @@ const CATEGORY_KEYS: CategoryKey[] = [
 
 const CATEGORY_STAT_KEYS: Record<CategoryKey, string[]> = {
   recentTrend: ['record', 'runDiffPerGame', 'runsPerGame', 'runsAllowedPerGame', 'hitsPerGame', 'hrsPerGame'],
-  hitters: ['wRC_plus', 'xwOBA', 'xBA', 'Barrel_pct'],
+  hitters: ['wRC_plus', 'AVG', 'xBA', 'Barrel_pct'],
   starters: ['K-BB_pct', 'xFIP', 'SIERA', 'ERA'],
   relievers: ['K-BB_pct', 'FIP', 'SV', 'SIERA', 'ERA'],
   fielders: ['OAA', 'DRS', 'FRP'],
@@ -94,7 +94,7 @@ function formatStatValue(stat: ReportCardStatValue | undefined): string {
   if (stat.label.toLowerCase().includes('%') || stat.label.includes('+')) {
     return stat.value.toFixed(1);
   }
-  if (stat.label === 'xwOBA' || stat.label === 'xBA') {
+  if (stat.label === 'AVG' || stat.label === 'xBA') {
     return stat.value.toFixed(3);
   }
   if (stat.label === 'FRP' || stat.label === 'SV') {

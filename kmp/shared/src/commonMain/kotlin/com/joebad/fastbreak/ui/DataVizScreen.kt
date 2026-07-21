@@ -23,7 +23,10 @@ import androidx.compose.ui.unit.sp
 import com.joebad.fastbreak.data.model.*
 import com.joebad.fastbreak.navigation.DataVizComponent
 import com.joebad.fastbreak.telemetry.TelemetryService
+import com.joebad.fastbreak.ui.components.FabOption
 import com.joebad.fastbreak.ui.components.InfoBottomSheet
+import com.joebad.fastbreak.ui.components.MultiOptionFab
+import com.joebad.fastbreak.ui.components.ShareFab
 import com.joebad.fastbreak.ui.visualizations.*
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -132,6 +135,19 @@ fun DataVizScreen(
     // State to hold the share callback from charts
     var chartShareHandler by remember { mutableStateOf<(() -> Unit)?>(null) }
 
+    // Sort state for the chart's data table, hoisted so list shares match what's on screen
+    val tableSortState = rememberChartTableSortState()
+
+    // Which slice of the list (if any) the user asked to share
+    var listShareScope by remember { mutableStateOf<ChartListShareScope?>(null) }
+
+    val successData = (state as? DataVizState.Success)?.data
+    val chartListTable = remember(successData, tableSortState.column, tableSortState.ascending) {
+        successData?.let {
+            buildChartListTable(it, tableSortState.column, tableSortState.ascending)
+        }
+    }
+
     // State to hold the schedule toggle handler from NBA matchup worksheet
     var scheduleToggleHandler by remember { mutableStateOf<ScheduleToggleHandler?>(null) }
 
@@ -206,24 +222,6 @@ fun DataVizScreen(
                     actionIconContentColor = MaterialTheme.colorScheme.onBackground
                 )
             )
-        },
-        floatingActionButton = {
-            // Show FAB for all shareable charts
-            if (isShareableChart) {
-                ScatterPlotFab(
-                    onShareClick = {
-                        // Track share click event
-                        val chartTitle = (state as? DataVizState.Success)?.data?.title ?: ""
-                        TelemetryService.trackShareClicked(
-                            chartId = component.chartId,
-                            chartTitle = chartTitle,
-                            shareType = "image"
-                        )
-                        // Call the actual share handler
-                        chartShareHandler?.invoke()
-                    }
-                )
-            }
         }
     ) { paddingValues ->
         Box(
@@ -238,6 +236,7 @@ fun DataVizScreen(
                     visualization = currentState.data,
                     pinnedTeams = pinnedTeams,
                     initialFilters = component.initialFilters,
+                    tableSortState = tableSortState,
                     onChartShareHandlerChanged = { handler ->
                         chartShareHandler = handler
                     },
@@ -294,6 +293,75 @@ fun DataVizScreen(
                     }
                 )
             }
+
+            // Share FAB - expands into chart image + list slice options
+            val listRowCount = chartListTable?.rows?.size ?: 0
+            val shareOptions = buildList {
+                ChartListShareScope.entries
+                    .filter { it.isAvailableFor(listRowCount) }
+                    .forEach { listScope ->
+                        add(
+                            FabOption(
+                                icon = Icons.Filled.Share,
+                                label = listScope.fabLabel,
+                                onClick = {
+                                    TelemetryService.trackShareClicked(
+                                        chartId = component.chartId,
+                                        chartTitle = successData?.title ?: "",
+                                        shareType = "list_${listScope.name.lowercase()}"
+                                    )
+                                    listShareScope = listScope
+                                }
+                            )
+                        )
+                    }
+                if (isShareableChart) {
+                    add(
+                        FabOption(
+                            icon = Icons.Filled.Share,
+                            label = "Share chart",
+                            onClick = {
+                                TelemetryService.trackShareClicked(
+                                    chartId = component.chartId,
+                                    chartTitle = successData?.title ?: "",
+                                    shareType = "image"
+                                )
+                                chartShareHandler?.invoke()
+                            }
+                        )
+                    )
+                }
+            }
+
+            when {
+                shareOptions.size > 1 -> MultiOptionFab(
+                    options = shareOptions,
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(16.dp)
+                )
+                shareOptions.size == 1 -> ShareFab(
+                    onClick = shareOptions.first().onClick,
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(16.dp)
+                )
+            }
+
+            // Off-screen render + capture of the requested list slice
+            val pendingScope = listShareScope
+            if (pendingScope != null && chartListTable != null) {
+                val sliceSubtitle = pendingScope.subtitleFor(chartListTable.rows.size)
+                val chartTitle = successData?.title ?: "Chart"
+                ChartListShareCapture(
+                    title = chartTitle,
+                    subtitle = sliceSubtitle,
+                    source = successData?.source,
+                    table = chartListTable.sliceFor(pendingScope),
+                    shareTitle = "$chartTitle - $sliceSubtitle",
+                    onFinished = { listShareScope = null }
+                )
+            }
         }
     }
 
@@ -334,6 +402,7 @@ private fun SuccessContent(
     visualization: VisualizationType,
     pinnedTeams: List<PinnedTeam>,
     initialFilters: Map<String, String>? = null,
+    tableSortState: ChartTableSortState,
     onChartShareHandlerChanged: ((() -> Unit)?) -> Unit,
     onScheduleToggleHandlerChanged: ((ScheduleToggleHandler?) -> Unit)? = null,
     onBracketNavigationToggleHandlerChanged: ((BracketNavigationToggleHandler?) -> Unit)? = null
@@ -461,6 +530,7 @@ private fun SuccessContent(
             visualization = displayVisualization,
             highlightedTeamCodes = allHighlightedTeamCodes,
             highlightedPlayerLabels = selectedPlayerLabels,
+            tableSortState = tableSortState,
             onChartShareHandlerChanged = onChartShareHandlerChanged,
             pinnedTeams = pinnedTeams,
             onScheduleToggleHandlerChanged = onScheduleToggleHandlerChanged,
@@ -502,6 +572,7 @@ private fun RenderVisualization(
     visualization: VisualizationType,
     highlightedTeamCodes: Set<String> = emptySet(),
     highlightedPlayerLabels: Set<String> = emptySet(),
+    tableSortState: ChartTableSortState,
     onChartShareHandlerChanged: ((() -> Unit)?) -> Unit = {},
     onTeamClick: (String) -> Unit = {},
     pinnedTeams: List<PinnedTeam> = emptyList(),
@@ -525,6 +596,7 @@ private fun RenderVisualization(
                 onTeamClick = onTeamClick,
                 highlightedTeamCodes = highlightedTeamCodes,
                 highlightedPlayerLabels = highlightedPlayerLabels,
+                sortState = tableSortState,
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f)
@@ -733,7 +805,8 @@ private fun RenderVisualization(
                     modifier = Modifier.fillMaxWidth(),
                     onTeamClick = onTeamClick,
                     highlightedTeamCodes = highlightedTeamCodes,
-                    highlightedPlayerLabels = highlightedPlayerLabels
+                    highlightedPlayerLabels = highlightedPlayerLabels,
+                    sortState = tableSortState
                 )
 
                 // Source attribution at bottom
@@ -1069,22 +1142,4 @@ private fun applyMatchupFilters(
     }
 
     return visualization.copy(dataPoints = filteredDataPoints)
-}
-
-@Composable
-private fun ScatterPlotFab(
-    onShareClick: (() -> Unit)?
-) {
-    FloatingActionButton(
-        onClick = { onShareClick?.invoke() },
-        containerColor = MaterialTheme.colorScheme.primaryContainer,
-        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-        shape = CircleShape
-    ) {
-        Icon(
-            imageVector = Icons.Filled.Share,
-            contentDescription = "Share chart",
-            modifier = Modifier.size(24.dp)
-        )
-    }
 }

@@ -76,7 +76,7 @@ private val CATEGORY_CONFIGS = mapOf(
         showPlayerRankAndComposite = false
     ),
     "hitters" to CategoryConfig(
-        statKeys = listOf("wRC_plus", "xwOBA", "xBA", "Barrel_pct"),
+        statKeys = listOf("wRC_plus", "AVG", "xBA", "Barrel_pct"),
         teamRankColorFn = ::getMLBTeamRankColor
     ),
     "starters" to CategoryConfig(
@@ -154,7 +154,7 @@ private fun reportCardStatLabel(categoryKey: String, statKey: String): String {
     return when (categoryKey) {
         "hitters" -> when (statKey) {
             "wRC_plus" -> "wRC+"
-            "xwOBA" -> "xwOBA"
+            "AVG" -> "AVG"
             "xBA" -> "xBA"
             "Barrel_pct" -> "Barrel%"
             else -> statKey
@@ -1665,7 +1665,7 @@ private fun formatReportCardStat(stat: ReportCardStatValue): String {
         stat.label.equals("Composite", ignoreCase = true) -> formatReportCardValue(value, 1)
         stat.label.equals("OAA", ignoreCase = true) || stat.label.equals("DRS", ignoreCase = true) ->
             formatReportCardValue(value, 1)
-        stat.label.equals("xwOBA", ignoreCase = true) || stat.label.equals("xBA", ignoreCase = true) ->
+        stat.label.equals("AVG", ignoreCase = true) || stat.label.equals("xBA", ignoreCase = true) ->
             formatReportCardValue(value, 3)
         stat.label.equals("FRP", ignoreCase = true) -> formatReportCardValue(value, 0)
         stat.label.equals("SV", ignoreCase = true) -> formatReportCardValue(value, 0)

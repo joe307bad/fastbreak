@@ -6,7 +6,7 @@
 # on every team. Players can appear in multiple categories (e.g. two-way players).
 #
 # Stat groups mirror advanced metrics used elsewhere in the MLB pipeline:
-#  - Hitters:    wRC+ (production) + AVG (batting average) + xBA + Barrel%
+#  - Hitters:    wRC+ (production) + AVG (batting average) + OPS+ + Barrel%
 #  - Starters:   K-BB% (command) + xFIP + SIERA + ERA (official)
 #  - Relievers:  K-BB% (miss+command) + FIP + SV + SIERA + ERA (official)
 #  - Fielders:   OAA (Statcast range) + DRS (comprehensive defense) + FRP
@@ -400,6 +400,12 @@ stat_entry <- function(row, col, label, digits = NULL, display_value = NULL) {
     rankDisplay = if (length(rank_display) == 0 || is.na(rank_display)) NULL else as.character(rank_display[[1]]),
     displayValue = display_value
   )
+}
+
+# FanGraphs exposes park- and league-adjusted OBP+ / SLG+ but no OPS+ column,
+# so derive it with the standard OPS+ = OBP+ + SLG+ - 100 identity (100 = average).
+ops_plus <- function(obp_plus, slg_plus) {
+  as.numeric(obp_plus) + as.numeric(slg_plus) - 100
 }
 
 # Average percentile across category stat ranks (100 = best). Used to surface
@@ -840,7 +846,7 @@ hitters <- batter_stats %>%
     G = as.integer(G),
     wRC_plus = as.numeric(wRC_plus),
     AVG = as.numeric(AVG),
-    xBA = as.numeric(xAVG),
+    OPS_plus = ops_plus(`OBP+`, `SLG+`),
     Barrel_pct = round(as.numeric(Barrel_pct) * 100, 1),
     WAR = as.numeric(WAR),
     Pos = coalesce(as.character(position), as.character(positionDB))
@@ -849,7 +855,7 @@ hitters <- batter_stats %>%
     !is.na(team_code),
     !is.na(PA), !is.na(G),
     !is.na(wRC_plus), !is.na(AVG),
-    !is.na(xBA), !is.na(Barrel_pct),
+    !is.na(OPS_plus), !is.na(Barrel_pct),
     PA >= MIN_PA,
     G >= MIN_G_HIT
   )
@@ -1205,7 +1211,7 @@ fielders <- fielder_stats %>%
   ) %>%
   left_join(war_lookup %>% select(playerid, WAR), by = "playerid")
 
-for (col in c("wRC_plus", "AVG", "xBA", "Barrel_pct")) hitters <- rank_and_assign(hitters, col)
+for (col in c("wRC_plus", "AVG", "OPS_plus", "Barrel_pct")) hitters <- rank_and_assign(hitters, col)
 for (col in c("K-BB_pct", "xFIP", "SIERA", "ERA")) {
   starters <- rank_and_assign(starters, col, lower_better = col %in% c("xFIP", "SIERA", "ERA"))
 }
@@ -1220,13 +1226,13 @@ team_hitting <- team_batting_stats %>%
     team_code = vapply(team_name_abb, normalize_team, character(1)),
     wRC_plus = as.numeric(wRC_plus),
     AVG = as.numeric(AVG),
-    xBA = as.numeric(xAVG),
+    OPS_plus = ops_plus(`OBP+`, `SLG+`),
     Barrel_pct = round(as.numeric(Barrel_pct) * 100, 1)
   ) %>%
   filter(
     !is.na(team_code),
     !is.na(wRC_plus), !is.na(AVG),
-    !is.na(xBA), !is.na(Barrel_pct)
+    !is.na(OPS_plus), !is.na(Barrel_pct)
   )
 
 team_fielding <- team_fielding_stats %>%
@@ -1256,7 +1262,7 @@ team_bullpen_saves <- team_pitching_stats %>%
 team_relievers <- aggregate_pitching_team_stats(relievers, c("K-BB_pct", "FIP", "SIERA", "ERA")) %>%
   left_join(team_bullpen_saves, by = "team_code")
 
-for (col in c("wRC_plus", "AVG", "xBA", "Barrel_pct")) team_hitting <- rank_and_assign(team_hitting, col)
+for (col in c("wRC_plus", "AVG", "OPS_plus", "Barrel_pct")) team_hitting <- rank_and_assign(team_hitting, col)
 for (col in c("K-BB_pct", "xFIP", "SIERA", "ERA")) {
   team_starters <- rank_and_assign(team_starters, col, lower_better = col %in% c("xFIP", "SIERA", "ERA"))
 }
@@ -1266,11 +1272,11 @@ for (col in c("K-BB_pct", "FIP", "SIERA", "ERA")) {
 team_relievers <- rank_and_assign(team_relievers, "SV_per_G")
 for (col in c("OAA", "DRS", "FRP")) team_fielding <- rank_and_assign(team_fielding, col)
 
-hitters <- add_composite_score(hitters, c("wRC_plus", "AVG", "xBA", "Barrel_pct"))
+hitters <- add_composite_score(hitters, c("wRC_plus", "AVG", "OPS_plus", "Barrel_pct"))
 starters <- add_composite_score(starters, c("K-BB_pct", "xFIP", "SIERA", "ERA"))
 relievers <- add_composite_score(relievers, c("K-BB_pct", "FIP", "SV", "SIERA", "ERA"))
 fielders <- add_composite_score(fielders, c("OAA", "DRS", "FRP"))
-team_hitting <- add_composite_score(team_hitting, c("wRC_plus", "AVG", "xBA", "Barrel_pct"))
+team_hitting <- add_composite_score(team_hitting, c("wRC_plus", "AVG", "OPS_plus", "Barrel_pct"))
 team_starters <- add_composite_score(team_starters, c("K-BB_pct", "xFIP", "SIERA", "ERA"))
 team_relievers <- add_composite_score(team_relievers, c("K-BB_pct", "FIP", "SV_per_G", "SIERA", "ERA"))
 team_fielding <- add_composite_score(team_fielding, c("OAA", "DRS", "FRP"))
@@ -1423,12 +1429,12 @@ cat("Qualified pools — hitters:", nrow(hitters),
     "| fielders:", nrow(fielders),
     "| below-replacement:", nrow(below_replacement), "\n")
 
-hitter_labels <- c(wRC_plus = "wRC+", AVG = "AVG", xBA = "xBA", Barrel_pct = "Barrel%")
+hitter_labels <- c(wRC_plus = "wRC+", AVG = "AVG", OPS_plus = "OPS+", Barrel_pct = "Barrel%")
 starter_labels <- c(`K-BB_pct` = "K-BB%", xFIP = "xFIP", SIERA = "SIERA", ERA = "ERA")
 reliever_labels <- c(`K-BB_pct` = "K-BB%", FIP = "FIP", SV = "SV", SIERA = "SIERA", ERA = "ERA")
 fielder_labels <- c(OAA = "OAA", DRS = "DRS", FRP = "FRP")
 
-hitter_digits <- list(wRC_plus = 0, AVG = 3, xBA = 3, Barrel_pct = 1)
+hitter_digits <- list(wRC_plus = 0, AVG = 3, OPS_plus = 0, Barrel_pct = 1)
 starter_digits <- list(`K-BB_pct` = 1, xFIP = 2, SIERA = 2, ERA = 2)
 reliever_digits <- list(`K-BB_pct` = 1, FIP = 2, SV = 0, SIERA = 2, ERA = 2)
 reliever_team_labels <- c(`K-BB_pct` = "K-BB%", FIP = "FIP", SV_per_G = "SV/G", SIERA = "SIERA", ERA = "ERA")
@@ -1459,7 +1465,7 @@ team_relievers <- scale_k_bb(team_relievers)
 teams_json <- lapply(ALL_TEAMS, function(team) {
   hitters_list <- top_team_players(
     hitters, team,
-    c("wRC_plus", "AVG", "xBA", "Barrel_pct"), hitter_labels, hitter_digits
+    c("wRC_plus", "AVG", "OPS_plus", "Barrel_pct"), hitter_labels, hitter_digits
   )
   starters_list <- top_team_players(
     starters, team,
@@ -1522,10 +1528,10 @@ teams_json <- lapply(ALL_TEAMS, function(team) {
       ),
       hitters = list(
         label = "Hitters",
-        description = "Top offensive producers by wRC+, batting average (AVG), expected average (xBA), and barrel rate.",
+        description = "Top offensive producers by wRC+, batting average (AVG), OPS+, and barrel rate.",
         team = build_team_category_stats(
           team_hitting, team,
-          c("wRC_plus", "AVG", "xBA", "Barrel_pct"), hitter_labels, hitter_digits
+          c("wRC_plus", "AVG", "OPS_plus", "Barrel_pct"), hitter_labels, hitter_digits
         ),
         players = hitters_list
       ),
@@ -1645,7 +1651,7 @@ rankings_json <- c(
     )
   ),
   build_category_stat_rankings(
-    "hitters", team_hitting, c("wRC_plus", "AVG", "xBA", "Barrel_pct")
+    "hitters", team_hitting, c("wRC_plus", "AVG", "OPS_plus", "Barrel_pct")
   ),
   build_category_stat_rankings(
     "starters", team_starters, c("K-BB_pct", "xFIP", "SIERA", "ERA")
@@ -1664,7 +1670,7 @@ rankings_json <- c(
   ),
   build_trend_rankings(team_trend),
   build_player_pool_rankings(
-    "hitters", hitters, c("wRC_plus", "AVG", "xBA", "Barrel_pct")
+    "hitters", hitters, c("wRC_plus", "AVG", "OPS_plus", "Barrel_pct")
   ),
   build_player_pool_rankings(
     "starters", starters, c("K-BB_pct", "xFIP", "SIERA", "ERA")
@@ -1695,8 +1701,8 @@ output_data <- list(
     " • wRC+: Park- and league-adjusted offensive production (100 = average). ",
     "Higher is better.\n\n",
     " • AVG: Batting average — hits per at-bat. Higher is better.\n\n",
-    " • xBA: Expected batting average from Statcast batted-ball quality. ",
-    "Higher is better.\n\n",
+    " • OPS+: Park- and league-adjusted on-base plus slugging (100 = average), ",
+    "derived from FanGraphs OBP+ and SLG+. Higher is better.\n\n",
     " • Barrel%: Percent of batted balls hit with optimal launch angle and ",
     "exit velocity. Higher is better.\n\n",
     " • K-BB%: Strikeout rate minus walk rate. Higher is better.\n\n",

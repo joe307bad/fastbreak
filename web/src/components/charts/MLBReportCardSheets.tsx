@@ -794,8 +794,8 @@ function formatReportCardStatLabel(categoryKey: string, statKey: string): string
           return 'wRC+';
         case 'AVG':
           return 'AVG';
-        case 'xBA':
-          return 'xBA';
+        case 'OPS_plus':
+          return 'OPS+';
         case 'Barrel_pct':
           return 'Barrel%';
         default:

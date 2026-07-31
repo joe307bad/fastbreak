@@ -383,6 +383,68 @@ normalize_team <- function(team_abb) {
 
 `%||%` <- function(a, b) if (!is.null(a) && !is.na(a) && nzchar(a)) a else b
 
+# Fetch current team records from ESPN scoreboard (more up-to-date than FanGraphs)
+fetch_espn_standings <- function() {
+  cat("Fetching current team records from ESPN...\n")
+  url <- paste0("https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/scoreboard?dates=", format(Sys.Date(), "%Y%m%d"))
+  resp <- tryCatch(GET(url), error = function(e) NULL)
+  if (is.null(resp) || status_code(resp) != 200) {
+    cat("Warning: Could not fetch ESPN scoreboard for current records\n")
+    return(NULL)
+  }
+
+  data <- content(resp, as = "parsed")
+  if (is.null(data$events) || length(data$events) == 0) {
+    cat("Warning: No events in ESPN scoreboard response\n")
+    return(NULL)
+  }
+
+  records <- list()
+  for (ev in data$events) {
+    comp <- ev$competitions[[1]]
+    if (is.null(comp$competitors)) next
+
+    for (ct in comp$competitors) {
+      abbrev <- ct$team$abbreviation
+      if (is.null(abbrev) || abbrev %in% names(records)) next
+
+      # Map ESPN abbreviation to app abbreviation
+      app_abbrev <- if (abbrev %in% names(FG_TO_APP_ABBREV)) FG_TO_APP_ABBREV[[abbrev]] else abbrev
+
+      team_records <- ct$records
+      if (!is.null(team_records) && length(team_records) > 0) {
+        summary <- team_records[[1]]$summary
+        if (!is.null(summary) && nzchar(summary)) {
+          parts <- strsplit(summary, "-")[[1]]
+          if (length(parts) >= 2) {
+            records[[app_abbrev]] <- list(
+              W = as.integer(parts[1]),
+              L = as.integer(parts[2])
+            )
+          }
+        }
+      }
+    }
+  }
+
+  if (length(records) == 0) {
+    cat("Warning: No team records found in ESPN response\n")
+    return(NULL)
+  }
+
+  # Convert to data frame
+  df <- bind_rows(lapply(names(records), function(abbrev) {
+    tibble(
+      team_code = abbrev,
+      espn_W = records[[abbrev]]$W,
+      espn_L = records[[abbrev]]$L
+    )
+  }))
+
+  cat("Fetched current records for", nrow(df), "teams from ESPN\n")
+  df
+}
+
 stat_entry <- function(row, col, label, digits = NULL, display_value = NULL) {
   if (is.null(row) || !col %in% names(row) || is.na(row[[col]])) {
     return(list(label = label, value = NULL, rank = NULL, rankDisplay = NULL, displayValue = NULL))
@@ -809,14 +871,38 @@ cat("Loaded", nrow(batter_stats), "batters,",
     nrow(team_fielding_stats), "team fielding rows,",
     nrow(team_pitching_stats), "team pitching rows\n")
 
+# Fetch current standings from ESPN (more up-to-date than FanGraphs)
+espn_standings <- fetch_espn_standings()
+
+# Start with FanGraphs data for team codes, then update W/L from ESPN if available
 team_records <- team_pitching_stats %>%
   mutate(
     team_code = vapply(team_name_abb, normalize_team, character(1)),
-    W = as.integer(W),
-    L = as.integer(L),
-    win_pct = W / (W + L)
+    fg_W = as.integer(W),
+    fg_L = as.integer(L)
   ) %>%
-  filter(!is.na(team_code), !is.na(W), !is.na(L), !is.na(win_pct))
+  filter(!is.na(team_code), !is.na(fg_W), !is.na(fg_L))
+
+# Update with ESPN records if available (more current)
+if (!is.null(espn_standings) && nrow(espn_standings) > 0) {
+  team_records <- team_records %>%
+    left_join(espn_standings, by = "team_code") %>%
+    mutate(
+      W = coalesce(espn_W, fg_W),
+      L = coalesce(espn_L, fg_L)
+    ) %>%
+    select(-espn_W, -espn_L, -fg_W, -fg_L)
+  cat("Using ESPN records for current standings\n")
+} else {
+  team_records <- team_records %>%
+    mutate(W = fg_W, L = fg_L) %>%
+    select(-fg_W, -fg_L)
+  cat("Warning: Falling back to FanGraphs records (ESPN unavailable)\n")
+}
+
+team_records <- team_records %>%
+  mutate(win_pct = W / (W + L)) %>%
+  filter(!is.na(win_pct))
 
 team_records <- rank_and_assign(team_records, "win_pct")
 

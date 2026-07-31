@@ -12,6 +12,7 @@ import { usePinnedTeams } from '@/lib/usePinnedTeams';
 import {
   ChartInfoSheet,
   formatReportCardRankingLabel,
+  formatReportCardStatLabel,
   isReportCardPlayerRankingKey,
   isReportCardRankingPct,
   PlayoffChancesSheet,
@@ -83,9 +84,12 @@ const PLAYER_NAME_MIN_WIDTH = 'min-w-[6.75rem] w-[6.75rem]';
 const STICKY_PLAYER_CELL = `sticky left-0 z-10 ${PLAYER_NAME_MIN_WIDTH} shrink-0 border-r border-[var(--border)] bg-[var(--card)] group-hover:bg-[var(--foreground)]/5`;
 const STAT_COL = 'min-w-[5.5rem] px-2 whitespace-nowrap';
 
+const INVALID_DISPLAY_VALUES = ['null', 'NA', 'undefined', 'nul'];
+
 function formatStatValue(stat: ReportCardStatValue | undefined): string {
   if (!stat) return '-';
-  if (stat.displayValue) return stat.displayValue;
+  // Filter out invalid displayValue strings like "null", "NA", etc.
+  if (stat.displayValue && !INVALID_DISPLAY_VALUES.includes(stat.displayValue)) return stat.displayValue;
   if (stat.value == null) return '-';
   if (stat.label === 'Run Diff/G') {
     const formatted = stat.value.toFixed(2);
@@ -115,7 +119,10 @@ function teamRankBadgeClasses(rank: number | null | undefined): string {
 
 function RankBadge({ rank, display }: { rank?: number | null; display?: string | null }) {
   if (rank == null && !display) return null;
-  const value = display ?? String(rank);
+  // Filter out invalid display values like "null", "NA", etc.
+  const validDisplay = display && !['null', 'NA', 'undefined', 'nul'].includes(display) ? display : null;
+  const value = validDisplay ?? (rank != null ? String(rank) : '');
+  if (!value) return null;
   return <span className={teamRankBadgeClasses(rank)}>{value}</span>;
 }
 
@@ -130,7 +137,10 @@ function playerRankBadgeClasses(rank: number | null | undefined): string {
 
 function PlayerRankBadge({ rank, display }: { rank?: number | null; display?: string | null }) {
   if (rank == null && !display) return null;
-  const value = display ?? String(rank);
+  // Filter out invalid display values like "null", "NA", etc.
+  const validDisplay = display && !['null', 'NA', 'undefined', 'nul'].includes(display) ? display : null;
+  const value = validDisplay ?? (rank != null ? String(rank) : '');
+  if (!value) return null;
   return <span className={playerRankBadgeClasses(rank)}>{value}</span>;
 }
 
@@ -265,7 +275,9 @@ function CategoryPanel({
   const statLabels = Object.fromEntries(
     [...teamStatKeys, ...playerStatKeys].map(key => [
       key,
-      category.players[0]?.stats[key]?.label ?? category.team?.stats[key]?.label ?? key,
+      category.players[0]?.stats[key]?.label ??
+        category.team?.stats[key]?.label ??
+        formatReportCardStatLabel(categoryKey, key),
     ])
   );
 

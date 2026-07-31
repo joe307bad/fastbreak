@@ -292,11 +292,13 @@ function RankBadge({
   playerRankings?: boolean;
 }) {
   const colorFn = playerRankings ? playerRankColor : teamRankColor;
+  // Filter out invalid display values like "null", "NA", etc.
+  const validDisplay = display && !['null', 'NA', 'undefined', 'nul'].includes(display) ? display : null;
   return (
     <span
       className={`inline-flex items-center justify-center min-w-8 h-5 px-1 rounded text-[10px] font-bold text-white ${colorFn(rank)}`}
     >
-      {display ?? rank}
+      {validDisplay ?? rank}
     </span>
   );
 }
@@ -786,7 +788,7 @@ function formatReportCardCategoryLabel(categoryKey: string): string {
   }
 }
 
-function formatReportCardStatLabel(categoryKey: string, statKey: string): string {
+export function formatReportCardStatLabel(categoryKey: string, statKey: string): string {
   switch (categoryKey) {
     case 'hitters':
       switch (statKey) {

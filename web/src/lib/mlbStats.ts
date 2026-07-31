@@ -1,12 +1,17 @@
 import { MLBMonthTrend, MLBStatValue, MLBTeamStats } from '@/types/chart';
 
+const INVALID_DISPLAY_VALUES = ['null', 'NA', 'undefined', 'nul'];
+
 export function parseMLBStat(stat: unknown): MLBStatValue | null {
   if (stat == null || typeof stat !== 'object') return null;
   const s = stat as Record<string, unknown>;
+  // Filter out invalid rankDisplay values that could show as "null", "NA", etc.
+  const rawDisplay = typeof s.rankDisplay === 'string' ? s.rankDisplay : null;
+  const validDisplay = rawDisplay && !INVALID_DISPLAY_VALUES.includes(rawDisplay) ? rawDisplay : null;
   return {
     value: typeof s.value === 'number' ? s.value : null,
     rank: typeof s.rank === 'number' ? s.rank : null,
-    rankDisplay: typeof s.rankDisplay === 'string' ? s.rankDisplay : null,
+    rankDisplay: validDisplay,
   };
 }
 

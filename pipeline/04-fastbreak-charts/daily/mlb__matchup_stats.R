@@ -220,6 +220,38 @@ extract_team_stats <- function(competitor) {
   stats
 }
 
+# The scoreboard competitor statistics block has no homeRuns entry for MLB,
+# so home runs have to come from the per-game boxscore summary.
+fetch_game_batting_home_runs <- function(event_id) {
+  url <- paste0("https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/summary?event=", event_id)
+  add_api_delay()
+  resp <- tryCatch(GET(url), error = function(e) NULL)
+  if (is.null(resp) || status_code(resp) != 200) return(list())
+
+  data <- tryCatch(content(resp, as = "parsed"), error = function(e) NULL)
+  if (is.null(data) || is.null(data$boxscore) || is.null(data$boxscore$teams)) return(list())
+
+  hrs_by_team <- list()
+  for (t in data$boxscore$teams) {
+    if (is.null(t$team$abbreviation)) next
+    hrs <- NA_real_
+    if (!is.null(t$statistics)) {
+      for (sg in t$statistics) {
+        if (!identical(sg$name, "batting") || is.null(sg$stats)) next
+        for (s in sg$stats) {
+          if (identical(s$name, "homeRuns")) {
+            hrs <- safe_num(s$value)
+            if (is.na(hrs)) hrs <- safe_num(s$displayValue)
+            break
+          }
+        }
+      }
+    }
+    hrs_by_team[[t$team$abbreviation]] <- hrs
+  }
+  hrs_by_team
+}
+
 while (fetch_date <= season_fetch_end) {
   date_str <- format(fetch_date, "%Y%m%d")
   url <- paste0("https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/scoreboard?dates=", date_str)
@@ -263,19 +295,20 @@ while (fetch_date <= season_fetch_end) {
         if (fetch_date >= (Sys.Date() - days(TREND_DAYS))) {
           home_box <- extract_team_stats(home)
           away_box <- extract_team_stats(away)
+          hr_by_team <- fetch_game_batting_home_runs(ev$id)
 
           trend_games[[length(trend_games) + 1]] <- list(
             team = home_abbrev, opponent = away_abbrev,
             runs_scored = home_score, runs_allowed = away_score,
             won = home_score > away_score,
-            hits = safe_num(home_box[["hits"]]), hrs = safe_num(home_box[["homeRuns"]]),
+            hits = safe_num(home_box[["hits"]]), hrs = safe_num(hr_by_team[[home_abbrev]]),
             date = game_date_str
           )
           trend_games[[length(trend_games) + 1]] <- list(
             team = away_abbrev, opponent = home_abbrev,
             runs_scored = away_score, runs_allowed = home_score,
             won = away_score > home_score,
-            hits = safe_num(away_box[["hits"]]), hrs = safe_num(away_box[["homeRuns"]]),
+            hits = safe_num(away_box[["hits"]]), hrs = safe_num(hr_by_team[[away_abbrev]]),
             date = game_date_str
           )
         }

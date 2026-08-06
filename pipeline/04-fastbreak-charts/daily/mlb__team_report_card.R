@@ -102,6 +102,18 @@ MLB_TEAM_NAME_TO_ABBREV <- c(
   "Mets" = "NYM", "Royals" = "KC", "Giants" = "SF", "Rockies" = "COL"
 )
 
+# MLB Stats API team ids are stable across seasons, so keying off them avoids
+# the abbreviation drift that name/abbrev matching runs into (the API reports
+# AZ for Arizona and ATH for the Athletics).
+MLB_TEAM_ID_TO_ABBREV <- c(
+  "108" = "LAA", "109" = "ARI", "110" = "BAL", "111" = "BOS", "112" = "CHC",
+  "113" = "CIN", "114" = "CLE", "115" = "COL", "116" = "DET", "117" = "HOU",
+  "118" = "KC",  "119" = "LAD", "120" = "WSH", "121" = "NYM", "133" = "OAK",
+  "134" = "PIT", "135" = "SD",  "136" = "SEA", "137" = "SF",  "138" = "STL",
+  "139" = "TB",  "140" = "TEX", "141" = "TOR", "142" = "MIN", "143" = "PHI",
+  "144" = "ATL", "145" = "CWS", "146" = "MIA", "147" = "NYY", "158" = "MIL"
+)
+
 # ============================================================================
 # Helpers
 # ============================================================================
@@ -383,65 +395,75 @@ normalize_team <- function(team_abb) {
 
 `%||%` <- function(a, b) if (!is.null(a) && !is.na(a) && nzchar(a)) a else b
 
-# Fetch current team records from ESPN scoreboard (more up-to-date than FanGraphs)
-fetch_espn_standings <- function() {
-  cat("Fetching current team records from ESPN...\n")
-  url <- paste0("https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/scoreboard?dates=", format(Sys.Date(), "%Y%m%d"))
-  resp <- tryCatch(GET(url), error = function(e) NULL)
-  if (is.null(resp) || status_code(resp) != 200) {
-    cat("Warning: Could not fetch ESPN scoreboard for current records\n")
+STATSAPI_BASE <- "https://statsapi.mlb.com/api/v1"
+
+statsapi_team_code <- function(team_id) {
+  if (is.null(team_id) || length(team_id) == 0) return(NA_character_)
+  key <- as.character(team_id[[1]])
+  if (key %in% names(MLB_TEAM_ID_TO_ABBREV)) MLB_TEAM_ID_TO_ABBREV[[key]] else NA_character_
+}
+
+# Every MLB Stats API call goes through here so a transient blip degrades the
+# affected section instead of halting the daily job: both the request and the
+# JSON parse are guarded, and failures retry with a backoff before giving up.
+statsapi_get <- function(path, attempts = 3) {
+  url <- paste0(STATSAPI_BASE, path)
+  for (attempt in seq_len(attempts)) {
+    resp <- tryCatch(GET(url, timeout(60)), error = function(e) NULL)
+    if (!is.null(resp) && status_code(resp) == 200) {
+      parsed <- tryCatch(
+        fromJSON(
+          content(resp, as = "text", encoding = "UTF-8"),
+          simplifyVector = FALSE
+        ),
+        error = function(e) NULL
+      )
+      if (!is.null(parsed)) return(parsed)
+    }
+    if (attempt < attempts) Sys.sleep(2 * attempt)
+  }
+  cat("Warning: MLB Stats API request failed after", attempts, "attempts:", path, "\n")
+  NULL
+}
+
+# Current records for all 30 teams in a single request. FanGraphs W/L lags by a
+# day or more, and the ESPN scoreboard this replaced only carried teams with a
+# game on that day's slate — teams on an off day silently kept the stale record.
+fetch_mlb_standings <- function() {
+  cat("Fetching current team records from MLB Stats API...\n")
+  data <- statsapi_get(paste0(
+    "/standings?leagueId=103,104&season=", mlb_season,
+    "&standingsTypes=regularSeason"
+  ))
+  if (is.null(data) || is.null(data$records)) {
+    cat("Warning: Could not fetch MLB Stats API standings\n")
     return(NULL)
   }
 
-  data <- content(resp, as = "parsed")
-  if (is.null(data$events) || length(data$events) == 0) {
-    cat("Warning: No events in ESPN scoreboard response\n")
-    return(NULL)
-  }
-
-  records <- list()
-  for (ev in data$events) {
-    comp <- ev$competitions[[1]]
-    if (is.null(comp$competitors)) next
-
-    for (ct in comp$competitors) {
-      abbrev <- ct$team$abbreviation
-      if (is.null(abbrev) || abbrev %in% names(records)) next
-
-      # Map ESPN abbreviation to app abbreviation
-      app_abbrev <- if (abbrev %in% names(FG_TO_APP_ABBREV)) FG_TO_APP_ABBREV[[abbrev]] else abbrev
-
-      team_records <- ct$records
-      if (!is.null(team_records) && length(team_records) > 0) {
-        summary <- team_records[[1]]$summary
-        if (!is.null(summary) && nzchar(summary)) {
-          parts <- strsplit(summary, "-")[[1]]
-          if (length(parts) >= 2) {
-            records[[app_abbrev]] <- list(
-              W = as.integer(parts[1]),
-              L = as.integer(parts[2])
-            )
-          }
-        }
-      }
+  rows <- list()
+  for (rec in data$records) {
+    if (is.null(rec$teamRecords)) next
+    for (tr in rec$teamRecords) {
+      code <- statsapi_team_code(tr$team$id)
+      if (is.na(code)) next
+      wins <- suppressWarnings(as.integer(tr$wins))
+      losses <- suppressWarnings(as.integer(tr$losses))
+      if (is.na(wins) || is.na(losses)) next
+      rows[[length(rows) + 1]] <- tibble(
+        team_code = code,
+        api_W = wins,
+        api_L = losses
+      )
     }
   }
 
-  if (length(records) == 0) {
-    cat("Warning: No team records found in ESPN response\n")
+  if (length(rows) == 0) {
+    cat("Warning: No team records found in MLB Stats API standings\n")
     return(NULL)
   }
 
-  # Convert to data frame
-  df <- bind_rows(lapply(names(records), function(abbrev) {
-    tibble(
-      team_code = abbrev,
-      espn_W = records[[abbrev]]$W,
-      espn_L = records[[abbrev]]$L
-    )
-  }))
-
-  cat("Fetched current records for", nrow(df), "teams from ESPN\n")
+  df <- bind_rows(rows)
+  cat("Fetched current records for", nrow(df), "teams from MLB Stats API\n")
   df
 }
 
@@ -871,10 +893,10 @@ cat("Loaded", nrow(batter_stats), "batters,",
     nrow(team_fielding_stats), "team fielding rows,",
     nrow(team_pitching_stats), "team pitching rows\n")
 
-# Fetch current standings from ESPN (more up-to-date than FanGraphs)
-espn_standings <- fetch_espn_standings()
+# Fetch current standings from MLB Stats API (more up-to-date than FanGraphs)
+current_standings <- fetch_mlb_standings()
 
-# Start with FanGraphs data for team codes, then update W/L from ESPN if available
+# Start with FanGraphs data for team codes, then update W/L from the API if available
 team_records <- team_pitching_stats %>%
   mutate(
     team_code = vapply(team_name_abb, normalize_team, character(1)),
@@ -883,21 +905,21 @@ team_records <- team_pitching_stats %>%
   ) %>%
   filter(!is.na(team_code), !is.na(fg_W), !is.na(fg_L))
 
-# Update with ESPN records if available (more current)
-if (!is.null(espn_standings) && nrow(espn_standings) > 0) {
+# Update with MLB Stats API records if available (more current)
+if (!is.null(current_standings) && nrow(current_standings) > 0) {
   team_records <- team_records %>%
-    left_join(espn_standings, by = "team_code") %>%
+    left_join(current_standings, by = "team_code") %>%
     mutate(
-      W = coalesce(espn_W, fg_W),
-      L = coalesce(espn_L, fg_L)
+      W = coalesce(api_W, fg_W),
+      L = coalesce(api_L, fg_L)
     ) %>%
-    select(-espn_W, -espn_L, -fg_W, -fg_L)
-  cat("Using ESPN records for current standings\n")
+    select(-api_W, -api_L, -fg_W, -fg_L)
+  cat("Using MLB Stats API records for current standings\n")
 } else {
   team_records <- team_records %>%
     mutate(W = fg_W, L = fg_L) %>%
     select(-fg_W, -fg_L)
-  cat("Warning: Falling back to FanGraphs records (ESPN unavailable)\n")
+  cat("Warning: Falling back to FanGraphs records (MLB Stats API unavailable)\n")
 }
 
 team_records <- team_records %>%
@@ -1039,7 +1061,7 @@ cat(
 )
 
 # ============================================================================
-# 4-week trend (ESPN completed games)
+# 4-week trend (MLB Stats API completed games)
 # ============================================================================
 TREND_WEEKS <- 4
 TREND_DAYS <- TREND_WEEKS * 7
@@ -1050,131 +1072,94 @@ safe_num <- function(x) {
   if (is.na(val)) NA_real_ else val
 }
 
-add_api_delay <- function() Sys.sleep(0.5)
-
-espn_to_app_abbrev <- function(abbrev) {
-  if (abbrev %in% names(FG_TO_APP_ABBREV)) FG_TO_APP_ABBREV[[abbrev]] else abbrev
-}
-
-extract_box_score_stats <- function(competitor) {
-  stats <- list()
-  if (!is.null(competitor$statistics)) {
-    for (s in competitor$statistics) {
-      if (!is.null(s$name) && !is.null(s$displayValue)) {
-        stats[[s$name]] <- safe_num(s$displayValue)
-      }
-    }
+# One schedule request covers the whole window and carries per-game runs, hits
+# and the winner in the hydrated linescore. This replaced a day-by-day ESPN
+# scoreboard walk that also fetched a box score per game (~360 serialized
+# requests with no retries, where a single bad response killed the daily run).
+fetch_recent_trend_games <- function(start_date, end_date) {
+  cat("Fetching MLB Stats API completed games for 4-week trend...\n")
+  data <- statsapi_get(paste0(
+    "/schedule?sportId=1&gameType=R",
+    "&startDate=", format(start_date, "%Y-%m-%d"),
+    "&endDate=", format(end_date, "%Y-%m-%d"),
+    "&hydrate=linescore"
+  ))
+  if (is.null(data) || is.null(data$dates)) {
+    cat("Warning: Could not fetch MLB schedule for 4-week trend\n")
+    return(list())
   }
-  stats
-}
 
-competitor_hits <- function(competitor, box_stats) {
-  val <- safe_num(competitor$hits)
-  if (!is.na(val)) return(val)
-  safe_num(box_stats[["hits"]])
-}
-
-fetch_game_batting_home_runs <- function(event_id) {
-  url <- paste0(
-    "https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/summary?event=",
-    event_id
-  )
-  add_api_delay()
-  resp <- tryCatch(GET(url), error = function(e) NULL)
-  if (is.null(resp) || status_code(resp) != 200) return(list())
-
-  data <- tryCatch(content(resp, as = "parsed"), error = function(e) NULL)
-  if (is.null(data) || is.null(data$boxscore) || is.null(data$boxscore$teams)) return(list())
-
-  hrs_by_team <- list()
-  for (t in data$boxscore$teams) {
-    if (is.null(t$team$abbreviation)) next
-    abbrev <- espn_to_app_abbrev(t$team$abbreviation)
-    hrs <- NA_real_
-    if (!is.null(t$statistics)) {
-      for (sg in t$statistics) {
-        if (!identical(sg$name, "batting") || is.null(sg$stats)) next
-        for (s in sg$stats) {
-          if (identical(s$name, "homeRuns")) {
-            hrs <- safe_num(s$value)
-            if (is.na(hrs)) hrs <- safe_num(s$displayValue)
-            break
-          }
-        }
-      }
-    }
-    hrs_by_team[[abbrev]] <- hrs
-  }
-  hrs_by_team
-}
-
-fetch_recent_trend_games <- function() {
-  cat("Fetching ESPN completed games for 4-week trend...\n")
-  fetch_end <- Sys.Date() - 1
-  fetch_start <- fetch_end - TREND_DAYS + 1
   trend_games <- list()
-  fetch_date <- fetch_start
+  for (day in data$dates) {
+    if (is.null(day$games)) next
+    for (g in day$games) {
+      # codedGameState "F" is the only state meaning the game was actually
+      # played to completion — postponed games also report an abstract state
+      # of "Final" but carry no linescore.
+      if (!identical(g$status$codedGameState, "F")) next
 
-  while (fetch_date <= fetch_end) {
-    date_str <- format(fetch_date, "%Y%m%d")
-    url <- paste0(
-      "https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/scoreboard?dates=",
-      date_str
-    )
-    add_api_delay()
-    resp <- tryCatch(GET(url), error = function(e) NULL)
-    if (!is.null(resp) && status_code(resp) == 200) {
-      data <- content(resp, as = "parsed")
-      if (!is.null(data$events)) {
-        for (ev in data$events) {
-          comp <- ev$competitions[[1]]
-          if (length(comp$competitors) != 2) next
-          if (!isTRUE(comp$status$type$completed)) next
+      ls_teams <- g$linescore$teams
+      if (is.null(ls_teams)) next
+      home_runs <- safe_num(ls_teams$home$runs)
+      away_runs <- safe_num(ls_teams$away$runs)
+      if (is.na(home_runs) || is.na(away_runs)) next
 
-          home <- NULL
-          away <- NULL
-          for (ct in comp$competitors) {
-            if (ct$homeAway == "home") home <- ct else away <- ct
-          }
-          if (is.null(home) || is.null(away)) next
+      home_code <- statsapi_team_code(g$teams$home$team$id)
+      away_code <- statsapi_team_code(g$teams$away$team$id)
+      if (is.na(home_code) || is.na(away_code)) next
 
-          home_score <- safe_num(home$score)
-          away_score <- safe_num(away$score)
-          if (is.na(home_score) || is.na(away_score)) next
-
-          home_abbrev <- espn_to_app_abbrev(home$team$abbreviation)
-          away_abbrev <- espn_to_app_abbrev(away$team$abbreviation)
-          if (is.na(home_abbrev) || is.na(away_abbrev)) next
-
-          home_box <- extract_box_score_stats(home)
-          away_box <- extract_box_score_stats(away)
-          hr_by_team <- fetch_game_batting_home_runs(ev$id)
-
-          trend_games[[length(trend_games) + 1]] <- list(
-            team_code = home_abbrev,
-            runs_scored = home_score,
-            runs_allowed = away_score,
-            won = home_score > away_score,
-            hits = competitor_hits(home, home_box),
-            hrs = safe_num(hr_by_team[[home_abbrev]])
-          )
-          trend_games[[length(trend_games) + 1]] <- list(
-            team_code = away_abbrev,
-            runs_scored = away_score,
-            runs_allowed = home_score,
-            won = away_score > home_score,
-            hits = competitor_hits(away, away_box),
-            hrs = safe_num(hr_by_team[[away_abbrev]])
-          )
-        }
-      }
+      trend_games[[length(trend_games) + 1]] <- list(
+        team_code = home_code,
+        runs_scored = home_runs,
+        runs_allowed = away_runs,
+        won = home_runs > away_runs,
+        hits = safe_num(ls_teams$home$hits)
+      )
+      trend_games[[length(trend_games) + 1]] <- list(
+        team_code = away_code,
+        runs_scored = away_runs,
+        runs_allowed = home_runs,
+        won = away_runs > home_runs,
+        hits = safe_num(ls_teams$away$hits)
+      )
     }
-    fetch_date <- fetch_date + 1
   }
   trend_games
 }
 
-trend_games_list <- fetch_recent_trend_games()
+# Home runs are not part of the linescore, so they come from a single
+# byDateRange team-hitting request rather than a box score per game.
+fetch_trend_home_runs <- function(start_date, end_date) {
+  empty <- tibble(team_code = character(), trend_hrs = numeric())
+  data <- statsapi_get(paste0(
+    "/teams/stats?season=", mlb_season,
+    "&group=hitting&stats=byDateRange&sportIds=1",
+    "&startDate=", format(start_date, "%Y-%m-%d"),
+    "&endDate=", format(end_date, "%Y-%m-%d")
+  ))
+  splits <- if (!is.null(data) && length(data$stats) > 0) data$stats[[1]]$splits else NULL
+  if (is.null(splits) || length(splits) == 0) {
+    cat("Warning: Could not fetch team home run totals for 4-week trend\n")
+    return(empty)
+  }
+
+  rows <- list()
+  for (s in splits) {
+    code <- statsapi_team_code(s$team$id)
+    if (is.na(code)) next
+    rows[[length(rows) + 1]] <- tibble(
+      team_code = code,
+      trend_hrs = safe_num(s$stat$homeRuns)
+    )
+  }
+  if (length(rows) == 0) return(empty)
+  bind_rows(rows)
+}
+
+trend_end <- Sys.Date() - 1
+trend_start <- trend_end - TREND_DAYS + 1
+trend_games_list <- fetch_recent_trend_games(trend_start, trend_end)
+trend_home_runs <- fetch_trend_home_runs(trend_start, trend_end)
 cat("Fetched", length(trend_games_list), "team-game entries for 4-week trend\n")
 
 team_trend <- tibble(team_code = ALL_TEAMS)
@@ -1190,10 +1175,14 @@ if (length(trend_games_list) > 0) {
       runs_allowed_per_game = mean(runs_allowed, na.rm = TRUE),
       run_diff_per_game = mean(runs_scored - runs_allowed, na.rm = TRUE),
       hits_per_game = mean(hits, na.rm = TRUE),
-      hrs_per_game = mean(hrs, na.rm = TRUE),
       .groups = "drop"
     ) %>%
-    mutate(win_pct = wins / pmax(wins + losses, 1))
+    left_join(trend_home_runs, by = "team_code") %>%
+    mutate(
+      win_pct = wins / pmax(wins + losses, 1),
+      hrs_per_game = trend_hrs / pmax(games_played, 1)
+    ) %>%
+    select(-trend_hrs)
 
   for (stat in c("win_pct", "runs_per_game", "run_diff_per_game", "hits_per_game", "hrs_per_game")) {
     trend_df <- rank_and_assign(trend_df, stat, lower_better = FALSE)
@@ -1606,7 +1595,7 @@ teams_json <- lapply(ALL_TEAMS, function(team) {
         label = "4 Week Trend",
         description = paste0(
           "Recent team performance over the last ", TREND_WEEKS,
-          " weeks from ESPN completed games. Includes record, run differential, ",
+          " weeks from MLB Stats API completed games. Includes record, run differential, ",
           "and per-game offense metrics."
         ),
         team = build_trend_category_stats(team_trend, team),
@@ -1812,12 +1801,12 @@ output_data <- list(
     MIN_PA, " plate appearances. BR PA% is the share of team plate ",
     "appearances from those regulars. Composite ranks teams by that share — ",
     "rank 1 = fewest below-replacement plate appearances.\n\n",
-    " • 4 Week Trend: Recent team performance from ESPN completed games ",
+    " • 4 Week Trend: Recent team performance from MLB Stats API completed games ",
     "over the last 4 weeks. Includes record, run differential per game, ",
     "runs scored/allowed per game, hits per game, and home runs per game."
   ),
   lastUpdated = format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC"),
-  source = "FanGraphs • ESPN",
+  source = "FanGraphs • MLB Stats API • ESPN",
   season = mlb_season,
   topN = TOP_N,
   rankings = rankings_json,

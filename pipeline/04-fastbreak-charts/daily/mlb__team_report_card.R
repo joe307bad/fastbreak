@@ -696,13 +696,23 @@ fetch_espn_mlb_injuries <- function() {
     if (is.na(x) || !nzchar(as.character(x))) return(default)
     as.character(x)
   }
-  # ESPN intermittently 403s this endpoint from datacenter IPs, so retry before
-  # giving up. Do not send a browser User-Agent — ESPN rejects those outright
-  # while accepting the default one.
+  # ESPN 403s R's built-in url-connection User-Agent, which is what a bare
+  # jsonlite::fromJSON(url) sends, while serving the identical request fine over
+  # libcurl. Go through httr like every other request in this script. Do not add
+  # a browser User-Agent — ESPN rejects those too; the libcurl default works.
   fetch_payload <- function(attempts = 3) {
     for (attempt in seq_len(attempts)) {
-      payload <- tryCatch(fromJSON(url, simplifyVector = FALSE), error = function(e) NULL)
-      if (!is.null(payload)) return(payload)
+      resp <- tryCatch(GET(url, timeout(60)), error = function(e) NULL)
+      if (!is.null(resp) && status_code(resp) == 200) {
+        payload <- tryCatch(
+          fromJSON(
+            content(resp, as = "text", encoding = "UTF-8"),
+            simplifyVector = FALSE
+          ),
+          error = function(e) NULL
+        )
+        if (!is.null(payload)) return(payload)
+      }
       if (attempt < attempts) Sys.sleep(2 * attempt)
     }
     NULL

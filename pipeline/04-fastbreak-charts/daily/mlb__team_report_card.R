@@ -696,8 +696,20 @@ fetch_espn_mlb_injuries <- function() {
     if (is.na(x) || !nzchar(as.character(x))) return(default)
     as.character(x)
   }
+  # ESPN intermittently 403s this endpoint from datacenter IPs, so retry before
+  # giving up. Do not send a browser User-Agent — ESPN rejects those outright
+  # while accepting the default one.
+  fetch_payload <- function(attempts = 3) {
+    for (attempt in seq_len(attempts)) {
+      payload <- tryCatch(fromJSON(url, simplifyVector = FALSE), error = function(e) NULL)
+      if (!is.null(payload)) return(payload)
+      if (attempt < attempts) Sys.sleep(2 * attempt)
+    }
+    NULL
+  }
   tryCatch({
-    payload <- fromJSON(url, simplifyVector = FALSE)
+    payload <- fetch_payload()
+    if (is.null(payload)) stop("ESPN injury endpoint unreachable after retries")
     groups <- payload$injuries
     if (is.null(groups)) groups <- list()
     rows <- list()
@@ -1022,17 +1034,29 @@ war_lookup <- bind_rows(
 
 cat("Loading ESPN MLB injury report...\n")
 injury_players_raw <- fetch_espn_mlb_injuries()
-injury_players <- injury_players_raw %>%
-  rowwise() %>%
-  mutate(
-    war_match = list(lookup_player_war(athlete_name, war_lookup)),
-    playerid = war_match$playerid,
-    PlayerName = war_match$PlayerName,
-    WAR = war_match$WAR,
-    impact = pmax(coalesce(WAR, 0), 0) * status_weight
-  ) %>%
-  ungroup() %>%
-  select(-war_match)
+
+# dplyr evaluates a rowwise mutate once on a zero-row frame to infer the output
+# type, which calls lookup_player_war() with a zero-length name and aborts the
+# whole script ("`..1` must be of size N or 1, not size 0"). An empty injury
+# report is a normal degraded state — ESPN 403s this endpoint intermittently —
+# so short-circuit it. The fetcher's empty frame already carries every column
+# read downstream.
+injury_players <- if (nrow(injury_players_raw) == 0) {
+  cat("Warning: injury report unavailable — continuing without injury data\n")
+  injury_players_raw
+} else {
+  injury_players_raw %>%
+    rowwise() %>%
+    mutate(
+      war_match = list(lookup_player_war(athlete_name, war_lookup)),
+      playerid = war_match$playerid,
+      PlayerName = war_match$PlayerName,
+      WAR = war_match$WAR,
+      impact = pmax(coalesce(WAR, 0), 0) * status_weight
+    ) %>%
+    ungroup() %>%
+    select(-war_match)
+}
 
 team_injury_totals <- injury_players %>%
   group_by(team_code) %>%

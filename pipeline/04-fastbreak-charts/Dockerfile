@@ -15,9 +15,12 @@ RUN apt-get update && \
 # Update rlang first (base image has older version)
 # hockeyR is GitHub-only (default branch: master). Download the tarball with curl
 # so we avoid both GitHub API rate limits and R download.file redirect failures.
-RUN curl -fsSL -o /tmp/hockeyR.tar.gz \
+# The Posit binary repo is keyed by Ubuntu codename; take it from the base image
+# rather than hardcoding it, or the binaries link against an ICU the image lacks.
+RUN . /etc/os-release && \
+    curl -fsSL -o /tmp/hockeyR.tar.gz \
       https://codeload.github.com/danmorse314/hockeyR/tar.gz/refs/heads/master && \
-    R -e "options(repos = c(CRAN = 'https://packagemanager.posit.co/cran/__linux__/jammy/latest')); \
+    R -e "options(repos = c(CRAN = 'https://packagemanager.posit.co/cran/__linux__/$VERSION_CODENAME/latest')); \
     install.packages(c('rlang', 'vctrs', 'lifecycle')); \
     install.packages(c('nflreadr', 'hoopR', 'baseballr', 'remotes')); \
     remotes::install_local('/tmp/hockeyR.tar.gz', dependencies = TRUE); \

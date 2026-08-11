@@ -373,6 +373,9 @@ function LastTenGamesPanel({ lastTen }: { lastTen: ReportCardLastTenGames }) {
 
   const record = lastTen.record;
   const recordDisplay = record?.display ?? `${record?.wins ?? 0}-${record?.losses ?? 0}`;
+  // Older payloads predate totalDifferential; sum the shown games instead.
+  const totalDiff =
+    lastTen.totalDifferential ?? games.reduce((sum, game) => sum + game.differential, 0);
 
   return (
     <div className="border border-[var(--border)] rounded bg-[var(--card)] w-full max-w-full min-w-0 box-border">
@@ -419,6 +422,14 @@ function LastTenGamesPanel({ lastTen }: { lastTen: ReportCardLastTenGames }) {
       <div className="grid grid-cols-[1fr_auto] gap-2 px-2 py-1 border-t border-[var(--border)] items-center text-xs">
         <span className="text-[var(--muted)] whitespace-nowrap">Record (last {games.length})</span>
         <span className="font-mono font-medium">{recordDisplay}</span>
+        <span className="text-[var(--muted)] whitespace-nowrap">Total Diff</span>
+        <span
+          className={`font-mono font-medium ${
+            totalDiff > 0 ? 'text-green-500' : totalDiff < 0 ? 'text-red-500' : ''
+          }`}
+        >
+          {formatGameDifferential(totalDiff)}
+        </span>
       </div>
     </div>
   );
@@ -720,9 +731,6 @@ export function MLBTeamReportCard({ data }: Props) {
       <div className="flex-1 min-h-0 w-full max-w-full overflow-y-auto overflow-x-hidden">
         <TwoColumnMasonry className="pb-8">
           {[
-            ...(team.lastTenGames && team.lastTenGames.games.length > 0
-              ? [<LastTenGamesPanel key="lastTenGames" lastTen={team.lastTenGames} />]
-              : []),
             ...CATEGORY_KEYS.flatMap(key => {
             const category =
               key === 'recentTrend'
@@ -748,6 +756,9 @@ export function MLBTeamReportCard({ data }: Props) {
               />,
             ];
             }),
+            ...(team.lastTenGames && team.lastTenGames.games.length > 0
+              ? [<LastTenGamesPanel key="lastTenGames" lastTen={team.lastTenGames} />]
+              : []),
           ]}
         </TwoColumnMasonry>
       </div>

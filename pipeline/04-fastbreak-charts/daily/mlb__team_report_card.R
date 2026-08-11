@@ -1380,7 +1380,8 @@ build_last_ten_for_team <- function(rows, team) {
     label = "Last 10 Games",
     columns = list("Opponent", "Opp", "Team", "Diff"),
     games = list(),
-    record = list(wins = 0L, losses = 0L, display = "0-0")
+    record = list(wins = 0L, losses = 0L, display = "0-0"),
+    totalDifferential = 0L
   )
 
   team_rows <- Filter(function(r) identical(r$team_code, team), rows)
@@ -1414,6 +1415,7 @@ build_last_ten_for_team <- function(rows, team) {
 
   wins <- sum(vapply(team_rows, function(r) isTRUE(r$won), logical(1)))
   losses <- length(team_rows) - wins
+  total_diff <- sum(vapply(games, function(g) g$differential, integer(1)))
   list(
     label = "Last 10 Games",
     columns = list("Opponent", "Opp", "Team", "Diff"),
@@ -1422,7 +1424,8 @@ build_last_ten_for_team <- function(rows, team) {
       wins = as.integer(wins),
       losses = as.integer(losses),
       display = paste0(wins, "-", losses)
-    )
+    ),
+    totalDifferential = as.integer(total_diff)
   )
 }
 

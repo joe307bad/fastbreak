@@ -593,13 +593,6 @@ fun MLBTeamReportCardWorksheet(
                     .verticalScroll(rememberScrollState())
                     .padding(top = 8.dp, bottom = 80.dp)
             ) {
-                selectedTeam.lastTenGames
-                    ?.takeIf { it.games.isNotEmpty() }
-                    ?.let { lastTen ->
-                        ReportCardLastTenGamesSection(lastTen)
-                        Spacer(modifier = Modifier.height(12.dp))
-                    }
-
                 categories.forEachIndexed { index, (key, category) ->
                     val config = CATEGORY_CONFIGS[key] ?: return@forEachIndexed
                     val hasTeamStats = !category.team?.stats.isNullOrEmpty()
@@ -623,6 +616,13 @@ fun MLBTeamReportCardWorksheet(
                         Spacer(modifier = Modifier.height(12.dp))
                     }
                 }
+
+                selectedTeam.lastTenGames
+                    ?.takeIf { it.games.isNotEmpty() }
+                    ?.let { lastTen ->
+                        Spacer(modifier = Modifier.height(12.dp))
+                        ReportCardLastTenGamesSection(lastTen)
+                    }
 
                 buildReportCardSourceAttribution(visualization)?.let { attribution ->
                     Spacer(modifier = Modifier.height(12.dp))
@@ -1802,6 +1802,32 @@ private fun ReportCardLastTenGamesSection(
                 fontSize = 11.sp,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface
+            )
+        }
+
+        // Older payloads predate totalDifferential; sum the shown games instead.
+        val totalDiff = lastTen.totalDifferential ?: games.sumOf { it.differential }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Total Diff",
+                style = MaterialTheme.typography.labelSmall,
+                fontSize = 10.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.weight(1f)
+            )
+            Text(
+                text = formatLastTenDifferential(totalDiff),
+                style = MaterialTheme.typography.bodySmall,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                color = when {
+                    totalDiff > 0 -> LAST_TEN_WIN_COLOR
+                    totalDiff < 0 -> LAST_TEN_LOSS_COLOR
+                    else -> MaterialTheme.colorScheme.onSurface
+                }
             )
         }
     }

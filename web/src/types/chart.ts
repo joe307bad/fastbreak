@@ -612,6 +612,7 @@ export interface ReportCardLastTenGames {
   columns?: string[];
   games: ReportCardGameLogGame[];
   record: ReportCardGameLogRecord;
+  totalDifferential?: number;
 }
 
 export interface ReportCardTeam {

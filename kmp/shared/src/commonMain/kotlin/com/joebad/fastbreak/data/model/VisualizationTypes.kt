@@ -1310,7 +1310,8 @@ data class ReportCardLastTenGames(
     val label: String = "Last 10 Games",
     val columns: List<String> = emptyList(),
     val games: List<ReportCardGameLogGame> = emptyList(),
-    val record: ReportCardGameLogRecord? = null
+    val record: ReportCardGameLogRecord? = null,
+    val totalDifferential: Int? = null
 )
 
 @Serializable

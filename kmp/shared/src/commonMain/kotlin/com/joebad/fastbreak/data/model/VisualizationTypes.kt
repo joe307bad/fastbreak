@@ -1287,6 +1287,33 @@ data class ReportCardCategories(
 )
 
 @Serializable
+data class ReportCardGameLogGame(
+    val date: String? = null,
+    val location: String,          // "vs" (home) or "@" (away)
+    val opponent: String,
+    val opponentLabel: String,     // e.g. "vs LAD" or "@ SF"
+    val teamScore: Int,
+    val opponentScore: Int,
+    val differential: Int,
+    val won: Boolean
+)
+
+@Serializable
+data class ReportCardGameLogRecord(
+    val wins: Int = 0,
+    val losses: Int = 0,
+    val display: String = "0-0"
+)
+
+@Serializable
+data class ReportCardLastTenGames(
+    val label: String = "Last 10 Games",
+    val columns: List<String> = emptyList(),
+    val games: List<ReportCardGameLogGame> = emptyList(),
+    val record: ReportCardGameLogRecord? = null
+)
+
+@Serializable
 data class ReportCardTeam(
     val teamCode: String,
     val teamName: String,
@@ -1302,6 +1329,7 @@ data class ReportCardTeam(
     val overallCompositeRank: Int? = null,
     val overallCompositeRankDisplay: String? = null,
     val playoffProb: Double? = null,
+    val lastTenGames: ReportCardLastTenGames? = null,
     val categories: ReportCardCategories
 )
 

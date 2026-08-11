@@ -4,6 +4,7 @@ import { Children, isValidElement, useEffect, useLayoutEffect, useMemo, useState
 import {
   MLBTeamReportCardData,
   ReportCardCategory,
+  ReportCardLastTenGames,
   ReportCardPlayer,
   ReportCardStatValue,
   ReportCardTeam,
@@ -362,6 +363,67 @@ function TeamStatRow({ stat, onClick }: { stat?: ReportCardStatValue; onClick?: 
   );
 }
 
+function formatGameDifferential(diff: number): string {
+  return diff > 0 ? `+${diff}` : String(diff);
+}
+
+function LastTenGamesPanel({ lastTen }: { lastTen: ReportCardLastTenGames }) {
+  const games = lastTen.games ?? [];
+  if (games.length === 0) return null;
+
+  const record = lastTen.record;
+  const recordDisplay = record?.display ?? `${record?.wins ?? 0}-${record?.losses ?? 0}`;
+
+  return (
+    <div className="border border-[var(--border)] rounded bg-[var(--card)] w-full max-w-full min-w-0 box-border">
+      <div className="grid grid-cols-[1fr_minmax(60px,1fr)_1fr] gap-0 px-2 py-1 border-b border-[var(--border)] bg-[var(--border)]/30 items-center">
+        <div />
+        <div className="text-center text-xs font-bold whitespace-nowrap">{lastTen.label}</div>
+        <div />
+      </div>
+
+      <div className="min-w-0 max-w-full overflow-x-auto overscroll-x-contain">
+        <table className="w-full min-w-full text-sm border-collapse">
+          <thead>
+            <tr className="border-b border-[var(--border)] bg-[var(--card)] text-xs font-bold">
+              <th className="py-1 pl-2 pr-1 text-left whitespace-nowrap">Opponent</th>
+              <th className="py-1 px-2 text-right whitespace-nowrap">Opp</th>
+              <th className="py-1 px-2 text-right whitespace-nowrap">Team</th>
+              <th className="py-1 pl-2 pr-2 text-right whitespace-nowrap">Diff</th>
+            </tr>
+          </thead>
+          <tbody>
+            {games.map((game, index) => (
+              <tr
+                key={`${game.date ?? ''}-${game.opponent}-${index}`}
+                className="border-b border-[var(--border)] last:border-b-0 hover:bg-[var(--foreground)]/5"
+              >
+                <td className="py-1 pl-2 pr-1 font-medium whitespace-nowrap">
+                  <span className="text-[var(--muted)]">{game.location}</span> {game.opponent}
+                </td>
+                <td className="py-1 px-2 text-right font-mono whitespace-nowrap">{game.opponentScore}</td>
+                <td className="py-1 px-2 text-right font-mono whitespace-nowrap">{game.teamScore}</td>
+                <td
+                  className={`py-1 pl-2 pr-2 text-right font-mono whitespace-nowrap ${
+                    game.won ? 'text-green-500' : 'text-red-500'
+                  }`}
+                >
+                  {formatGameDifferential(game.differential)}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="grid grid-cols-[1fr_auto] gap-2 px-2 py-1 border-t border-[var(--border)] items-center text-xs">
+        <span className="text-[var(--muted)] whitespace-nowrap">Record (last {games.length})</span>
+        <span className="font-mono font-medium">{recordDisplay}</span>
+      </div>
+    </div>
+  );
+}
+
 function PlayerTable({
   players,
   statKeys,
@@ -657,7 +719,11 @@ export function MLBTeamReportCard({ data }: Props) {
 
       <div className="flex-1 min-h-0 w-full max-w-full overflow-y-auto overflow-x-hidden">
         <TwoColumnMasonry className="pb-8">
-          {CATEGORY_KEYS.flatMap(key => {
+          {[
+            ...(team.lastTenGames && team.lastTenGames.games.length > 0
+              ? [<LastTenGamesPanel key="lastTenGames" lastTen={team.lastTenGames} />]
+              : []),
+            ...CATEGORY_KEYS.flatMap(key => {
             const category =
               key === 'recentTrend'
                 ? team.categories.recentTrend
@@ -681,7 +747,8 @@ export function MLBTeamReportCard({ data }: Props) {
                 onRankingClick={setRankingSheetKey}
               />,
             ];
-          })}
+            }),
+          ]}
         </TwoColumnMasonry>
       </div>
       </div>

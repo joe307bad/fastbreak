@@ -590,6 +590,30 @@ export interface ReportCardCategories {
   injuries?: ReportCardCategory;
 }
 
+export interface ReportCardGameLogGame {
+  date?: string | null;
+  location: string; // "vs" (home) or "@" (away)
+  opponent: string;
+  opponentLabel: string; // e.g. "vs LAD" or "@ SF"
+  teamScore: number;
+  opponentScore: number;
+  differential: number;
+  won: boolean;
+}
+
+export interface ReportCardGameLogRecord {
+  wins: number;
+  losses: number;
+  display: string; // e.g. "6-4"
+}
+
+export interface ReportCardLastTenGames {
+  label: string;
+  columns?: string[];
+  games: ReportCardGameLogGame[];
+  record: ReportCardGameLogRecord;
+}
+
 export interface ReportCardTeam {
   teamCode: string;
   teamName: string;
@@ -605,6 +629,7 @@ export interface ReportCardTeam {
   overallCompositeRank?: number;
   overallCompositeRankDisplay?: string;
   playoffProb?: number;
+  lastTenGames?: ReportCardLastTenGames;
   categories: ReportCardCategories;
 }
 

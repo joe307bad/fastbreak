@@ -38,6 +38,8 @@ import com.joebad.fastbreak.data.model.PinnedTeam
 import com.joebad.fastbreak.data.model.PlayoffChanceEntry
 import com.joebad.fastbreak.data.model.RankingEntry
 import com.joebad.fastbreak.data.model.ReportCardCategory
+import com.joebad.fastbreak.data.model.ReportCardGameLogGame
+import com.joebad.fastbreak.data.model.ReportCardLastTenGames
 import com.joebad.fastbreak.data.model.ReportCardPlayer
 import com.joebad.fastbreak.data.model.ReportCardStatValue
 import com.joebad.fastbreak.data.model.ReportCardTeam
@@ -289,6 +291,7 @@ private fun mergeReportCardRankings(
 
 private enum class ReportCardShareTarget(val categoryKey: String?, val shareLabel: String) {
     RECENT_TREND("recentTrend", "4 Week Trend"),
+    LAST_TEN(null, "Last 10 Games"),
     HITTERS("hitters", "Hitters"),
     STARTERS("starters", "Starting Pitchers"),
     RELIEVERS("relievers", "Bullpen"),
@@ -590,6 +593,13 @@ fun MLBTeamReportCardWorksheet(
                     .verticalScroll(rememberScrollState())
                     .padding(top = 8.dp, bottom = 80.dp)
             ) {
+                selectedTeam.lastTenGames
+                    ?.takeIf { it.games.isNotEmpty() }
+                    ?.let { lastTen ->
+                        ReportCardLastTenGamesSection(lastTen)
+                        Spacer(modifier = Modifier.height(12.dp))
+                    }
+
                 categories.forEachIndexed { index, (key, category) ->
                     val config = CATEGORY_CONFIGS[key] ?: return@forEachIndexed
                     val hasTeamStats = !category.team?.stats.isNullOrEmpty()
@@ -631,18 +641,21 @@ fun MLBTeamReportCardWorksheet(
         }
 
         if (selectedTeam != null) {
-            val shareOptions = ReportCardShareTarget.entries.map { target ->
-                FabOption(
-                    icon = Icons.Filled.Share,
-                    label = target.shareLabel,
-                    onClick = {
-                        captureRequest = ReportCardCaptureRequest(
-                            target = target,
-                            title = "${selectedTeam.teamCode} Report Card - ${target.shareLabel}"
-                        )
-                    }
-                )
-            }
+            val hasLastTen = !selectedTeam.lastTenGames?.games.isNullOrEmpty()
+            val shareOptions = ReportCardShareTarget.entries
+                .filter { it != ReportCardShareTarget.LAST_TEN || hasLastTen }
+                .map { target ->
+                    FabOption(
+                        icon = Icons.Filled.Share,
+                        label = target.shareLabel,
+                        onClick = {
+                            captureRequest = ReportCardCaptureRequest(
+                                target = target,
+                                title = "${selectedTeam.teamCode} Report Card - ${target.shareLabel}"
+                            )
+                        }
+                    )
+                }
             MultiOptionFab(
                 options = shareOptions,
                 modifier = Modifier
@@ -678,7 +691,6 @@ fun MLBTeamReportCardWorksheet(
 
         captureRequest?.let { request ->
             val team = selectedTeam ?: return@let
-            val categoriesToShare = teamShareCategoryEntries(team, request.target)
 
             LaunchedEffect(request) {
                 kotlinx.coroutines.delay(50)
@@ -704,16 +716,24 @@ fun MLBTeamReportCardWorksheet(
                             drawLayer(graphicsLayer)
                         }
                 ) {
-                    MLBTeamReportCardShareImage(
-                        team = team,
-                        seasonLabel = seasonLabel,
-                        source = buildReportCardShareSourceAttribution(
-                            visualization,
-                            request.target.categoryKey
-                        ),
-                        categories = categoriesToShare,
-                        showSummary = request.target.categoryKey == null
-                    )
+                    if (request.target == ReportCardShareTarget.LAST_TEN) {
+                        MLBTeamReportCardLastTenShareImage(
+                            team = team,
+                            seasonLabel = seasonLabel,
+                            source = buildReportCardLastTenShareSource(visualization)
+                        )
+                    } else {
+                        MLBTeamReportCardShareImage(
+                            team = team,
+                            seasonLabel = seasonLabel,
+                            source = buildReportCardShareSourceAttribution(
+                                visualization,
+                                request.target.categoryKey
+                            ),
+                            categories = teamShareCategoryEntries(team, request.target),
+                            showSummary = request.target.categoryKey == null
+                        )
+                    }
                 }
             }
         }
@@ -1626,6 +1646,248 @@ private fun MLBTeamReportCardShareImage(
                 showTeamComposite = config.showTeamComposite,
                 expandStatsForShare = true
             )
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                text = source,
+                style = MaterialTheme.typography.labelSmall,
+                fontSize = 9.sp,
+                color = onBg,
+                modifier = Modifier.weight(1f, fill = false)
+            )
+            Text(
+                text = "fbrk.app",
+                style = MaterialTheme.typography.labelSmall,
+                fontSize = 9.sp,
+                fontWeight = FontWeight.Bold,
+                color = onBg
+            )
+        }
+    }
+}
+
+// ============================================================================
+// Last 10 games section
+// ============================================================================
+private val LAST_TEN_SCORE_WIDTH = 46.dp
+private val LAST_TEN_DIFF_WIDTH = 52.dp
+private val LAST_TEN_ROW_MIN_HEIGHT = 22.dp
+private val LAST_TEN_OPP_MIN_WIDTH = 84.dp
+private val LAST_TEN_WIN_COLOR = Color(0xFF228B22)
+private val LAST_TEN_LOSS_COLOR = Color(0xFFC0392B)
+private val SHARE_LAST_TEN_MIN_WIDTH = 260.dp
+
+private fun formatLastTenDifferential(diff: Int): String =
+    if (diff > 0) "+$diff" else diff.toString()
+
+@Composable
+private fun LastTenGamesRow(
+    opponent: @Composable () -> Unit,
+    oppScore: @Composable () -> Unit,
+    teamScore: @Composable () -> Unit,
+    diff: @Composable () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = LAST_TEN_ROW_MIN_HEIGHT)
+            .padding(vertical = 3.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .widthIn(min = LAST_TEN_OPP_MIN_WIDTH)
+                .padding(start = 4.dp, end = 4.dp),
+            contentAlignment = Alignment.CenterStart
+        ) { opponent() }
+        Box(modifier = Modifier.width(LAST_TEN_SCORE_WIDTH), contentAlignment = Alignment.CenterEnd) { oppScore() }
+        Box(modifier = Modifier.width(LAST_TEN_SCORE_WIDTH), contentAlignment = Alignment.CenterEnd) { teamScore() }
+        Box(modifier = Modifier.width(LAST_TEN_DIFF_WIDTH), contentAlignment = Alignment.CenterEnd) { diff() }
+    }
+}
+
+@Composable
+private fun LastTenOpponentCell(game: ReportCardGameLogGame) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = game.location,
+            style = MaterialTheme.typography.bodySmall,
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Medium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            softWrap = false
+        )
+        Spacer(modifier = Modifier.width(3.dp))
+        Text(
+            text = game.opponent,
+            style = MaterialTheme.typography.bodySmall,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Medium,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+            softWrap = false,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
+}
+
+@Composable
+private fun ReportCardLastTenGamesSection(
+    lastTen: ReportCardLastTenGames,
+    modifier: Modifier = Modifier
+) {
+    val games = lastTen.games
+    if (games.isEmpty()) return
+
+    val headerStyle = MaterialTheme.typography.labelSmall
+    val headerColor = MaterialTheme.colorScheme.onSurfaceVariant
+
+    Column(modifier = modifier.fillMaxWidth()) {
+        SectionHeader(lastTen.label)
+
+        LastTenGamesRow(
+            opponent = { ReportCardHeaderText("Opponent", headerStyle, headerColor, TextAlign.Start) },
+            oppScore = { ReportCardHeaderText("Opp", headerStyle, headerColor, TextAlign.End) },
+            teamScore = { ReportCardHeaderText("Team", headerStyle, headerColor, TextAlign.End) },
+            diff = { ReportCardHeaderText("Diff", headerStyle, headerColor, TextAlign.End) }
+        )
+
+        games.forEach { game ->
+            LastTenGamesRow(
+                opponent = { LastTenOpponentCell(game) },
+                oppScore = { ReportCardStatText(game.opponentScore.toString(), TextAlign.End) },
+                teamScore = { ReportCardStatText(game.teamScore.toString(), TextAlign.End) },
+                diff = {
+                    Text(
+                        text = formatLastTenDifferential(game.differential),
+                        style = MaterialTheme.typography.bodySmall,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 1,
+                        softWrap = false,
+                        textAlign = TextAlign.End,
+                        color = if (game.won) LAST_TEN_WIN_COLOR else LAST_TEN_LOSS_COLOR,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            )
+        }
+
+        Spacer(modifier = Modifier.height(6.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Record (last ${games.size})",
+                style = MaterialTheme.typography.labelSmall,
+                fontSize = 10.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.weight(1f)
+            )
+            Text(
+                text = lastTen.record?.display
+                    ?: "${lastTen.record?.wins ?: 0}-${lastTen.record?.losses ?: 0}",
+                style = MaterialTheme.typography.bodySmall,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+        }
+    }
+}
+
+private fun buildReportCardLastTenShareSource(
+    visualization: MLBTeamReportCardVisualization
+): String {
+    val sources = parseReportCardSources(visualization.source ?: "MLB Stats API")
+        .filter { it.contains("MLB", ignoreCase = true) && it.contains("Stats", ignoreCase = true) }
+        .distinct()
+    return sources.joinToString(" • ").ifBlank { "MLB Stats API" }
+}
+
+@Composable
+private fun rememberLastTenShareImageWidth(
+    team: ReportCardTeam,
+    seasonLabel: String,
+    source: String
+): Dp {
+    val density = LocalDensity.current
+    val textMeasurer = rememberTextMeasurer()
+    val titleStyle = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
+    val sourceStyle = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp)
+    val subtitleLine = formatReportCardShareSubtitleLine(seasonLabel, team)
+
+    val subtitleWidth = with(density) {
+        textMeasurer.measure(text = subtitleLine, style = titleStyle, softWrap = false, maxLines = 1).size.width.toDp()
+    }
+    val teamNameWidth = with(density) {
+        textMeasurer.measure(text = team.teamName, style = titleStyle, softWrap = false, maxLines = 1).size.width.toDp()
+    }
+    val sourceWidth = with(density) {
+        textMeasurer.measure(text = source, style = sourceStyle, softWrap = false, maxLines = 1).size.width.toDp()
+    }
+    val tableWidth = LAST_TEN_OPP_MIN_WIDTH + LAST_TEN_SCORE_WIDTH * 2 + LAST_TEN_DIFF_WIDTH + 8.dp
+
+    return remember(team, seasonLabel, source, subtitleWidth, teamNameWidth, sourceWidth) {
+        listOf(
+            tableWidth + SHARE_REPORT_CARD_HORIZONTAL_PADDING,
+            subtitleWidth + SHARE_REPORT_CARD_HORIZONTAL_PADDING,
+            teamNameWidth + SHARE_REPORT_CARD_HORIZONTAL_PADDING,
+            sourceWidth + 72.dp + SHARE_REPORT_CARD_HORIZONTAL_PADDING
+        ).max().coerceAtLeast(SHARE_LAST_TEN_MIN_WIDTH)
+    }
+}
+
+@Composable
+private fun MLBTeamReportCardLastTenShareImage(
+    team: ReportCardTeam,
+    seasonLabel: String,
+    source: String
+) {
+    val bg = MaterialTheme.colorScheme.background
+    val onBg = MaterialTheme.colorScheme.onSurface
+    val lastTen = team.lastTenGames
+    val shareWidth = rememberLastTenShareImageWidth(team, seasonLabel, source)
+
+    Column(
+        modifier = Modifier
+            .width(shareWidth)
+            .wrapContentHeight()
+            .background(bg)
+            .padding(16.dp)
+    ) {
+        Text(
+            text = team.teamName,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            color = onBg,
+            maxLines = 1,
+            softWrap = false
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = formatReportCardShareSubtitleLine(seasonLabel, team),
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            color = onBg,
+            maxLines = 1,
+            softWrap = false
+        )
+
+        Spacer(modifier = Modifier.height(12.dp))
+        if (lastTen != null) {
+            ReportCardLastTenGamesSection(lastTen)
         }
 
         Spacer(modifier = Modifier.height(8.dp))

@@ -1303,6 +1303,134 @@ build_trend_rankings <- function(trend_df) {
   )
 }
 
+# ============================================================================
+# Last 10 games (MLB Stats API completed games)
+# ============================================================================
+LAST_TEN_COUNT <- 10
+# Wide enough to guarantee 10 completed games survive off days and the All-Star
+# break; per-team we sort by game time and keep only the most recent LAST_TEN_COUNT.
+LAST_TEN_WINDOW_DAYS <- 30
+
+# Reuse the hydrated schedule endpoint the 4-week trend rides on, but keep the
+# opponent, home/away flag, and game time so each row is a real game-log entry
+# rather than an aggregate. One request covers the whole window.
+fetch_last_ten_games_raw <- function(start_date, end_date) {
+  cat("Fetching MLB Stats API completed games for last-10 game logs...\n")
+  data <- statsapi_get(paste0(
+    "/schedule?sportId=1&gameType=R",
+    "&startDate=", format(start_date, "%Y-%m-%d"),
+    "&endDate=", format(end_date, "%Y-%m-%d"),
+    "&hydrate=linescore"
+  ))
+  if (is.null(data) || is.null(data$dates)) {
+    cat("Warning: Could not fetch MLB schedule for last-10 game logs\n")
+    return(list())
+  }
+
+  rows <- list()
+  for (day in data$dates) {
+    if (is.null(day$games)) next
+    for (g in day$games) {
+      # Only "F" means played to completion; postponed games report an abstract
+      # "Final" but carry no linescore (see fetch_recent_trend_games).
+      if (!identical(g$status$codedGameState, "F")) next
+
+      ls_teams <- g$linescore$teams
+      if (is.null(ls_teams)) next
+      home_runs <- safe_num(ls_teams$home$runs)
+      away_runs <- safe_num(ls_teams$away$runs)
+      if (is.na(home_runs) || is.na(away_runs)) next
+
+      home_code <- statsapi_team_code(g$teams$home$team$id)
+      away_code <- statsapi_team_code(g$teams$away$team$id)
+      if (is.na(home_code) || is.na(away_code)) next
+
+      # gameDate is an ISO timestamp, so string ordering is chronological and
+      # doubleheaders on the same day stay in the order they were played.
+      game_date <- if (!is.null(g$gameDate)) as.character(g$gameDate[[1]]) else NA_character_
+
+      rows[[length(rows) + 1]] <- list(
+        team_code = home_code,
+        opponent_code = away_code,
+        is_home = TRUE,
+        team_score = home_runs,
+        opponent_score = away_runs,
+        won = home_runs > away_runs,
+        game_date = game_date
+      )
+      rows[[length(rows) + 1]] <- list(
+        team_code = away_code,
+        opponent_code = home_code,
+        is_home = FALSE,
+        team_score = away_runs,
+        opponent_score = home_runs,
+        won = away_runs > home_runs,
+        game_date = game_date
+      )
+    }
+  }
+  rows
+}
+
+# Per-team game log: the most recent LAST_TEN_COUNT games in chronological order,
+# each with a "vs"/"@" opponent label, both scores, and the differential, plus
+# the team's record over exactly those games.
+build_last_ten_for_team <- function(rows, team) {
+  empty <- list(
+    label = "Last 10 Games",
+    columns = list("Opponent", "Opp", "Team", "Diff"),
+    games = list(),
+    record = list(wins = 0L, losses = 0L, display = "0-0")
+  )
+
+  team_rows <- Filter(function(r) identical(r$team_code, team), rows)
+  if (length(team_rows) == 0) return(empty)
+
+  dates <- vapply(team_rows, function(r) r$game_date %||% "", character(1))
+  team_rows <- team_rows[order(dates)]
+  n <- length(team_rows)
+  if (n > LAST_TEN_COUNT) {
+    team_rows <- team_rows[(n - LAST_TEN_COUNT + 1):n]
+  }
+
+  games <- lapply(team_rows, function(r) {
+    diff <- r$team_score - r$opponent_score
+    loc <- if (isTRUE(r$is_home)) "vs" else "@"
+    list(
+      date = if (!is.null(r$game_date) && !is.na(r$game_date) && nzchar(r$game_date)) {
+        substr(r$game_date, 1, 10)
+      } else {
+        NULL
+      },
+      location = loc,
+      opponent = r$opponent_code,
+      opponentLabel = paste(loc, r$opponent_code),
+      teamScore = as.integer(r$team_score),
+      opponentScore = as.integer(r$opponent_score),
+      differential = as.integer(diff),
+      won = isTRUE(r$won)
+    )
+  })
+
+  wins <- sum(vapply(team_rows, function(r) isTRUE(r$won), logical(1)))
+  losses <- length(team_rows) - wins
+  list(
+    label = "Last 10 Games",
+    columns = list("Opponent", "Opp", "Team", "Diff"),
+    games = games,
+    record = list(
+      wins = as.integer(wins),
+      losses = as.integer(losses),
+      display = paste0(wins, "-", losses)
+    )
+  )
+}
+
+last_ten_end <- Sys.Date() - 1
+last_ten_start <- last_ten_end - LAST_TEN_WINDOW_DAYS + 1
+last_ten_games_raw <- fetch_last_ten_games_raw(last_ten_start, last_ten_end)
+cat("Fetched", length(last_ten_games_raw), "team-game entries for last-10 game logs\n")
+
 fielders <- fielder_stats %>%
   mutate(
     team_code = vapply(team_name_abb, normalize_team, character(1)),
@@ -1593,6 +1721,7 @@ teams_json <- lapply(ALL_TEAMS, function(team) {
     below_replacement, team,
     c("PA", "wRC_plus"), below_replacement_labels, below_replacement_digits
   )
+  last_ten <- build_last_ten_for_team(last_ten_games_raw, team)
 
   record_row <- team_records %>% filter(team_code == team)
   overall_row <- team_overall %>% filter(team_code == team)
@@ -1624,6 +1753,7 @@ teams_json <- lapply(ALL_TEAMS, function(team) {
     overallCompositeRank = team_overall_rank,
     overallCompositeRankDisplay = team_overall_rank_display,
     playoffProb = team_playoff_prob,
+    lastTenGames = last_ten,
     categories = list(
       recentTrend = list(
         label = "4 Week Trend",
@@ -1837,7 +1967,11 @@ output_data <- list(
     "rank 1 = fewest below-replacement plate appearances.\n\n",
     " • 4 Week Trend: Recent team performance from MLB Stats API completed games ",
     "over the last 4 weeks. Includes record, run differential per game, ",
-    "runs scored/allowed per game, hits per game, and home runs per game."
+    "runs scored/allowed per game, hits per game, and home runs per game.\n\n",
+    " • Last 10 Games: The team's most recent 10 completed games from the MLB ",
+    "Stats API, in chronological order. Each row shows the opponent (vs = home, ",
+    "@ = away), the opponent's score, the team's score, and the run differential, ",
+    "with the team's record over those 10 games."
   ),
   lastUpdated = format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC"),
   source = "FanGraphs • MLB Stats API • ESPN",
@@ -1871,6 +2005,18 @@ if ("Konnor Griffin" %in% pit_names) {
 }
 cat("Teams with data:", sum(vapply(teams_json, function(t) {
   any(vapply(t$categories, function(c) length(c$players) > 0, logical(1)))
+}, logical(1))), "/", length(teams_json), "\n")
+
+lad_last_ten <- output_data$teams$LAD$lastTenGames
+cat("Sample — LAD last 10 record:", lad_last_ten$record$display,
+    "| games:", length(lad_last_ten$games), "\n")
+if (length(lad_last_ten$games) > 0) {
+  g1 <- lad_last_ten$games[[length(lad_last_ten$games)]]
+  cat("  Most recent:", g1$opponentLabel, "-", g1$teamScore, "to", g1$opponentScore,
+      "(diff", g1$differential, ")\n")
+}
+cat("Teams with last-10 data:", sum(vapply(teams_json, function(t) {
+  length(t$lastTenGames$games) > 0
 }, logical(1))), "/", length(teams_json), "\n")
 
 # ============================================================================

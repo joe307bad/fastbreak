@@ -4,8 +4,11 @@ library(jsonlite)
 library(nflreadr)
 
 # Load team info for division data and create name mapping
+# nflverse ships the Rams as "LA"; the team roster and every other NFL chart
+# here use "LAR", and the app matches pinned teams by code.
 teams_info <- nflreadr::load_teams() %>%
-  select(team_abbr, team_nick, team_division)
+  select(team_abbr, team_nick, team_division) %>%
+  mutate(team_abbr = ifelse(team_abbr == "LA", "LAR", team_abbr))
 
 # Create mapping from team nickname to abbreviation
 # The playoff status website uses team nicknames (e.g., "Seahawks", "Patriots")
@@ -105,12 +108,20 @@ if (any(grepl("^Team$|^Conference|^W$|^L$|^T$", first_row, ignore.case = TRUE)))
 cat("\nData after header removal:\n")
 print(head(playoff_data, 3))
 
-# Clean percentage values - remove % and convert to numeric
+# Clean percentage values - remove % and convert to numeric.
+# playoffstatus.com does not print a percentage once a round is decided: it
+# marks rounds a team has already reached with "^" and rounds it is eliminated
+# from with "X". Treating "^" as a number produced NA, which dropped the column
+# entirely for every team that had clinched — most of the table by January.
 clean_pct <- function(x) {
-  x <- gsub("%", "", as.character(x))
-  x <- gsub("X|x|-|^$", "0", x)  # X or - or empty means eliminated
-  x <- trimws(x)
-  suppressWarnings(as.numeric(x))
+  x <- trimws(as.character(x))
+  clinched <- grepl("\\^", x)
+  eliminated <- grepl("^[Xx]$|^-$|^$", x)
+  vals <- suppressWarnings(as.numeric(gsub("[%,]", "", x)))
+  vals[eliminated] <- 0
+  vals[clinched] <- 100
+  vals[is.na(vals)] <- 0
+  vals
 }
 
 # Build cleaned dataframe based on column positions
@@ -211,6 +222,11 @@ output_data <- list(
   description = "This table shows each team's probability of making the playoffs and advancing through each round. Data is sourced from PlayoffStatus.com which calculates odds based on current standings, remaining schedule, and historical performance patterns.",
   lastUpdated = format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC"),
   source = "PlayoffStatus.com",
+  tags = list(
+    list(label = "team", layout = "left", color = "#4CAF50"),
+    list(label = "regular season", layout = "right", color = "#9C27B0")
+  ),
+  sortOrder = 2,
   dataPoints = data_points
 )
 
@@ -221,10 +237,13 @@ if (!nzchar(s3_bucket)) {
   stop("AWS_S3_BUCKET environment variable is not set")
 }
 
-is_prod <- tolower(Sys.getenv("PROD")) == "true"
+# ENV=PROD is the pipeline-wide switch (see start.sh / prod.sh); the old PROD=true
+# flag this script shipped with was never set by the container, and its prod key
+# was missing the prod/ prefix the registry reads from.
+env <- toupper(Sys.getenv("ENV", "DEV"))
 
-s3_key <- if (is_prod) {
-  "nfl__playoff_odds.json"
+s3_key <- if (env == "PROD") {
+  "prod/nfl__playoff_odds.json"
 } else {
   "dev/nfl__playoff_odds.json"
 }

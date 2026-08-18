@@ -168,10 +168,13 @@ if (!nzchar(s3_bucket)) {
   stop("AWS_S3_BUCKET environment variable is not set")
 }
 
-is_prod <- tolower(Sys.getenv("PROD")) == "true"
+# ENV=PROD is the pipeline-wide switch (see start.sh / prod.sh); the old PROD=true
+# flag this script shipped with was never set by the container, and its prod key
+# was missing the prod/ prefix the registry reads from.
+env <- toupper(Sys.getenv("ENV", "DEV"))
 
-s3_key <- if (is_prod) {
-  "nfl__cumulative_epa_trend.json"
+s3_key <- if (env == "PROD") {
+  "prod/nfl__cumulative_epa_trend.json"
 } else {
   "dev/nfl__cumulative_epa_trend.json"
 }

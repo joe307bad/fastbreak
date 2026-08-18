@@ -12,7 +12,18 @@ library(httr)
 MIN_GAMES_QB <- 8
 MIN_GAMES_RB <- 6
 MIN_GAMES_WR <- 6
-CURRENT_SEASON <- 2025
+
+# The season was pinned to a literal, which silently froze this chart on 2025
+# once the calendar moved on. most_recent_season() is what every other NFL
+# script here uses: it rolls forward on its own at the September opener, and in
+# the offseason it points at the last season that actually has data.
+CURRENT_SEASON <- tryCatch({
+  nflreadr::most_recent_season()
+}, error = function(e) {
+  current_year <- as.numeric(format(Sys.Date(), "%Y"))
+  current_month <- as.numeric(format(Sys.Date(), "%m"))
+  if (current_month < 9) current_year - 1 else current_year
+})
 
 # Helper function to create tied ranks
 # Returns a list with two components:
@@ -403,9 +414,14 @@ if (!is.null(snap_counts)) {
   cat("Loaded snap counts for", nrow(snap_counts), "players\n")
 }
 
-# Calculate season totals and filter by games played
+# Calculate season totals and filter by games played.
+# nflverse `player_name` is the abbreviated form ("A.Rodgers"); the snap count
+# feed keys on full names, so joining on it matched nothing and the snap-based
+# player prioritization below silently fell back to stat-based selection. Carry
+# `player_display_name` through under the same name — it also reads better on
+# the worksheet.
 player_stats_filtered <- player_stats %>%
-  group_by(player_id, player_name, team, position) %>%
+  group_by(player_id, player_name = player_display_name, team, position) %>%
   summarise(
     games = n_distinct(week),
 
@@ -883,6 +899,16 @@ get_current_week_info <- function(schedules_df) {
 week_info <- get_current_week_info(schedules)
 current_week <- week_info$week
 season_type <- week_info$season_type
+
+# ESPN season type 1 is the preseason. There are no real matchups to worksheet
+# then, and ESPN's preseason week number does not line up with the completed
+# season nflreadr is serving — pairing them produced a chart of last season's
+# week N dressed up as this week's games. Stop before publishing anything.
+if (identical(season_type, 1L) || identical(season_type, 1)) {
+  cat("ESPN reports the preseason; no regular season matchups to publish yet.\n")
+  cat("\n=== SKIPPED (preseason) ===\n")
+  quit(save = "no", status = 0)
+}
 
 # Determine if we're in playoffs (season_type 3) or regular season (season_type 2)
 is_playoffs <- (season_type == 3)
@@ -2102,7 +2128,14 @@ cat("Generated stats for", length(matchups_json), "matchup(s)\n")
 s3_bucket <- Sys.getenv("AWS_S3_BUCKET")
 
 if (nzchar(s3_bucket)) {
-  s3_key <- "dev/nfl__matchup_stats.json"
+  # ENV=PROD is the pipeline-wide switch (see start.sh / prod.sh). This script
+  # was pinned to the dev key, so its output never reached the prod registry.
+  env <- toupper(Sys.getenv("ENV", "DEV"))
+  s3_key <- if (env == "PROD") {
+    "prod/nfl__matchup_stats.json"
+  } else {
+    "dev/nfl__matchup_stats.json"
+  }
 
   s3_path <- paste0("s3://", s3_bucket, "/", s3_key)
   cmd <- paste("aws s3 cp", shQuote(tmp_file), shQuote(s3_path), "--content-type application/json")
@@ -2139,7 +2172,7 @@ if (nzchar(s3_bucket)) {
   }
 
   # Insert pipeline execution record
-  pipeline_file_key <- "dev/nfl__matchup_stats.json"
+  pipeline_file_key <- s3_key
   pipeline_item <- sprintf(
     '{"file_key": {"S": "%s"}, "updatedAt": {"S": "%s"}, "title": {"S": "%s"}, "interval": {"S": "%s"}}',
     pipeline_file_key, utc_timestamp, chart_title, chart_interval

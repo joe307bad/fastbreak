@@ -44,39 +44,39 @@ if (most_recent_week_available > 18) {
   cat("NOTE: Playoffs detected (week", most_recent_week_available, "). Using regular season data through week 18.\n")
 }
 
-cat("Processing NFL snap data for season:", current_season, "week:", most_recent_week, "\n")
+cat("Processing NFL data for season:", current_season, "week:", most_recent_week, "\n")
 
-# Calculate total offensive snaps by team (plays where team is on offense)
-offense_snaps <- pbp %>%
-  filter(week <= most_recent_week, !is.na(posteam)) %>%
+# Calculate offensive EPA per play by team
+offense_epa <- pbp %>%
+  filter(week <= most_recent_week, !is.na(epa), !is.na(posteam)) %>%
   group_by(posteam) %>%
-  summarise(offense_snaps = n(), .groups = "drop") %>%
+  summarise(offense_epa_per_play = mean(epa, na.rm = TRUE), .groups = "drop") %>%
   rename(team = posteam) %>%
   mutate(team = ifelse(team == "LA", "LAR", team))
 
-# Calculate total defensive snaps by team (plays where team is on defense)
-defense_snaps <- pbp %>%
-  filter(week <= most_recent_week, !is.na(defteam)) %>%
+# Calculate defensive EPA per play by team
+defense_epa <- pbp %>%
+  filter(week <= most_recent_week, !is.na(epa), !is.na(defteam)) %>%
   group_by(defteam) %>%
-  summarise(defense_snaps = n(), .groups = "drop") %>%
+  summarise(defense_epa_per_play = mean(epa, na.rm = TRUE), .groups = "drop") %>%
   rename(team = defteam) %>%
   mutate(team = ifelse(team == "LA", "LAR", team))
 
-# Combine offense and defense snaps with team info
-team_snaps <- offense_snaps %>%
-  left_join(defense_snaps, by = "team") %>%
+# Combine offense and defense EPA with team info
+team_epa <- offense_epa %>%
+  left_join(defense_epa, by = "team") %>%
   left_join(teams_info, by = c("team" = "team_abbr")) %>%
   arrange(team)
 
 # Convert to list format for JSON matching ScatterPlotVisualization model
 # ScatterPlotDataPoint: label, x, y, sum, division, conference
-data_points <- team_snaps %>%
+data_points <- team_epa %>%
   rowwise() %>%
   mutate(data_point = list(list(
     label = team,
-    x = as.integer(defense_snaps),
-    y = as.integer(offense_snaps),
-    sum = as.integer(offense_snaps + defense_snaps),
+    x = round(offense_epa_per_play, 4),
+    y = round(defense_epa_per_play, 4),
+    sum = round(offense_epa_per_play + defense_epa_per_play, 4),
     division = team_division,
     conference = team_conf
   ))) %>%
@@ -86,19 +86,23 @@ data_points <- team_snaps %>%
 output_data <- list(
   sport = "NFL",
   visualizationType = "SCATTER_PLOT",
-  title = paste("NFL Team Snaps - Week", most_recent_week),
-  subtitle = "Total Offensive vs Defensive Snaps",
-  description = "This chart shows the total number of offensive and defensive snaps each team has played through the season. More snaps generally indicate longer, more competitive games and stronger time of possession. Teams with significantly more defensive snaps than offensive snaps may be struggling to maintain possession, while teams with more offensive snaps are likely controlling the game tempo.",
+  title = paste("NFL Team Tier List - Week", most_recent_week),
+  subtitle = "Offensive vs Defensive EPA Analysis",
+  description = "Expected Points Added (EPA) measures the value of each play by comparing the expected points before and after the play. Offensive EPA per play shows how many points a team adds per offensive play on average, while defensive EPA per play (where lower is better) shows how many points a team allows per defensive play. Teams in the top-right quadrant have strong offenses and defenses, making them the most dominant teams. EPA calculations include only passing and running plays.",
   lastUpdated = format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC"),
-  xAxisLabel = "Defensive Snaps",
-  yAxisLabel = "Offensive Snaps",
-  xColumnLabel = "Def Snaps",
-  yColumnLabel = "Off Snaps",
-  invertYAxis = FALSE,
-  quadrantTopRight = list(color = "#9C27B0", label = "High D/High O"),
-  quadrantTopLeft = list(color = "#2196F3", label = "Low D/High O"),
-  quadrantBottomLeft = list(color = "#F44336", label = "Low D/Low O"),
-  quadrantBottomRight = list(color = "#FF9800", label = "High D/Low O"),
+  xAxisLabel = "Offensive EPA per Play",
+  yAxisLabel = "Defensive EPA per Play",
+  xColumnLabel = "OEPA",
+  yColumnLabel = "DEPA",
+  invertYAxis = TRUE,
+  quadrantTopRight = list(color = "#4CAF50", label = "Good D/Good O"),
+  quadrantTopLeft = list(color = "#2196F3", label = "Good D/Bad O"),
+  quadrantBottomLeft = list(color = "#F44336", label = "Bad D/Bad O"),
+  quadrantBottomRight = list(
+    color = "#FFEB3B",
+    label = "Good O/Bad D",
+    lightModeColor = "#F57C00"
+  ),
   source = "nflfastR / nflreadr",
   subject = "TEAM",
   tags = list(
@@ -115,12 +119,15 @@ if (!nzchar(s3_bucket)) {
   stop("AWS_S3_BUCKET environment variable is not set")
 }
 
-is_prod <- tolower(Sys.getenv("PROD")) == "true"
+# ENV=PROD is the pipeline-wide switch (see start.sh / prod.sh); the old PROD=true
+# flag this script shipped with was never set by the container, and its prod key
+# was missing the prod/ prefix the registry reads from.
+env <- toupper(Sys.getenv("ENV", "DEV"))
 
-s3_key <- if (is_prod) {
-  "nfl__team_snaps.json"
+s3_key <- if (env == "PROD") {
+  "prod/nfl__team_tier_list.json"
 } else {
-  "dev/nfl__team_snaps.json"
+  "dev/nfl__team_tier_list.json"
 }
 
 # Write JSON to temp file and upload via AWS CLI

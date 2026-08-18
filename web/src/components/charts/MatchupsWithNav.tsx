@@ -1,13 +1,13 @@
 'use client';
 
 import { useState, useMemo, useCallback, useEffect } from 'react';
-import { MatchupData, MLBMatchupData, MLBMatchupDataPoint, NBAMatchupData, NBAMatchupDataPoint, NHLMatchupData, NHLMatchupDataPoint, MatchupV2Data, MatchupV2DataPoint } from '@/types/chart';
+import { MatchupData, MLBMatchupData, MLBMatchupDataPoint, NBAMatchupData, NBAMatchupDataPoint, NFLMatchupData, NFLMatchupDataPoint, NHLMatchupData, NHLMatchupDataPoint, MatchupV2Data, MatchupV2DataPoint } from '@/types/chart';
 import { MatchupNav, getFilteredMatchups } from '@/components/ui/MatchupNav';
 import { usePinnedTeams } from '@/lib/usePinnedTeams';
 import { formatRunDiff, getLeagueAbbrev, getRecordRank, getRunDiffPerGame } from '@/lib/mlbStats';
 import { findPinnedMatchupIdForDay } from '@/lib/pinnedMatchups';
 
-type AnyMatchupData = MatchupData | NBAMatchupData | NHLMatchupData | MLBMatchupData | MatchupV2Data;
+type AnyMatchupData = MatchupData | NBAMatchupData | NHLMatchupData | MLBMatchupData | NFLMatchupData | MatchupV2Data;
 
 interface Props {
   data: AnyMatchupData;
@@ -184,8 +184,8 @@ function NHLMatchupCard({ matchup, expanded, pinned }: { matchup: NHLMatchupData
   );
 }
 
-// NFL/V2 Matchup Card
-function NFLMatchupCard({ matchupKey, matchup, expanded, pinned }: { matchupKey: string; matchup: MatchupV2DataPoint; expanded?: boolean; pinned?: boolean }) {
+// Legacy NFL MATCHUP_V2 card, kept so older cached payloads still render.
+function NFLMatchupV2Card({ matchupKey, matchup, expanded, pinned }: { matchupKey: string; matchup: MatchupV2DataPoint; expanded?: boolean; pinned?: boolean }) {
   const { date, time } = formatGameTime(matchup.game_datetime);
   const [awayCode, homeCode] = matchupKey.split('-').map(s => s.toUpperCase());
   const odds = matchup.odds;
@@ -307,6 +307,76 @@ function MLBMatchupCard({ matchup, expanded, pinned }: { matchup: MLBMatchupData
   );
 }
 
+// The NFL stat bag is free-form on the wire, so pull the handful of values the
+// card shows through one narrow accessor rather than typing the whole catalog.
+function nflStat(
+  team: NFLMatchupDataPoint['homeTeam'],
+  key: string
+): number | null {
+  const stat = team.stats?.[key] as { value?: number | null } | undefined;
+  return stat?.value ?? null;
+}
+
+function formatPointDiff(value: number | null): string {
+  if (value == null) return '-';
+  return value >= 0 ? `+${value.toFixed(1)}` : value.toFixed(1);
+}
+
+function NFLMatchupCard({ matchup, expanded, pinned }: { matchup: NFLMatchupDataPoint; expanded?: boolean; pinned?: boolean }) {
+  const { date, time } = formatGameTime(matchup.gameDate);
+  const isCompleted = matchup.gameCompleted;
+  const awayDiff = nflStat(matchup.awayTeam, 'pointDiffPerGame');
+  const homeDiff = nflStat(matchup.homeTeam, 'pointDiffPerGame');
+
+  const weekLabel = matchup.seasonType === 'REG'
+    ? matchup.week != null ? `Wk ${matchup.week}` : null
+    : matchup.seasonTypeLabel ?? matchup.seasonType ?? null;
+
+  const teamRow = (team: NFLMatchupDataPoint['homeTeam'], diff: number | null) => (
+    <div className="flex items-center justify-between">
+      <div className="flex items-center gap-2">
+        <span className="text-xs text-[var(--muted)] w-8">{team.conference ?? ''}</span>
+        <span className="font-bold">{team.abbreviation}</span>
+        <span className="text-xs text-[var(--muted)]">({team.record ?? '-'})</span>
+      </div>
+      <div className="flex items-center gap-3 text-xs">
+        <span className={`font-mono w-12 text-right ${(diff ?? 0) >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+          {formatPointDiff(diff)}
+        </span>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className={`border border-[var(--border)] rounded p-3 bg-[var(--card)] ${expanded ? 'ring-2 ring-[var(--foreground)]/20' : ''} ${pinned ? 'border-l-2 border-l-blue-500' : ''}`}>
+      <div className="flex justify-between items-center text-xs text-[var(--muted)] mb-2">
+        <span>{[date, weekLabel].filter(Boolean).join(' · ')}</span>
+        <span>{isCompleted ? 'Final' : time}</span>
+      </div>
+
+      <div className="space-y-2">
+        {teamRow(matchup.awayTeam, awayDiff)}
+        {teamRow(matchup.homeTeam, homeDiff)}
+      </div>
+
+      <div className="flex justify-between items-center mt-3 pt-2 border-t border-[var(--border)] text-xs text-[var(--muted)]">
+        <div>
+          <span>PPG: </span>
+          <span className="font-mono">{nflStat(matchup.awayTeam, 'pointsPerGame')?.toFixed(1) ?? '-'}</span>
+          <span> vs </span>
+          <span className="font-mono">{nflStat(matchup.homeTeam, 'pointsPerGame')?.toFixed(1) ?? '-'}</span>
+        </div>
+        <div>
+          <span>EPA/Play: </span>
+          <span className="font-mono">{nflStat(matchup.awayTeam, 'offEpaPerPlay')?.toFixed(3) ?? '-'}</span>
+          <span> vs </span>
+          <span className="font-mono">{nflStat(matchup.homeTeam, 'offEpaPerPlay')?.toFixed(3) ?? '-'}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function MatchupsWithNav({ data }: Props) {
   const [selectedDay, setSelectedDay] = useState<string | null>(getTodayKey());
   const [selectedMatchup, setSelectedMatchup] = useState<string | null>(null);
@@ -316,6 +386,7 @@ export function MatchupsWithNav({ data }: Props) {
     if (data.visualizationType === 'NBA_MATCHUP') return 'nba';
     if (data.visualizationType === 'NHL_MATCHUP') return 'nhl';
     if (data.visualizationType === 'MLB_MATCHUP') return 'mlb';
+    if (data.visualizationType === 'NFL_MATCHUP') return 'nfl';
     if (data.visualizationType === 'MATCHUP_V2') return 'nfl';
     return data.sport?.toLowerCase() ?? '';
   }, [data]);
@@ -458,6 +529,35 @@ export function MatchupsWithNav({ data }: Props) {
       );
     }
 
+    if (data.visualizationType === 'NFL_MATCHUP') {
+      const nflData = data as NFLMatchupData;
+      const games = nflData.dataPoints
+        .sort((a, b) => new Date(a.gameDate).getTime() - new Date(b.gameDate).getTime());
+
+      const filteredGames = showAll
+        ? games
+        : games.filter(g => matchupIds.includes(g.gameId));
+
+      const sortedGames = sortPinnedFirst(filteredGames, g => [g.awayTeam.abbreviation, g.homeTeam.abbreviation]);
+
+      if (sortedGames.length === 0) {
+        return <p className="text-[var(--muted)] text-sm">No upcoming games</p>;
+      }
+
+      return (
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {sortedGames.map(matchup => (
+            <NFLMatchupCard
+              key={matchup.gameId}
+              matchup={matchup}
+              expanded={selectedMatchup === matchup.gameId}
+              pinned={[matchup.awayTeam.abbreviation, matchup.homeTeam.abbreviation].some(c => pinnedCodes.has(c.toUpperCase()))}
+            />
+          ))}
+        </div>
+      );
+    }
+
     if (data.visualizationType === 'MATCHUP_V2') {
       const v2Data = data as MatchupV2Data;
       const dataPointsObj = v2Data.dataPoints as unknown as Record<string, MatchupV2DataPoint>;
@@ -477,7 +577,7 @@ export function MatchupsWithNav({ data }: Props) {
       return (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {sortedEntries.map(([key, matchup]) => (
-            <NFLMatchupCard
+            <NFLMatchupV2Card
               key={key}
               matchupKey={key}
               matchup={matchup}

@@ -469,7 +469,8 @@ private fun SuccessContent(
             && visualization !is NBAMatchupVisualization
             && visualization !is NHLMatchupVisualization
             && visualization !is MLBMatchupVisualization
-            && visualization !is MLBTeamReportCardVisualization
+            && visualization !is NFLMatchupVisualization
+            && visualization !is TeamReportCardVisualization
             && visualization !is CBBMatchupVisualization
             && visualization !is NCAABracketVisualization
             && visualization !is NBAPlayoffBracketVisualization
@@ -641,8 +642,16 @@ private fun RenderVisualization(
             highlightedTeamCodes = highlightedTeamCodes,
             onScheduleToggleHandlerChanged = onScheduleToggleHandlerChanged
         )
-    } else if (visualization is MLBTeamReportCardVisualization) {
-        MLBTeamReportCardWorksheet(
+    } else if (visualization is NFLMatchupVisualization) {
+        NFLMatchupWorksheet(
+            visualization = visualization,
+            modifier = Modifier.fillMaxSize(),
+            pinnedTeams = pinnedTeams,
+            highlightedTeamCodes = highlightedTeamCodes,
+            onScheduleToggleHandlerChanged = onScheduleToggleHandlerChanged
+        )
+    } else if (visualization is TeamReportCardVisualization) {
+        TeamReportCardWorksheet(
             visualization = visualization,
             modifier = Modifier.fillMaxSize(),
             pinnedTeams = pinnedTeams,
@@ -773,8 +782,11 @@ private fun RenderVisualization(
                             is MLBMatchupVisualization -> {
                                 // Handled by MLBMatchupWorksheet above
                             }
-                            is MLBTeamReportCardVisualization -> {
-                                // Handled by MLBTeamReportCardWorksheet above
+                            is NFLMatchupVisualization -> {
+                                // Handled by NFLMatchupWorksheet above
+                            }
+                            is TeamReportCardVisualization -> {
+                                // Handled by TeamReportCardWorksheet above
                             }
                             is CBBMatchupVisualization -> {
                                 // Handled by CBBMatchupWorksheet above
@@ -902,7 +914,11 @@ private fun extractFiltersAndCalculateHighlights(
             val highlights = selectedFilters["team"]?.let { setOf(it.uppercase()) } ?: emptySet()
             emptyList<FilterOption>() to highlights
         }
-        is MLBTeamReportCardVisualization -> {
+        is NFLMatchupVisualization -> {
+            val highlights = selectedFilters["team"]?.let { setOf(it.uppercase()) } ?: emptySet()
+            emptyList<FilterOption>() to highlights
+        }
+        is TeamReportCardVisualization -> {
             val highlights = selectedFilters["team"]?.let { setOf(it.uppercase()) } ?: emptySet()
             emptyList<FilterOption>() to highlights
         }

@@ -2,15 +2,17 @@
 
 import { Children, isValidElement, useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import {
-  MLBTeamReportCardData,
+  TeamReportCardData,
   ReportCardCategory,
-  ReportCardLastTenGames,
+  ReportCardGameLog,
+  ReportCardGameLogGame,
   ReportCardPlayer,
   ReportCardStatValue,
   ReportCardTeam,
 } from '@/types/chart';
 import { usePinnedTeams } from '@/lib/usePinnedTeams';
 import {
+  buildReportCardLabelIndex,
   ChartInfoSheet,
   formatReportCardRankingLabel,
   formatReportCardStatLabel,
@@ -18,18 +20,14 @@ import {
   isReportCardRankingPct,
   PlayoffChancesSheet,
   StatRankingsSheet,
-} from '@/components/charts/MLBReportCardSheets';
+} from '@/components/charts/TeamReportCardSheets';
 
-type CategoryKey =
-  | 'recentTrend'
-  | 'hitters'
-  | 'starters'
-  | 'relievers'
-  | 'fielders'
-  | 'belowReplacement'
-  | 'injuries';
+// Fallback table layout for MLB cards published before the payload carried its
+// own keys and flags. Anything newer — including every NFL card — drives the
+// layout from the category itself, so no sport needs an entry here.
+type CategoryKey = string;
 
-const CATEGORY_KEYS: CategoryKey[] = [
+const MLB_CATEGORY_ORDER: CategoryKey[] = [
   'recentTrend',
   'hitters',
   'starters',
@@ -39,7 +37,7 @@ const CATEGORY_KEYS: CategoryKey[] = [
   'injuries',
 ];
 
-const CATEGORY_STAT_KEYS: Record<CategoryKey, string[]> = {
+const CATEGORY_STAT_KEYS: Record<string, string[]> = {
   recentTrend: ['record', 'runDiffPerGame', 'runsPerGame', 'runsAllowedPerGame', 'hitsPerGame', 'hrsPerGame'],
   hitters: ['wRC_plus', 'AVG', 'OPS_plus', 'Barrel_pct'],
   starters: ['K-BB_pct', 'xFIP', 'SIERA', 'ERA'],
@@ -49,11 +47,11 @@ const CATEGORY_STAT_KEYS: Record<CategoryKey, string[]> = {
   injuries: ['impact'],
 };
 
-const CATEGORY_PLAYER_STAT_KEYS: Partial<Record<CategoryKey, string[]>> = {
+const CATEGORY_PLAYER_STAT_KEYS: Record<string, string[]> = {
   belowReplacement: ['PA', 'wRC_plus'],
 };
 
-const CATEGORY_COMPOSITE_RANKING_KEYS: Partial<Record<CategoryKey, string>> = {
+const CATEGORY_COMPOSITE_RANKING_KEYS: Record<string, string> = {
   hitters: 'hittersComposite',
   starters: 'startersComposite',
   relievers: 'relieversComposite',
@@ -61,23 +59,89 @@ const CATEGORY_COMPOSITE_RANKING_KEYS: Partial<Record<CategoryKey, string>> = {
   injuries: 'injuriesComposite',
 };
 
-const CATEGORY_SHOW_STATUS_COLUMN: Partial<Record<CategoryKey, boolean>> = {
+const CATEGORY_SHOW_STATUS_COLUMN: Record<string, boolean> = {
   injuries: true,
 };
 
-const CATEGORY_SHOW_WAR_COLUMN: Partial<Record<CategoryKey, boolean>> = {
+const CATEGORY_SHOW_WAR_COLUMN: Record<string, boolean> = {
   belowReplacement: true,
 };
 
-const CATEGORY_SHOW_PLAYER_RANK_AND_COMPOSITE: Partial<Record<CategoryKey, boolean>> = {
+const CATEGORY_SHOW_PLAYER_RANK_AND_COMPOSITE: Record<string, boolean> = {
   recentTrend: false,
   belowReplacement: false,
   injuries: false,
 };
 
-const CATEGORY_SHOW_TEAM_COMPOSITE: Partial<Record<CategoryKey, boolean>> = {
+const CATEGORY_SHOW_TEAM_COMPOSITE: Record<string, boolean> = {
   belowReplacement: false,
 };
+
+interface ResolvedCategoryConfig {
+  statKeys: string[];
+  playerStatKeys: string[];
+  positionColumnLabel: string;
+  showPlayerRankAndComposite: boolean;
+  showStatusColumn: boolean;
+  showWarColumn: boolean;
+  showTeamComposite: boolean;
+  compositeRankingKey?: string;
+}
+
+function statKeysFrom(stats: Record<string, ReportCardStatValue> | undefined): string[] {
+  return Object.keys(stats ?? {}).filter(key => key !== PLAYER_COMPOSITE_KEY);
+}
+
+function resolveCategoryConfig(
+  categoryKey: string,
+  category: ReportCardCategory
+): ResolvedCategoryConfig {
+  return {
+    statKeys:
+      category.statKeys ?? CATEGORY_STAT_KEYS[categoryKey] ?? statKeysFrom(category.team?.stats),
+    playerStatKeys:
+      category.playerStatKeys ??
+      CATEGORY_PLAYER_STAT_KEYS[categoryKey] ??
+      CATEGORY_STAT_KEYS[categoryKey] ??
+      statKeysFrom(category.players[0]?.stats),
+    positionColumnLabel: category.positionColumnLabel ?? 'Pos',
+    showPlayerRankAndComposite:
+      category.showPlayerRankAndComposite ??
+      CATEGORY_SHOW_PLAYER_RANK_AND_COMPOSITE[categoryKey] ??
+      true,
+    showStatusColumn: category.showStatusColumn ?? CATEGORY_SHOW_STATUS_COLUMN[categoryKey] ?? false,
+    showWarColumn: category.showWarColumn ?? CATEGORY_SHOW_WAR_COLUMN[categoryKey] ?? false,
+    showTeamComposite:
+      category.showTeamComposite ?? CATEGORY_SHOW_TEAM_COMPOSITE[categoryKey] ?? true,
+    compositeRankingKey: category.compositeRankingKey ?? CATEGORY_COMPOSITE_RANKING_KEYS[categoryKey],
+  };
+}
+
+// Category order comes from the payload; older MLB cards fall back to the fixed
+// order the page has always used, then to whatever keys the record carries.
+function categoryEntries(
+  data: TeamReportCardData,
+  team: ReportCardTeam
+): [string, ReportCardCategory][] {
+  const order =
+    team.categoryOrder ??
+    data.categoryOrder ??
+    (Object.keys(team.categories).some(key => MLB_CATEGORY_ORDER.includes(key))
+      ? MLB_CATEGORY_ORDER
+      : Object.keys(team.categories));
+  return order
+    .map(key => [key, team.categories[key]] as [string, ReportCardCategory | undefined])
+    .filter((entry): entry is [string, ReportCardCategory] => {
+      const category = entry[1];
+      if (!category) return false;
+      return category.players.length > 0 || Object.keys(category.team?.stats ?? {}).length > 0;
+    });
+}
+
+function teamGameLog(team: ReportCardTeam): ReportCardGameLog | undefined {
+  const log = team.gameLog ?? team.lastTenGames;
+  return log && log.games.length > 0 ? log : undefined;
+}
 
 const PLAYER_COMPOSITE_KEY = 'aggregate';
 
@@ -257,6 +321,7 @@ function CategoryPanel({
   showStatusColumn = false,
   showWarColumn = false,
   showTeamComposite = true,
+  compositeRankingKey,
   rankings,
   onRankingClick,
 }: {
@@ -270,7 +335,8 @@ function CategoryPanel({
   showStatusColumn?: boolean;
   showWarColumn?: boolean;
   showTeamComposite?: boolean;
-  rankings: MLBTeamReportCardData['rankings'];
+  compositeRankingKey?: string;
+  rankings: TeamReportCardData['rankings'];
   onRankingClick: (key: string) => void;
 }) {
   const statLabels = Object.fromEntries(
@@ -285,7 +351,6 @@ function CategoryPanel({
   const hasTeam = !!category.team;
   const hasPlayers = category.players.length > 0;
   const composite = showTeamComposite ? category.team?.stats[PLAYER_COMPOSITE_KEY] : undefined;
-  const compositeRankingKey = CATEGORY_COMPOSITE_RANKING_KEYS[categoryKey];
 
   if (!hasTeam && !hasPlayers) return null;
 
@@ -363,25 +428,37 @@ function TeamStatRow({ stat, onClick }: { stat?: ReportCardStatValue; onClick?: 
   );
 }
 
-function formatGameDifferential(diff: number): string {
+function formatGameDifferential(diff: number | null | undefined): string {
+  if (diff == null) return '-';
   return diff > 0 ? `+${diff}` : String(diff);
 }
 
-function LastTenGamesPanel({ lastTen }: { lastTen: ReportCardLastTenGames }) {
-  const games = lastTen.games ?? [];
+function gameDifferentialClass(game: ReportCardGameLogGame): string {
+  if (game.played === false) return 'text-[var(--muted)]';
+  if (game.won === true) return 'text-green-500';
+  if (game.won === false) return 'text-red-500';
+  return '';
+}
+
+function GameLogPanel({ gameLog }: { gameLog: ReportCardGameLog }) {
+  const games = gameLog.games ?? [];
   if (games.length === 0) return null;
 
-  const record = lastTen.record;
+  const record = gameLog.record;
   const recordDisplay = record?.display ?? `${record?.wins ?? 0}-${record?.losses ?? 0}`;
   // Older payloads predate totalDifferential; sum the shown games instead.
   const totalDiff =
-    lastTen.totalDifferential ?? games.reduce((sum, game) => sum + game.differential, 0);
+    gameLog.totalDifferential ?? games.reduce((sum, game) => sum + (game.differential ?? 0), 0);
+  // A full NFL schedule carries week numbers; the MLB last-10 ledger does not,
+  // and gains nothing from an empty column.
+  const showWeek = games.some(game => game.week != null);
+  const playedCount = games.filter(game => game.played !== false).length;
 
   return (
     <div className="border border-[var(--border)] rounded bg-[var(--card)] w-full max-w-full min-w-0 box-border">
       <div className="grid grid-cols-[1fr_minmax(60px,1fr)_1fr] gap-0 px-2 py-1 border-b border-[var(--border)] bg-[var(--border)]/30 items-center">
         <div />
-        <div className="text-center text-xs font-bold whitespace-nowrap">{lastTen.label}</div>
+        <div className="text-center text-xs font-bold whitespace-nowrap">{gameLog.label}</div>
         <div />
       </div>
 
@@ -389,6 +466,7 @@ function LastTenGamesPanel({ lastTen }: { lastTen: ReportCardLastTenGames }) {
         <table className="w-full min-w-full text-sm border-collapse">
           <thead>
             <tr className="border-b border-[var(--border)] bg-[var(--card)] text-xs font-bold">
+              {showWeek && <th className="py-1 pl-2 pr-1 text-left whitespace-nowrap">Wk</th>}
               <th className="py-1 pl-2 pr-1 text-left whitespace-nowrap">Opponent</th>
               <th className="py-1 px-2 text-right whitespace-nowrap">Opp</th>
               <th className="py-1 px-2 text-right whitespace-nowrap">Team</th>
@@ -401,15 +479,22 @@ function LastTenGamesPanel({ lastTen }: { lastTen: ReportCardLastTenGames }) {
                 key={`${game.date ?? ''}-${game.opponent}-${index}`}
                 className="border-b border-[var(--border)] last:border-b-0 hover:bg-[var(--foreground)]/5"
               >
+                {showWeek && (
+                  <td className="py-1 pl-2 pr-1 text-xs text-[var(--muted)] whitespace-nowrap">
+                    {game.week ?? '-'}
+                  </td>
+                )}
                 <td className="py-1 pl-2 pr-1 font-medium whitespace-nowrap">
                   <span className="text-[var(--muted)]">{game.location}</span> {game.opponent}
                 </td>
-                <td className="py-1 px-2 text-right font-mono whitespace-nowrap">{game.opponentScore}</td>
-                <td className="py-1 px-2 text-right font-mono whitespace-nowrap">{game.teamScore}</td>
+                <td className="py-1 px-2 text-right font-mono whitespace-nowrap">
+                  {game.opponentScore ?? '-'}
+                </td>
+                <td className="py-1 px-2 text-right font-mono whitespace-nowrap">
+                  {game.teamScore ?? '-'}
+                </td>
                 <td
-                  className={`py-1 pl-2 pr-2 text-right font-mono whitespace-nowrap ${
-                    game.won ? 'text-green-500' : 'text-red-500'
-                  }`}
+                  className={`py-1 pl-2 pr-2 text-right font-mono whitespace-nowrap ${gameDifferentialClass(game)}`}
                 >
                   {formatGameDifferential(game.differential)}
                 </td>
@@ -420,7 +505,7 @@ function LastTenGamesPanel({ lastTen }: { lastTen: ReportCardLastTenGames }) {
       </div>
 
       <div className="grid grid-cols-[1fr_auto] gap-2 px-2 py-1 border-t border-[var(--border)] items-center text-xs">
-        <span className="text-[var(--muted)] whitespace-nowrap">Record (last {games.length})</span>
+        <span className="text-[var(--muted)] whitespace-nowrap">Record ({playedCount} games)</span>
         <span className="font-mono font-medium">{recordDisplay}</span>
         <span className="text-[var(--muted)] whitespace-nowrap">Total Diff</span>
         <span
@@ -451,7 +536,7 @@ function PlayerTable({
   statKeys: string[];
   labels: Record<string, string>;
   categoryKey: CategoryKey;
-  rankings: MLBTeamReportCardData['rankings'];
+  rankings: TeamReportCardData['rankings'];
   onRankingClick: (key: string) => void;
   positionColumnLabel?: string;
   showPlayerRankAndComposite?: boolean;
@@ -537,7 +622,7 @@ function PlayerTable({
 }
 
 function getPlayoffProbRank(
-  playoffChances: MLBTeamReportCardData['playoffChances'],
+  playoffChances: TeamReportCardData['playoffChances'],
   teamCode: string
 ): { rank: number; rankDisplay: string } | null {
   const idx = playoffChances.findIndex(
@@ -579,15 +664,16 @@ function TeamSummaryStat({
 }
 
 interface Props {
-  data: MLBTeamReportCardData;
+  data: TeamReportCardData;
 }
 
-export function MLBTeamReportCard({ data }: Props) {
+export function TeamReportCard({ data }: Props) {
   const { getPinnedForSport, mounted } = usePinnedTeams();
 
+  const sportKey = (data.sport ?? 'mlb').toLowerCase();
   const pinnedCodes = useMemo(
-    () => (mounted ? getPinnedForSport('mlb') : []).map(t => t.teamCode),
-    [getPinnedForSport, mounted]
+    () => (mounted ? getPinnedForSport(sportKey) : []).map(t => t.teamCode),
+    [getPinnedForSport, mounted, sportKey]
   );
 
   const teams = useMemo(() => {
@@ -632,6 +718,7 @@ export function MLBTeamReportCard({ data }: Props) {
 
   const activeTeamCode = selectedTeamCode ?? '';
   const team = selectedTeamCode ? data.teams[activeTeamCode] : undefined;
+  const gameLog = team ? teamGameLog(team) : undefined;
   const playoffRank = team ? getPlayoffProbRank(data.playoffChances, team.teamCode) : null;
 
   const [rankingSheetKey, setRankingSheetKey] = useState<string | null>(null);
@@ -640,10 +727,15 @@ export function MLBTeamReportCard({ data }: Props) {
 
   const hasDescription = Boolean(data.description?.trim());
 
+  // The pipeline ships a formatted season label; older payloads did not, so
+  // fall back to the MLB-style "2025-26" the card has always shown.
   const seasonLabel = useMemo(() => {
+    if (data.seasonLabel?.trim()) return data.seasonLabel;
     const nextYear = (data.season + 1) % 100;
     return `${data.season}-${nextYear.toString().padStart(2, '0')}`;
-  }, [data.season]);
+  }, [data.season, data.seasonLabel]);
+
+  const labelIndex = useMemo(() => buildReportCardLabelIndex(data.teams), [data.teams]);
 
   const hasOverallRankings = (data.rankings.overallComposite?.length ?? 0) > 0;
   const hasPlayoffChances = data.playoffChances.length > 0;
@@ -701,7 +793,10 @@ export function MLBTeamReportCard({ data }: Props) {
 
         <div className="flex flex-wrap items-center gap-3">
           {team.wins != null && team.losses != null && (
-            <span className="text-xs text-[var(--muted)]">{team.wins}-{team.losses}</span>
+            <span className="text-xs text-[var(--muted)]">
+              {team.wins}-{team.losses}
+              {team.ties != null && team.ties > 0 ? `-${team.ties}` : ''}
+            </span>
           )}
           {team.overallComposite != null && (
             <TeamSummaryStat
@@ -731,34 +826,28 @@ export function MLBTeamReportCard({ data }: Props) {
       <div className="flex-1 min-h-0 w-full max-w-full overflow-y-auto overflow-x-hidden">
         <TwoColumnMasonry className="pb-8">
           {[
-            ...CATEGORY_KEYS.flatMap(key => {
-            const category =
-              key === 'recentTrend'
-                ? team.categories.recentTrend
-                : key === 'belowReplacement'
-                  ? team.categories.belowReplacement
-                  : team.categories[key];
-            if (!category) return [];
-            return [
-              <CategoryPanel
-                key={key}
-                categoryKey={key}
-                title={category.label}
-                category={category}
-                teamStatKeys={CATEGORY_STAT_KEYS[key]}
-                playerStatKeys={CATEGORY_PLAYER_STAT_KEYS[key] ?? CATEGORY_STAT_KEYS[key]}
-                showPlayerRankAndComposite={CATEGORY_SHOW_PLAYER_RANK_AND_COMPOSITE[key] ?? true}
-                showStatusColumn={CATEGORY_SHOW_STATUS_COLUMN[key] ?? false}
-                showWarColumn={CATEGORY_SHOW_WAR_COLUMN[key] ?? false}
-                showTeamComposite={CATEGORY_SHOW_TEAM_COMPOSITE[key] ?? true}
-                rankings={data.rankings}
-                onRankingClick={setRankingSheetKey}
-              />,
-            ];
+            ...categoryEntries(data, team).map(([key, category]) => {
+              const config = resolveCategoryConfig(key, category);
+              return (
+                <CategoryPanel
+                  key={key}
+                  categoryKey={key}
+                  title={category.label}
+                  category={category}
+                  teamStatKeys={config.statKeys}
+                  playerStatKeys={config.playerStatKeys}
+                  positionColumnLabel={config.positionColumnLabel}
+                  showPlayerRankAndComposite={config.showPlayerRankAndComposite}
+                  showStatusColumn={config.showStatusColumn}
+                  showWarColumn={config.showWarColumn}
+                  showTeamComposite={config.showTeamComposite}
+                  compositeRankingKey={config.compositeRankingKey}
+                  rankings={data.rankings}
+                  onRankingClick={setRankingSheetKey}
+                />
+              );
             }),
-            ...(team.lastTenGames && team.lastTenGames.games.length > 0
-              ? [<LastTenGamesPanel key="lastTenGames" lastTen={team.lastTenGames} />]
-              : []),
+            ...(gameLog ? [<GameLogPanel key="gameLog" gameLog={gameLog} />] : []),
           ]}
         </TwoColumnMasonry>
       </div>
@@ -768,7 +857,7 @@ export function MLBTeamReportCard({ data }: Props) {
         <StatRankingsSheet
           open={!!rankingSheetKey}
           onClose={() => setRankingSheetKey(null)}
-          title={formatReportCardRankingLabel(seasonLabel, rankingSheetKey)}
+          title={formatReportCardRankingLabel(seasonLabel, rankingSheetKey, labelIndex)}
           entries={data.rankings[rankingSheetKey] ?? []}
           highlightedTeam={activeTeamCode}
           isPct={isReportCardRankingPct(rankingSheetKey)}
@@ -801,7 +890,7 @@ export function MLBTeamReportCard({ data }: Props) {
   );
 }
 
-export function MLBTeamReportCardSummary({ data }: Props) {
+export function TeamReportCardSummary({ data }: Props) {
   const teams = useMemo(
     () => Object.values(data.teams).sort((a, b) => (a.overallCompositeRank ?? 99) - (b.overallCompositeRank ?? 99)),
     [data.teams]

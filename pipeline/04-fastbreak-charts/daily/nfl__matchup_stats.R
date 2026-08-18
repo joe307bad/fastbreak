@@ -1,2201 +1,1428 @@
 #!/usr/bin/env Rscript
 
+# NFL Matchup Stats generator — the NFL counterpart to mlb__matchup_stats.R.
+#
+# Emits NFL_MATCHUP: one entry per game in a window around today (recently
+# completed games plus the upcoming slate), each carrying full season stat
+# comparisons for both teams, head-to-head history, chart series, and — for
+# completed games — a team box score, player highlights, and a game-vs-season
+# comparison.
+#
+# Everything comes from the nflverse feeds rather than a per-game ESPN call:
+# nflreadr::load_schedules already carries scores, odds, and venue, so this
+# script makes no rate-limited HTTP requests and cannot be throttled mid-run.
+
 library(nflreadr)
 library(dplyr)
 library(tidyr)
 library(jsonlite)
-library(httr)
 
-# Script runs in production mode by default
+options(nflreadr.verbose = FALSE)
 
+# ============================================================================
 # Constants
-MIN_GAMES_QB <- 8
-MIN_GAMES_RB <- 6
-MIN_GAMES_WR <- 6
+# ============================================================================
+DAYS_BEHIND <- 10
+DAYS_AHEAD <- 10
 
-# The season was pinned to a literal, which silently froze this chart on 2025
-# once the calendar moved on. most_recent_season() is what every other NFL
-# script here uses: it rolls forward on its own at the September opener, and in
-# the offseason it points at the last season that actually has data.
-CURRENT_SEASON <- tryCatch({
-  nflreadr::most_recent_season()
-}, error = function(e) {
-  current_year <- as.numeric(format(Sys.Date(), "%Y"))
-  current_month <- as.numeric(format(Sys.Date(), "%m"))
-  if (current_month < 9) current_year - 1 else current_year
-})
+# NFL teams meet once or twice a season, so a single season of head-to-head is
+# usually one game. Three seasons is enough to be worth reading.
+H2H_SEASONS <- 3
 
-# Helper function to create tied ranks
-# Returns a list with two components:
-#   - rank: numeric rank for color coding (e.g., 1, 2, 2, 4)
-#   - rankDisplay: string with "T" prefix for ties (e.g., "1", "T2", "T2", "4")
-tied_rank <- function(x) {
-  # Get numeric ranks using min rank (ties get same rank)
-  numeric_ranks <- rank(x, ties.method = "min", na.last = "keep")
+# Recent form window, in games. The NFL plays once a week, so the MLB card's
+# one-month trend is four games here.
+RECENT_FORM_GAMES <- 4
 
-  # Count how many times each rank appears
-  rank_counts <- table(numeric_ranks[!is.na(numeric_ranks)])
+REGULAR_SEASON_WEEKS <- 18
+EXPLOSIVE_PASS_YARDS <- 20
+EXPLOSIVE_RUSH_YARDS <- 12
 
-  # Create display strings with "T" prefix for ties
-  display_ranks <- sapply(numeric_ranks, function(r) {
-    if (is.na(r)) {
-      return(NA_character_)
-    }
-    # If this rank appears more than once, it's a tie
-    if (rank_counts[as.character(r)] > 1) {
-      paste0("T", r)
-    } else {
-      as.character(r)
-    }
-  })
-
-  return(list(rank = numeric_ranks, rankDisplay = display_ranks))
-}
-
-# Helper function to convert integer to Roman numeral
-to_roman <- function(num) {
-  if (num <= 0) return("")
-
-  values <- c(1000, 900, 500, 400, 100, 90, 50, 40, 10, 9, 5, 4, 1)
-  symbols <- c("M", "CM", "D", "CD", "C", "XC", "L", "XL", "X", "IX", "V", "IV", "I")
-
-  result <- ""
-  for (i in seq_along(values)) {
-    while (num >= values[i]) {
-      result <- paste0(result, symbols[i])
-      num <- num - values[i]
-    }
+# ============================================================================
+# Helpers
+# ============================================================================
+`%||%` <- function(a, b) {
+  if (is.null(a) || length(a) == 0) return(b)
+  if (is.atomic(a) && length(a) == 1) {
+    if (is.na(a)) return(b)
+    if (is.character(a) && !nzchar(a)) return(b)
   }
-  return(result)
+  a
 }
 
-# Calculate Super Bowl number from season year
-# Super Bowl I was after the 1966 season
-get_super_bowl_number <- function(season_year) {
-  season_year - 1965
+safe_num <- function(x) {
+  if (is.null(x) || length(x) == 0) return(NA_real_)
+  v <- suppressWarnings(as.numeric(x[[1]]))
+  if (is.na(v)) NA_real_ else v
 }
 
-cat("=== Loading NFL data for", CURRENT_SEASON, "season ===\n")
+null_if_na <- function(x, digits = NULL) {
+  v <- safe_num(x)
+  if (is.na(v)) return(NULL)
+  if (!is.null(digits)) v <- round(v, digits)
+  v
+}
+
+int_or_null <- function(x) {
+  v <- safe_num(x)
+  if (is.na(v)) return(NULL)
+  as.integer(round(v))
+}
+
+tied_rank <- function(x) {
+  numeric_ranks <- rank(x, ties.method = "min", na.last = "keep")
+  rank_counts <- table(numeric_ranks[!is.na(numeric_ranks)])
+  display_ranks <- vapply(numeric_ranks, function(r) {
+    if (is.na(r)) return(NA_character_)
+    if (rank_counts[as.character(r)] > 1) paste0("T", r) else as.character(r)
+  }, character(1))
+  list(rank = numeric_ranks, rankDisplay = display_ranks)
+}
+
+rank_and_assign <- function(df, col, lower_better = FALSE) {
+  vals <- suppressWarnings(as.numeric(df[[col]]))
+  rk <- if (lower_better) tied_rank(vals) else tied_rank(-vals)
+  df[[paste0(col, "_rank")]] <- as.integer(rk$rank)
+  df[[paste0(col, "_rankDisplay")]] <- rk$rankDisplay
+  df
+}
+
+safe_div <- function(numerator, denominator) {
+  ifelse(is.na(denominator) | denominator == 0, NA_real_, numerator / denominator)
+}
+
+# nflverse ships the Rams as "LA"; the team roster and every other NFL chart
+# here use "LAR", and the app matches pinned teams by code.
+normalize_nfl_team <- function(team) {
+  code <- as.character(team)
+  ifelse(is.na(code), NA_character_, ifelse(code == "LA", "LAR", code))
+}
+
+cat("=== NFL Matchup Stats Generation ===\n")
+cat("Date:", format(Sys.Date(), "%Y-%m-%d"), "\n")
 
 # ============================================================================
-# STEP 1 & 2: Load team stats and calculate season totals with ranks
+# Team metadata
 # ============================================================================
-cat("\n1. Loading team stats from nflreadr...\n")
+teams_meta <- nflreadr::load_teams() %>%
+  transmute(
+    team_code = normalize_nfl_team(team_abbr),
+    team_id = as.character(team_id),
+    team_name = team_name,
+    conference = team_conf,
+    division = team_division,
+    logo = team_logo_espn
+  ) %>%
+  filter(!is.na(team_code)) %>%
+  distinct(team_code, .keep_all = TRUE)
 
-# Load play-by-play data for defensive EPA calculation
-pbp_data <- tryCatch({
-  load_pbp(seasons = CURRENT_SEASON)
-}, error = function(e) {
-  cat("Error loading play-by-play data:", e$message, "\n")
-  stop(e)
-})
+ALL_TEAMS <- teams_meta$team_code
+team_meta_row <- function(code) {
+  row <- teams_meta %>% filter(team_code == code)
+  if (nrow(row) == 0) NULL else row[1, ]
+}
 
-cat("Loaded", nrow(pbp_data), "plays from play-by-play data\n")
+cat("Loaded", length(ALL_TEAMS), "NFL teams\n")
 
-# Calculate comprehensive offensive stats by week from play-by-play data
-offense_weekly <- pbp_data %>%
-  filter(!is.na(posteam)) %>%
-  group_by(posteam, week) %>%
+# ============================================================================
+# Season resolution
+# ============================================================================
+# Stats always come from the most recent season that has been played. The game
+# window may reach into the next season's schedule once it is published, which
+# is what keeps this chart populated through the offseason.
+load_schedule <- function(season) {
+  tryCatch(nflreadr::load_schedules(season), error = function(e) NULL)
+}
+
+calendar_season <- {
+  y <- as.numeric(format(Sys.Date(), "%Y"))
+  m <- as.numeric(format(Sys.Date(), "%m"))
+  if (m >= 3) y else y - 1
+}
+
+resolve_stats_season <- function() {
+  for (season in c(calendar_season, calendar_season - 1, calendar_season - 2)) {
+    sched <- load_schedule(season)
+    if (!is.null(sched) && any(!is.na(sched$result))) return(season)
+  }
+  stop("Could not find an NFL season with completed games")
+}
+
+stats_season <- resolve_stats_season()
+cat("Stats season:", stats_season, "\n")
+
+# Every schedule we might draw games from: the stats season, the one after it
+# (published well before kickoff), and enough history for head-to-head.
+schedule_seasons <- sort(unique(c(
+  seq(stats_season - H2H_SEASONS + 1, stats_season),
+  stats_season + 1
+)))
+
+schedules_all <- bind_rows(lapply(schedule_seasons, function(season) {
+  sched <- load_schedule(season)
+  if (is.null(sched)) return(NULL)
+  sched %>% mutate(season = season)
+})) %>%
+  filter(!is.na(home_team), !is.na(away_team)) %>%
+  mutate(
+    home_code = normalize_nfl_team(home_team),
+    away_code = normalize_nfl_team(away_team),
+    game_day = suppressWarnings(as.Date(gameday)),
+    played = !is.na(result)
+  ) %>%
+  filter(!is.na(home_code), !is.na(away_code), !is.na(game_day))
+
+cat("Loaded", nrow(schedules_all), "scheduled games across seasons",
+    paste(range(schedule_seasons), collapse = "-"), "\n")
+
+# ============================================================================
+# Season data used for stats, charts and box scores
+# ============================================================================
+# Loaded whole so postseason games still get a box score; season rates below
+# are computed from the regular season slice only, so they stay comparable.
+pbp_all <- tryCatch(
+  nflreadr::load_pbp(stats_season),
+  error = function(e) {
+    cat("Error loading play-by-play:", e$message, "\n")
+    stop(e)
+  }
+)
+pbp <- pbp_all %>% filter(season_type == "REG")
+
+weekly_player_stats <- tryCatch(
+  nflreadr::load_player_stats(stats_season),
+  error = function(e) {
+    cat("Warning: could not load weekly player stats:", e$message, "\n")
+    NULL
+  }
+)
+
+cat("Loaded", nrow(pbp), "regular season plays\n")
+
+season_schedule <- schedules_all %>% filter(season == stats_season)
+
+# One row per team per completed regular season game — the spine for records,
+# recent form, the chart series, and season highs.
+team_game_rows_for <- function(sched) {
+  bind_rows(
+    sched %>%
+      transmute(
+        game_id, week, game_day, game_type,
+        team = home_code, opponent = away_code, is_home = TRUE,
+        points = home_score, points_allowed = away_score
+      ),
+    sched %>%
+      transmute(
+        game_id, week, game_day, game_type,
+        team = away_code, opponent = home_code, is_home = FALSE,
+        points = away_score, points_allowed = home_score
+      )
+  )
+}
+
+team_game_results_all <- team_game_rows_for(season_schedule %>% filter(played)) %>%
+  mutate(
+    point_diff = points - points_allowed,
+    result = case_when(
+      points > points_allowed ~ "W",
+      points < points_allowed ~ "L",
+      TRUE ~ "T"
+    )
+  )
+
+team_game_results <- team_game_results_all %>%
+  filter(game_type == "REG") %>%
+  select(-game_type) %>%
+  arrange(team, week)
+
+cat("Completed team-game rows:", nrow(team_game_results),
+    "(all game types:", nrow(team_game_results_all), ")\n")
+
+# ============================================================================
+# Per-game team box scores from play-by-play
+# ============================================================================
+# Offensive production is attributed to posteam; the same rows are the defensive
+# line for defteam, so one aggregation feeds both sides of every matchup.
+offense_by_game <- pbp_all %>%
+  filter(!is.na(posteam), play_type %in% c("pass", "run")) %>%
+  mutate(team = normalize_nfl_team(posteam)) %>%
+  group_by(game_id, team) %>%
   summarise(
-    # EPA stats (only pass and run plays)
-    off_epa_total = sum(epa[play_type %in% c("pass", "run")], na.rm = TRUE),
-    off_plays = sum(play_type %in% c("pass", "run"), na.rm = TRUE),
-
-    # Yards stats
+    plays = n(),
     total_yards = sum(yards_gained, na.rm = TRUE),
     pass_yards = sum(yards_gained[play_type == "pass"], na.rm = TRUE),
     rush_yards = sum(yards_gained[play_type == "run"], na.rm = TRUE),
-
-    # Scoring stats
-    points_scored = sum(posteam_score_post - posteam_score, na.rm = TRUE),
-    touchdowns = sum(touchdown == 1, na.rm = TRUE),
-
-    # Play counts
-    total_plays = n(),
-    pass_plays = sum(play_type == "pass", na.rm = TRUE),
-    rush_plays = sum(play_type == "run", na.rm = TRUE),
-
-    # Efficiency stats
-    third_down_conversions = sum(third_down_converted == 1, na.rm = TRUE),
-    third_down_attempts = sum(!is.na(third_down_converted), na.rm = TRUE),
-
-    # Turnover stats
-    interceptions_thrown = sum(interception == 1, na.rm = TRUE),
-    fumbles_lost = sum(fumble_lost == 1, na.rm = TRUE),
-
+    epa_total = sum(epa, na.rm = TRUE),
+    success_rate = mean(success, na.rm = TRUE) * 100,
+    explosive_plays = sum(
+      (play_type == "pass" & yards_gained >= EXPLOSIVE_PASS_YARDS) |
+        (play_type == "run" & yards_gained >= EXPLOSIVE_RUSH_YARDS),
+      na.rm = TRUE
+    ),
+    sacks_allowed = sum(sack, na.rm = TRUE),
+    turnovers = sum(interception, na.rm = TRUE) + sum(fumble_lost, na.rm = TRUE),
     .groups = "drop"
   ) %>%
-  rename(team = posteam) %>%
-  mutate(team = ifelse(team == "LA", "LAR", team))
+  mutate(yards_per_play = safe_div(total_yards, plays))
 
-# Get detailed offensive stats from player stats
-player_stats_weekly <- tryCatch({
-  player_data <- load_player_stats(seasons = CURRENT_SEASON)
-
-  player_data %>%
-    group_by(team, week) %>%
-    summarise(
-      passing_epa_total = sum(passing_epa, na.rm = TRUE),
-      passing_attempts = sum(attempts, na.rm = TRUE),
-      rushing_epa_total = sum(rushing_epa, na.rm = TRUE),
-      rushing_carries = sum(carries, na.rm = TRUE),
-      receiving_epa_total = sum(receiving_epa, na.rm = TRUE),
-      receiving_targets = sum(targets, na.rm = TRUE),
-      passing_cpoe = mean(passing_cpoe, na.rm = TRUE),
-      pacr = mean(pacr, na.rm = TRUE),
-      passing_first_downs = sum(passing_first_downs, na.rm = TRUE),
-      sacks_suffered = sum(sacks_suffered, na.rm = TRUE),
-      .groups = "drop"
-    ) %>%
-    mutate(team = ifelse(team == "LA", "LAR", team))
-}, error = function(e) {
-  cat("Error loading team stats:", e$message, "\n")
-  stop(e)
-})
-
-# Calculate comprehensive defensive stats by week from play-by-play data
-defense_weekly <- pbp_data %>%
-  filter(!is.na(defteam)) %>%
-  group_by(defteam, week) %>%
+# First downs, downs conversions and drive-level context come from every play,
+# not just pass/run, so they are aggregated separately.
+drives_by_game <- pbp_all %>%
+  filter(!is.na(posteam)) %>%
+  mutate(team = normalize_nfl_team(posteam)) %>%
+  group_by(game_id, team) %>%
   summarise(
-    # EPA stats (only pass and run plays)
-    def_epa_total = sum(epa[play_type %in% c("pass", "run")], na.rm = TRUE),
-    def_plays = sum(play_type %in% c("pass", "run"), na.rm = TRUE),
-
-    # Yards allowed stats
-    total_yards_allowed = sum(yards_gained, na.rm = TRUE),
-    pass_yards_allowed = sum(yards_gained[play_type == "pass"], na.rm = TRUE),
-    rush_yards_allowed = sum(yards_gained[play_type == "run"], na.rm = TRUE),
-
-    # Scoring defense stats
-    points_allowed = sum(posteam_score_post - posteam_score, na.rm = TRUE),
-    touchdowns_allowed = sum(touchdown == 1, na.rm = TRUE),
-
-    # Defensive playmaking
-    sacks_made = sum(sack == 1, na.rm = TRUE),
-    interceptions_made = sum(interception == 1, na.rm = TRUE),
-    fumbles_forced = sum(fumble == 1, na.rm = TRUE),
-    fumbles_recovered = sum(fumble_lost == 1, na.rm = TRUE),
-
-    # Efficiency defense
-    third_down_conversions_allowed = sum(third_down_converted == 1, na.rm = TRUE),
-    third_down_attempts_def = sum(!is.na(third_down_converted), na.rm = TRUE),
-
+    first_downs = sum(first_down, na.rm = TRUE),
+    third_down_att = sum(third_down_converted, na.rm = TRUE) + sum(third_down_failed, na.rm = TRUE),
+    third_down_conv = sum(third_down_converted, na.rm = TRUE),
+    fourth_down_att = sum(fourth_down_converted, na.rm = TRUE) + sum(fourth_down_failed, na.rm = TRUE),
+    fourth_down_conv = sum(fourth_down_converted, na.rm = TRUE),
+    red_zone_trips = n_distinct(series[yardline_100 <= 20 & !is.na(series)]),
+    red_zone_tds = sum(touchdown == 1 & yardline_100 <= 20, na.rm = TRUE),
     .groups = "drop"
   ) %>%
-  rename(team = defteam) %>%
-  mutate(team = ifelse(team == "LA", "LAR", team))
+  mutate(
+    third_down_pct = safe_div(third_down_conv, third_down_att) * 100,
+    red_zone_td_pct = safe_div(red_zone_tds, red_zone_trips) * 100
+  )
 
-# Join all stats together
-team_stats_weekly <- player_stats_weekly %>%
-  left_join(offense_weekly, by = c("team", "week")) %>%
-  left_join(defense_weekly, by = c("team", "week"))
+# Time of possession is a drive attribute; sum one value per drive.
+top_by_game <- pbp_all %>%
+  filter(!is.na(posteam), !is.na(drive), !is.na(drive_time_of_possession)) %>%
+  mutate(team = normalize_nfl_team(posteam)) %>%
+  distinct(game_id, team, drive, .keep_all = TRUE) %>%
+  mutate(
+    top_seconds = {
+      parts <- strsplit(as.character(drive_time_of_possession), ":", fixed = TRUE)
+      vapply(parts, function(p) {
+        if (length(p) < 2) return(NA_real_)
+        m <- suppressWarnings(as.numeric(p[1]))
+        s <- suppressWarnings(as.numeric(p[2]))
+        if (is.na(m) || is.na(s)) NA_real_ else m * 60 + s
+      }, numeric(1))
+    }
+  ) %>%
+  group_by(game_id, team) %>%
+  summarise(top_seconds = sum(top_seconds, na.rm = TRUE), .groups = "drop")
 
-cat("Loaded weekly team stats:", nrow(team_stats_weekly), "rows\n")
+# Penalties are charged to the penalized team regardless of who had the ball.
+penalties_by_game <- pbp_all %>%
+  filter(penalty == 1, !is.na(penalty_team)) %>%
+  mutate(team = normalize_nfl_team(penalty_team)) %>%
+  group_by(game_id, team) %>%
+  summarise(
+    penalties = n(),
+    penalty_yards = sum(abs(penalty_yards), na.rm = TRUE),
+    .groups = "drop"
+  )
 
-# Calculate season totals for ranking
-team_season_totals <- team_stats_weekly %>%
+# Sacks recorded by the defense, keyed to the defending team.
+defense_by_game <- pbp_all %>%
+  filter(!is.na(defteam), play_type %in% c("pass", "run")) %>%
+  mutate(team = normalize_nfl_team(defteam)) %>%
+  group_by(game_id, team) %>%
+  summarise(
+    sacks = sum(sack, na.rm = TRUE),
+    takeaways = sum(interception, na.rm = TRUE) + sum(fumble_lost, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+game_box_all <- team_game_results_all %>%
+  select(game_id, week, game_type, team, opponent, is_home, points, points_allowed, point_diff, result) %>%
+  left_join(offense_by_game, by = c("game_id", "team")) %>%
+  left_join(drives_by_game, by = c("game_id", "team")) %>%
+  left_join(top_by_game, by = c("game_id", "team")) %>%
+  left_join(penalties_by_game, by = c("game_id", "team")) %>%
+  left_join(defense_by_game, by = c("game_id", "team")) %>%
+  mutate(
+    penalties = coalesce(penalties, 0),
+    penalty_yards = coalesce(penalty_yards, 0),
+    sacks = coalesce(sacks, 0),
+    takeaways = coalesce(takeaways, 0)
+  )
+
+# Season rates and season highs read the regular season slice; per-game box
+# score lookups read every completed game, postseason included.
+game_box <- game_box_all %>% filter(game_type == "REG") %>% select(-game_type)
+
+cat("Built per-game box scores for", nrow(game_box_all), "team-games (",
+    nrow(game_box), "regular season )\n")
+
+# ============================================================================
+# Season team stats + league ranks
+# ============================================================================
+# Season rates are the sum of the per-game box scores rather than a separate
+# feed, so a team's season line and its game lines can never disagree.
+team_season <- game_box %>%
   group_by(team) %>%
   summarise(
-    # Player-level aggregates
-    passing_epa_total = sum(passing_epa_total, na.rm = TRUE),
-    passing_attempts = sum(passing_attempts, na.rm = TRUE),
-    rushing_epa_total = sum(rushing_epa_total, na.rm = TRUE),
-    rushing_carries = sum(rushing_carries, na.rm = TRUE),
-    receiving_epa_total = sum(receiving_epa_total, na.rm = TRUE),
-    receiving_targets = sum(receiving_targets, na.rm = TRUE),
-    passing_cpoe = mean(passing_cpoe, na.rm = TRUE),
-    pacr = mean(pacr, na.rm = TRUE),
-    passing_first_downs = sum(passing_first_downs, na.rm = TRUE),
-    sacks_suffered = sum(sacks_suffered, na.rm = TRUE),
-
-    # Offensive totals
-    off_epa_total = sum(off_epa_total, na.rm = TRUE),
-    off_plays = sum(off_plays, na.rm = TRUE),
-    total_yards = sum(total_yards, na.rm = TRUE),
-    pass_yards = sum(pass_yards, na.rm = TRUE),
-    rush_yards = sum(rush_yards, na.rm = TRUE),
-    points_scored = sum(points_scored, na.rm = TRUE),
-    touchdowns = sum(touchdowns, na.rm = TRUE),
-    total_plays = sum(total_plays, na.rm = TRUE),
-    third_down_conversions = sum(third_down_conversions, na.rm = TRUE),
-    third_down_attempts = sum(third_down_attempts, na.rm = TRUE),
-    interceptions_thrown = sum(interceptions_thrown, na.rm = TRUE),
-    fumbles_lost = sum(fumbles_lost, na.rm = TRUE),
-
-    # Defensive totals
-    def_epa_total = sum(def_epa_total, na.rm = TRUE),
-    def_plays = sum(def_plays, na.rm = TRUE),
-    total_yards_allowed = sum(total_yards_allowed, na.rm = TRUE),
-    pass_yards_allowed = sum(pass_yards_allowed, na.rm = TRUE),
-    rush_yards_allowed = sum(rush_yards_allowed, na.rm = TRUE),
-    points_allowed = sum(points_allowed, na.rm = TRUE),
-    touchdowns_allowed = sum(touchdowns_allowed, na.rm = TRUE),
-    sacks_made = sum(sacks_made, na.rm = TRUE),
-    interceptions_made = sum(interceptions_made, na.rm = TRUE),
-    fumbles_forced = sum(fumbles_forced, na.rm = TRUE),
-    third_down_conversions_allowed = sum(third_down_conversions_allowed, na.rm = TRUE),
-    third_down_attempts_def = sum(third_down_attempts_def, na.rm = TRUE),
-
-    # Number of games played for per-game calculations
-    games_played = n_distinct(week),
-
+    games_played = n(),
+    wins = sum(result == "W"),
+    losses = sum(result == "L"),
+    ties = sum(result == "T"),
+    points_per_game = mean(points, na.rm = TRUE),
+    points_allowed_per_game = mean(points_allowed, na.rm = TRUE),
+    point_diff_per_game = mean(point_diff, na.rm = TRUE),
+    yards_per_game = mean(total_yards, na.rm = TRUE),
+    pass_yards_per_game = mean(pass_yards, na.rm = TRUE),
+    rush_yards_per_game = mean(rush_yards, na.rm = TRUE),
+    yards_per_play = safe_div(sum(total_yards, na.rm = TRUE), sum(plays, na.rm = TRUE)),
+    off_epa_per_play = safe_div(sum(epa_total, na.rm = TRUE), sum(plays, na.rm = TRUE)),
+    off_success_rate = mean(success_rate, na.rm = TRUE),
+    explosive_per_game = mean(explosive_plays, na.rm = TRUE),
+    first_downs_per_game = mean(first_downs, na.rm = TRUE),
+    third_down_pct = safe_div(sum(third_down_conv, na.rm = TRUE), sum(third_down_att, na.rm = TRUE)) * 100,
+    fourth_down_pct = safe_div(sum(fourth_down_conv, na.rm = TRUE), sum(fourth_down_att, na.rm = TRUE)) * 100,
+    red_zone_td_pct = safe_div(sum(red_zone_tds, na.rm = TRUE), sum(red_zone_trips, na.rm = TRUE)) * 100,
+    turnovers_per_game = mean(turnovers, na.rm = TRUE),
+    takeaways_per_game = mean(takeaways, na.rm = TRUE),
+    sacks_allowed_per_game = mean(sacks_allowed, na.rm = TRUE),
+    sacks_per_game = mean(sacks, na.rm = TRUE),
+    penalties_per_game = mean(penalties, na.rm = TRUE),
+    penalty_yards_per_game = mean(penalty_yards, na.rm = TRUE),
+    time_of_possession = mean(top_seconds, na.rm = TRUE) / 60,
     .groups = "drop"
   ) %>%
   mutate(
-    # Offensive per-play/per-game stats
-    off_epa = if_else(off_plays > 0, off_epa_total / off_plays, NA_real_),
-    yards_per_game = if_else(games_played > 0, total_yards / games_played, NA_real_),
-    pass_yards_per_game = if_else(games_played > 0, pass_yards / games_played, NA_real_),
-    rush_yards_per_game = if_else(games_played > 0, rush_yards / games_played, NA_real_),
-    points_per_game = if_else(games_played > 0, points_scored / games_played, NA_real_),
-    yards_per_play = if_else(total_plays > 0, total_yards / total_plays, NA_real_),
-    third_down_pct = if_else(third_down_attempts > 0, third_down_conversions / third_down_attempts * 100, NA_real_),
-    turnover_differential = (interceptions_made + fumbles_forced) - (interceptions_thrown + fumbles_lost),
-
-    # Defensive per-play/per-game stats
-    def_epa = if_else(def_plays > 0, def_epa_total / def_plays, NA_real_),
-    yards_allowed_per_game = if_else(games_played > 0, total_yards_allowed / games_played, NA_real_),
-    pass_yards_allowed_per_game = if_else(games_played > 0, pass_yards_allowed / games_played, NA_real_),
-    rush_yards_allowed_per_game = if_else(games_played > 0, rush_yards_allowed / games_played, NA_real_),
-    points_allowed_per_game = if_else(games_played > 0, points_allowed / games_played, NA_real_),
-    third_down_pct_def = if_else(third_down_attempts_def > 0, third_down_conversions_allowed / third_down_attempts_def * 100, NA_real_),
-
-    # EPA-based stats for player metrics
-    rushing_epa = if_else(rushing_carries > 0, rushing_epa_total / rushing_carries, NA_real_),
-    receiving_epa = if_else(receiving_targets > 0, receiving_epa_total / receiving_targets, NA_real_)
+    win_pct = safe_div(wins + 0.5 * ties, games_played),
+    turnover_diff_per_game = takeaways_per_game - turnovers_per_game
   )
 
-# Add ranks with tie handling (separate step to handle list return from tied_rank)
-# Offensive ranks
-off_epa_ranks <- tied_rank(-team_season_totals$off_epa)
-yards_per_game_ranks <- tied_rank(-team_season_totals$yards_per_game)
-pass_yards_per_game_ranks <- tied_rank(-team_season_totals$pass_yards_per_game)
-rush_yards_per_game_ranks <- tied_rank(-team_season_totals$rush_yards_per_game)
-points_per_game_ranks <- tied_rank(-team_season_totals$points_per_game)
-yards_per_play_ranks <- tied_rank(-team_season_totals$yards_per_play)
-third_down_pct_ranks <- tied_rank(-team_season_totals$third_down_pct)
-rushing_epa_ranks <- tied_rank(-team_season_totals$rushing_epa)
-receiving_epa_ranks <- tied_rank(-team_season_totals$receiving_epa)
-pacr_ranks <- tied_rank(-team_season_totals$pacr)
-passing_first_downs_ranks <- tied_rank(-team_season_totals$passing_first_downs)
-sacks_suffered_ranks <- tied_rank(team_season_totals$sacks_suffered)
-touchdowns_ranks <- tied_rank(-team_season_totals$touchdowns)
-interceptions_thrown_ranks <- tied_rank(team_season_totals$interceptions_thrown)
-fumbles_lost_ranks <- tied_rank(team_season_totals$fumbles_lost)
-turnovers_ranks <- tied_rank(team_season_totals$interceptions_thrown + team_season_totals$fumbles_lost)
-
-# Defensive ranks
-def_epa_ranks <- tied_rank(team_season_totals$def_epa)
-yards_allowed_per_game_ranks <- tied_rank(team_season_totals$yards_allowed_per_game)
-pass_yards_allowed_per_game_ranks <- tied_rank(team_season_totals$pass_yards_allowed_per_game)
-rush_yards_allowed_per_game_ranks <- tied_rank(team_season_totals$rush_yards_allowed_per_game)
-points_allowed_per_game_ranks <- tied_rank(team_season_totals$points_allowed_per_game)
-third_down_pct_def_ranks <- tied_rank(team_season_totals$third_down_pct_def)
-sacks_made_ranks <- tied_rank(-team_season_totals$sacks_made)
-interceptions_made_ranks <- tied_rank(-team_season_totals$interceptions_made)
-fumbles_forced_ranks <- tied_rank(-team_season_totals$fumbles_forced)
-touchdowns_allowed_ranks <- tied_rank(team_season_totals$touchdowns_allowed)
-turnover_differential_ranks <- tied_rank(-team_season_totals$turnover_differential)
-
-# Add rank columns to data frame
-team_season_totals <- team_season_totals %>%
-  mutate(
-    # Offensive ranks
-    off_epa_rank = off_epa_ranks$rank,
-    off_epa_rankDisplay = off_epa_ranks$rankDisplay,
-    yards_per_game_rank = yards_per_game_ranks$rank,
-    yards_per_game_rankDisplay = yards_per_game_ranks$rankDisplay,
-    pass_yards_per_game_rank = pass_yards_per_game_ranks$rank,
-    pass_yards_per_game_rankDisplay = pass_yards_per_game_ranks$rankDisplay,
-    rush_yards_per_game_rank = rush_yards_per_game_ranks$rank,
-    rush_yards_per_game_rankDisplay = rush_yards_per_game_ranks$rankDisplay,
-    points_per_game_rank = points_per_game_ranks$rank,
-    points_per_game_rankDisplay = points_per_game_ranks$rankDisplay,
-    yards_per_play_rank = yards_per_play_ranks$rank,
-    yards_per_play_rankDisplay = yards_per_play_ranks$rankDisplay,
-    third_down_pct_rank = third_down_pct_ranks$rank,
-    third_down_pct_rankDisplay = third_down_pct_ranks$rankDisplay,
-    rushing_epa_rank = rushing_epa_ranks$rank,
-    rushing_epa_rankDisplay = rushing_epa_ranks$rankDisplay,
-    receiving_epa_rank = receiving_epa_ranks$rank,
-    receiving_epa_rankDisplay = receiving_epa_ranks$rankDisplay,
-    pacr_rank = pacr_ranks$rank,
-    pacr_rankDisplay = pacr_ranks$rankDisplay,
-    passing_first_downs_rank = passing_first_downs_ranks$rank,
-    passing_first_downs_rankDisplay = passing_first_downs_ranks$rankDisplay,
-    sacks_suffered_rank = sacks_suffered_ranks$rank,
-    sacks_suffered_rankDisplay = sacks_suffered_ranks$rankDisplay,
-    touchdowns_rank = touchdowns_ranks$rank,
-    touchdowns_rankDisplay = touchdowns_ranks$rankDisplay,
-    interceptions_thrown_rank = interceptions_thrown_ranks$rank,
-    interceptions_thrown_rankDisplay = interceptions_thrown_ranks$rankDisplay,
-    fumbles_lost_rank = fumbles_lost_ranks$rank,
-    fumbles_lost_rankDisplay = fumbles_lost_ranks$rankDisplay,
-    turnovers_rank = turnovers_ranks$rank,
-    turnovers_rankDisplay = turnovers_ranks$rankDisplay,
-
-    # Defensive ranks
-    def_epa_rank = def_epa_ranks$rank,
-    def_epa_rankDisplay = def_epa_ranks$rankDisplay,
-    yards_allowed_per_game_rank = yards_allowed_per_game_ranks$rank,
-    yards_allowed_per_game_rankDisplay = yards_allowed_per_game_ranks$rankDisplay,
-    pass_yards_allowed_per_game_rank = pass_yards_allowed_per_game_ranks$rank,
-    pass_yards_allowed_per_game_rankDisplay = pass_yards_allowed_per_game_ranks$rankDisplay,
-    rush_yards_allowed_per_game_rank = rush_yards_allowed_per_game_ranks$rank,
-    rush_yards_allowed_per_game_rankDisplay = rush_yards_allowed_per_game_ranks$rankDisplay,
-    points_allowed_per_game_rank = points_allowed_per_game_ranks$rank,
-    points_allowed_per_game_rankDisplay = points_allowed_per_game_ranks$rankDisplay,
-    third_down_pct_def_rank = third_down_pct_def_ranks$rank,
-    third_down_pct_def_rankDisplay = third_down_pct_def_ranks$rankDisplay,
-    sacks_made_rank = sacks_made_ranks$rank,
-    sacks_made_rankDisplay = sacks_made_ranks$rankDisplay,
-    interceptions_made_rank = interceptions_made_ranks$rank,
-    interceptions_made_rankDisplay = interceptions_made_ranks$rankDisplay,
-    fumbles_forced_rank = fumbles_forced_ranks$rank,
-    fumbles_forced_rankDisplay = fumbles_forced_ranks$rankDisplay,
-    touchdowns_allowed_rank = touchdowns_allowed_ranks$rank,
-    touchdowns_allowed_rankDisplay = touchdowns_allowed_ranks$rankDisplay,
-    turnover_differential_rank = turnover_differential_ranks$rank,
-    turnover_differential_rankDisplay = turnover_differential_ranks$rankDisplay
-  )
-
-cat("Calculated season totals for", nrow(team_season_totals), "teams\n")
-
-# ============================================================================
-# STEP 3: Calculate cumulative EPA by week
-# ============================================================================
-cat("\n3. Calculating cumulative EPA...\n")
-
-cum_epa_by_team <- team_stats_weekly %>%
+# The defensive side of the ledger is the opponents' offensive line, so it is
+# derived by joining each team's games to what the other team did in them.
+opponent_season <- game_box %>%
+  select(game_id, team = opponent, opp_team = team, plays, total_yards,
+         pass_yards, rush_yards, epa_total, success_rate, third_down_conv,
+         third_down_att, red_zone_tds, red_zone_trips) %>%
   group_by(team) %>%
-  arrange(week) %>%
-  mutate(
-    # Calculate net EPA (offense - defense) to match cumulative_epa_trend.R
-    # Higher net EPA = better overall team performance
-    net_epa = off_epa_total - def_epa_total,
-    cum_epa = cumsum(net_epa)
-  ) %>%
-  select(team, week, cum_epa) %>%
-  ungroup()
-
-cat("Calculated cumulative EPA for", length(unique(cum_epa_by_team$team)), "teams\n")
-
-# ============================================================================
-# STEP 4-7: Load player stats, filter by snaps, rank, and select top N
-# ============================================================================
-cat("\n4-7. Loading and ranking player stats...\n")
-
-player_stats <- tryCatch({
-  load_player_stats(seasons = CURRENT_SEASON)
-}, error = function(e) {
-  cat("Error loading player stats:", e$message, "\n")
-  stop(e)
-})
-
-cat("Loaded", nrow(player_stats), "player stat rows\n")
-
-# Load snap counts to prioritize players by playing time
-snap_counts <- tryCatch({
-  load_snap_counts(seasons = CURRENT_SEASON) %>%
-    filter(game_type == "REG") %>%
-    group_by(player, team, position) %>%
-    summarise(
-      total_offense_snaps = sum(offense_snaps, na.rm = TRUE),
-      .groups = "drop"
-    )
-}, error = function(e) {
-  cat("Warning: Could not load snap counts:", e$message, "\n")
-  cat("Will fall back to stat-based player selection\n")
-  NULL
-})
-
-if (!is.null(snap_counts)) {
-  cat("Loaded snap counts for", nrow(snap_counts), "players\n")
-}
-
-# Calculate season totals and filter by games played.
-# nflverse `player_name` is the abbreviated form ("A.Rodgers"); the snap count
-# feed keys on full names, so joining on it matched nothing and the snap-based
-# player prioritization below silently fell back to stat-based selection. Carry
-# `player_display_name` through under the same name — it also reads better on
-# the worksheet.
-player_stats_filtered <- player_stats %>%
-  group_by(player_id, player_name = player_display_name, team, position) %>%
   summarise(
-    games = n_distinct(week),
+    yards_allowed_per_game = mean(total_yards, na.rm = TRUE),
+    pass_yards_allowed_per_game = mean(pass_yards, na.rm = TRUE),
+    rush_yards_allowed_per_game = mean(rush_yards, na.rm = TRUE),
+    yards_allowed_per_play = safe_div(sum(total_yards, na.rm = TRUE), sum(plays, na.rm = TRUE)),
+    def_epa_per_play = safe_div(sum(epa_total, na.rm = TRUE), sum(plays, na.rm = TRUE)),
+    def_success_rate_allowed = mean(success_rate, na.rm = TRUE),
+    third_down_pct_allowed = safe_div(sum(third_down_conv, na.rm = TRUE), sum(third_down_att, na.rm = TRUE)) * 100,
+    red_zone_td_pct_allowed = safe_div(sum(red_zone_tds, na.rm = TRUE), sum(red_zone_trips, na.rm = TRUE)) * 100,
+    .groups = "drop"
+  )
 
-    # QB stats - comprehensive passing stats
-    passing_epa_total = sum(passing_epa, na.rm = TRUE),
-    passing_attempts = sum(attempts, na.rm = TRUE),
-    completions = sum(completions, na.rm = TRUE),
-    passing_yards = sum(passing_yards, na.rm = TRUE),
-    passing_tds = sum(passing_tds, na.rm = TRUE),
-    interceptions = sum(passing_interceptions, na.rm = TRUE),
-    passing_cpoe = mean(passing_cpoe, na.rm = TRUE),
-    pacr = mean(pacr, na.rm = TRUE),
-    passing_air_yards = sum(passing_air_yards, na.rm = TRUE),
+team_stats <- team_season %>%
+  left_join(opponent_season, by = "team") %>%
+  left_join(
+    teams_meta %>% select(team = team_code, division, conference),
+    by = "team"
+  ) %>%
+  mutate(net_epa_per_play = off_epa_per_play - def_epa_per_play)
 
-    # RB stats - comprehensive rushing and receiving stats
-    rushing_epa_total = sum(rushing_epa, na.rm = TRUE),
-    rushing_yards = sum(rushing_yards, na.rm = TRUE),
-    rushing_tds = sum(rushing_tds, na.rm = TRUE),
-    rushing_first_downs = sum(rushing_first_downs, na.rm = TRUE),
-    carries = sum(carries, na.rm = TRUE),
-    receiving_epa_total = sum(receiving_epa, na.rm = TRUE),
-    receptions = sum(receptions, na.rm = TRUE),
-    receiving_yards = sum(receiving_yards, na.rm = TRUE),
-    receiving_tds = sum(receiving_tds, na.rm = TRUE),
-    targets = sum(targets, na.rm = TRUE),
+HIGHER_BETTER_STATS <- c(
+  "points_per_game", "point_diff_per_game", "yards_per_game", "pass_yards_per_game",
+  "rush_yards_per_game", "yards_per_play", "off_epa_per_play", "off_success_rate",
+  "explosive_per_game", "first_downs_per_game", "third_down_pct", "fourth_down_pct",
+  "red_zone_td_pct", "takeaways_per_game", "sacks_per_game", "time_of_possession",
+  "turnover_diff_per_game", "net_epa_per_play", "win_pct"
+)
 
-    # WR/TE stats - comprehensive receiving stats
-    wopr = mean(wopr, na.rm = TRUE),
-    racr = mean(racr, na.rm = TRUE),
-    air_yards_share = mean(air_yards_share, na.rm = TRUE),
+LOWER_BETTER_STATS <- c(
+  "points_allowed_per_game", "yards_allowed_per_game", "pass_yards_allowed_per_game",
+  "rush_yards_allowed_per_game", "yards_allowed_per_play", "def_epa_per_play",
+  "def_success_rate_allowed", "third_down_pct_allowed", "red_zone_td_pct_allowed",
+  "turnovers_per_game", "sacks_allowed_per_game", "penalties_per_game",
+  "penalty_yards_per_game"
+)
+
+for (stat in HIGHER_BETTER_STATS) team_stats <- rank_and_assign(team_stats, stat)
+for (stat in LOWER_BETTER_STATS) team_stats <- rank_and_assign(team_stats, stat, lower_better = TRUE)
+
+cat("Computed season stats and ranks for", nrow(team_stats), "teams\n")
+
+# ============================================================================
+# Recent form (last N games)
+# ============================================================================
+recent_form <- game_box %>%
+  group_by(team) %>%
+  arrange(week, .by_group = TRUE) %>%
+  slice_tail(n = RECENT_FORM_GAMES) %>%
+  summarise(
+    games_played = n(),
+    wins = sum(result == "W"),
+    losses = sum(result == "L"),
+    ties = sum(result == "T"),
+    points_per_game = mean(points, na.rm = TRUE),
+    points_allowed_per_game = mean(points_allowed, na.rm = TRUE),
+    point_diff_per_game = mean(point_diff, na.rm = TRUE),
+    yards_per_game = mean(total_yards, na.rm = TRUE),
+    turnover_diff_per_game = mean(takeaways - turnovers, na.rm = TRUE),
     .groups = "drop"
   ) %>%
-  mutate(
-    # Calculate EPA per play
-    passing_epa = if_else(passing_attempts > 0, passing_epa_total / passing_attempts, NA_real_),
-    rushing_epa = if_else(carries > 0, rushing_epa_total / carries, NA_real_),
-    receiving_epa = if_else(targets > 0, receiving_epa_total / targets, NA_real_),
+  mutate(win_pct = safe_div(wins + 0.5 * ties, games_played))
 
-    # QB per-game and efficiency stats
-    completion_pct = if_else(passing_attempts > 0, completions / passing_attempts * 100, NA_real_),
-    passing_yards_per_game = if_else(games > 0, passing_yards / games, NA_real_),
-    passing_tds_per_game = if_else(games > 0, passing_tds / games, NA_real_),
-
-    # RB per-game and efficiency stats
-    rushing_yards_per_carry = if_else(carries > 0, rushing_yards / carries, NA_real_),
-    rushing_yards_per_game = if_else(games > 0, rushing_yards / games, NA_real_),
-    rushing_tds_per_game = if_else(games > 0, rushing_tds / games, NA_real_),
-    receiving_yards_per_game = if_else(games > 0, receiving_yards / games, NA_real_),
-
-    # WR/TE per-game and efficiency stats
-    receiving_yards_per_reception = if_else(receptions > 0, receiving_yards / receptions, NA_real_),
-    catch_pct = if_else(targets > 0, receptions / targets * 100, NA_real_),
-
-    # For QBs: total EPA per play (passing + rushing combined)
-    qb_total_plays = if_else(position == "QB", passing_attempts + carries, NA_real_),
-    qb_total_epa = if_else(position == "QB", passing_epa_total + rushing_epa_total, NA_real_),
-    qb_epa_per_play = if_else(position == "QB" & qb_total_plays > 0, qb_total_epa / qb_total_plays, NA_real_)
-  ) %>%
-  filter(
-    (position == "QB" & games >= MIN_GAMES_QB) |
-    (position == "RB" & games >= MIN_GAMES_RB) |
-    (position %in% c("WR", "TE") & games >= MIN_GAMES_WR)
-  ) %>%
-  mutate(team = ifelse(team == "LA", "LAR", team))
-
-cat("Filtered to", nrow(player_stats_filtered), "players meeting game thresholds\n")
-
-# Join snap counts if available
-if (!is.null(snap_counts)) {
-  player_stats_filtered <- player_stats_filtered %>%
-    left_join(
-      snap_counts %>% mutate(team = ifelse(team == "LA", "LAR", team)),
-      by = c("player_name" = "player", "team", "position")
-    ) %>%
-    mutate(total_offense_snaps = coalesce(total_offense_snaps, 0L))
-
-  cat("Joined snap counts - players with snap data:", sum(player_stats_filtered$total_offense_snaps > 0), "\n")
-} else {
-  # If snap counts not available, use a proxy (games played * estimated snaps)
-  player_stats_filtered <- player_stats_filtered %>%
-    mutate(total_offense_snaps = games * 50)  # Rough estimate
+for (stat in c("win_pct", "points_per_game", "point_diff_per_game",
+               "yards_per_game", "turnover_diff_per_game")) {
+  recent_form <- rank_and_assign(recent_form, stat)
 }
+recent_form <- rank_and_assign(recent_form, "points_allowed_per_game", lower_better = TRUE)
 
-# Rank players by position for each stat (with tie handling)
-# Process each position separately to properly handle tied_rank() list return
-player_stats_ranked <- player_stats_filtered
+cat("Computed", RECENT_FORM_GAMES, "game recent form for", nrow(recent_form), "teams\n")
 
-# QB ranks
-qb_players <- player_stats_ranked %>% filter(position == "QB")
-if (nrow(qb_players) > 0) {
-  qb_ranks <- list(
-    qb_epa_per_play = tied_rank(-qb_players$qb_epa_per_play),
-    passing_epa = tied_rank(-qb_players$passing_epa),
-    passing_cpoe = tied_rank(-qb_players$passing_cpoe),
-    pacr = tied_rank(-qb_players$pacr),
-    passing_yards = tied_rank(-qb_players$passing_yards),
-    passing_tds = tied_rank(-qb_players$passing_tds),
-    completion_pct = tied_rank(-qb_players$completion_pct),
-    passing_yards_per_game = tied_rank(-qb_players$passing_yards_per_game),
-    interceptions = tied_rank(qb_players$interceptions)
-  )
-
-  qb_players <- qb_players %>% mutate(
-    qb_epa_per_play_rank = qb_ranks$qb_epa_per_play$rank,
-    qb_epa_per_play_rankDisplay = qb_ranks$qb_epa_per_play$rankDisplay,
-    passing_epa_rank = qb_ranks$passing_epa$rank,
-    passing_epa_rankDisplay = qb_ranks$passing_epa$rankDisplay,
-    passing_cpoe_rank = qb_ranks$passing_cpoe$rank,
-    passing_cpoe_rankDisplay = qb_ranks$passing_cpoe$rankDisplay,
-    pacr_rank = qb_ranks$pacr$rank,
-    pacr_rankDisplay = qb_ranks$pacr$rankDisplay,
-    passing_yards_rank = qb_ranks$passing_yards$rank,
-    passing_yards_rankDisplay = qb_ranks$passing_yards$rankDisplay,
-    passing_tds_rank = qb_ranks$passing_tds$rank,
-    passing_tds_rankDisplay = qb_ranks$passing_tds$rankDisplay,
-    completion_pct_rank = qb_ranks$completion_pct$rank,
-    completion_pct_rankDisplay = qb_ranks$completion_pct$rankDisplay,
-    passing_yards_per_game_rank = qb_ranks$passing_yards_per_game$rank,
-    passing_yards_per_game_rankDisplay = qb_ranks$passing_yards_per_game$rankDisplay,
-    interceptions_rank = qb_ranks$interceptions$rank,
-    interceptions_rankDisplay = qb_ranks$interceptions$rankDisplay
-  )
-}
-
-# RB ranks
-rb_players <- player_stats_ranked %>% filter(position == "RB")
-if (nrow(rb_players) > 0) {
-  rb_ranks <- list(
-    rushing_epa = tied_rank(-rb_players$rushing_epa),
-    rushing_yards = tied_rank(-rb_players$rushing_yards),
-    rushing_tds = tied_rank(-rb_players$rushing_tds),
-    rushing_yards_per_carry = tied_rank(-rb_players$rushing_yards_per_carry),
-    rushing_yards_per_game = tied_rank(-rb_players$rushing_yards_per_game),
-    carries = tied_rank(-rb_players$carries),
-    receiving_epa = tied_rank(-rb_players$receiving_epa),
-    receiving_yards = tied_rank(-rb_players$receiving_yards),
-    receiving_tds = tied_rank(-rb_players$receiving_tds),
-    receptions = tied_rank(-rb_players$receptions),
-    receiving_yards_per_game = tied_rank(-rb_players$receiving_yards_per_game)
-  )
-
-  rb_players <- rb_players %>% mutate(
-    rushing_epa_rank = rb_ranks$rushing_epa$rank,
-    rushing_epa_rankDisplay = rb_ranks$rushing_epa$rankDisplay,
-    rushing_yards_rank = rb_ranks$rushing_yards$rank,
-    rushing_yards_rankDisplay = rb_ranks$rushing_yards$rankDisplay,
-    rushing_tds_rank = rb_ranks$rushing_tds$rank,
-    rushing_tds_rankDisplay = rb_ranks$rushing_tds$rankDisplay,
-    rushing_yards_per_carry_rank = rb_ranks$rushing_yards_per_carry$rank,
-    rushing_yards_per_carry_rankDisplay = rb_ranks$rushing_yards_per_carry$rankDisplay,
-    rushing_yards_per_game_rank = rb_ranks$rushing_yards_per_game$rank,
-    rushing_yards_per_game_rankDisplay = rb_ranks$rushing_yards_per_game$rankDisplay,
-    carries_rank = rb_ranks$carries$rank,
-    carries_rankDisplay = rb_ranks$carries$rankDisplay,
-    rb_receiving_epa_rank = rb_ranks$receiving_epa$rank,
-    rb_receiving_epa_rankDisplay = rb_ranks$receiving_epa$rankDisplay,
-    rb_receiving_yards_rank = rb_ranks$receiving_yards$rank,
-    rb_receiving_yards_rankDisplay = rb_ranks$receiving_yards$rankDisplay,
-    rb_receiving_tds_rank = rb_ranks$receiving_tds$rank,
-    rb_receiving_tds_rankDisplay = rb_ranks$receiving_tds$rankDisplay,
-    rb_receptions_rank = rb_ranks$receptions$rank,
-    rb_receptions_rankDisplay = rb_ranks$receptions$rankDisplay,
-    rb_receiving_yards_per_game_rank = rb_ranks$receiving_yards_per_game$rank,
-    rb_receiving_yards_per_game_rankDisplay = rb_ranks$receiving_yards_per_game$rankDisplay
-  )
-}
-
-# WR/TE ranks
-wr_players <- player_stats_ranked %>% filter(position %in% c("WR", "TE"))
-if (nrow(wr_players) > 0) {
-  wr_ranks <- list(
-    receiving_epa = tied_rank(-wr_players$receiving_epa),
-    receiving_yards = tied_rank(-wr_players$receiving_yards),
-    receiving_tds = tied_rank(-wr_players$receiving_tds),
-    receptions = tied_rank(-wr_players$receptions),
-    receiving_yards_per_reception = tied_rank(-wr_players$receiving_yards_per_reception),
-    receiving_yards_per_game = tied_rank(-wr_players$receiving_yards_per_game),
-    catch_pct = tied_rank(-wr_players$catch_pct),
-    wopr = tied_rank(-wr_players$wopr),
-    racr = tied_rank(-wr_players$racr),
-    air_yards_share = tied_rank(-wr_players$air_yards_share)
-  )
-
-  wr_players <- wr_players %>% mutate(
-    receiving_epa_rank = wr_ranks$receiving_epa$rank,
-    receiving_epa_rankDisplay = wr_ranks$receiving_epa$rankDisplay,
-    receiving_yards_rank = wr_ranks$receiving_yards$rank,
-    receiving_yards_rankDisplay = wr_ranks$receiving_yards$rankDisplay,
-    receiving_tds_rank = wr_ranks$receiving_tds$rank,
-    receiving_tds_rankDisplay = wr_ranks$receiving_tds$rankDisplay,
-    receptions_rank = wr_ranks$receptions$rank,
-    receptions_rankDisplay = wr_ranks$receptions$rankDisplay,
-    receiving_yards_per_reception_rank = wr_ranks$receiving_yards_per_reception$rank,
-    receiving_yards_per_reception_rankDisplay = wr_ranks$receiving_yards_per_reception$rankDisplay,
-    receiving_yards_per_game_rank = wr_ranks$receiving_yards_per_game$rank,
-    receiving_yards_per_game_rankDisplay = wr_ranks$receiving_yards_per_game$rankDisplay,
-    catch_pct_rank = wr_ranks$catch_pct$rank,
-    catch_pct_rankDisplay = wr_ranks$catch_pct$rankDisplay,
-    wopr_rank = wr_ranks$wopr$rank,
-    wopr_rankDisplay = wr_ranks$wopr$rankDisplay,
-    racr_rank = wr_ranks$racr$rank,
-    racr_rankDisplay = wr_ranks$racr$rankDisplay,
-    air_yards_share_rank = wr_ranks$air_yards_share$rank,
-    air_yards_share_rankDisplay = wr_ranks$air_yards_share$rankDisplay
-  )
-}
-
-# Combine all position-specific rankings
-player_stats_ranked <- bind_rows(qb_players, rb_players, wr_players)
-
-# Calculate target share per team (with tie handling)
-player_stats_ranked <- player_stats_ranked %>%
+# ============================================================================
+# Chart series: cumulative point differential + weekly performance
+# ============================================================================
+cum_point_diff <- team_game_results %>%
+  arrange(team, week) %>%
   group_by(team) %>%
-  mutate(
-    team_targets = sum(targets, na.rm = TRUE)
-  ) %>%
+  mutate(cum_point_diff = cumsum(point_diff)) %>%
   ungroup() %>%
-  mutate(
-    target_share = if_else(team_targets > 0, targets / team_targets, 0)
-  )
-
-# Add target share ranks
-target_share_ranks <- tied_rank(-player_stats_ranked$target_share)
-player_stats_ranked <- player_stats_ranked %>%
-  mutate(
-    target_share_rank = target_share_ranks$rank,
-    target_share_rankDisplay = target_share_ranks$rankDisplay
-  )
-
-# Select top players per team - prioritize by primary stat for each position
-# QBs by passing yards, RBs by rushing yards, WR/TE by receiving yards
-# league_rank = rank among ALL players at that position (for sortOrder)
-# team_rank = rank within team (for selecting top N per team)
-
-# First calculate league-wide ranks, then select top per team
-top_qbs <- player_stats_ranked %>%
-  filter(position == "QB") %>%
-  arrange(desc(passing_yards)) %>%
-  mutate(league_rank = row_number()) %>%
-  group_by(team) %>%
-  mutate(team_rank = row_number()) %>%
-  filter(team_rank <= 1) %>%
-  ungroup()
-
-top_rbs <- player_stats_ranked %>%
-  filter(position == "RB") %>%
-  arrange(desc(rushing_yards)) %>%
-  mutate(league_rank = row_number()) %>%
-  group_by(team) %>%
-  mutate(team_rank = row_number()) %>%
-  filter(team_rank <= 2) %>%
-  ungroup()
-
-top_receivers <- player_stats_ranked %>%
-  filter(position %in% c("WR", "TE")) %>%
-  arrange(desc(receiving_yards)) %>%
-  mutate(league_rank = row_number()) %>%
-  group_by(team) %>%
-  mutate(team_rank = row_number()) %>%
-  filter(team_rank <= 3) %>%
-  ungroup()
-
-top_players <- bind_rows(top_qbs, top_rbs, top_receivers)
-
-cat("Selected top players:", nrow(top_players), "total\n")
-
-# ============================================================================
-# STEP 8: Load schedule data for matchups, h2h, and common opponents
-# ============================================================================
-cat("\n8. Loading schedule data...\n")
-
-schedules <- tryCatch({
-  load_schedules(seasons = CURRENT_SEASON)
-}, error = function(e) {
-  cat("Error loading schedules:", e$message, "\n")
-  stop(e)
-})
-
-cat("Loaded", nrow(schedules), "games from schedule\n")
-
-# Helper function to add random delay between API calls (3-5 seconds)
-add_api_delay <- function() {
-  delay <- runif(1, 3, 5)
-  cat(sprintf("Waiting %.2f seconds to avoid rate limiting...\n", delay))
-  Sys.sleep(delay)
-}
-
-# Helper function to determine current week and season type
-get_current_week_info <- function(schedules_df) {
-  # Get scoreboard to determine current week
-  add_api_delay()
-  resp <- GET("https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard")
-  scoreboard <- content(resp, as = "parsed")
-
-  if (!is.null(scoreboard$week)) {
-    espn_week <- scoreboard$week$number
-    espn_season_type <- scoreboard$season$type
-
-    cat(sprintf("ESPN current week: %d, Season type: %d (%s)\n",
-                espn_week, espn_season_type,
-                ifelse(espn_season_type == 2, "Regular", ifelse(espn_season_type == 3, "Playoffs", "Other"))))
-
-    # Check if we should advance to next week based on schedule
-    # Strategy: Look for the first week with upcoming games (no results yet)
-    # but allow Tuesday rollover by checking if all games in current week are complete
-
-    current_day_of_week <- as.POSIXlt(Sys.Date())$wday  # 0=Sunday, 1=Monday, 2=Tuesday, etc.
-
-    # For regular season
-    if (espn_season_type == 2) {
-      # Find the first upcoming week (has games but no results yet)
-      upcoming_weeks <- schedules_df %>%
-        filter(game_type == "REG", is.na(result)) %>%
-        pull(week) %>%
-        unique() %>%
-        sort()
-
-      # Check if ESPN's current week has all games completed
-      espn_week_games <- schedules_df %>%
-        filter(game_type == "REG", week == espn_week)
-
-      espn_week_all_complete <- nrow(espn_week_games) > 0 &&
-                                all(!is.na(espn_week_games$result))
-
-      # Day of week logic:
-      # - Sunday (0): Show upcoming Sunday's games
-      # - Monday (1): Show previous Sunday's games (just finished)
-      # - Tuesday-Saturday (2-6): Show upcoming Sunday's games
-      # Advance to next week on Tuesday or later (after MNF is done)
-      if (current_day_of_week >= 2 && nrow(espn_week_games) > 0) {
-        if (length(upcoming_weeks) > 0) {
-          target_week <- upcoming_weeks[1]
-          cat(sprintf("Tuesday rollover: Advancing from week %d to week %d\n",
-                      espn_week, target_week))
-          return(list(week = target_week, season_type = 2))
-        } else {
-          # No more regular season games - regular season is over
-          # Check if nflreadr has playoff data
-          playoff_games <- schedules_df %>% filter(game_type == "POST")
-          if (nrow(playoff_games) > 0) {
-            cat("Regular season complete, advancing to playoffs (week 1)\n")
-            return(list(week = 1, season_type = 3))
-          } else {
-            # No playoff data in nflreadr yet, but regular season is done
-            # Wait for ESPN to update to playoffs, or stay on last week
-            cat("Regular season complete but no playoff data available yet\n")
-            cat("Staying on week", espn_week, "until playoffs begin\n")
-            return(list(week = espn_week, season_type = 2))
-          }
-        }
-      }
-
-      # Otherwise use ESPN's week if there are upcoming games
-      if (espn_week %in% upcoming_weeks) {
-        return(list(week = espn_week, season_type = espn_season_type))
-      } else if (length(upcoming_weeks) > 0) {
-        return(list(week = upcoming_weeks[1], season_type = 2))
-      } else {
-        # Use ESPN's week as fallback
-        return(list(week = espn_week, season_type = espn_season_type))
-      }
-    }
-
-    # For playoffs
-    if (espn_season_type == 3) {
-      # Find all playoff weeks with games (not just upcoming)
-      all_playoff_weeks <- schedules_df %>%
-        filter(game_type == "POST") %>%
-        pull(week) %>%
-        unique() %>%
-        sort()
-
-      # Find upcoming playoff games (games without results)
-      upcoming_playoff_weeks <- schedules_df %>%
-        filter(game_type == "POST", is.na(result)) %>%
-        pull(week) %>%
-        unique() %>%
-        sort()
-
-      # Find completed playoff weeks (all games have results)
-      completed_playoff_weeks <- schedules_df %>%
-        filter(game_type == "POST", !is.na(result)) %>%
-        pull(week) %>%
-        unique() %>%
-        sort()
-
-      cat(sprintf("Playoff data: all_weeks=%s, upcoming=%s, completed=%s\n",
-                  paste(all_playoff_weeks, collapse=","),
-                  paste(upcoming_playoff_weeks, collapse=","),
-                  paste(completed_playoff_weeks, collapse=",")))
-
-      # If nflreadr has no playoff data at all, trust ESPN
-      if (length(all_playoff_weeks) == 0) {
-        cat(sprintf("No playoff data in nflreadr, trusting ESPN week %d\n", espn_week))
-        # Check if ESPN scoreboard has any events for the current week
-        # If there are events, use ESPN's week (don't advance)
-        # Only advance if ESPN's week has no events (meaning games are done)
-        has_espn_events <- !is.null(scoreboard$events) && length(scoreboard$events) > 0
-
-        # Special handling: If Conference Championships (week 3) and it's Tuesday+,
-        # advance to Super Bowl (week 5) - skip Pro Bowl (week 4)
-        if (current_day_of_week >= 2 && espn_week == 3) {
-          cat("Conference Championships week detected on Tuesday+ - advancing to Super Bowl (week 5), skipping Pro Bowl\n")
-          return(list(week = 5, season_type = 3))
-        }
-
-        if (has_espn_events) {
-          cat(sprintf("ESPN shows events for week %d, using that week\n", espn_week))
-          return(list(week = espn_week, season_type = 3))
-        } else if (current_day_of_week >= 2) {
-          # No events showing and it's Tuesday or later - advance to next week
-          next_week <- espn_week + 1
-          cat(sprintf("Tuesday rollover (no playoff data, no ESPN events): Advancing from week %d to week %d\n",
-                      espn_week, next_week))
-          return(list(week = next_week, season_type = 3))
-        }
-        return(list(week = espn_week, season_type = 3))
-      }
-
-      # Check if ESPN's current week has any unplayed games
-      espn_week_has_unplayed <- espn_week %in% upcoming_playoff_weeks
-
-      # If ESPN's current week still has unplayed games, use that week
-      # Don't advance even on Tuesday if games haven't been played yet
-      if (espn_week_has_unplayed) {
-        cat(sprintf("Using ESPN week %d (has unplayed games)\n", espn_week))
-        return(list(week = espn_week, season_type = 3))
-      }
-
-      # Check if ESPN's current week is actually complete (has results in nflreadr)
-      espn_week_is_complete <- espn_week %in% completed_playoff_weeks
-
-      # Day of week logic (same as regular season):
-      # - Sunday (0): Show upcoming Sunday's games
-      # - Monday (1): Show previous Sunday's games (just finished)
-      # - Tuesday-Saturday (2-6): Show upcoming Sunday's games
-      # If it's Tuesday or later AND current week is verified complete, advance to the NEXT playoff week
-      if (current_day_of_week >= 2 && espn_week_is_complete) {
-        next_playoff_weeks <- all_playoff_weeks[all_playoff_weeks > espn_week]
-        if (length(next_playoff_weeks) > 0) {
-          target_week <- next_playoff_weeks[1]
-          cat(sprintf("Tuesday rollover (playoffs): Advancing from week %d to week %d\n",
-                      espn_week, target_week))
-          return(list(week = target_week, season_type = 3))
-        }
-
-        # Special handling: If Conference Championships (week 3) is complete and it's Tuesday+,
-        # advance to Super Bowl (week 5) even if week 5 doesn't exist in all_playoff_weeks yet
-        # This skips the Pro Bowl week (week 4)
-        if (espn_week == 3) {
-          cat("Conference Championships complete, advancing to Super Bowl (week 5) - skipping Pro Bowl\n")
-          return(list(week = 5, season_type = 3))
-        }
-      }
-
-      # Fallback: use ESPN's week or first upcoming playoff week
-      if (length(upcoming_playoff_weeks) > 0) {
-        return(list(week = upcoming_playoff_weeks[1], season_type = 3))
-      }
-
-      # Final fallback: trust ESPN
-      cat(sprintf("Falling back to ESPN week %d\n", espn_week))
-      return(list(week = espn_week, season_type = 3))
-    }
-
-    # Fallback to ESPN's values
-    return(list(week = espn_week, season_type = espn_season_type))
-  }
-
-  # Fallback to regular season week 1 if we can't determine
-  return(list(week = 1, season_type = 2))
-}
-
-# Get current week info (pass schedules for Tuesday rollover logic)
-week_info <- get_current_week_info(schedules)
-current_week <- week_info$week
-season_type <- week_info$season_type
-
-# ESPN season type 1 is the preseason. There are no real matchups to worksheet
-# then, and ESPN's preseason week number does not line up with the completed
-# season nflreadr is serving — pairing them produced a chart of last season's
-# week N dressed up as this week's games. Stop before publishing anything.
-if (identical(season_type, 1L) || identical(season_type, 1)) {
-  cat("ESPN reports the preseason; no regular season matchups to publish yet.\n")
-  cat("\n=== SKIPPED (preseason) ===\n")
-  quit(save = "no", status = 0)
-}
-
-# Determine if we're in playoffs (season_type 3) or regular season (season_type 2)
-is_playoffs <- (season_type == 3)
-
-# Fetch all games for the current week from ESPN API
-# This ensures we get ALL games regardless of their completion status
-cat(sprintf("\nFetching games for week %d from ESPN API (%s)...\n",
-            current_week, ifelse(is_playoffs, "playoffs", "regular season")))
-
-add_api_delay()
-events_url <- sprintf(
-  "https://sports.core.api.espn.com/v2/sports/football/leagues/nfl/seasons/%d/types/%d/weeks/%d/events?limit=50",
-  CURRENT_SEASON, season_type, current_week
-)
-
-events_resp <- tryCatch({
-  GET(events_url)
-}, error = function(e) {
-  cat("Error fetching events:", e$message, "\n")
-  stop(e)
-})
-
-events_data <- content(events_resp, as = "parsed")
-
-if (is.null(events_data$items) || length(events_data$items) == 0) {
-  cat("No games found for current week, using nflreadr schedules as fallback\n")
-  current_week_games <- schedules %>%
-    filter(
-      week == max(week[game_type == "REG" & is.na(result)], na.rm = TRUE),
-      game_type == "REG",
-      is.na(result)
-    )
-
-  if (nrow(current_week_games) == 0) {
-    current_week_games <- schedules %>%
-      filter(week == max(week), game_type == "REG")
-  }
-} else {
-  # Extract event IDs from the ESPN API response
-  event_ids <- sapply(events_data$items, function(item) {
-    # Extract event ID from the $ref URL
-    ref_url <- item$`$ref`
-    id <- sub(".*events/([0-9]+)\\?.*", "\\1", ref_url)
-    return(id)
-  })
-
-  cat(sprintf("Found %d event IDs from ESPN API\n", length(event_ids)))
-
-  # Match these events with our schedule data
-  current_week_games <- schedules %>%
-    filter(
-      game_id %in% event_ids |
-      (week == current_week & game_type == ifelse(is_playoffs, "POST", "REG"))
-    )
-
-  # If we don't get matches, fall back to week-based filtering
-  if (nrow(current_week_games) == 0) {
-    cat("No matches found by event ID, falling back to week filtering\n")
-    current_week_games <- schedules %>%
-      filter(
-        week == current_week,
-        game_type == ifelse(is_playoffs, "POST", "REG")
-      )
-  }
-}
-
-cat("Found", nrow(current_week_games), "games for current week\n")
-
-# Safety check: if we have no games, we need to create placeholder games from ESPN data
-if (nrow(current_week_games) == 0 && exists("event_ids") && length(event_ids) > 0) {
-  cat("WARNING: nflreadr has no game data for this week, but ESPN has events\n")
-  cat("This likely means playoff data isn't available in nflreadr yet\n")
-  cat("Creating placeholder game records from ESPN event IDs...\n")
-
-  # We'll fetch the team info from the scoreboard and create minimal game records
-  # This will be done in the team mapping section below
-}
-
-# Check if we have any games at all - if not, exit gracefully
-if (nrow(current_week_games) == 0 && (!exists("event_ids") || length(event_ids) == 0)) {
-  cat("\nERROR: No games found for current week from either nflreadr or ESPN\n")
-  cat("This likely means:\n")
-  cat("  - The season is over, or\n")
-  cat("  - There's a data availability issue\n")
-  cat("Exiting without generating output.\n")
-  quit(status = 1)
-}
-
-# Store event IDs for odds fetching
-espn_event_ids <- if (exists("event_ids")) event_ids else c()
-
-# Build a mapping from team matchups to ESPN event IDs
-# Use the scoreboard endpoint which includes teams and event IDs in one call
-cat("Building team-to-event mapping for odds lookup...\n")
-team_to_event_map <- list()
-
-add_api_delay()
-scoreboard_url <- sprintf(
-  "https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?seasontype=%d&week=%d",
-  season_type, current_week
-)
-
-scoreboard_resp <- tryCatch({
-  resp <- GET(scoreboard_url)
-  if (status_code(resp) == 200) {
-    content(resp, as = "parsed")
-  } else {
-    NULL
-  }
-}, error = function(e) {
-  cat("Warning: Could not fetch scoreboard for mapping\n")
-  NULL
-})
-
-if (!is.null(scoreboard_resp) && !is.null(scoreboard_resp$events)) {
-  # If we have no games from nflreadr, we'll build them from ESPN data
-  needs_placeholder_games <- nrow(current_week_games) == 0
-  placeholder_games_list <- list()
-
-  for (event in scoreboard_resp$events) {
-    event_id <- event$id
-
-    if (!is.null(event$competitions) && length(event$competitions) > 0) {
-      comp <- event$competitions[[1]]
-
-      # Skip all-star games (Pro Bowl)
-      if (!is.null(comp$type) && !is.null(comp$type$type) && comp$type$type == "ALLSTAR") {
-        cat(sprintf("  Skipping all-star game (event %s)\n", event_id))
-        next
-      }
-
-      if (!is.null(comp$competitors) && length(comp$competitors) >= 2) {
-        home_abbr <- NULL
-        away_abbr <- NULL
-
-        for (competitor in comp$competitors) {
-          abbr <- competitor$team$abbreviation
-          home_away <- competitor$homeAway
-
-          if (home_away == "home") {
-            home_abbr <- abbr
-          } else if (home_away == "away") {
-            away_abbr <- abbr
-          }
-        }
-
-        if (!is.null(home_abbr) && !is.null(away_abbr)) {
-          # Skip NFC vs AFC games (Pro Bowl, all-star games)
-          if (tolower(home_abbr) %in% c("nfc", "afc") || tolower(away_abbr) %in% c("nfc", "afc")) {
-            cat(sprintf("  Skipping NFC/AFC all-star matchup (event %s)\n", event_id))
-            next
-          }
-
-          # Normalize team abbreviations (ESPN -> nflreadr format)
-          home_abbr_norm <- case_when(
-            home_abbr == "WSH" ~ "WAS",
-            home_abbr == "LAR" ~ "LAR",  # Keep as LAR to match our data processing
-            TRUE ~ home_abbr
-          )
-          away_abbr_norm <- case_when(
-            away_abbr == "WSH" ~ "WAS",
-            away_abbr == "LAR" ~ "LAR",  # Keep as LAR to match our data processing
-            TRUE ~ away_abbr
-          )
-
-          matchup_key <- paste(away_abbr_norm, home_abbr_norm, sep = "-")
-          team_to_event_map[[matchup_key]] <- event_id
-          cat(sprintf("  Mapped %s to event %s\n", matchup_key, event_id))
-
-          # If we need placeholder games, create them
-          if (needs_placeholder_games) {
-            # Extract game date and time from ESPN event
-            # event$date is in ISO 8601 format (e.g., "2026-01-10T21:30Z")
-            gameday <- NA
-            gametime <- NA
-
-            if (!is.null(event$date) && nchar(event$date) > 0) {
-              # Parse the ISO 8601 datetime
-              event_datetime <- tryCatch({
-                # Remove 'Z' and parse as UTC
-                date_str <- sub("Z$", "", event$date)
-                as.POSIXct(date_str, format = "%Y-%m-%dT%H:%M", tz = "UTC")
-              }, error = function(e) {
-                cat(sprintf("Error parsing date '%s': %s\n", event$date, e$message))
-                NULL
-              })
-
-              if (!is.null(event_datetime) && !is.na(event_datetime)) {
-                # Convert to Eastern Time
-                event_datetime_et <- as.POSIXct(format(event_datetime, tz = "America/New_York"), tz = "America/New_York")
-                # Extract date and time
-                gameday <- format(event_datetime_et, "%Y-%m-%d")
-                gametime <- format(event_datetime_et, "%H:%M")
-                cat(sprintf("    Game time: %s %s ET\n", gameday, gametime))
-              }
-            }
-
-            placeholder_game <- data.frame(
-              game_id = event_id,
-              week = current_week,
-              game_type = ifelse(is_playoffs, "POST", "REG"),
-              home_team = home_abbr_norm,
-              away_team = away_abbr_norm,
-              gameday = gameday,
-              gametime = gametime,
-              result = NA_real_,
-              home_score = NA_real_,
-              away_score = NA_real_,
-              stringsAsFactors = FALSE
-            )
-            placeholder_games_list[[length(placeholder_games_list) + 1]] <- placeholder_game
-          }
-        }
-      }
-    }
-  }
-
-  # If we created placeholder games, combine them into current_week_games
-  if (needs_placeholder_games && length(placeholder_games_list) > 0) {
-    current_week_games <- do.call(rbind, placeholder_games_list)
-    cat(sprintf("Created %d placeholder games from ESPN data\n", nrow(current_week_games)))
-  } else if (needs_placeholder_games && length(placeholder_games_list) == 0) {
-    cat("\nWARNING: No valid games found after filtering (all-star games excluded)\n")
-    cat("This likely means only Pro Bowl or other exhibition games are scheduled\n")
-    cat("Exiting without generating output.\n")
-    quit(status = 1)
-  }
-}
-
-cat(sprintf("Built mapping for %d matchups\n", length(team_to_event_map)))
-cat(sprintf("Final game count: %d games to process\n", nrow(current_week_games)))
-
-# Final check to ensure we have games to process
-if (nrow(current_week_games) == 0) {
-  cat("\nERROR: No valid games to process after all filtering\n")
-  cat("Exiting without generating output.\n")
-  quit(status = 1)
-}
-
-# Process all matchups
-
-# ============================================================================
-# STEP 9: Fetch odds from ESPN API using dedicated odds endpoint
-# ============================================================================
-cat("\n9. Fetching odds from ESPN API...\n")
-
-# Helper function to normalize team abbreviations for ESPN API
-normalize_team_abbr <- function(abbr) {
-  # ESPN uses different abbreviations for some teams
-  # WSH instead of WAS for Washington
-  # LAR instead of LA for Los Angeles Rams
-  case_when(
-    abbr == "WAS" ~ "WSH",
-    abbr == "LA" ~ "LAR",
-    TRUE ~ abbr
-  )
-}
-
-# Cache odds data by event ID to avoid redundant API calls
-odds_cache <- list()
-
-# Helper function to fetch odds for a specific event ID
-# This uses the ESPN core API which provides odds even after games start/complete
-fetch_event_odds <- function(event_id) {
-  # Check cache first
-  if (!is.null(odds_cache[[event_id]])) {
-    return(odds_cache[[event_id]])
-  }
-
-  add_api_delay()
-
-  odds_url <- sprintf(
-    "http://sports.core.api.espn.com/v2/sports/football/leagues/nfl/events/%s/competitions/%s/odds?lang=en&region=us",
-    event_id, event_id
-  )
-
-  odds_resp <- tryCatch({
-    resp <- GET(odds_url)
-    if (status_code(resp) == 200) {
-      content(resp, as = "parsed")
+  group_by(team, week) %>%
+  summarise(cum_point_diff = last(cum_point_diff), .groups = "drop")
+
+weekly_performance <- team_game_results %>%
+  group_by(team, week) %>%
+  summarise(
+    points_scored = mean(points, na.rm = TRUE),
+    points_allowed = mean(points_allowed, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  arrange(week)
+
+league_cum_point_diff_stats <- list(minCumPointDiff = NULL, maxCumPointDiff = NULL)
+if (nrow(cum_point_diff) > 0) {
+  # The 10th-best cumulative differential each week draws the "top 10" reference
+  # line on the chart, the same way the MLB card marks the playoff-pace cutoff.
+  top10_by_week <- cum_point_diff %>%
+    group_by(week) %>%
+    summarise(
+      top10_threshold = if (n() >= 10) sort(cum_point_diff, decreasing = TRUE)[10] else NA_real_,
+      .groups = "drop"
+    ) %>%
+    filter(!is.na(top10_threshold))
+
+  league_cum_point_diff_stats <- list(
+    minCumPointDiff = round(min(cum_point_diff$cum_point_diff, na.rm = TRUE)),
+    maxCumPointDiff = round(max(cum_point_diff$cum_point_diff, na.rm = TRUE)),
+    # Omitted rather than emitted empty: jsonlite writes a zero-length named
+    # list as [] and the client field is typed as an object.
+    top10ByWeek = if (nrow(top10_by_week) > 0) {
+      setNames(as.list(round(top10_by_week$top10_threshold)), paste0("week-", top10_by_week$week))
     } else {
       NULL
     }
-  }, error = function(e) {
-    cat("Warning: Could not fetch odds for event", event_id, ":", e$message, "\n")
-    NULL
-  })
-
-  # Cache the result
-  odds_cache[[event_id]] <<- odds_resp
-  return(odds_resp)
-}
-
-# Helper function to extract odds from ESPN odds API response
-extract_odds_from_response <- function(odds_response) {
-  default_odds <- list(
-    home_spread = NULL,
-    home_moneyline = NULL,
-    away_spread = NULL,
-    away_moneyline = NULL,
-    over_under = NULL
   )
-
-  if (is.null(odds_response) || is.null(odds_response$items) || length(odds_response$items) == 0) {
-    return(default_odds)
-  }
-
-  # Get the first odds provider (usually DraftKings with priority 1)
-  odds_item <- odds_response$items[[1]]
-
-  # Extract spread and over/under from top level
-  over_under <- odds_item$overUnder
-  spread <- odds_item$spread
-
-  # Extract away team odds
-  away_spread <- NULL
-  away_moneyline <- NULL
-  if (!is.null(odds_item$awayTeamOdds)) {
-    away_odds <- odds_item$awayTeamOdds
-
-    # Try current first, then close, then open
-    if (!is.null(away_odds$current) && !is.null(away_odds$current$pointSpread)) {
-      away_spread <- as.numeric(sub("\\+", "", away_odds$current$pointSpread$american))
-    } else if (!is.null(away_odds$close) && !is.null(away_odds$close$pointSpread)) {
-      away_spread <- as.numeric(sub("\\+", "", away_odds$close$pointSpread$american))
-    } else if (!is.null(away_odds$open) && !is.null(away_odds$open$pointSpread)) {
-      away_spread <- as.numeric(sub("\\+", "", away_odds$open$pointSpread$american))
-    }
-
-    # Get moneyline
-    if (!is.null(away_odds$current) && !is.null(away_odds$current$moneyLine)) {
-      away_moneyline <- away_odds$current$moneyLine$american
-    } else if (!is.null(away_odds$close) && !is.null(away_odds$close$moneyLine)) {
-      away_moneyline <- away_odds$close$moneyLine$american
-    } else if (!is.null(away_odds$open) && !is.null(away_odds$open$moneyLine)) {
-      away_moneyline <- away_odds$open$moneyLine$american
-    } else if (!is.null(away_odds$moneyLine)) {
-      away_moneyline <- away_odds$moneyLine
-    }
-  }
-
-  # Extract home team odds
-  home_spread <- NULL
-  home_moneyline <- NULL
-  if (!is.null(odds_item$homeTeamOdds)) {
-    home_odds <- odds_item$homeTeamOdds
-
-    # Try current first, then close, then open
-    if (!is.null(home_odds$current) && !is.null(home_odds$current$pointSpread)) {
-      home_spread <- as.numeric(sub("\\+", "", home_odds$current$pointSpread$american))
-    } else if (!is.null(home_odds$close) && !is.null(home_odds$close$pointSpread)) {
-      home_spread <- as.numeric(sub("\\+", "", home_odds$close$pointSpread$american))
-    } else if (!is.null(home_odds$open) && !is.null(home_odds$open$pointSpread)) {
-      home_spread <- as.numeric(sub("\\+", "", home_odds$open$pointSpread$american))
-    }
-
-    # Get moneyline
-    if (!is.null(home_odds$current) && !is.null(home_odds$current$moneyLine)) {
-      home_moneyline <- home_odds$current$moneyLine$american
-    } else if (!is.null(home_odds$close) && !is.null(home_odds$close$moneyLine)) {
-      home_moneyline <- home_odds$close$moneyLine$american
-    } else if (!is.null(home_odds$open) && !is.null(home_odds$open$moneyLine)) {
-      home_moneyline <- home_odds$open$moneyLine$american
-    } else if (!is.null(home_odds$moneyLine)) {
-      home_moneyline <- home_odds$moneyLine
-    }
-  }
-
-  # Format all odds as strings for JSON serialization
-  # Format spreads with proper sign (e.g., "-3.5", "+3.5")
-  format_spread <- function(x) {
-    if (is.null(x) || is.na(x)) return(NULL)
-    val <- as.numeric(x)
-    if (val > 0) {
-      sprintf("+%.1f", val)
-    } else {
-      sprintf("%.1f", val)
-    }
-  }
-
-  # Format moneylines and over/under as strings
-  format_odds <- function(x) {
-    if (is.null(x) || is.na(x)) return(NULL)
-    as.character(x)
-  }
-
-  return(list(
-    home_spread = format_spread(home_spread),
-    home_moneyline = format_odds(home_moneyline),
-    away_spread = format_spread(away_spread),
-    away_moneyline = format_odds(away_moneyline),
-    over_under = format_odds(over_under)
-  ))
 }
 
-# Helper function to extract odds for a game by finding its event ID
-get_odds_for_game <- function(home_team, away_team, game_id = NULL) {
-  default_odds <- list(
-    home_spread = NULL,
-    home_moneyline = NULL,
-    away_spread = NULL,
-    away_moneyline = NULL,
-    over_under = NULL
+league_weekly_stats <- list()
+if (nrow(weekly_performance) > 0) {
+  league_weekly_stats <- list(
+    avgPointsScored = round(mean(weekly_performance$points_scored, na.rm = TRUE), 2),
+    avgPointsAllowed = round(mean(weekly_performance$points_allowed, na.rm = TRUE), 2),
+    minPointsScored = round(min(weekly_performance$points_scored, na.rm = TRUE), 2),
+    maxPointsScored = round(max(weekly_performance$points_scored, na.rm = TRUE), 2),
+    minPointsAllowed = round(min(weekly_performance$points_allowed, na.rm = TRUE), 2),
+    maxPointsAllowed = round(max(weekly_performance$points_allowed, na.rm = TRUE), 2)
   )
-
-  # Create matchup key
-  matchup_key <- paste(away_team, home_team, sep = "-")
-
-  # Look up event ID from our team mapping
-  event_id <- team_to_event_map[[matchup_key]]
-
-  if (!is.null(event_id)) {
-    odds_response <- fetch_event_odds(event_id)
-    if (!is.null(odds_response)) {
-      return(extract_odds_from_response(odds_response))
-    }
-  } else {
-    cat("Warning: No event ID found for matchup", matchup_key, "\n")
-  }
-
-  return(default_odds)
 }
 
-# Helper function to calculate head-to-head record
-get_h2h_record <- function(team1, team2, schedules_df) {
-  # Normalize team abbreviations for schedules data (reverse the LA->LAR normalization)
-  normalize_for_schedule <- function(team) {
-    ifelse(team == "LAR", "LA", team)
-  }
+cat("Built chart series for", n_distinct(cum_point_diff$team), "teams\n")
 
-  team1_sched <- normalize_for_schedule(team1)
-  team2_sched <- normalize_for_schedule(team2)
+# ============================================================================
+# Head-to-head across the last H2H_SEASONS seasons
+# ============================================================================
+h2h_pool <- schedules_all %>%
+  filter(played, season >= stats_season - H2H_SEASONS + 1) %>%
+  transmute(
+    season, week, game_type,
+    date = format(game_day, "%Y-%m-%d"),
+    home_team = home_code, away_team = away_code,
+    home_score = as.integer(home_score), away_score = as.integer(away_score)
+  ) %>%
+  mutate(
+    winner = case_when(
+      home_score > away_score ~ home_team,
+      away_score > home_score ~ away_team,
+      TRUE ~ NA_character_
+    )
+  ) %>%
+  arrange(date)
 
-  # Find completed games between these two teams
-  h2h_games <- schedules_df %>%
+# Grouped by season rather than by MLB's date-adjacent series: NFL opponents meet
+# once or twice a year, so the season is the natural unit.
+build_h2h <- function(team_a, team_b) {
+  games <- h2h_pool %>%
     filter(
-      game_type == "REG",
-      !is.na(home_score),
-      !is.na(away_score),
-      (home_team == team1_sched & away_team == team2_sched) |
-      (home_team == team2_sched & away_team == team1_sched)
+      (home_team == team_a & away_team == team_b) |
+        (home_team == team_b & away_team == team_a)
     )
+  if (nrow(games) == 0) return(NULL)
 
-  if (nrow(h2h_games) == 0) {
-    return(list())
-  }
+  a_wins <- sum(games$winner == team_a, na.rm = TRUE)
+  b_wins <- sum(games$winner == team_b, na.rm = TRUE)
 
-  # Build array of matchup objects
-  h2h_array <- lapply(seq_len(nrow(h2h_games)), function(i) {
-    game <- h2h_games[i, ]
-
-    # Determine winner
-    winner <- if (game$home_score > game$away_score) {
-      game$home_team
-    } else if (game$away_score > game$home_score) {
-      game$away_team
-    } else {
-      "TIE"
-    }
-
-    # Build final score string
-    final_score <- paste0(
-      game$away_team, " ", game$away_score, " - ",
-      game$home_team, " ", game$home_score
-    )
-
+  series_list <- lapply(sort(unique(games$season)), function(season) {
+    sg <- games %>% filter(season == !!season)
     list(
-      week = as.integer(game$week),
-      finalScore = final_score,
-      winner = winner
-    )
-  })
-
-  return(h2h_array)
-}
-
-# Helper function to find common opponents
-get_common_opponents <- function(team1, team2, schedules_df) {
-  # Normalize team abbreviations for schedules data (reverse the LA->LAR normalization)
-  # The schedules data uses "LA" while our processed data uses "LAR"
-  normalize_for_schedule <- function(team) {
-    ifelse(team == "LAR", "LA", team)
-  }
-
-  team1_sched <- normalize_for_schedule(team1)
-  team2_sched <- normalize_for_schedule(team2)
-
-  # Get completed games only
-  completed <- schedules_df %>%
-    filter(game_type == "REG", !is.na(home_score), !is.na(away_score))
-
-  # Return empty list if no completed games
-  if (nrow(completed) == 0) {
-    return(list())
-  }
-
-  # Find all opponents for team1 (excluding team2)
-  team1_games <- completed %>%
-    filter(home_team == team1_sched | away_team == team1_sched) %>%
-    mutate(
-      opponent = ifelse(home_team == team1_sched, away_team, home_team),
-      team1_score = ifelse(home_team == team1_sched, home_score, away_score),
-      opp_score = ifelse(home_team == team1_sched, away_score, home_score),
-      result = case_when(
-        team1_score > opp_score ~ "W",
-        team1_score < opp_score ~ "L",
-        TRUE ~ "T"
-      )
-    ) %>%
-    filter(opponent != team2_sched) %>%
-    select(week, opponent, result, team1_score, opp_score)
-
-  # Find all opponents for team2 (excluding team1)
-  team2_games <- completed %>%
-    filter(home_team == team2_sched | away_team == team2_sched) %>%
-    mutate(
-      opponent = ifelse(home_team == team2_sched, away_team, home_team),
-      team2_score = ifelse(home_team == team2_sched, home_score, away_score),
-      opp_score = ifelse(home_team == team2_sched, away_score, home_score),
-      result = case_when(
-        team2_score > opp_score ~ "W",
-        team2_score < opp_score ~ "L",
-        TRUE ~ "T"
-      )
-    ) %>%
-    filter(opponent != team1_sched) %>%
-    select(week, opponent, result, team2_score, opp_score)
-
-  # Return empty list if either team has no games
-  if (nrow(team1_games) == 0 || nrow(team2_games) == 0) {
-    return(list())
-  }
-
-  # Find common opponents (allow many-to-many for division games)
-  common_opps <- inner_join(
-    team1_games,
-    team2_games,
-    by = "opponent",
-    suffix = c("_team1", "_team2"),
-    relationship = "many-to-many"
-  )
-
-  if (nrow(common_opps) == 0) {
-    return(list())
-  }
-
-  # Build dictionary structure grouped by opponent
-  result_dict <- list()
-  unique_opponents <- unique(common_opps$opponent)
-
-  for (opp in unique_opponents) {
-    opp_rows <- common_opps %>% filter(opponent == opp)
-
-    # Get unique team1 games (remove duplicates from many-to-many join)
-    team1_unique <- opp_rows %>%
-      select(week_team1, result_team1, team1_score, opp_score_team1) %>%
-      distinct()
-
-    # Get unique team2 games
-    team2_unique <- opp_rows %>%
-      select(week_team2, result_team2, team2_score, opp_score_team2) %>%
-      distinct()
-
-    # Build list of results for team1
-    team1_results <- lapply(1:nrow(team1_unique), function(i) {
-      list(
-        week = as.integer(team1_unique$week_team1[i]),
-        result = team1_unique$result_team1[i],
-        score = paste0(team1_unique$team1_score[i], "-", team1_unique$opp_score_team1[i])
-      )
-    })
-
-    # Build list of results for team2
-    team2_results <- lapply(1:nrow(team2_unique), function(i) {
-      list(
-        week = as.integer(team2_unique$week_team2[i]),
-        result = team2_unique$result_team2[i],
-        score = paste0(team2_unique$team2_score[i], "-", team2_unique$opp_score_team2[i])
-      )
-    })
-
-    # Create the opponent entry
-    result_dict[[opp]] <- list()
-    result_dict[[opp]][[tolower(team1)]] <- team1_results
-    result_dict[[opp]][[tolower(team2)]] <- team2_results
-  }
-
-  return(result_dict)
-}
-
-# ============================================================================
-# STEP 10: Build matchup JSON
-# ============================================================================
-cat("\n10. Building matchup JSON...\n")
-
-build_team_json <- function(team_abbr, cum_epa_df, season_totals, top_players_df, weekly_stats) {
-  # Helper to convert NA to NULL
-  na_to_null <- function(x) if (is.na(x)) NULL else x
-
-  # Get cumulative EPA by week
-  team_cum_epa <- cum_epa_df %>%
-    filter(team == team_abbr) %>%
-    select(week, cum_epa)
-
-  # Handle case where there's no cumulative EPA data (e.g., playoffs with only regular season data)
-  cum_epa_list <- if (nrow(team_cum_epa) > 0) {
-    setNames(
-      as.list(round(team_cum_epa$cum_epa, 2)),
-      paste0("week-", team_cum_epa$week)
-    )
-  } else {
-    list()  # Empty list if no data available
-  }
-
-  # Get EPA per play by week (off and def for each week)
-  team_weekly <- weekly_stats %>%
-    filter(team == team_abbr)
-
-  # Handle case where there's no weekly EPA data
-  epa_by_week_list <- if (nrow(team_weekly) > 0) {
-    epa_list <- lapply(1:nrow(team_weekly), function(i) {
-      # Calculate EPA per play
-      off_epa_per_play <- if (!is.na(team_weekly$off_epa_total[i]) && !is.na(team_weekly$off_plays[i]) && team_weekly$off_plays[i] > 0) {
-        round(team_weekly$off_epa_total[i] / team_weekly$off_plays[i], 4)
-      } else NULL
-
-      def_epa_per_play <- if (!is.na(team_weekly$def_epa_total[i]) && !is.na(team_weekly$def_plays[i]) && team_weekly$def_plays[i] > 0) {
-        round(team_weekly$def_epa_total[i] / team_weekly$def_plays[i], 4)
-      } else NULL
-
-      list(
-        off = off_epa_per_play,
-        def = def_epa_per_play
-      )
-    })
-    names(epa_list) <- paste0("week-", team_weekly$week)
-    epa_list
-  } else {
-    list()  # Empty list if no data available
-  }
-
-  # Get current season stats
-  team_totals <- season_totals %>%
-    filter(team == team_abbr)
-
-  if (nrow(team_totals) == 0) {
-    cat("Warning: No team stats found for", team_abbr, "\n")
-    return(NULL)
-  }
-
-  current_stats <- list(
-    offense = list(
-      off_epa = list(value = round(team_totals$off_epa[1], 3), rank = as.integer(team_totals$off_epa_rank[1]), rankDisplay = team_totals$off_epa_rankDisplay[1]),
-      yards_per_game = list(value = round(team_totals$yards_per_game[1], 1), rank = as.integer(team_totals$yards_per_game_rank[1]), rankDisplay = team_totals$yards_per_game_rankDisplay[1]),
-      pass_yards_per_game = list(value = round(team_totals$pass_yards_per_game[1], 1), rank = as.integer(team_totals$pass_yards_per_game_rank[1]), rankDisplay = team_totals$pass_yards_per_game_rankDisplay[1]),
-      rush_yards_per_game = list(value = round(team_totals$rush_yards_per_game[1], 1), rank = as.integer(team_totals$rush_yards_per_game_rank[1]), rankDisplay = team_totals$rush_yards_per_game_rankDisplay[1]),
-      points_per_game = list(value = round(team_totals$points_per_game[1], 1), rank = as.integer(team_totals$points_per_game_rank[1]), rankDisplay = team_totals$points_per_game_rankDisplay[1]),
-      yards_per_play = list(value = round(team_totals$yards_per_play[1], 2), rank = as.integer(team_totals$yards_per_play_rank[1]), rankDisplay = team_totals$yards_per_play_rankDisplay[1]),
-      third_down_pct = list(value = round(team_totals$third_down_pct[1], 1), rank = as.integer(team_totals$third_down_pct_rank[1]), rankDisplay = team_totals$third_down_pct_rankDisplay[1]),
-      rushing_epa = list(value = round(team_totals$rushing_epa[1], 3), rank = as.integer(team_totals$rushing_epa_rank[1]), rankDisplay = team_totals$rushing_epa_rankDisplay[1]),
-      receiving_epa = list(value = round(team_totals$receiving_epa[1], 3), rank = as.integer(team_totals$receiving_epa_rank[1]), rankDisplay = team_totals$receiving_epa_rankDisplay[1]),
-      pacr = list(value = round(team_totals$pacr[1], 2), rank = as.integer(team_totals$pacr_rank[1]), rankDisplay = team_totals$pacr_rankDisplay[1]),
-      passing_first_downs = list(value = as.integer(team_totals$passing_first_downs[1]), rank = as.integer(team_totals$passing_first_downs_rank[1]), rankDisplay = team_totals$passing_first_downs_rankDisplay[1]),
-      sacks_suffered = list(value = as.integer(team_totals$sacks_suffered[1]), rank = as.integer(team_totals$sacks_suffered_rank[1]), rankDisplay = team_totals$sacks_suffered_rankDisplay[1]),
-      touchdowns = list(value = as.integer(team_totals$touchdowns[1]), rank = as.integer(team_totals$touchdowns_rank[1]), rankDisplay = team_totals$touchdowns_rankDisplay[1]),
-      interceptions_thrown = list(value = as.integer(team_totals$interceptions_thrown[1]), rank = as.integer(team_totals$interceptions_thrown_rank[1]), rankDisplay = team_totals$interceptions_thrown_rankDisplay[1]),
-      fumbles_lost = list(value = as.integer(team_totals$fumbles_lost[1]), rank = as.integer(team_totals$fumbles_lost_rank[1]), rankDisplay = team_totals$fumbles_lost_rankDisplay[1])
-    ),
-    defense = list(
-      def_epa = list(value = round(team_totals$def_epa[1], 3), rank = as.integer(team_totals$def_epa_rank[1]), rankDisplay = team_totals$def_epa_rankDisplay[1]),
-      yards_allowed_per_game = list(value = round(team_totals$yards_allowed_per_game[1], 1), rank = as.integer(team_totals$yards_allowed_per_game_rank[1]), rankDisplay = team_totals$yards_allowed_per_game_rankDisplay[1]),
-      pass_yards_allowed_per_game = list(value = round(team_totals$pass_yards_allowed_per_game[1], 1), rank = as.integer(team_totals$pass_yards_allowed_per_game_rank[1]), rankDisplay = team_totals$pass_yards_allowed_per_game_rankDisplay[1]),
-      rush_yards_allowed_per_game = list(value = round(team_totals$rush_yards_allowed_per_game[1], 1), rank = as.integer(team_totals$rush_yards_allowed_per_game_rank[1]), rankDisplay = team_totals$rush_yards_allowed_per_game_rankDisplay[1]),
-      points_allowed_per_game = list(value = round(team_totals$points_allowed_per_game[1], 1), rank = as.integer(team_totals$points_allowed_per_game_rank[1]), rankDisplay = team_totals$points_allowed_per_game_rankDisplay[1]),
-      third_down_pct_def = list(value = round(team_totals$third_down_pct_def[1], 1), rank = as.integer(team_totals$third_down_pct_def_rank[1]), rankDisplay = team_totals$third_down_pct_def_rankDisplay[1]),
-      sacks_made = list(value = as.integer(team_totals$sacks_made[1]), rank = as.integer(team_totals$sacks_made_rank[1]), rankDisplay = team_totals$sacks_made_rankDisplay[1]),
-      interceptions_made = list(value = as.integer(team_totals$interceptions_made[1]), rank = as.integer(team_totals$interceptions_made_rank[1]), rankDisplay = team_totals$interceptions_made_rankDisplay[1]),
-      fumbles_forced = list(value = as.integer(team_totals$fumbles_forced[1]), rank = as.integer(team_totals$fumbles_forced_rank[1]), rankDisplay = team_totals$fumbles_forced_rankDisplay[1]),
-      touchdowns_allowed = list(value = as.integer(team_totals$touchdowns_allowed[1]), rank = as.integer(team_totals$touchdowns_allowed_rank[1]), rankDisplay = team_totals$touchdowns_allowed_rankDisplay[1]),
-      turnover_differential = list(value = as.integer(team_totals$turnover_differential[1]), rank = as.integer(team_totals$turnover_differential_rank[1]), rankDisplay = team_totals$turnover_differential_rankDisplay[1])
-    )
-  )
-
-  # Get top players
-  team_players <- top_players_df %>%
-    filter(team == team_abbr)
-
-  # Use team_rank from top_players selection (sorted by primary stat within team)
-  qb <- team_players %>% filter(position == "QB") %>% arrange(team_rank)
-  rbs <- team_players %>% filter(position == "RB") %>% arrange(team_rank)
-  receivers <- team_players %>% filter(position %in% c("WR", "TE")) %>% arrange(team_rank)
-
-  qb_json <- if (nrow(qb) > 0) {
-    list(
-      name = qb$player_name[1],
-      sortOrder = as.integer(qb$team_rank[1]),  # Rank by passing_yards within team
-      total_epa = list(value = na_to_null(round(qb$qb_epa_per_play[1], 2)), rank = na_to_null(as.integer(qb$qb_epa_per_play_rank[1])), rankDisplay = na_to_null(qb$qb_epa_per_play_rankDisplay[1])),
-      passing_yards = list(value = na_to_null(as.integer(qb$passing_yards[1])), rank = na_to_null(as.integer(qb$passing_yards_rank[1])), rankDisplay = na_to_null(qb$passing_yards_rankDisplay[1])),
-      passing_tds = list(value = na_to_null(as.integer(qb$passing_tds[1])), rank = na_to_null(as.integer(qb$passing_tds_rank[1])), rankDisplay = na_to_null(qb$passing_tds_rankDisplay[1])),
-      completion_pct = list(value = na_to_null(round(qb$completion_pct[1], 1)), rank = na_to_null(as.integer(qb$completion_pct_rank[1])), rankDisplay = na_to_null(qb$completion_pct_rankDisplay[1])),
-      passing_cpoe = list(value = na_to_null(round(qb$passing_cpoe[1], 3)), rank = na_to_null(as.integer(qb$passing_cpoe_rank[1])), rankDisplay = na_to_null(qb$passing_cpoe_rankDisplay[1])),
-      pacr = list(value = na_to_null(round(qb$pacr[1], 2)), rank = na_to_null(as.integer(qb$pacr_rank[1])), rankDisplay = na_to_null(qb$pacr_rankDisplay[1])),
-      passing_yards_per_game = list(value = na_to_null(round(qb$passing_yards_per_game[1], 1)), rank = na_to_null(as.integer(qb$passing_yards_per_game_rank[1])), rankDisplay = na_to_null(qb$passing_yards_per_game_rankDisplay[1])),
-      interceptions = list(value = na_to_null(as.integer(qb$interceptions[1])), rank = na_to_null(as.integer(qb$interceptions_rank[1])), rankDisplay = na_to_null(qb$interceptions_rankDisplay[1]))
-    )
-  } else NULL
-
-  rbs_json <- lapply(1:nrow(rbs), function(i) {
-    list(
-      name = rbs$player_name[i],
-      sortOrder = as.integer(rbs$team_rank[i]),  # Rank by rushing_yards within team
-      rushing_epa = list(value = na_to_null(round(rbs$rushing_epa[i], 2)), rank = na_to_null(as.integer(rbs$rushing_epa_rank[i])), rankDisplay = na_to_null(rbs$rushing_epa_rankDisplay[i])),
-      rushing_yards = list(value = na_to_null(as.integer(rbs$rushing_yards[i])), rank = na_to_null(as.integer(rbs$rushing_yards_rank[i])), rankDisplay = na_to_null(rbs$rushing_yards_rankDisplay[i])),
-      rushing_tds = list(value = na_to_null(as.integer(rbs$rushing_tds[i])), rank = na_to_null(as.integer(rbs$rushing_tds_rank[i])), rankDisplay = na_to_null(rbs$rushing_tds_rankDisplay[i])),
-      yards_per_carry = list(value = na_to_null(round(rbs$rushing_yards_per_carry[i], 2)), rank = na_to_null(as.integer(rbs$rushing_yards_per_carry_rank[i])), rankDisplay = na_to_null(rbs$rushing_yards_per_carry_rankDisplay[i])),
-      rushing_yards_per_game = list(value = na_to_null(round(rbs$rushing_yards_per_game[i], 1)), rank = na_to_null(as.integer(rbs$rushing_yards_per_game_rank[i])), rankDisplay = na_to_null(rbs$rushing_yards_per_game_rankDisplay[i])),
-      receptions = list(value = na_to_null(as.integer(rbs$receptions[i])), rank = na_to_null(as.integer(rbs$rb_receptions_rank[i])), rankDisplay = na_to_null(rbs$rb_receptions_rankDisplay[i])),
-      receiving_yards = list(value = na_to_null(as.integer(rbs$receiving_yards[i])), rank = na_to_null(as.integer(rbs$rb_receiving_yards_rank[i])), rankDisplay = na_to_null(rbs$rb_receiving_yards_rankDisplay[i])),
-      receiving_tds = list(value = na_to_null(as.integer(rbs$receiving_tds[i])), rank = na_to_null(as.integer(rbs$rb_receiving_tds_rank[i])), rankDisplay = na_to_null(rbs$rb_receiving_tds_rankDisplay[i])),
-      receiving_yards_per_game = list(value = na_to_null(round(rbs$receiving_yards_per_game[i], 1)), rank = na_to_null(as.integer(rbs$rb_receiving_yards_per_game_rank[i])), rankDisplay = na_to_null(rbs$rb_receiving_yards_per_game_rankDisplay[i])),
-      target_share = list(value = na_to_null(round(rbs$target_share[i], 3)), rank = na_to_null(as.integer(rbs$target_share_rank[i])), rankDisplay = na_to_null(rbs$target_share_rankDisplay[i]))
-    )
-  })
-
-  receivers_json <- lapply(1:nrow(receivers), function(i) {
-    list(
-      name = receivers$player_name[i],
-      sortOrder = as.integer(receivers$team_rank[i]),  # Rank by receiving_yards within team
-      receiving_epa = list(value = na_to_null(round(receivers$receiving_epa[i], 2)), rank = na_to_null(as.integer(receivers$receiving_epa_rank[i])), rankDisplay = na_to_null(receivers$receiving_epa_rankDisplay[i])),
-      receiving_yards = list(value = na_to_null(as.integer(receivers$receiving_yards[i])), rank = na_to_null(as.integer(receivers$receiving_yards_rank[i])), rankDisplay = na_to_null(receivers$receiving_yards_rankDisplay[i])),
-      receiving_tds = list(value = na_to_null(as.integer(receivers$receiving_tds[i])), rank = na_to_null(as.integer(receivers$receiving_tds_rank[i])), rankDisplay = na_to_null(receivers$receiving_tds_rankDisplay[i])),
-      receptions = list(value = na_to_null(as.integer(receivers$receptions[i])), rank = na_to_null(as.integer(receivers$receptions_rank[i])), rankDisplay = na_to_null(receivers$receptions_rankDisplay[i])),
-      yards_per_reception = list(value = na_to_null(round(receivers$receiving_yards_per_reception[i], 2)), rank = na_to_null(as.integer(receivers$receiving_yards_per_reception_rank[i])), rankDisplay = na_to_null(receivers$receiving_yards_per_reception_rankDisplay[i])),
-      receiving_yards_per_game = list(value = na_to_null(round(receivers$receiving_yards_per_game[i], 1)), rank = na_to_null(as.integer(receivers$receiving_yards_per_game_rank[i])), rankDisplay = na_to_null(receivers$receiving_yards_per_game_rankDisplay[i])),
-      catch_pct = list(value = na_to_null(round(receivers$catch_pct[i], 1)), rank = na_to_null(as.integer(receivers$catch_pct_rank[i])), rankDisplay = na_to_null(receivers$catch_pct_rankDisplay[i])),
-      wopr = list(value = na_to_null(round(receivers$wopr[i], 2)), rank = na_to_null(as.integer(receivers$wopr_rank[i])), rankDisplay = na_to_null(receivers$wopr_rankDisplay[i])),
-      racr = list(value = na_to_null(round(receivers$racr[i], 2)), rank = na_to_null(as.integer(receivers$racr_rank[i])), rankDisplay = na_to_null(receivers$racr_rankDisplay[i])),
-      target_share = list(value = na_to_null(round(receivers$target_share[i], 3)), rank = na_to_null(as.integer(receivers$target_share_rank[i])), rankDisplay = na_to_null(receivers$target_share_rankDisplay[i])),
-      air_yards_share = list(value = na_to_null(round(receivers$air_yards_share[i], 2)), rank = na_to_null(as.integer(receivers$air_yards_share_rank[i])), rankDisplay = na_to_null(receivers$air_yards_share_rankDisplay[i]))
+      dateRange = paste0(season, " season"),
+      startDate = min(sg$date),
+      endDate = max(sg$date),
+      teamAWins = as.integer(sum(sg$winner == team_a, na.rm = TRUE)),
+      teamBWins = as.integer(sum(sg$winner == team_b, na.rm = TRUE)),
+      games = lapply(seq_len(nrow(sg)), function(i) {
+        row <- sg[i, ]
+        list(
+          date = row$date,
+          week = as.integer(row$week),
+          seasonType = row$game_type,
+          homeTeam = row$home_team,
+          awayTeam = row$away_team,
+          homeScore = row$home_score,
+          awayScore = row$away_score,
+          winner = row$winner %||% "TIE"
+        )
+      })
     )
   })
 
   list(
-    team_stats = list(
-      cum_epa_by_week = cum_epa_list,
-      epa_by_week = epa_by_week_list,
-      current = current_stats
-    ),
-    players = list(
-      qb = qb_json,
-      rbs = rbs_json,
-      receivers = receivers_json
-    )
+    teamA = team_a,
+    teamB = team_b,
+    teamAWins = as.integer(a_wins),
+    teamBWins = as.integer(b_wins),
+    totalGames = as.integer(nrow(games)),
+    series = series_list
   )
 }
 
 # ============================================================================
-# Helper function to extract team stats for comparison views
+# Season highs (prior-best before each game, so a game can set a new one)
 # ============================================================================
-get_team_stats_for_comparison <- function(team_abbr, season_totals) {
-  team_totals <- season_totals %>%
-    filter(team == team_abbr)
+season_high_cols <- c(
+  points = "points", totalYards = "total_yards",
+  passYards = "pass_yards", rushYards = "rush_yards"
+)
 
-  if (nrow(team_totals) == 0) {
-    return(NULL)
-  }
+season_high_table <- game_box %>% arrange(team, week)
 
-  # Offensive stats
-  offense <- list(
-    off_epa = list(
-      value = round(team_totals$off_epa[1], 3),
-      rank = as.integer(team_totals$off_epa_rank[1]),
-      rankDisplay = team_totals$off_epa_rankDisplay[1],
-      label = "Off EPA/Play",
-      pairedWith = "def_epa"
-    ),
-    yards_per_game = list(
-      value = round(team_totals$yards_per_game[1], 1),
-      rank = as.integer(team_totals$yards_per_game_rank[1]),
-      rankDisplay = team_totals$yards_per_game_rankDisplay[1],
-      label = "Total Yards/Game",
-      pairedWith = "yards_allowed_per_game"
-    ),
-    pass_yards_per_game = list(
-      value = round(team_totals$pass_yards_per_game[1], 1),
-      rank = as.integer(team_totals$pass_yards_per_game_rank[1]),
-      rankDisplay = team_totals$pass_yards_per_game_rankDisplay[1],
-      label = "Pass Yards/Game",
-      pairedWith = "pass_yards_allowed_per_game"
-    ),
-    rush_yards_per_game = list(
-      value = round(team_totals$rush_yards_per_game[1], 1),
-      rank = as.integer(team_totals$rush_yards_per_game_rank[1]),
-      rankDisplay = team_totals$rush_yards_per_game_rankDisplay[1],
-      label = "Rush Yards/Game",
-      pairedWith = "rush_yards_allowed_per_game"
-    ),
-    points_per_game = list(
-      value = round(team_totals$points_per_game[1], 1),
-      rank = as.integer(team_totals$points_per_game_rank[1]),
-      rankDisplay = team_totals$points_per_game_rankDisplay[1],
-      label = "Points/Game",
-      pairedWith = "points_allowed_per_game"
-    ),
-    yards_per_play = list(
-      value = round(team_totals$yards_per_play[1], 2),
-      rank = as.integer(team_totals$yards_per_play_rank[1]),
-      rankDisplay = team_totals$yards_per_play_rankDisplay[1],
-      label = "Yards/Play",
-      pairedWith = NULL  # No defensive equivalent
-    ),
-    third_down_pct = list(
-      value = round(team_totals$third_down_pct[1], 1),
-      rank = as.integer(team_totals$third_down_pct_rank[1]),
-      rankDisplay = team_totals$third_down_pct_rankDisplay[1],
-      label = "3rd Down %",
-      pairedWith = "third_down_pct_def"
-    ),
-    rushing_epa = list(
-      value = round(team_totals$rushing_epa[1], 3),
-      rank = as.integer(team_totals$rushing_epa_rank[1]),
-      rankDisplay = team_totals$rushing_epa_rankDisplay[1],
-      label = "Rush EPA/Play",
-      pairedWith = NULL  # No defensive equivalent
-    ),
-    receiving_epa = list(
-      value = round(team_totals$receiving_epa[1], 3),
-      rank = as.integer(team_totals$receiving_epa_rank[1]),
-      rankDisplay = team_totals$receiving_epa_rankDisplay[1],
-      label = "Rec EPA/Play",
-      pairedWith = NULL  # No defensive equivalent
-    ),
-    touchdowns = list(
-      value = as.integer(team_totals$touchdowns[1]),
-      rank = as.integer(team_totals$touchdowns_rank[1]),
-      rankDisplay = team_totals$touchdowns_rankDisplay[1],
-      label = "Touchdowns",
-      pairedWith = "touchdowns_allowed"
-    ),
-    sacks_suffered = list(
-      value = as.integer(team_totals$sacks_suffered[1]),
-      rank = as.integer(team_totals$sacks_suffered_rank[1]),
-      rankDisplay = team_totals$sacks_suffered_rankDisplay[1],
-      label = "Sacks Allowed",
-      pairedWith = "sacks_made"
-    ),
-    interceptions_thrown = list(
-      value = as.integer(team_totals$interceptions_thrown[1]),
-      rank = as.integer(team_totals$interceptions_thrown_rank[1]),
-      rankDisplay = team_totals$interceptions_thrown_rankDisplay[1],
-      label = "INTs Thrown",
-      pairedWith = "interceptions_made"
-    ),
-    fumbles_lost = list(
-      value = as.integer(team_totals$fumbles_lost[1]),
-      rank = as.integer(team_totals$fumbles_lost_rank[1]),
-      rankDisplay = team_totals$fumbles_lost_rankDisplay[1],
-      label = "Fumbles Lost",
-      pairedWith = "fumbles_forced"
-    )
-  )
+check_season_highs <- function(team_code, game_id) {
+  rows <- season_high_table %>% filter(team == team_code)
+  if (nrow(rows) == 0) return(NULL)
+  idx <- which(rows$game_id == game_id)
+  if (length(idx) == 0) return(NULL)
+  i <- idx[1]
+  if (i == 1) return(NULL)
 
-  # Defensive stats
-  defense <- list(
-    def_epa = list(
-      value = round(team_totals$def_epa[1], 3),
-      rank = as.integer(team_totals$def_epa_rank[1]),
-      rankDisplay = team_totals$def_epa_rankDisplay[1],
-      label = "Def EPA/Play",
-      pairedWith = "off_epa"
-    ),
-    yards_allowed_per_game = list(
-      value = round(team_totals$yards_allowed_per_game[1], 1),
-      rank = as.integer(team_totals$yards_allowed_per_game_rank[1]),
-      rankDisplay = team_totals$yards_allowed_per_game_rankDisplay[1],
-      label = "Total Yards Allowed/Game",
-      pairedWith = "yards_per_game"
-    ),
-    pass_yards_allowed_per_game = list(
-      value = round(team_totals$pass_yards_allowed_per_game[1], 1),
-      rank = as.integer(team_totals$pass_yards_allowed_per_game_rank[1]),
-      rankDisplay = team_totals$pass_yards_allowed_per_game_rankDisplay[1],
-      label = "Pass Yards Allowed/Game",
-      pairedWith = "pass_yards_per_game"
-    ),
-    rush_yards_allowed_per_game = list(
-      value = round(team_totals$rush_yards_allowed_per_game[1], 1),
-      rank = as.integer(team_totals$rush_yards_allowed_per_game_rank[1]),
-      rankDisplay = team_totals$rush_yards_allowed_per_game_rankDisplay[1],
-      label = "Rush Yards Allowed/Game",
-      pairedWith = "rush_yards_per_game"
-    ),
-    points_allowed_per_game = list(
-      value = round(team_totals$points_allowed_per_game[1], 1),
-      rank = as.integer(team_totals$points_allowed_per_game_rank[1]),
-      rankDisplay = team_totals$points_allowed_per_game_rankDisplay[1],
-      label = "Points Allowed/Game",
-      pairedWith = "points_per_game"
-    ),
-    third_down_pct_def = list(
-      value = round(team_totals$third_down_pct_def[1], 1),
-      rank = as.integer(team_totals$third_down_pct_def_rank[1]),
-      rankDisplay = team_totals$third_down_pct_def_rankDisplay[1],
-      label = "3rd Down % Allowed",
-      pairedWith = "third_down_pct"
-    ),
-    sacks_made = list(
-      value = as.integer(team_totals$sacks_made[1]),
-      rank = as.integer(team_totals$sacks_made_rank[1]),
-      rankDisplay = team_totals$sacks_made_rankDisplay[1],
-      label = "Sacks Made",
-      pairedWith = "sacks_suffered"
-    ),
-    interceptions_made = list(
-      value = as.integer(team_totals$interceptions_made[1]),
-      rank = as.integer(team_totals$interceptions_made_rank[1]),
-      rankDisplay = team_totals$interceptions_made_rankDisplay[1],
-      label = "INTs Made",
-      pairedWith = "interceptions_thrown"
-    ),
-    fumbles_forced = list(
-      value = as.integer(team_totals$fumbles_forced[1]),
-      rank = as.integer(team_totals$fumbles_forced_rank[1]),
-      rankDisplay = team_totals$fumbles_forced_rankDisplay[1],
-      label = "Fumbles Forced",
-      pairedWith = "fumbles_lost"
-    ),
-    touchdowns_allowed = list(
-      value = as.integer(team_totals$touchdowns_allowed[1]),
-      rank = as.integer(team_totals$touchdowns_allowed_rank[1]),
-      rankDisplay = team_totals$touchdowns_allowed_rankDisplay[1],
-      label = "TDs Allowed",
-      pairedWith = "touchdowns"
-    ),
-    turnover_differential = list(
-      value = as.integer(team_totals$turnover_differential[1]),
-      rank = as.integer(team_totals$turnover_differential_rank[1]),
-      rankDisplay = team_totals$turnover_differential_rankDisplay[1],
-      label = "Turnover Diff",
-      pairedWith = NULL  # No offensive equivalent - this is a combined stat
-    )
-  )
-
-  return(list(offense = offense, defense = defense))
-}
-
-# ============================================================================
-# Build comparison views for a matchup
-# ============================================================================
-build_comparison_views <- function(home_stats, away_stats, home_team, away_team) {
-  # View 1: Side-by-side Off vs Off and Def vs Def
-  # These are stats where we compare like-for-like (offense to offense, defense to defense)
-
-  # Offensive comparison (all offensive stats)
-  off_comparison <- list()
-  off_stat_names <- names(home_stats$offense)
-  for (stat_name in off_stat_names) {
-    home_stat <- home_stats$offense[[stat_name]]
-    away_stat <- away_stats$offense[[stat_name]]
-    off_comparison[[stat_name]] <- list(
-      label = home_stat$label,
-      home = list(
-        value = home_stat$value,
-        rank = home_stat$rank,
-        rankDisplay = home_stat$rankDisplay
-      ),
-      away = list(
-        value = away_stat$value,
-        rank = away_stat$rank,
-        rankDisplay = away_stat$rankDisplay
-      )
-    )
-  }
-
-  # Defensive comparison (all defensive stats)
-  def_comparison <- list()
-  def_stat_names <- names(home_stats$defense)
-  for (stat_name in def_stat_names) {
-    home_stat <- home_stats$defense[[stat_name]]
-    away_stat <- away_stats$defense[[stat_name]]
-    def_comparison[[stat_name]] <- list(
-      label = home_stat$label,
-      home = list(
-        value = home_stat$value,
-        rank = home_stat$rank,
-        rankDisplay = home_stat$rankDisplay
-      ),
-      away = list(
-        value = away_stat$value,
-        rank = away_stat$rank,
-        rankDisplay = away_stat$rankDisplay
-      )
-    )
-  }
-
-  # View 2: Home Offense vs Away Defense (matchup stats)
-  # Only include stats that have a defensive counterpart
-  home_off_vs_away_def <- list()
-  for (stat_name in names(home_stats$offense)) {
-    off_stat <- home_stats$offense[[stat_name]]
-    paired_def_name <- off_stat$pairedWith
-
-    if (!is.null(paired_def_name) && paired_def_name %in% names(away_stats$defense)) {
-      def_stat <- away_stats$defense[[paired_def_name]]
-
-      # Calculate advantage: -1 = offense advantage, 1 = defense advantage, 0 = even
-      # Lower rank is better for both offense and defense
-      advantage <- 0
-      if (!is.null(off_stat$rank) && !is.null(def_stat$rank)) {
-        if (off_stat$rank < def_stat$rank) {
-          advantage <- -1  # Offense has better rank (advantage)
-        } else if (off_stat$rank > def_stat$rank) {
-          advantage <- 1   # Defense has better rank (advantage)
-        }
-      }
-
-      home_off_vs_away_def[[stat_name]] <- list(
-        statKey = stat_name,
-        offLabel = off_stat$label,
-        defLabel = def_stat$label,
-        offense = list(
-          team = home_team,
-          value = off_stat$value,
-          rank = off_stat$rank,
-          rankDisplay = off_stat$rankDisplay
-        ),
-        defense = list(
-          team = away_team,
-          value = def_stat$value,
-          rank = def_stat$rank,
-          rankDisplay = def_stat$rankDisplay
-        ),
-        advantage = advantage
+  highs <- list()
+  for (out_key in names(season_high_cols)) {
+    col <- season_high_cols[[out_key]]
+    value <- safe_num(rows[[col]][i])
+    prior <- suppressWarnings(max(rows[[col]][seq_len(i - 1)], na.rm = TRUE))
+    if (is.na(value) || !is.finite(prior)) next
+    if (value > prior) {
+      highs[[out_key]] <- list(
+        previousHigh = round(prior, 1),
+        differential = round(value - prior, 1)
       )
     }
   }
+  if (length(highs) == 0) NULL else highs
+}
 
-  # View 3: Away Offense vs Home Defense (matchup stats)
-  away_off_vs_home_def <- list()
-  for (stat_name in names(away_stats$offense)) {
-    off_stat <- away_stats$offense[[stat_name]]
-    paired_def_name <- off_stat$pairedWith
+# ============================================================================
+# Player highlights for completed games
+# ============================================================================
+# Postseason weeks are kept: week numbers do not collide with the regular
+# season (19-22), so a playoff game still gets its player highlights.
+player_week_stats <- if (is.null(weekly_player_stats)) {
+  NULL
+} else {
+  weekly_player_stats %>%
+    mutate(
+      team_code = normalize_nfl_team(team),
+      player_name = coalesce(player_display_name, player_name)
+    ) %>%
+    filter(!is.na(team_code))
+}
 
-    if (!is.null(paired_def_name) && paired_def_name %in% names(home_stats$defense)) {
-      def_stat <- home_stats$defense[[paired_def_name]]
+build_player_highlights <- function(team_code, week_num) {
+  if (is.null(player_week_stats)) return(NULL)
+  rows <- player_week_stats %>% filter(team_code == !!team_code, week == week_num)
+  if (nrow(rows) == 0) return(NULL)
 
-      # Calculate advantage: -1 = offense advantage, 1 = defense advantage, 0 = even
-      # Lower rank is better for both offense and defense
-      advantage <- 0
-      if (!is.null(off_stat$rank) && !is.null(def_stat$rank)) {
-        if (off_stat$rank < def_stat$rank) {
-          advantage <- -1  # Offense has better rank (advantage)
-        } else if (off_stat$rank > def_stat$rank) {
-          advantage <- 1   # Defense has better rank (advantage)
-        }
-      }
+  qb_row <- rows %>%
+    filter(coalesce(attempts, 0) > 0) %>%
+    arrange(desc(attempts)) %>%
+    head(1)
 
-      away_off_vs_home_def[[stat_name]] <- list(
-        statKey = stat_name,
-        offLabel = off_stat$label,
-        defLabel = def_stat$label,
-        offense = list(
-          team = away_team,
-          value = off_stat$value,
-          rank = off_stat$rank,
-          rankDisplay = off_stat$rankDisplay
-        ),
-        defense = list(
-          team = home_team,
-          value = def_stat$value,
-          rank = def_stat$rank,
-          rankDisplay = def_stat$rankDisplay
-        ),
-        advantage = advantage
+  quarterback <- if (nrow(qb_row) == 0) NULL else list(
+    playerId = as.character(qb_row$player_id[1]),
+    name = as.character(qb_row$player_name[1]),
+    position = as.character(qb_row$position[1]),
+    completions = int_or_null(qb_row$completions[1]),
+    attempts = int_or_null(qb_row$attempts[1]),
+    passYards = int_or_null(qb_row$passing_yards[1]),
+    passTds = int_or_null(qb_row$passing_tds[1]),
+    interceptions = int_or_null(qb_row$passing_interceptions[1]),
+    sacksTaken = int_or_null(qb_row$sacks_suffered[1]),
+    rushYards = int_or_null(qb_row$rushing_yards[1]),
+    rushTds = int_or_null(qb_row$rushing_tds[1]),
+    epa = null_if_na(qb_row$passing_epa[1], 1),
+    cpoe = null_if_na(qb_row$passing_cpoe[1], 1)
+  )
+
+  # Quarterbacks are excluded here — they already have their own block, and a
+  # scrambling QB otherwise pushes the actual lead back off the list.
+  rusher_rows <- rows %>%
+    filter(coalesce(carries, 0) > 0, position != "QB") %>%
+    arrange(desc(rushing_yards), desc(carries)) %>%
+    head(2)
+  rushers <- lapply(seq_len(nrow(rusher_rows)), function(i) {
+    r <- rusher_rows[i, ]
+    list(
+      playerId = as.character(r$player_id),
+      name = as.character(r$player_name),
+      position = as.character(r$position),
+      carries = int_or_null(r$carries),
+      rushYards = int_or_null(r$rushing_yards),
+      rushTds = int_or_null(r$rushing_tds),
+      yardsPerCarry = null_if_na(safe_div(r$rushing_yards, r$carries), 1),
+      receptions = int_or_null(r$receptions),
+      recYards = int_or_null(r$receiving_yards),
+      epa = null_if_na(r$rushing_epa, 1)
+    )
+  })
+
+  receiver_rows <- rows %>%
+    filter(coalesce(targets, 0) > 0) %>%
+    arrange(desc(receiving_yards), desc(receptions)) %>%
+    head(3)
+  receivers <- lapply(seq_len(nrow(receiver_rows)), function(i) {
+    r <- receiver_rows[i, ]
+    list(
+      playerId = as.character(r$player_id),
+      name = as.character(r$player_name),
+      position = as.character(r$position),
+      targets = int_or_null(r$targets),
+      receptions = int_or_null(r$receptions),
+      recYards = int_or_null(r$receiving_yards),
+      recTds = int_or_null(r$receiving_tds),
+      yardsPerReception = null_if_na(safe_div(r$receiving_yards, r$receptions), 1),
+      epa = null_if_na(r$receiving_epa, 1)
+    )
+  })
+
+  # Weighted so a sack or a takeaway outranks a pile of routine tackles.
+  defender_rows <- rows %>%
+    mutate(
+      tackles = coalesce(def_tackles_solo, 0) + coalesce(def_tackle_assists, 0),
+      def_score = coalesce(def_sacks, 0) * 3 +
+        coalesce(def_tackles_for_loss, 0) * 2 +
+        coalesce(def_interceptions, 0) * 4 +
+        coalesce(def_pass_defended, 0) * 1.5 +
+        coalesce(def_fumbles_forced, 0) * 3 +
+        tackles * 0.5
+    ) %>%
+    filter(def_score > 0) %>%
+    arrange(desc(def_score)) %>%
+    head(3)
+  defenders <- lapply(seq_len(nrow(defender_rows)), function(i) {
+    r <- defender_rows[i, ]
+    list(
+      playerId = as.character(r$player_id),
+      name = as.character(r$player_name),
+      position = as.character(r$position),
+      tackles = int_or_null(r$tackles),
+      sacks = null_if_na(r$def_sacks, 1),
+      tacklesForLoss = int_or_null(r$def_tackles_for_loss),
+      interceptions = int_or_null(r$def_interceptions),
+      passesDefensed = int_or_null(r$def_pass_defended),
+      forcedFumbles = int_or_null(r$def_fumbles_forced),
+      qbHits = int_or_null(r$def_qb_hits)
+    )
+  })
+
+  list(
+    quarterback = quarterback,
+    rushers = rushers,
+    receivers = receivers,
+    defenders = defenders
+  )
+}
+
+# ============================================================================
+# Game window
+# ============================================================================
+today <- Sys.Date()
+window_start <- today - DAYS_BEHIND
+window_end <- today + DAYS_AHEAD
+
+selected_games <- schedules_all %>%
+  filter(game_day >= window_start, game_day <= window_end) %>%
+  arrange(game_day, gametime)
+
+window_mode <- "window"
+
+# In the offseason the live window is empty. Rather than publish an empty chart
+# for months, fall back to the last week that was played plus the next week that
+# is scheduled — the results a reader still cares about, and the slate ahead.
+if (nrow(selected_games) == 0) {
+  window_mode <- "fallback"
+  last_played <- schedules_all %>%
+    filter(played) %>%
+    arrange(desc(game_day)) %>%
+    head(1)
+  next_scheduled <- schedules_all %>%
+    filter(!played, game_day >= today) %>%
+    arrange(game_day) %>%
+    head(1)
+
+  parts <- list()
+  if (nrow(last_played) > 0) {
+    parts[[length(parts) + 1]] <- schedules_all %>%
+      filter(season == last_played$season[1], week == last_played$week[1],
+             game_type == last_played$game_type[1])
+  }
+  if (nrow(next_scheduled) > 0) {
+    parts[[length(parts) + 1]] <- schedules_all %>%
+      filter(season == next_scheduled$season[1], week == next_scheduled$week[1],
+             game_type == next_scheduled$game_type[1])
+  }
+  selected_games <- bind_rows(parts) %>%
+    distinct(game_id, .keep_all = TRUE) %>%
+    arrange(game_day, gametime)
+}
+
+cat("Selected", nrow(selected_games), "games (", window_mode, "mode )\n")
+
+if (nrow(selected_games) == 0) {
+  cat("No games to publish. Exiting.\n")
+  quit(save = "no", status = 0)
+}
+
+# ============================================================================
+# Stat catalog — drives both the team stat block and the side-by-side view
+# ============================================================================
+OFFENSE_STATS <- list(
+  list(key = "pointsPerGame", col = "points_per_game", label = "Points/Game", digits = 1),
+  list(key = "yardsPerGame", col = "yards_per_game", label = "Yards/Game", digits = 1),
+  list(key = "passYardsPerGame", col = "pass_yards_per_game", label = "Pass Yards/Game", digits = 1),
+  list(key = "rushYardsPerGame", col = "rush_yards_per_game", label = "Rush Yards/Game", digits = 1),
+  list(key = "yardsPerPlay", col = "yards_per_play", label = "Yards/Play", digits = 2),
+  list(key = "offEpaPerPlay", col = "off_epa_per_play", label = "Off EPA/Play", digits = 3),
+  list(key = "offSuccessRate", col = "off_success_rate", label = "Off Success %", digits = 1),
+  list(key = "firstDownsPerGame", col = "first_downs_per_game", label = "1st Downs/Game", digits = 1),
+  list(key = "thirdDownPct", col = "third_down_pct", label = "3rd Down %", digits = 1),
+  list(key = "fourthDownPct", col = "fourth_down_pct", label = "4th Down %", digits = 1),
+  list(key = "redZoneTdPct", col = "red_zone_td_pct", label = "Red Zone TD %", digits = 1),
+  list(key = "explosivePerGame", col = "explosive_per_game", label = "Explosive/Game", digits = 1),
+  list(key = "turnoversPerGame", col = "turnovers_per_game", label = "Turnovers/Game", digits = 2),
+  list(key = "sacksAllowedPerGame", col = "sacks_allowed_per_game", label = "Sacks Allowed/Game", digits = 2),
+  list(key = "timeOfPossession", col = "time_of_possession", label = "Time of Poss (min)", digits = 1)
+)
+
+DEFENSE_STATS <- list(
+  list(key = "pointsAllowedPerGame", col = "points_allowed_per_game", label = "Points Allowed/Game", digits = 1),
+  list(key = "yardsAllowedPerGame", col = "yards_allowed_per_game", label = "Yards Allowed/Game", digits = 1),
+  list(key = "passYardsAllowedPerGame", col = "pass_yards_allowed_per_game", label = "Pass Yards Allowed/Game", digits = 1),
+  list(key = "rushYardsAllowedPerGame", col = "rush_yards_allowed_per_game", label = "Rush Yards Allowed/Game", digits = 1),
+  list(key = "yardsAllowedPerPlay", col = "yards_allowed_per_play", label = "Yards Allowed/Play", digits = 2),
+  list(key = "defEpaPerPlay", col = "def_epa_per_play", label = "Def EPA/Play", digits = 3),
+  list(key = "defSuccessRateAllowed", col = "def_success_rate_allowed", label = "Success % Allowed", digits = 1),
+  list(key = "thirdDownPctAllowed", col = "third_down_pct_allowed", label = "3rd Down % Allowed", digits = 1),
+  list(key = "redZoneTdPctAllowed", col = "red_zone_td_pct_allowed", label = "Red Zone TD % Allowed", digits = 1),
+  list(key = "takeawaysPerGame", col = "takeaways_per_game", label = "Takeaways/Game", digits = 2),
+  list(key = "sacksPerGame", col = "sacks_per_game", label = "Sacks/Game", digits = 2)
+)
+
+OVERALL_STATS <- list(
+  list(key = "pointDiffPerGame", col = "point_diff_per_game", label = "Point Diff/Game", digits = 1),
+  list(key = "netEpaPerPlay", col = "net_epa_per_play", label = "Net EPA/Play", digits = 3),
+  list(key = "turnoverDiffPerGame", col = "turnover_diff_per_game", label = "Turnover Diff/Game", digits = 2),
+  list(key = "penaltiesPerGame", col = "penalties_per_game", label = "Penalties/Game", digits = 1),
+  list(key = "penaltyYardsPerGame", col = "penalty_yards_per_game", label = "Penalty Yards/Game", digits = 1)
+)
+
+ALL_STAT_SPECS <- c(OFFENSE_STATS, DEFENSE_STATS, OVERALL_STATS)
+
+stat_val <- function(row, col, digits = 3) {
+  if (is.null(row) || !col %in% names(row)) {
+    return(list(value = NULL, rank = NULL, rankDisplay = NULL))
+  }
+  value <- safe_num(row[[col]])
+  if (is.na(value)) return(list(value = NULL, rank = NULL, rankDisplay = NULL))
+  rank_val <- if (paste0(col, "_rank") %in% names(row)) row[[paste0(col, "_rank")]] else NA
+  rank_display <- if (paste0(col, "_rankDisplay") %in% names(row)) row[[paste0(col, "_rankDisplay")]] else NA
+  list(
+    value = round(value, digits),
+    rank = if (length(rank_val) == 0 || is.na(rank_val)) NULL else as.integer(rank_val[[1]]),
+    rankDisplay = if (length(rank_display) == 0 || is.na(rank_display)) NULL else as.character(rank_display[[1]])
+  )
+}
+
+build_stat_block <- function(row) {
+  if (is.null(row)) return(NULL)
+  stats <- list(gamesPlayed = as.integer(row$games_played[1]))
+  for (spec in ALL_STAT_SPECS) {
+    stats[[spec$key]] <- stat_val(row, spec$col, spec$digits)
+  }
+  stats
+}
+
+build_side_by_side <- function(home_row, away_row) {
+  make_group <- function(specs) {
+    setNames(
+      lapply(specs, function(spec) {
+        list(
+          label = spec$label,
+          home = stat_val(home_row, spec$col, spec$digits),
+          away = stat_val(away_row, spec$col, spec$digits)
+        )
+      }),
+      vapply(specs, function(spec) spec$key, character(1))
+    )
+  }
+  list(
+    offense = make_group(OFFENSE_STATS),
+    defense = make_group(DEFENSE_STATS),
+    overall = make_group(OVERALL_STATS)
+  )
+}
+
+# Offense-vs-defense pairings: each maps one team's offensive rate against the
+# stat the opponent's defense gives up, so the advantage is a real comparison
+# rather than two unrelated league ranks.
+OFF_VS_DEF_PAIRS <- list(
+  list(key = "points", off = "points_per_game", def = "points_allowed_per_game",
+       offLabel = "Points/Game", defLabel = "Points Allowed/Game", digits = 1),
+  list(key = "yards", off = "yards_per_game", def = "yards_allowed_per_game",
+       offLabel = "Yards/Game", defLabel = "Yards Allowed/Game", digits = 1),
+  list(key = "pass", off = "pass_yards_per_game", def = "pass_yards_allowed_per_game",
+       offLabel = "Pass Yards/Game", defLabel = "Pass Yards Allowed/Game", digits = 1),
+  list(key = "rush", off = "rush_yards_per_game", def = "rush_yards_allowed_per_game",
+       offLabel = "Rush Yards/Game", defLabel = "Rush Yards Allowed/Game", digits = 1),
+  list(key = "epa", off = "off_epa_per_play", def = "def_epa_per_play",
+       offLabel = "Off EPA/Play", defLabel = "Def EPA/Play", digits = 3),
+  list(key = "success", off = "off_success_rate", def = "def_success_rate_allowed",
+       offLabel = "Off Success %", defLabel = "Success % Allowed", digits = 1),
+  list(key = "thirdDown", off = "third_down_pct", def = "third_down_pct_allowed",
+       offLabel = "3rd Down %", defLabel = "3rd Down % Allowed", digits = 1),
+  list(key = "redZone", off = "red_zone_td_pct", def = "red_zone_td_pct_allowed",
+       offLabel = "Red Zone TD %", defLabel = "Red Zone TD % Allowed", digits = 1),
+  list(key = "protection", off = "sacks_allowed_per_game", def = "sacks_per_game",
+       offLabel = "Sacks Allowed/Game", defLabel = "Sacks/Game", digits = 2),
+  list(key = "ballSecurity", off = "turnovers_per_game", def = "takeaways_per_game",
+       offLabel = "Turnovers/Game", defLabel = "Takeaways/Game", digits = 2)
+)
+
+# Both sides are already ranked best-to-worst within their own stat, so the
+# better rank wins regardless of whether the underlying stat is high- or
+# low-is-better. -1 = offense has the edge, 1 = defense does.
+calc_advantage <- function(off_rank, def_rank) {
+  if (is.null(off_rank) || is.null(def_rank)) return(0L)
+  if (off_rank < def_rank) return(-1L)
+  if (off_rank > def_rank) return(1L)
+  0L
+}
+
+build_off_vs_def <- function(off_team, def_team, off_row, def_row) {
+  setNames(
+    lapply(OFF_VS_DEF_PAIRS, function(pair) {
+      off_v <- stat_val(off_row, pair$off, pair$digits)
+      def_v <- stat_val(def_row, pair$def, pair$digits)
+      list(
+        statKey = pair$key,
+        offLabel = pair$offLabel,
+        defLabel = pair$defLabel,
+        offense = list(team = off_team, value = off_v$value, rank = off_v$rank, rankDisplay = off_v$rankDisplay),
+        defense = list(team = def_team, value = def_v$value, rank = def_v$rank, rankDisplay = def_v$rankDisplay),
+        advantage = calc_advantage(off_v$rank, def_v$rank)
       )
+    }),
+    vapply(OFF_VS_DEF_PAIRS, function(pair) pair$key, character(1))
+  )
+}
+
+# ============================================================================
+# Per-team payload pieces
+# ============================================================================
+build_recent_form <- function(team_code) {
+  row <- recent_form %>% filter(team == team_code)
+  if (nrow(row) == 0) return(setNames(list(), character(0)))
+  row <- row[1, ]
+  entry <- function(col, digits) {
+    list(
+      value = null_if_na(row[[col]], digits),
+      rank = int_or_null(row[[paste0(col, "_rank")]]),
+      rankDisplay = as.character(row[[paste0(col, "_rankDisplay")]])
+    )
+  }
+  list(
+    gamesPlayed = as.integer(row$games_played),
+    record = list(
+      wins = as.integer(row$wins),
+      losses = as.integer(row$losses),
+      ties = as.integer(row$ties),
+      rank = int_or_null(row$win_pct_rank),
+      rankDisplay = as.character(row$win_pct_rankDisplay)
+    ),
+    pointsPerGame = entry("points_per_game", 1),
+    pointsAllowedPerGame = entry("points_allowed_per_game", 1),
+    pointDiffPerGame = entry("point_diff_per_game", 1),
+    yardsPerGame = entry("yards_per_game", 1),
+    turnoverDiffPerGame = entry("turnover_diff_per_game", 2)
+  )
+}
+
+build_cum_point_diff <- function(team_code) {
+  rows <- cum_point_diff %>% filter(team == team_code) %>% arrange(week)
+  if (nrow(rows) == 0) return(setNames(list(), character(0)))
+  setNames(as.list(round(rows$cum_point_diff)), paste0("week-", rows$week))
+}
+
+build_performance_by_week <- function(team_code) {
+  rows <- weekly_performance %>% filter(team == team_code) %>% arrange(week)
+  if (nrow(rows) == 0) return(setNames(list(), character(0)))
+  setNames(
+    lapply(seq_len(nrow(rows)), function(i) {
+      list(
+        pointsScored = round(rows$points_scored[i], 2),
+        pointsAllowed = round(rows$points_allowed[i], 2)
+      )
+    }),
+    paste0("week-", rows$week)
+  )
+}
+
+format_record <- function(w, l, t) {
+  if (is.na(w) || is.na(l)) return(NULL)
+  if (!is.na(t) && t > 0) paste0(w, "-", l, "-", t) else paste0(w, "-", l)
+}
+
+team_record_string <- function(team_code) {
+  row <- team_stats %>% filter(team == team_code)
+  if (nrow(row) == 0) return(NULL)
+  format_record(row$wins[1], row$losses[1], row$ties[1])
+}
+
+build_team_info <- function(team_code, stats_row) {
+  meta <- team_meta_row(team_code)
+  stats <- build_stat_block(stats_row)
+  if (!is.null(stats)) {
+    stats$recentForm <- build_recent_form(team_code)
+    stats$cumPointDiffByWeek <- build_cum_point_diff(team_code)
+    stats$performanceByWeek <- build_performance_by_week(team_code)
+  }
+  list(
+    id = if (is.null(meta)) team_code else meta$team_id,
+    name = if (is.null(meta)) team_code else meta$team_name,
+    abbreviation = team_code,
+    logo = if (is.null(meta)) NULL else meta$logo,
+    record = team_record_string(team_code),
+    division = if (is.null(meta)) NULL else meta$division,
+    conference = if (is.null(meta)) NULL else meta$conference,
+    stats = stats
+  )
+}
+
+# ============================================================================
+# Completed game results
+# ============================================================================
+BOX_SCORE_FIELDS <- list(
+  points = list(col = "points", digits = 0),
+  totalYards = list(col = "total_yards", digits = 0),
+  passYards = list(col = "pass_yards", digits = 0),
+  rushYards = list(col = "rush_yards", digits = 0),
+  plays = list(col = "plays", digits = 0),
+  yardsPerPlay = list(col = "yards_per_play", digits = 2),
+  firstDowns = list(col = "first_downs", digits = 0),
+  thirdDownConv = list(col = "third_down_conv", digits = 0),
+  thirdDownAtt = list(col = "third_down_att", digits = 0),
+  thirdDownPct = list(col = "third_down_pct", digits = 1),
+  fourthDownConv = list(col = "fourth_down_conv", digits = 0),
+  fourthDownAtt = list(col = "fourth_down_att", digits = 0),
+  redZoneTrips = list(col = "red_zone_trips", digits = 0),
+  redZoneTds = list(col = "red_zone_tds", digits = 0),
+  turnovers = list(col = "turnovers", digits = 0),
+  takeaways = list(col = "takeaways", digits = 0),
+  sacksAllowed = list(col = "sacks_allowed", digits = 0),
+  sacks = list(col = "sacks", digits = 0),
+  penalties = list(col = "penalties", digits = 0),
+  penaltyYards = list(col = "penalty_yards", digits = 0),
+  explosivePlays = list(col = "explosive_plays", digits = 0),
+  epa = list(col = "epa_total", digits = 2),
+  successRate = list(col = "success_rate", digits = 1)
+)
+
+build_box_score <- function(team_code, game_id) {
+  row <- game_box_all %>% filter(team == team_code, game_id == !!game_id)
+  if (nrow(row) == 0) return(NULL)
+  row <- row[1, ]
+  box <- lapply(BOX_SCORE_FIELDS, function(spec) null_if_na(row[[spec$col]], spec$digits))
+  box$timeOfPossession <- null_if_na(row$top_seconds / 60, 1)
+  box
+}
+
+# Game line vs the team's season per-game rate for the same stat.
+VS_AVG_FIELDS <- list(
+  points = list(game = "points", season = "points_per_game", digits = 1),
+  totalYards = list(game = "total_yards", season = "yards_per_game", digits = 1),
+  passYards = list(game = "pass_yards", season = "pass_yards_per_game", digits = 1),
+  rushYards = list(game = "rush_yards", season = "rush_yards_per_game", digits = 1),
+  yardsPerPlay = list(game = "yards_per_play", season = "yards_per_play", digits = 2),
+  firstDowns = list(game = "first_downs", season = "first_downs_per_game", digits = 1),
+  thirdDownPct = list(game = "third_down_pct", season = "third_down_pct", digits = 1),
+  turnovers = list(game = "turnovers", season = "turnovers_per_game", digits = 2),
+  takeaways = list(game = "takeaways", season = "takeaways_per_game", digits = 2),
+  sacksAllowed = list(game = "sacks_allowed", season = "sacks_allowed_per_game", digits = 2),
+  sacks = list(game = "sacks", season = "sacks_per_game", digits = 2),
+  penalties = list(game = "penalties", season = "penalties_per_game", digits = 1),
+  penaltyYards = list(game = "penalty_yards", season = "penalty_yards_per_game", digits = 1),
+  explosivePlays = list(game = "explosive_plays", season = "explosive_per_game", digits = 1),
+  successRate = list(game = "success_rate", season = "off_success_rate", digits = 1),
+  timeOfPossession = list(game = "top_minutes", season = "time_of_possession", digits = 1)
+)
+
+build_vs_season_avg <- function(team_code, game_id) {
+  game_row <- game_box_all %>% filter(team == team_code, game_id == !!game_id)
+  season_row <- team_stats %>% filter(team == team_code)
+  if (nrow(game_row) == 0 || nrow(season_row) == 0) return(NULL)
+  game_row <- game_row[1, ]
+  game_row$top_minutes <- game_row$top_seconds / 60
+  season_row <- season_row[1, ]
+
+  out <- lapply(VS_AVG_FIELDS, function(spec) {
+    game_val <- safe_num(game_row[[spec$game]])
+    season_val <- safe_num(season_row[[spec$season]])
+    if (is.na(game_val) || is.na(season_val)) return(NULL)
+    list(
+      gameValue = round(game_val, spec$digits),
+      seasonAvg = round(season_val, spec$digits),
+      difference = round(game_val - season_val, spec$digits)
+    )
+  })
+  if (all(vapply(out, is.null, logical(1)))) NULL else out
+}
+
+build_results <- function(game) {
+  home_score <- as.integer(game$home_score)
+  away_score <- as.integer(game$away_score)
+  home_won <- home_score > away_score
+  winner <- if (home_score == away_score) {
+    "TIE"
+  } else if (home_won) {
+    game$home_code
+  } else {
+    game$away_code
+  }
+
+  results <- list(
+    homeScore = home_score,
+    awayScore = away_score,
+    winner = winner,
+    margin = as.integer(abs(home_score - away_score)),
+    homeWon = home_won
+  )
+
+  # Box scores are built from the stats season's play-by-play, so a game from a
+  # different season (the offseason fallback can span two) has no line here.
+  home_box <- build_box_score(game$home_code, game$game_id)
+  away_box <- build_box_score(game$away_code, game$game_id)
+  if (!is.null(home_box) || !is.null(away_box)) {
+    results$teamBoxScore <- list(home = home_box, away = away_box)
+    results$vsSeasonAvg <- list(
+      home = build_vs_season_avg(game$home_code, game$game_id),
+      away = build_vs_season_avg(game$away_code, game$game_id)
+    )
+    home_highs <- check_season_highs(game$home_code, game$game_id)
+    away_highs <- check_season_highs(game$away_code, game$game_id)
+    if (!is.null(home_highs) || !is.null(away_highs)) {
+      results$seasonHighs <- list(home = home_highs, away = away_highs)
     }
   }
 
-  return(list(
-    sideBySide = list(
-      offense = off_comparison,
-      defense = def_comparison
-    ),
-    homeOffVsAwayDef = home_off_vs_away_def,
-    awayOffVsHomeDef = away_off_vs_home_def
-  ))
+  # Player highlights come from the stats season's weekly feed, so a game from
+  # a different season (the offseason fallback can span two) has none.
+  # Compared numerically: load_schedules ships `season` as an integer while
+  # stats_season is a double, and identical() would never match.
+  if (isTRUE(as.integer(game$season) == as.integer(stats_season))) {
+    home_players <- build_player_highlights(game$home_code, game$week)
+    away_players <- build_player_highlights(game$away_code, game$week)
+    if (!is.null(home_players) || !is.null(away_players)) {
+      results$playerHighlights <- list(home = home_players, away = away_players)
+    }
+  }
+
+  results
 }
 
-# Build JSON for all matchups
+# ============================================================================
+# Build matchups
+# ============================================================================
+cat("\nBuilding matchups...\n")
+
+SEASON_TYPE_LABELS <- c(
+  REG = "Regular Season", WC = "Wild Card", DIV = "Divisional Round",
+  CON = "Conference Championship", SB = "Super Bowl"
+)
+
+game_status_name <- function(game) {
+  if (isTRUE(game$played)) "STATUS_FINAL" else "STATUS_SCHEDULED"
+}
+
+# nflverse gives the kickoff as a local date plus a wall-clock time. The app
+# parses gameDate as an instant, so emit it in UTC using Eastern kickoff time,
+# which is how the league schedules and how every other matchup chart reads.
+game_date_iso <- function(game) {
+  time_str <- game$gametime
+  if (is.na(time_str) || !nzchar(time_str)) time_str <- "13:00"
+  local <- tryCatch(
+    as.POSIXct(paste(format(game$game_day, "%Y-%m-%d"), time_str),
+               tz = "America/New_York", format = "%Y-%m-%d %H:%M"),
+    error = function(e) NA
+  )
+  if (is.na(local)) {
+    return(paste0(format(game$game_day, "%Y-%m-%d"), "T18:00:00Z"))
+  }
+  format(as.POSIXct(local, tz = "UTC"), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC")
+}
+
+build_odds <- function(game) {
+  spread <- safe_num(game$spread_line)
+  total <- safe_num(game$total_line)
+  home_ml <- safe_num(game$home_moneyline)
+  away_ml <- safe_num(game$away_moneyline)
+  if (is.na(spread) && is.na(total) && is.na(home_ml) && is.na(away_ml)) return(NULL)
+
+  # nflverse spread_line is home-relative and positive when the home team is
+  # favored; the app's details string names the favorite with a negative number.
+  details <- NULL
+  if (!is.na(spread) && spread != 0) {
+    favorite <- if (spread > 0) game$home_code else game$away_code
+    details <- sprintf("%s -%s", favorite, format(abs(spread), nsmall = 1))
+  } else if (!is.na(spread)) {
+    details <- "PK"
+  }
+
+  list(
+    provider = "nflverse",
+    spread = if (is.na(spread)) NULL else round(spread, 1),
+    overUnder = if (is.na(total)) NULL else round(total, 1),
+    homeMoneyline = int_or_null(home_ml),
+    awayMoneyline = int_or_null(away_ml),
+    details = details
+  )
+}
+
+build_location <- function(game) {
+  stadium <- game$stadium
+  if ((is.na(stadium) || !nzchar(stadium)) && is.na(game$roof)) return(NULL)
+  list(
+    stadium = if (is.na(stadium) || !nzchar(stadium)) NULL else as.character(stadium),
+    roof = if (is.na(game$roof)) NULL else as.character(game$roof),
+    surface = if (is.na(game$surface)) NULL else as.character(game$surface)
+  )
+}
+
 matchups_json <- list()
 
-for (i in 1:nrow(current_week_games)) {
-  game <- current_week_games[i, ]
-  home_team <- game$home_team
-  away_team <- game$away_team
-  game_id <- game$game_id
-  matchup_key <- paste(tolower(away_team), tolower(home_team), sep = "-")
+for (i in seq_len(nrow(selected_games))) {
+  game <- selected_games[i, ]
 
-  cat("Processing matchup:", matchup_key, "\n")
+  home_row <- team_stats %>% filter(team == game$home_code)
+  away_row <- team_stats %>% filter(team == game$away_code)
+  home_s <- if (nrow(home_row) > 0) home_row[1, ] else NULL
+  away_s <- if (nrow(away_row) > 0) away_row[1, ] else NULL
 
-  # Get odds (pass game_id to use ESPN odds API)
-  odds <- get_odds_for_game(home_team, away_team, game_id)
+  home_meta <- team_meta_row(game$home_code)
+  away_meta <- team_meta_row(game$away_code)
+  game_name <- paste(
+    if (is.null(away_meta)) game$away_code else away_meta$team_name,
+    "at",
+    if (is.null(home_meta)) game$home_code else home_meta$team_name
+  )
 
-  # Get head-to-head record (from home team's perspective)
-  h2h <- get_h2h_record(home_team, away_team, schedules)
-
-  # Get common opponents
-  common_opps <- get_common_opponents(home_team, away_team, schedules)
-
-  # Build team JSONs
-  home_json <- build_team_json(home_team, cum_epa_by_team, team_season_totals, top_players, team_stats_weekly)
-  away_json <- build_team_json(away_team, cum_epa_by_team, team_season_totals, top_players, team_stats_weekly)
-
-  # Get team stats for comparison views
-  home_stats <- get_team_stats_for_comparison(home_team, team_season_totals)
-  away_stats <- get_team_stats_for_comparison(away_team, team_season_totals)
-
-  # Build the three comparison views
-  comparisons <- NULL
-  if (!is.null(home_stats) && !is.null(away_stats)) {
-    comparisons <- build_comparison_views(home_stats, away_stats, home_team, away_team)
+  comparisons <- if (!is.null(home_s) && !is.null(away_s)) {
+    list(
+      sideBySide = build_side_by_side(home_s, away_s),
+      homeOffVsAwayDef = build_off_vs_def(game$home_code, game$away_code, home_s, away_s),
+      awayOffVsHomeDef = build_off_vs_def(game$away_code, game$home_code, away_s, home_s)
+    )
+  } else {
+    NULL
   }
 
-  # Get game date and time
-  # Format: "2025-09-07T13:00:00Z" (ISO 8601 format in UTC)
-  game_datetime <- NULL
-  if (!is.null(game$gameday) && !is.na(game$gameday) &&
-      !is.null(game$gametime) && !is.na(game$gametime)) {
-    # Combine gameday and gametime
-    # gametime is in format "HH:MM" (Eastern Time)
-    # Convert to ISO 8601 format (we'll assume Eastern Time and add offset)
-    game_datetime <- paste0(game$gameday, "T", game$gametime, ":00-05:00")
-  }
-
-  # Build matchup JSON
   matchup <- list(
-    game_datetime = game_datetime,
-    odds = odds,
-    h2h_record = I(h2h),  # Use I() to prevent auto_unbox from converting empty list to null
-    common_opponents = common_opps,
+    gameId = as.character(game$game_id),
+    gameDate = game_date_iso(game),
+    gameName = game_name,
+    gameStatus = game_status_name(game),
+    gameCompleted = isTRUE(game$played),
+    season = as.integer(game$season),
+    week = as.integer(game$week),
+    seasonType = as.character(game$game_type),
+    seasonTypeLabel = unname(SEASON_TYPE_LABELS[as.character(game$game_type)]) %||% as.character(game$game_type),
+    homeTeam = build_team_info(game$home_code, home_s),
+    awayTeam = build_team_info(game$away_code, away_s),
+    location = build_location(game),
+    odds = build_odds(game),
     comparisons = comparisons,
-    teams = list()
+    # Away team is teamA so the H2H block reads in the same order as the
+    # matchup header (away at home).
+    h2h = build_h2h(game$away_code, game$home_code)
   )
-  matchup$teams[[tolower(home_team)]] <- home_json
-  matchup$teams[[tolower(away_team)]] <- away_json
 
-  matchups_json[[matchup_key]] <- matchup
+  if (isTRUE(game$played) && !is.na(game$home_score) && !is.na(game$away_score)) {
+    matchup$results <- build_results(game)
+  }
+
+  matchups_json[[length(matchups_json) + 1]] <- matchup
 }
 
+cat("Built", length(matchups_json), "matchups\n")
+
 # ============================================================================
-# Write output JSON and upload to S3
+# Output JSON
 # ============================================================================
-cat("\n11. Writing output and uploading to S3...\n")
+window_label <- paste0(
+  format(min(selected_games$game_day), "%b %d"), " - ",
+  format(max(selected_games$game_day), "%b %d")
+)
+chart_title <- paste0("NFL Matchups - ", window_label)
 
-# Wrap matchups in metadata structure
-# Use the original current_week from week_info for title generation (ESPN-based 1-5 playoff weeks)
-# current_week_games$week may have different numbering from nflreadr
-title_week <- current_week
+weeks_covered <- selected_games %>%
+  distinct(season, week, game_type) %>%
+  arrange(season, week)
+week_summary <- paste(
+  apply(weeks_covered, 1, function(r) {
+    label <- unname(SEASON_TYPE_LABELS[trimws(r[["game_type"]])]) %||% trimws(r[["game_type"]])
+    if (identical(trimws(r[["game_type"]]), "REG")) {
+      paste0(trimws(r[["season"]]), " Week ", trimws(r[["week"]]))
+    } else {
+      paste0(trimws(r[["season"]]), " ", label)
+    }
+  }),
+  collapse = " · "
+)
 
-# Determine title based on season type
-title_text <- if (is_playoffs) {
-  # Calculate Super Bowl number with Roman numerals (e.g., "Super Bowl LX")
-  super_bowl_label <- paste0("Super Bowl ", to_roman(get_super_bowl_number(CURRENT_SEASON)))
-
-  week_label <- case_when(
-    title_week == 1 ~ "Wild Card",
-    title_week == 2 ~ "Divisional Round",
-    title_week == 3 ~ "Conference Championships",
-    # Note: Pro Bowl (week 4) is skipped in get_current_week_info(), so this case shouldn't trigger
-    title_week == 4 ~ "Pro Bowl",
-    title_week == 5 ~ super_bowl_label,
-    TRUE ~ paste0("Playoff Week ", title_week)
-  )
-  # Super Bowl is singular (only one game)
-  suffix <- if (title_week == 5) " Matchup Worksheet" else " Matchup Worksheets"
-  paste0(week_label, suffix)
+subtitle <- if (identical(window_mode, "window")) {
+  paste0("Games from the past ", DAYS_BEHIND, " days and next ", DAYS_AHEAD, " days · ", week_summary)
 } else {
-  paste0("Week ", title_week, " Matchup Worksheets")
-}
-
-# Determine tags based on season type - matchups show both team and player stats
-chart_tags <- if (is_playoffs) {
-  list(
-    list(label = "team", layout = "left", color = "#4CAF50"),
-    list(label = "player", layout = "left", color = "#2196F3"),
-    list(label = "post season", layout = "right", color = "#FF9800")
-  )
-} else {
-  list(
-    list(label = "team", layout = "left", color = "#4CAF50"),
-    list(label = "player", layout = "left", color = "#2196F3"),
-    list(label = "regular season", layout = "right", color = "#9C27B0")
-  )
+  paste0("Most recent results and the next scheduled slate · ", week_summary)
 }
 
 output_data <- list(
   sport = "NFL",
-  visualizationType = "MATCHUP_V2",
-  title = title_text,
-  subtitle = "Comprehensive statistical analysis for all matchups",
-  description = "Detailed matchup statistics including team performance metrics, player stats, head-to-head records, and common opponent results.\n\nCUMULATIVE EPA CHART:\n\nThe cumulative EPA chart displays Net EPA over the season for each team. Net EPA combines both offensive and defensive performance:\n\n • Net EPA = Offensive EPA - Defensive EPA Allowed\n\n • Offensive EPA: Total Expected Points Added by the offense (higher is better)\n\n • Defensive EPA Allowed: Total Expected Points Added by opposing offenses (lower is better for the defense)\n\n • Higher Net EPA indicates better overall team performance, accounting for both sides of the ball\n\n • The cumulative view shows how teams have performed throughout the season, with steeper upward slopes indicating elite play\n\nQUARTERBACK STATS:\n\n • Total EPA: Expected Points Added - total offensive value generated across all plays\n\n • Passing Yards: Total passing yards thrown\n\n • Passing TDs: Total touchdown passes thrown\n\n • Completion %: Completion percentage (completions / attempts × 100)\n\n • Pass CPOE: Completion Percentage Over Expected - accuracy beyond what's expected based on throw difficulty\n\n • PACR: Pass Air Conversion Ratio - measures QB efficiency converting air yards to actual yards (Formula: Passing Yards / Air Yards). Higher PACR indicates more yards after catch.\n\n • Yards/Game: Average passing yards per game\n\n • Interceptions: Total interceptions thrown\n\nRUNNING BACK STATS:\n\n • Rush EPA: Expected Points Added on rushing plays\n\n • Rushing Yards: Total rushing yards gained\n\n • Rushing TDs: Total rushing touchdowns\n\n • Yards/Carry: Average yards per rushing attempt\n\n • Rush Yards/Game: Average rushing yards per game\n\n • Receptions: Total receptions\n\n • Receiving Yards: Total receiving yards\n\n • Receiving TDs: Total receiving touchdowns\n\n • Rec Yards/Game: Average receiving yards per game\n\n • Target Share: Percentage of team's total targets\n\nRECEIVER STATS:\n\n • Rec EPA: Expected Points Added on receptions\n\n • Receiving Yards: Total receiving yards gained\n\n • Receiving TDs: Total receiving touchdowns\n\n • Receptions: Total receptions\n\n • Yards/Reception: Average yards per reception\n\n • Rec Yards/Game: Average receiving yards per game\n\n • Catch %: Catch percentage (receptions / targets × 100)\n\n • WOPR: Weighted Opportunity Rating - combines targets and air yards to measure receiving opportunity\n\n • RACR: Receiver Air Conversion Ratio - receiving yards per air yard (measures efficiency converting targets to yards)\n\n • Target Share: Percentage of team's total targets\n\n • Air Yards %: Percentage of team's total air yards\n\nAll EPA stats are per play through the current week.",
+  visualizationType = "NFL_MATCHUP",
+  title = chart_title,
+  subtitle = subtitle,
+  description = paste0(
+    "NFL matchup worksheets with full-season team comparisons on offense, ",
+    "defense and overall, plus offense-versus-defense pairings that rank each ",
+    "team's attack against what the opponent's defense actually allows. ",
+    "Completed games add a team box score, a game-versus-season-average ",
+    "breakdown, season highs, and player highlights.\n\n",
+    "Season stats cover the ", stats_season, " regular season and come from ",
+    "nflverse play-by-play, so a team's season line and its per-game lines are ",
+    "always the same numbers.\n\n",
+    "OFFENSE:\n\n",
+    " • Points/Game, Yards/Game, Pass Yards/Game, Rush Yards/Game: Season ",
+    "per-game production. Higher is better.\n\n",
+    " • Yards/Play: Total yards divided by offensive plays. Higher is better.\n\n",
+    " • Off EPA/Play: Expected points added per offensive play — the single ",
+    "best measure of offensive efficiency. Higher is better.\n\n",
+    " • Off Success %: Share of plays with positive EPA. Higher is better.\n\n",
+    " • 3rd Down % / 4th Down %: Conversion rate on third and fourth down. ",
+    "Higher is better.\n\n",
+    " • Red Zone TD %: Touchdowns per trip inside the 20. Higher is better.\n\n",
+    " • Explosive/Game: Plays of 20+ passing yards or 12+ rushing yards. ",
+    "Higher is better.\n\n",
+    " • Turnovers/Game, Sacks Allowed/Game: Lower is better.\n\n",
+    " • Time of Poss: Average minutes of possession per game.\n\n",
+    "DEFENSE:\n\n",
+    " • Points Allowed/Game, Yards Allowed/Game, Pass and Rush Yards Allowed: ",
+    "What opponents produce against this defense. Lower is better.\n\n",
+    " • Def EPA/Play, Success % Allowed: Efficiency surrendered per play. ",
+    "Lower is better.\n\n",
+    " • 3rd Down % Allowed, Red Zone TD % Allowed: Lower is better.\n\n",
+    " • Takeaways/Game, Sacks/Game: Higher is better.\n\n",
+    "OVERALL:\n\n",
+    " • Point Diff/Game, Net EPA/Play, Turnover Diff/Game: Higher is better.\n\n",
+    " • Penalties/Game, Penalty Yards/Game: Lower is better.\n\n",
+    "OFFENSE VS DEFENSE:\n\n",
+    "Each pairing puts one team's offensive rank beside the rank of the stat ",
+    "the opposing defense gives up. The better league rank holds the edge.\n\n",
+    "CHARTS:\n\n",
+    " • Cumulative Point Differential: Each team's running point differential ",
+    "by week, against the league's 10th-best pace.\n\n",
+    " • Weekly Performance: Points scored versus points allowed per week — the ",
+    "upper-left quadrant is scoring more while allowing less.\n\n",
+    "RECENT FORM:\n\n",
+    "The last ", RECENT_FORM_GAMES, " games for each team, with league ranks ",
+    "over that same window.\n\n",
+    "HEAD TO HEAD:\n\n",
+    "Every meeting between the two teams over the last ", H2H_SEASONS,
+    " seasons, grouped by season."
+  ),
   lastUpdated = format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC"),
-  source = "nflfastR / nflreadr / ESPN",
-  tags = chart_tags,
+  source = "nflverse (nflfastR / nflreadr)",
+  season = stats_season,
+  tags = list(
+    list(label = "team", layout = "left", color = "#4CAF50"),
+    list(label = "player", layout = "left", color = "#2196F3"),
+    list(label = "regular season", layout = "right", color = "#9C27B0")
+  ),
   sortOrder = 0,
-  week = as.integer(current_week),
+  leagueCumPointDiffStats = league_cum_point_diff_stats,
+  leagueWeeklyStats = league_weekly_stats,
   dataPoints = matchups_json
 )
 
-# Write to temp file first
 tmp_file <- tempfile(fileext = ".json")
 write_json(output_data, tmp_file, pretty = TRUE, auto_unbox = TRUE, null = "null", na = "null")
 
-cat("Generated stats for", length(matchups_json), "matchup(s)\n")
-
-# Upload to S3 if in production
-s3_bucket <- Sys.getenv("AWS_S3_BUCKET")
-
-if (nzchar(s3_bucket)) {
-  # ENV=PROD is the pipeline-wide switch (see start.sh / prod.sh). This script
-  # was pinned to the dev key, so its output never reached the prod registry.
-  env <- toupper(Sys.getenv("ENV", "DEV"))
-  s3_key <- if (env == "PROD") {
-    "prod/nfl__matchup_stats.json"
-  } else {
-    "dev/nfl__matchup_stats.json"
-  }
-
-  s3_path <- paste0("s3://", s3_bucket, "/", s3_key)
-  cmd <- paste("aws s3 cp", shQuote(tmp_file), shQuote(s3_path), "--content-type application/json")
-  result <- system(cmd)
-
-  if (result != 0) {
-    stop("Failed to upload to S3")
-  }
-
-  cat("Uploaded to S3:", s3_path, "\n")
-
-  # Update DynamoDB with metadata
-  dynamodb_table <- Sys.getenv("AWS_DYNAMODB_TABLE", "fastbreak-file-timestamps")
-  utc_timestamp <- format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC")
-  chart_title <- paste0("NFL Matchup Worksheets - ", title_text)
-  chart_interval <- "daily"
-
-  dynamodb_item <- sprintf(
-    '{"file_key": {"S": "%s"}, "updatedAt": {"S": "%s"}, "title": {"S": "%s"}, "interval": {"S": "%s"}}',
-    s3_key, utc_timestamp, chart_title, chart_interval
-  )
-  dynamodb_cmd <- sprintf(
-    'aws dynamodb put-item --table-name %s --item %s',
-    shQuote(dynamodb_table),
-    shQuote(dynamodb_item)
-  )
-
-  dynamodb_result <- system(dynamodb_cmd)
-
-  if (dynamodb_result != 0) {
-    warning("Failed to update DynamoDB timestamp (non-fatal)")
-  } else {
-    cat("Updated DynamoDB:", dynamodb_table, "key:", s3_key, "\n")
-  }
-
-  # Insert pipeline execution record
-  pipeline_file_key <- s3_key
-  pipeline_item <- sprintf(
-    '{"file_key": {"S": "%s"}, "updatedAt": {"S": "%s"}, "title": {"S": "%s"}, "interval": {"S": "%s"}}',
-    pipeline_file_key, utc_timestamp, chart_title, chart_interval
-  )
-  pipeline_cmd <- sprintf(
-    'aws dynamodb put-item --table-name %s --item %s',
-    shQuote(dynamodb_table),
-    shQuote(pipeline_item)
-  )
-
-  pipeline_result <- system(pipeline_cmd)
-
-  if (pipeline_result != 0) {
-    warning("Failed to update DynamoDB pipeline record (non-fatal)")
-  } else {
-    cat("Updated DynamoDB pipeline record:", pipeline_file_key, "\n")
-  }
-} else {
-  cat("AWS_S3_BUCKET not set, skipping S3 upload\n")
-  # Write to local file for testing
-  local_file <- "nfl_matchup_stats.json"
-  write_json(output_data, local_file, pretty = TRUE, auto_unbox = TRUE, null = "null", na = "null")
-  cat("Wrote output to local file:", local_file, "\n")
+completed <- sum(vapply(matchups_json, function(m) isTRUE(m$gameCompleted), logical(1)))
+cat("\nSummary — matchups:", length(matchups_json),
+    "| completed:", completed,
+    "| upcoming:", length(matchups_json) - completed, "\n")
+if (length(matchups_json) > 0) {
+  sample <- matchups_json[[1]]
+  cat("Sample —", sample$gameName, "|", sample$gameDate,
+      "| week", sample$week, sample$seasonType, "\n")
+  cat("  comparisons:", if (is.null(sample$comparisons)) "none" else
+        paste(length(sample$comparisons$sideBySide$offense), "offense /",
+              length(sample$comparisons$sideBySide$defense), "defense /",
+              length(sample$comparisons$sideBySide$overall), "overall stats"), "\n")
+  cat("  h2h games:", if (is.null(sample$h2h)) 0 else sample$h2h$totalGames, "\n")
+  cat("  results:", if (is.null(sample$results)) "none" else
+        paste0(sample$results$awayScore, "-", sample$results$homeScore), "\n")
 }
 
-cat("\n=== COMPLETE ===\n")
+if (nzchar(Sys.getenv("FASTBREAK_LOCAL_JSON"))) {
+  file.copy(tmp_file, Sys.getenv("FASTBREAK_LOCAL_JSON"), overwrite = TRUE)
+  cat("Wrote local JSON copy:", Sys.getenv("FASTBREAK_LOCAL_JSON"), "\n")
+}
+
+s3_bucket <- Sys.getenv("AWS_S3_BUCKET")
+if (!nzchar(s3_bucket)) stop("AWS_S3_BUCKET environment variable is not set")
+
+env <- toupper(Sys.getenv("ENV", "DEV"))
+s3_key <- if (env == "PROD") "prod/nfl__matchup_stats.json" else "dev/nfl__matchup_stats.json"
+
+s3_path <- paste0("s3://", s3_bucket, "/", s3_key)
+cmd <- paste("aws s3 cp", shQuote(tmp_file), shQuote(s3_path), "--content-type application/json")
+if (system(cmd) != 0) stop("Failed to upload to S3")
+cat("Uploaded to S3:", s3_path, "\n")
+
+dynamodb_table <- Sys.getenv("AWS_DYNAMODB_TABLE", "fastbreak-file-timestamps")
+utc_timestamp <- format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC")
+dynamodb_item <- sprintf(
+  '{"file_key": {"S": "%s"}, "updatedAt": {"S": "%s"}, "title": {"S": "%s"}, "interval": {"S": "daily"}}',
+  s3_key, utc_timestamp, chart_title
+)
+ddb_cmd <- sprintf(
+  "aws dynamodb put-item --table-name %s --item %s",
+  shQuote(dynamodb_table), shQuote(dynamodb_item)
+)
+if (system(ddb_cmd) != 0) {
+  warning("Failed to update DynamoDB timestamp (non-fatal)")
+} else {
+  cat("Updated DynamoDB:", dynamodb_table, "key:", s3_key, "\n")
+}
+
+cat("\n=== NFL Matchup Stats generation complete ===\n")

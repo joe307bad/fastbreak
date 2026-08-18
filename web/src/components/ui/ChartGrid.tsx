@@ -5,10 +5,10 @@ import Link from 'next/link';
 import { ChartRenderer } from '@/components/charts';
 import { UpcomingMatchups } from '@/components/charts/UpcomingMatchups';
 import { TopMatchupsWidget } from '@/components/charts/TopMatchupsWidget';
-import { ChartData, MatchupV2Data, MLBMatchupData, NBAMatchupData, NHLMatchupData } from '@/types/chart';
+import { ChartData, MatchupV2Data, MLBMatchupData, NFLMatchupData, NBAMatchupData, NHLMatchupData } from '@/types/chart';
 import { ChartNav } from './ChartNav';
 import { fileKeyToChartId } from '@/lib/registry';
-import { AnyMatchupData, TOP_MATCHUP_TYPES, getTopMatchupMetricLabel, isMatchupVisibleOnHomeGrid } from '@/lib/charts';
+import { AnyMatchupData, REPORT_CARD_TYPES, TOP_MATCHUP_TYPES, getTopMatchupMetricLabel, isMatchupVisibleOnHomeGrid } from '@/lib/charts';
 
 interface ChartGridProps {
   charts: { key: string; data: ChartData }[];
@@ -29,7 +29,7 @@ export function ChartGrid({ charts, matchups, topMatchupGameIds = [] }: ChartGri
   // Find NBA or NHL matchup for the top matchups widget
   const topMatchupData = matchups.find(m =>
     TOP_MATCHUP_TYPES.includes(m.data.visualizationType)
-  ) as { key: string; data: NBAMatchupData | NHLMatchupData | MLBMatchupData } | undefined;
+  ) as { key: string; data: NBAMatchupData | NHLMatchupData | MLBMatchupData | NFLMatchupData } | undefined;
 
   // Find NFL/MATCHUP_V2 matchup for NFL homepage
   const nflMatchupData = matchups.find(m =>
@@ -214,7 +214,7 @@ export function ChartGrid({ charts, matchups, topMatchupGameIds = [] }: ChartGri
         {charts.map(({ key, data }) => {
           const slug = slugify(data.title);
           const isActive = activeChart === key;
-          const isReportCard = data.visualizationType === 'MLB_TEAM_REPORT_CARD';
+          const isReportCard = REPORT_CARD_TYPES.includes(data.visualizationType);
           return (
             <article
               key={key}

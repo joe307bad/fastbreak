@@ -9,7 +9,8 @@ import com.joebad.fastbreak.data.model.MatchupV2Visualization
 import com.joebad.fastbreak.data.model.NBAMatchupVisualization
 import com.joebad.fastbreak.data.model.NBAPlayoffBracketVisualization
 import com.joebad.fastbreak.data.model.MLBMatchupVisualization
-import com.joebad.fastbreak.data.model.MLBTeamReportCardVisualization
+import com.joebad.fastbreak.data.model.NFLMatchupVisualization
+import com.joebad.fastbreak.data.model.TeamReportCardVisualization
 import com.joebad.fastbreak.data.model.NHLPlayoffBracketVisualization
 import com.joebad.fastbreak.data.model.NCAABracketVisualization
 import com.joebad.fastbreak.data.model.NHLMatchupVisualization
@@ -118,8 +119,12 @@ class ChartDataContainer(
                     com.joebad.fastbreak.data.model.VizType.MLB_MATCHUP -> {
                         json.decodeFromString<MLBMatchupVisualization>(cached.dataJson)
                     }
-                    com.joebad.fastbreak.data.model.VizType.MLB_TEAM_REPORT_CARD -> {
-                        json.decodeFromString<MLBTeamReportCardVisualization>(cached.dataJson)
+                    com.joebad.fastbreak.data.model.VizType.NFL_MATCHUP -> {
+                        json.decodeFromString<NFLMatchupVisualization>(cached.dataJson)
+                    }
+                    com.joebad.fastbreak.data.model.VizType.MLB_TEAM_REPORT_CARD,
+                    com.joebad.fastbreak.data.model.VizType.NFL_TEAM_REPORT_CARD -> {
+                        json.decodeFromString<TeamReportCardVisualization>(cached.dataJson)
                     }
                     com.joebad.fastbreak.data.model.VizType.CBB_MATCHUP -> {
                         json.decodeFromString<CBBMatchupVisualization>(cached.dataJson)

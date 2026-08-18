@@ -1242,7 +1242,284 @@ data class MLBMatchupVisualization(
     val dataPoints: List<MLBMatchup>
 ) : VisualizationType
 
-// MLB Team Report Card data structures
+// NFL Matchup data structures. The generic MatchupComparisons / MatchupLocation
+// / SeasonHighsWrapper models are shared with the other sports; only the pieces
+// whose shape is football-specific are declared here.
+@Serializable
+data class NFLTeamInfo(
+    val id: String,
+    val name: String,
+    val abbreviation: String,
+    val logo: String? = null,
+    val record: String? = null,
+    val division: String? = null,
+    val conference: String? = null,
+    // Free-form so the pipeline can add a stat without a model change; the
+    // worksheet reads the keys it knows about.
+    val stats: JsonObject? = null
+)
+
+@Serializable
+data class NFLMatchupOdds(
+    val provider: String? = null,
+    val spread: Double? = null,
+    val overUnder: Double? = null,
+    val homeMoneyline: Int? = null,
+    val awayMoneyline: Int? = null,
+    val details: String? = null
+)
+
+@Serializable
+data class NFLMatchupLocation(
+    val stadium: String? = null,
+    val roof: String? = null,
+    val surface: String? = null
+)
+
+@Serializable
+data class NFLTeamBoxScore(
+    val points: Double? = null,
+    val totalYards: Double? = null,
+    val passYards: Double? = null,
+    val rushYards: Double? = null,
+    val plays: Double? = null,
+    val yardsPerPlay: Double? = null,
+    val firstDowns: Double? = null,
+    val thirdDownConv: Double? = null,
+    val thirdDownAtt: Double? = null,
+    val thirdDownPct: Double? = null,
+    val fourthDownConv: Double? = null,
+    val fourthDownAtt: Double? = null,
+    val redZoneTrips: Double? = null,
+    val redZoneTds: Double? = null,
+    val turnovers: Double? = null,
+    val takeaways: Double? = null,
+    val sacksAllowed: Double? = null,
+    val sacks: Double? = null,
+    val penalties: Double? = null,
+    val penaltyYards: Double? = null,
+    val explosivePlays: Double? = null,
+    val epa: Double? = null,
+    val successRate: Double? = null,
+    val timeOfPossession: Double? = null
+)
+
+@Serializable
+data class NFLQuarterbackLine(
+    val playerId: String? = null,
+    val name: String,
+    val position: String? = null,
+    val completions: Int? = null,
+    val attempts: Int? = null,
+    val passYards: Int? = null,
+    val passTds: Int? = null,
+    val interceptions: Int? = null,
+    val sacksTaken: Int? = null,
+    val rushYards: Int? = null,
+    val rushTds: Int? = null,
+    val epa: Double? = null,
+    val cpoe: Double? = null
+)
+
+@Serializable
+data class NFLRusherLine(
+    val playerId: String? = null,
+    val name: String,
+    val position: String? = null,
+    val carries: Int? = null,
+    val rushYards: Int? = null,
+    val rushTds: Int? = null,
+    val yardsPerCarry: Double? = null,
+    val receptions: Int? = null,
+    val recYards: Int? = null,
+    val epa: Double? = null
+)
+
+@Serializable
+data class NFLReceiverLine(
+    val playerId: String? = null,
+    val name: String,
+    val position: String? = null,
+    val targets: Int? = null,
+    val receptions: Int? = null,
+    val recYards: Int? = null,
+    val recTds: Int? = null,
+    val yardsPerReception: Double? = null,
+    val epa: Double? = null
+)
+
+@Serializable
+data class NFLDefenderLine(
+    val playerId: String? = null,
+    val name: String,
+    val position: String? = null,
+    val tackles: Int? = null,
+    val sacks: Double? = null,
+    val tacklesForLoss: Int? = null,
+    val interceptions: Int? = null,
+    val passesDefensed: Int? = null,
+    val forcedFumbles: Int? = null,
+    val qbHits: Int? = null
+)
+
+@Serializable
+data class NFLGamePlayerHighlights(
+    val quarterback: NFLQuarterbackLine? = null,
+    val rushers: List<NFLRusherLine> = emptyList(),
+    val receivers: List<NFLReceiverLine> = emptyList(),
+    val defenders: List<NFLDefenderLine> = emptyList()
+)
+
+@Serializable
+data class NFLGamePlayerHighlightsWrapper(
+    val home: NFLGamePlayerHighlights? = null,
+    val away: NFLGamePlayerHighlights? = null
+)
+
+@Serializable
+data class NFLVsSeasonAvgStat(
+    val gameValue: Double? = null,
+    val seasonAvg: Double? = null,
+    val difference: Double? = null
+)
+
+@Serializable
+data class NFLVsSeasonAvgTeam(
+    val points: NFLVsSeasonAvgStat? = null,
+    val totalYards: NFLVsSeasonAvgStat? = null,
+    val passYards: NFLVsSeasonAvgStat? = null,
+    val rushYards: NFLVsSeasonAvgStat? = null,
+    val yardsPerPlay: NFLVsSeasonAvgStat? = null,
+    val firstDowns: NFLVsSeasonAvgStat? = null,
+    val thirdDownPct: NFLVsSeasonAvgStat? = null,
+    val turnovers: NFLVsSeasonAvgStat? = null,
+    val takeaways: NFLVsSeasonAvgStat? = null,
+    val sacksAllowed: NFLVsSeasonAvgStat? = null,
+    val sacks: NFLVsSeasonAvgStat? = null,
+    val penalties: NFLVsSeasonAvgStat? = null,
+    val penaltyYards: NFLVsSeasonAvgStat? = null,
+    val explosivePlays: NFLVsSeasonAvgStat? = null,
+    val successRate: NFLVsSeasonAvgStat? = null,
+    val timeOfPossession: NFLVsSeasonAvgStat? = null
+)
+
+@Serializable
+data class NFLTeamBoxScoreWrapper(
+    val home: NFLTeamBoxScore? = null,
+    val away: NFLTeamBoxScore? = null
+)
+
+@Serializable
+data class NFLVsSeasonAvgWrapper(
+    val home: NFLVsSeasonAvgTeam? = null,
+    val away: NFLVsSeasonAvgTeam? = null
+)
+
+@Serializable
+data class NFLGameResults(
+    val homeScore: Int? = null,
+    val awayScore: Int? = null,
+    val winner: String? = null,
+    val margin: Int? = null,
+    val homeWon: Boolean? = null,
+    val teamBoxScore: NFLTeamBoxScoreWrapper? = null,
+    val vsSeasonAvg: NFLVsSeasonAvgWrapper? = null,
+    val seasonHighs: SeasonHighsWrapper? = null,
+    val playerHighlights: NFLGamePlayerHighlightsWrapper? = null
+)
+
+@Serializable
+data class NFLH2HGame(
+    val date: String,
+    val week: Int? = null,
+    val seasonType: String? = null,
+    val homeTeam: String,
+    val awayTeam: String,
+    val homeScore: Int,
+    val awayScore: Int,
+    val winner: String
+)
+
+// One entry per season rather than MLB's date-adjacent series: NFL opponents
+// meet once or twice a year, so the season is the natural grouping.
+@Serializable
+data class NFLH2HSeries(
+    val dateRange: String,
+    val startDate: String,
+    val endDate: String,
+    val teamAWins: Int,
+    val teamBWins: Int,
+    val games: List<NFLH2HGame> = emptyList()
+)
+
+@Serializable
+data class NFLH2H(
+    val teamA: String,
+    val teamB: String,
+    val teamAWins: Int,
+    val teamBWins: Int,
+    val totalGames: Int,
+    val series: List<NFLH2HSeries> = emptyList()
+)
+
+@Serializable
+data class NFLMatchup(
+    val gameId: String,
+    val gameDate: String,
+    val gameName: String,
+    val gameStatus: String? = null,
+    val gameCompleted: Boolean = false,
+    val season: Int? = null,
+    val week: Int? = null,
+    val seasonType: String? = null,
+    val seasonTypeLabel: String? = null,
+    val homeTeam: NFLTeamInfo,
+    val awayTeam: NFLTeamInfo,
+    val location: NFLMatchupLocation? = null,
+    val odds: NFLMatchupOdds? = null,
+    val comparisons: MatchupComparisons? = null,
+    val h2h: NFLH2H? = null,
+    val results: NFLGameResults? = null
+)
+
+@Serializable
+data class LeagueCumPointDiffStats(
+    val minCumPointDiff: Double? = null,
+    val maxCumPointDiff: Double? = null,
+    val top10ByWeek: JsonObject? = null
+)
+
+@Serializable
+data class LeagueWeeklyPointStats(
+    val avgPointsScored: Double? = null,
+    val avgPointsAllowed: Double? = null,
+    val minPointsScored: Double? = null,
+    val maxPointsScored: Double? = null,
+    val minPointsAllowed: Double? = null,
+    val maxPointsAllowed: Double? = null
+)
+
+@Serializable
+data class NFLMatchupVisualization(
+    override val sport: String,
+    override val visualizationType: String,
+    override val title: String,
+    override val subtitle: String,
+    override val description: String,
+    override val lastUpdated: Instant,
+    override val source: String? = null,
+    @Serializable(with = TagListSerializer::class)
+    override val tags: List<Tag>? = null,
+    override val sortOrder: Int? = null,
+    val season: Int? = null,
+    val leagueCumPointDiffStats: LeagueCumPointDiffStats? = null,
+    val leagueWeeklyStats: LeagueWeeklyPointStats? = null,
+    val dataPoints: List<NFLMatchup>
+) : VisualizationType
+
+// Team Report Card data structures. Shared by MLB and NFL: categories are a
+// plain ordered map so a sport can declare whatever position groups it has,
+// and each category carries the stat keys and display flags its table needs.
 @Serializable
 data class ReportCardStatValue(
     val label: String,
@@ -1272,42 +1549,46 @@ data class ReportCardCategory(
     val label: String,
     val description: String? = null,
     val team: ReportCardTeamSummary? = null,
-    val players: List<ReportCardPlayer> = emptyList()
-)
-
-@Serializable
-data class ReportCardCategories(
-    val recentTrend: ReportCardCategory? = null,
-    val hitters: ReportCardCategory,
-    val starters: ReportCardCategory,
-    val relievers: ReportCardCategory,
-    val fielders: ReportCardCategory,
-    val belowReplacement: ReportCardCategory? = null,
-    val injuries: ReportCardCategory? = null
+    val players: List<ReportCardPlayer> = emptyList(),
+    // Payload-driven table layout. Null falls back to the per-sport defaults in
+    // the worksheet, which is what older cached MLB payloads rely on.
+    val statKeys: List<String>? = null,
+    val playerStatKeys: List<String>? = null,
+    val positionColumnLabel: String? = null,
+    val showPlayerRankAndComposite: Boolean? = null,
+    val showStatusColumn: Boolean? = null,
+    val showWarColumn: Boolean? = null,
+    val showTeamComposite: Boolean? = null,
+    val compositeRankingKey: String? = null
 )
 
 @Serializable
 data class ReportCardGameLogGame(
     val date: String? = null,
-    val location: String,          // "vs" (home) or "@" (away)
+    val week: Int? = null,
+    val seasonType: String? = null,   // "REG", "WC", "DIV", "CON", "SB"
+    val location: String,             // "vs" (home) or "@" (away)
     val opponent: String,
-    val opponentLabel: String,     // e.g. "vs LAD" or "@ SF"
-    val teamScore: Int,
-    val opponentScore: Int,
-    val differential: Int,
-    val won: Boolean
+    val opponentLabel: String,        // e.g. "vs LAD" or "@ SF"
+    val teamScore: Int? = null,       // null until the game has been played
+    val opponentScore: Int? = null,
+    val differential: Int? = null,
+    val result: String? = null,       // "W", "L", "T"
+    val won: Boolean? = null,
+    val played: Boolean = true
 )
 
 @Serializable
 data class ReportCardGameLogRecord(
     val wins: Int = 0,
     val losses: Int = 0,
+    val ties: Int = 0,
     val display: String = "0-0"
 )
 
 @Serializable
-data class ReportCardLastTenGames(
-    val label: String = "Last 10 Games",
+data class ReportCardGameLog(
+    val label: String = "Game Log",
     val columns: List<String> = emptyList(),
     val games: List<ReportCardGameLogGame> = emptyList(),
     val record: ReportCardGameLogRecord? = null,
@@ -1322,6 +1603,7 @@ data class ReportCardTeam(
     val league: String? = null,
     val wins: Int? = null,
     val losses: Int? = null,
+    val ties: Int? = null,
     val recordRank: Int? = null,
     val recordRankDisplay: String? = null,
     val divisionRank: Int? = null,
@@ -1330,12 +1612,14 @@ data class ReportCardTeam(
     val overallCompositeRank: Int? = null,
     val overallCompositeRankDisplay: String? = null,
     val playoffProb: Double? = null,
-    val lastTenGames: ReportCardLastTenGames? = null,
-    val categories: ReportCardCategories
+    val lastTenGames: ReportCardGameLog? = null,
+    val gameLog: ReportCardGameLog? = null,
+    val categoryOrder: List<String>? = null,
+    val categories: Map<String, ReportCardCategory> = emptyMap()
 )
 
 @Serializable
-data class MLBTeamReportCardVisualization(
+data class TeamReportCardVisualization(
     override val sport: String,
     override val visualizationType: String,
     override val title: String,
@@ -1347,7 +1631,11 @@ data class MLBTeamReportCardVisualization(
     override val tags: List<Tag>? = null,
     override val sortOrder: Int? = null,
     val season: Int,
+    val seasonLabel: String? = null,
+    val seasonPhase: String? = null,       // "PRE", "REG", "POST"
+    val seasonPhaseLabel: String? = null,
     val topN: Int,
+    val categoryOrder: List<String>? = null,
     val rankings: Map<String, List<RankingEntry>> = emptyMap(),
     val playoffChances: List<PlayoffChanceEntry> = emptyList(),
     val teams: Map<String, ReportCardTeam>

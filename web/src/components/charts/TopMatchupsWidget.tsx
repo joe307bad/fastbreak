@@ -1,9 +1,9 @@
 'use client';
 
-import { MLBMatchupData, MLBMatchupDataPoint, NBAMatchupData, NBAMatchupDataPoint, NHLMatchupData, NHLMatchupDataPoint } from '@/types/chart';
+import { MLBMatchupData, MLBMatchupDataPoint, NBAMatchupData, NBAMatchupDataPoint, NFLMatchupData, NFLMatchupDataPoint, NHLMatchupData, NHLMatchupDataPoint } from '@/types/chart';
 import { formatRunDiff, getLeagueAbbrev, getRecordRank, getRunDiffPerGame } from '@/lib/mlbStats';
 
-type AnyMatchupWidgetData = NBAMatchupData | NHLMatchupData | MLBMatchupData;
+type AnyMatchupWidgetData = NBAMatchupData | NHLMatchupData | MLBMatchupData | NFLMatchupData;
 
 interface Props {
   data: AnyMatchupWidgetData;
@@ -141,6 +141,56 @@ function NHLMatchupCard({ matchup, dayLabel }: { matchup: NHLMatchupDataPoint; d
   );
 }
 
+function nflWidgetStat(team: NFLMatchupDataPoint['homeTeam'], key: string): number | null {
+  const stat = team.stats?.[key] as { value?: number | null } | undefined;
+  return stat?.value ?? null;
+}
+
+function formatNflPointDiff(value: number | null): string {
+  if (value == null) return '-';
+  return value >= 0 ? `+${value.toFixed(1)}` : value.toFixed(1);
+}
+
+function NFLTopMatchupCard({ matchup, dayLabel }: { matchup: NFLMatchupDataPoint; dayLabel: string }) {
+  const awayDiff = nflWidgetStat(matchup.awayTeam, 'pointDiffPerGame');
+  const homeDiff = nflWidgetStat(matchup.homeTeam, 'pointDiffPerGame');
+  const totalDiff = (awayDiff ?? 0) + (homeDiff ?? 0);
+
+  const row = (team: NFLMatchupDataPoint['homeTeam'], diff: number | null) => (
+    <div className="flex items-center justify-between mb-1">
+      <div className="flex items-center gap-1.5">
+        <span className="text-[10px] text-[var(--muted)] w-6">{team.conference ?? ''}</span>
+        <span className="font-bold">{team.abbreviation}</span>
+      </div>
+      <div className="flex items-center gap-2">
+        <span className="text-[var(--muted)]">{team.record ?? '-'}</span>
+        <span className={`font-mono w-10 text-right ${(diff ?? 0) >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+          {formatNflPointDiff(diff)}
+        </span>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="border border-[var(--border)] rounded p-2 bg-[var(--card)] text-xs">
+      <div className="flex justify-between items-center text-[10px] text-[var(--muted)] mb-1.5">
+        <span>{dayLabel}</span>
+        <div className="flex items-center gap-2">
+          <span>Record</span>
+          <span className="w-10 text-right">PD/G</span>
+        </div>
+      </div>
+      {row(matchup.awayTeam, awayDiff)}
+      {row(matchup.homeTeam, homeDiff)}
+      <div className="flex justify-end mt-1.5 pt-1.5 border-t border-[var(--border)]">
+        <span className="text-[10px] text-[var(--muted)]">
+          Combined {formatNflPointDiff(totalDiff)}
+        </span>
+      </div>
+    </div>
+  );
+}
+
 function MLBMatchupCard({ matchup, dayLabel }: { matchup: MLBMatchupDataPoint; dayLabel: string }) {
   const awayRunDiff = getRunDiffPerGame(matchup.awayTeam.stats);
   const homeRunDiff = getRunDiffPerGame(matchup.homeTeam.stats);
@@ -270,6 +320,26 @@ export function TopMatchupsWidget({ data, selectedGameIds }: Props) {
       <div className="grid grid-cols-2 gap-2">
         {matchups.map(matchup => (
           <MLBMatchupCard
+            key={matchup.gameId}
+            matchup={matchup}
+            dayLabel={getDayLabel(matchup.gameDate)}
+          />
+        ))}
+      </div>
+    );
+  }
+
+  if (data.visualizationType === 'NFL_MATCHUP') {
+    const byId = new Map<string, NFLMatchupDataPoint>(
+      (data as NFLMatchupData).dataPoints.map(g => [g.gameId, g])
+    );
+    const matchups = resolveSelectedMatchups(selectedGameIds, byId);
+    if (matchups.length === 0) return null;
+
+    return (
+      <div className="grid grid-cols-2 gap-2">
+        {matchups.map(matchup => (
+          <NFLTopMatchupCard
             key={matchup.gameId}
             matchup={matchup}
             dayLabel={getDayLabel(matchup.gameDate)}

@@ -12,7 +12,8 @@ import com.joebad.fastbreak.data.model.LineChartVisualization
 import com.joebad.fastbreak.data.model.MatchupVisualization
 import com.joebad.fastbreak.data.model.MatchupV2Visualization
 import com.joebad.fastbreak.data.model.MLBMatchupVisualization
-import com.joebad.fastbreak.data.model.MLBTeamReportCardVisualization
+import com.joebad.fastbreak.data.model.NFLMatchupVisualization
+import com.joebad.fastbreak.data.model.TeamReportCardVisualization
 import com.joebad.fastbreak.data.model.NBAMatchupVisualization
 import com.joebad.fastbreak.data.model.NBAPlayoffBracketVisualization
 import com.joebad.fastbreak.data.model.NCAABracketVisualization
@@ -304,7 +305,8 @@ class ChartSyncManager(
                 VizType.NBA_MATCHUP -> json.decodeFromString<NBAMatchupVisualization>(rawJson)
                 VizType.NHL_MATCHUP -> json.decodeFromString<NHLMatchupVisualization>(rawJson)
                 VizType.MLB_MATCHUP -> json.decodeFromString<MLBMatchupVisualization>(rawJson)
-                VizType.MLB_TEAM_REPORT_CARD -> json.decodeFromString<MLBTeamReportCardVisualization>(rawJson)
+                VizType.NFL_MATCHUP -> json.decodeFromString<NFLMatchupVisualization>(rawJson)
+                VizType.MLB_TEAM_REPORT_CARD, VizType.NFL_TEAM_REPORT_CARD -> json.decodeFromString<TeamReportCardVisualization>(rawJson)
                 VizType.CBB_MATCHUP -> json.decodeFromString<CBBMatchupVisualization>(rawJson)
                 VizType.NCAA_BRACKET -> json.decodeFromString<NCAABracketVisualization>(rawJson)
                 VizType.NBA_PLAYOFF_BRACKET -> json.decodeFromString<NBAPlayoffBracketVisualization>(rawJson)

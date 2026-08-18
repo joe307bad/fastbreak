@@ -2,6 +2,7 @@ import { fetchAllCharts, fetchChartData, fetchOrderedSportsWithCharts, slugToKey
 import { pageMetadata } from '@/lib/og';
 import { ChartWithTable } from '@/components/charts/ChartWithTable';
 import { SportTabs } from '@/components/ui/SportTabs';
+import { REPORT_CARD_TYPES } from '@/lib/charts';
 
 interface Props {
   params: Promise<{ sport: string; slug: string }>;
@@ -34,7 +35,7 @@ export default async function ChartPage({ params }: Props) {
   const { slug } = await params;
   const data = await fetchChartData(slugToKey(slug));
   const orderedSports = await fetchOrderedSportsWithCharts();
-  const isReportCard = data.visualizationType === 'MLB_TEAM_REPORT_CARD';
+  const isReportCard = REPORT_CARD_TYPES.includes(data.visualizationType);
 
   return (
     <main

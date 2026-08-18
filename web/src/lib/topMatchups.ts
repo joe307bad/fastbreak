@@ -1,6 +1,8 @@
 import {
   MLBMatchupData,
   MLBMatchupDataPoint,
+  NFLMatchupData,
+  NFLMatchupDataPoint,
   NBAMatchupData,
   NBAMatchupDataPoint,
   NHLMatchupData,
@@ -92,11 +94,28 @@ function selectMLB(data: MLBMatchupData): string[] {
   );
 }
 
+function getTeamPointDiff(team: NFLMatchupDataPoint['homeTeam']): number {
+  const stat = team.stats?.pointDiffPerGame as { value?: number | null } | undefined;
+  return stat?.value ?? 0;
+}
+
+function selectNFL(data: NFLMatchupData): string[] {
+  const upcoming = data.dataPoints.filter(m => !m.gameCompleted);
+  return selectTopGameIds(upcoming, games =>
+    [...games].sort((a: NFLMatchupDataPoint, b: NFLMatchupDataPoint) => {
+      const ta = getTeamPointDiff(a.homeTeam) + getTeamPointDiff(a.awayTeam);
+      const tb = getTeamPointDiff(b.homeTeam) + getTeamPointDiff(b.awayTeam);
+      return tb - ta;
+    })
+  );
+}
+
 export function selectTopMatchups(
-  data: NBAMatchupData | NHLMatchupData | MLBMatchupData
+  data: NBAMatchupData | NHLMatchupData | MLBMatchupData | NFLMatchupData
 ): string[] {
   if (data.visualizationType === 'NBA_MATCHUP') return selectNBA(data);
   if (data.visualizationType === 'NHL_MATCHUP') return selectNHL(data);
   if (data.visualizationType === 'MLB_MATCHUP') return selectMLB(data);
+  if (data.visualizationType === 'NFL_MATCHUP') return selectNFL(data);
   return [];
 }

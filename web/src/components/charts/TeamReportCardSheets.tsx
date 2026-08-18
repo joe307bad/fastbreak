@@ -736,35 +736,65 @@ function parseReportCardRankingKey(key: string): {
   return null;
 }
 
-export function formatReportCardRankingLabel(seasonLabel: string, key: string): string {
+// Category and stat display names come from the payload — every category
+// carries its own label and every stat entry carries its own — so ranking sheet
+// titles work for any sport. The hardcoded tables below only cover MLB cards
+// cached before the payload carried them.
+export interface ReportCardLabelIndex {
+  categoryLabels: Record<string, string>;
+  statLabels: Record<string, string>;
+}
+
+export function buildReportCardLabelIndex(
+  teams: Record<string, ReportCardTeam>
+): ReportCardLabelIndex {
+  const categoryLabels: Record<string, string> = {};
+  const statLabels: Record<string, string> = {};
+  for (const team of Object.values(teams ?? {})) {
+    for (const [categoryKey, category] of Object.entries(team.categories ?? {})) {
+      if (!(categoryKey in categoryLabels)) categoryLabels[categoryKey] = category.label;
+      const record = (statKey: string, label: string) => {
+        const key = `${categoryKey}.${statKey}`;
+        if (!(key in statLabels)) statLabels[key] = label;
+      };
+      for (const [statKey, stat] of Object.entries(category.team?.stats ?? {})) {
+        record(statKey, stat.label);
+      }
+      for (const player of category.players ?? []) {
+        for (const [statKey, stat] of Object.entries(player.stats ?? {})) {
+          record(statKey, stat.label);
+        }
+      }
+    }
+  }
+  return { categoryLabels, statLabels };
+}
+
+function categoryLabelFor(categoryKey: string, labels?: ReportCardLabelIndex): string {
+  return labels?.categoryLabels[categoryKey] ?? formatReportCardCategoryLabel(categoryKey);
+}
+
+export function formatReportCardRankingLabel(
+  seasonLabel: string,
+  key: string,
+  labels?: ReportCardLabelIndex
+): string {
   const parsed = parseReportCardRankingKey(key);
   if (parsed) {
-    const categoryLabel = formatReportCardCategoryLabel(parsed.categoryKey);
-    const statLabel = formatReportCardStatLabel(parsed.categoryKey, parsed.statKey);
+    const categoryLabel = categoryLabelFor(parsed.categoryKey, labels);
+    const statLabel =
+      labels?.statLabels[`${parsed.categoryKey}.${parsed.statKey}`] ??
+      formatReportCardStatLabel(parsed.categoryKey, parsed.statKey);
     const suffix = parsed.isPlayer ? ' / Players' : '';
     return `${seasonLabel} / ${categoryLabel} / ${statLabel}${suffix}`;
   }
 
-  switch (key) {
-    case 'record':
-      return `${seasonLabel} / Record`;
-    case 'overallComposite':
-      return `${seasonLabel} / Overall Composite`;
-    case 'hittersComposite':
-      return `${seasonLabel} / Hitters Composite`;
-    case 'startersComposite':
-      return `${seasonLabel} / Starting Pitchers Composite`;
-    case 'relieversComposite':
-      return `${seasonLabel} / Bullpen Composite`;
-    case 'fieldersComposite':
-      return `${seasonLabel} / Fielders Composite`;
-    case 'injuriesComposite':
-      return `${seasonLabel} / Injury Report Composite`;
-    case 'belowReplacementComposite':
-      return `${seasonLabel} / Below-replacement performers Composite`;
-    default:
-      return `${seasonLabel} / ${key}`;
+  if (key === 'record') return `${seasonLabel} / Record`;
+  if (key === 'overallComposite') return `${seasonLabel} / Overall Composite`;
+  if (key.endsWith('Composite')) {
+    return `${seasonLabel} / ${categoryLabelFor(key.slice(0, -'Composite'.length), labels)} Composite`;
   }
+  return `${seasonLabel} / ${key}`;
 }
 
 function formatReportCardCategoryLabel(categoryKey: string): string {
@@ -889,6 +919,7 @@ export function isReportCardRankingPct(key: string): boolean {
     key === 'record' ||
     key.endsWith('.K-BB_pct') ||
     key.endsWith('.Barrel_pct') ||
-    key.endsWith('.below_replacement_pa_pct')
+    key.endsWith('.below_replacement_pa_pct') ||
+    key.endsWith('.below_replacement_play_pct')
   );
 }

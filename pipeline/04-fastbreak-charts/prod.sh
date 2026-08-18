@@ -11,6 +11,7 @@ set -e
 #   ./prod.sh --scripts-only --sport mlb --once
 #                                    # MLB charts only, upload to prod/, then exit
 #   ./prod-mlb.sh                    # Convenience wrapper for the above
+#   ./prod-nfl.sh                    # Same, for NFL charts
 #   ./prod.sh --help                 # Show help
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"

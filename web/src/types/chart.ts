@@ -1,4 +1,4 @@
-export type VisualizationType = 'SCATTER_PLOT' | 'LINE_CHART' | 'BAR_CHART' | 'BAR_GRAPH' | 'TABLE' | 'MATCHUP' | 'MATCHUP_V2' | 'NBA_MATCHUP' | 'NHL_MATCHUP' | 'MLB_MATCHUP' | 'MLB_TEAM_REPORT_CARD';
+export type VisualizationType = 'SCATTER_PLOT' | 'LINE_CHART' | 'BAR_CHART' | 'BAR_GRAPH' | 'TABLE' | 'MATCHUP' | 'MATCHUP_V2' | 'NBA_MATCHUP' | 'NHL_MATCHUP' | 'MLB_MATCHUP' | 'NFL_MATCHUP' | 'MLB_TEAM_REPORT_CARD' | 'NFL_TEAM_REPORT_CARD';
 
 export interface QuadrantConfig {
   color: string;
@@ -551,7 +551,136 @@ export interface MLBMatchupData extends BaseChartData {
   dataPoints: MLBMatchupDataPoint[];
 }
 
-// MLB Team Report Card types
+// NFL Matchup types. Mirrors the MLB matchup payload — teams carry a free-form
+// stat bag, comparisons are the shared generic shape — with football stats and
+// per-game box scores in place of batting lines.
+export interface NFLMatchupStat {
+  value?: number | null;
+  rank?: number | null;
+  rankDisplay?: string | null;
+}
+
+export interface NFLMatchupTeamStats {
+  gamesPlayed?: number;
+  [key: string]: unknown;
+}
+
+export interface NFLMatchupTeamInfo {
+  id: string;
+  name: string;
+  abbreviation: string;
+  logo?: string | null;
+  record?: string | null;
+  division?: string | null;
+  conference?: string | null;
+  stats?: NFLMatchupTeamStats | null;
+}
+
+export interface NFLMatchupOdds {
+  provider?: string | null;
+  spread?: number | null;
+  overUnder?: number | null;
+  homeMoneyline?: number | null;
+  awayMoneyline?: number | null;
+  details?: string | null;
+}
+
+export interface NFLMatchupLocation {
+  stadium?: string | null;
+  roof?: string | null;
+  surface?: string | null;
+}
+
+export interface NFLTeamBoxScore {
+  [key: string]: number | null | undefined;
+}
+
+export interface NFLGameResults {
+  homeScore?: number | null;
+  awayScore?: number | null;
+  winner?: string | null;
+  margin?: number | null;
+  homeWon?: boolean | null;
+  teamBoxScore?: { home?: NFLTeamBoxScore | null; away?: NFLTeamBoxScore | null } | null;
+  vsSeasonAvg?: Record<string, unknown> | null;
+  seasonHighs?: Record<string, unknown> | null;
+  playerHighlights?: Record<string, unknown> | null;
+}
+
+export interface NFLH2HGame {
+  date: string;
+  week?: number | null;
+  seasonType?: string | null;
+  homeTeam: string;
+  awayTeam: string;
+  homeScore: number;
+  awayScore: number;
+  winner: string;
+}
+
+export interface NFLH2HSeries {
+  dateRange: string;
+  startDate: string;
+  endDate: string;
+  teamAWins: number;
+  teamBWins: number;
+  games: NFLH2HGame[];
+}
+
+export interface NFLH2H {
+  teamA: string;
+  teamB: string;
+  teamAWins: number;
+  teamBWins: number;
+  totalGames: number;
+  series: NFLH2HSeries[];
+}
+
+export interface NFLMatchupDataPoint {
+  gameId: string;
+  gameDate: string;
+  gameName: string;
+  gameStatus?: string;
+  gameCompleted: boolean;
+  season?: number;
+  week?: number;
+  seasonType?: string;
+  seasonTypeLabel?: string;
+  homeTeam: NFLMatchupTeamInfo;
+  awayTeam: NFLMatchupTeamInfo;
+  location?: NFLMatchupLocation | null;
+  odds?: NFLMatchupOdds | null;
+  comparisons?: NBAComparisons | null;
+  h2h?: NFLH2H | null;
+  results?: NFLGameResults | null;
+}
+
+export interface LeagueCumPointDiffStats {
+  minCumPointDiff: number | null;
+  maxCumPointDiff: number | null;
+  top10ByWeek?: Record<string, number>;
+}
+
+export interface LeagueWeeklyPointStats {
+  avgPointsScored: number | null;
+  avgPointsAllowed: number | null;
+  minPointsScored: number | null;
+  maxPointsScored: number | null;
+  minPointsAllowed: number | null;
+  maxPointsAllowed: number | null;
+}
+
+export interface NFLMatchupData extends BaseChartData {
+  visualizationType: 'NFL_MATCHUP';
+  season?: number;
+  leagueCumPointDiffStats?: LeagueCumPointDiffStats;
+  leagueWeeklyStats?: LeagueWeeklyPointStats;
+  dataPoints: NFLMatchupDataPoint[];
+}
+
+// Team Report Card types. Shared by MLB and NFL: categories are an ordered
+// record so each sport declares its own groups, and every category carries the
+// stat keys and display flags its table needs.
 export interface ReportCardStatValue {
   label: string;
   value?: number | null;
@@ -578,36 +707,43 @@ export interface ReportCardCategory {
   description?: string;
   team?: ReportCardTeamSummary;
   players: ReportCardPlayer[];
+  // Payload-driven table layout. Undefined falls back to the per-sport defaults
+  // in the renderer, which older cached MLB payloads rely on.
+  statKeys?: string[];
+  playerStatKeys?: string[];
+  positionColumnLabel?: string;
+  showPlayerRankAndComposite?: boolean;
+  showStatusColumn?: boolean;
+  showWarColumn?: boolean;
+  showTeamComposite?: boolean;
+  compositeRankingKey?: string;
 }
 
-export interface ReportCardCategories {
-  recentTrend?: ReportCardCategory;
-  hitters: ReportCardCategory;
-  starters: ReportCardCategory;
-  relievers: ReportCardCategory;
-  fielders: ReportCardCategory;
-  belowReplacement?: ReportCardCategory;
-  injuries?: ReportCardCategory;
-}
+export type ReportCardCategories = Record<string, ReportCardCategory>;
 
 export interface ReportCardGameLogGame {
   date?: string | null;
+  week?: number | null;
+  seasonType?: string | null; // "REG", "WC", "DIV", "CON", "SB"
   location: string; // "vs" (home) or "@" (away)
   opponent: string;
   opponentLabel: string; // e.g. "vs LAD" or "@ SF"
-  teamScore: number;
-  opponentScore: number;
-  differential: number;
-  won: boolean;
+  teamScore?: number | null; // null until the game has been played
+  opponentScore?: number | null;
+  differential?: number | null;
+  result?: string | null; // "W", "L", "T"
+  won?: boolean | null;
+  played?: boolean;
 }
 
 export interface ReportCardGameLogRecord {
   wins: number;
   losses: number;
+  ties?: number;
   display: string; // e.g. "6-4"
 }
 
-export interface ReportCardLastTenGames {
+export interface ReportCardGameLog {
   label: string;
   columns?: string[];
   games: ReportCardGameLogGame[];
@@ -622,6 +758,7 @@ export interface ReportCardTeam {
   league?: string;
   wins?: number;
   losses?: number;
+  ties?: number;
   recordRank?: number;
   recordRankDisplay?: string;
   divisionRank?: number;
@@ -630,7 +767,9 @@ export interface ReportCardTeam {
   overallCompositeRank?: number;
   overallCompositeRankDisplay?: string;
   playoffProb?: number;
-  lastTenGames?: ReportCardLastTenGames;
+  lastTenGames?: ReportCardGameLog;
+  gameLog?: ReportCardGameLog;
+  categoryOrder?: string[];
   categories: ReportCardCategories;
 }
 
@@ -660,10 +799,14 @@ export interface PlayoffChanceEntry {
   standingsSection?: string | null;
 }
 
-export interface MLBTeamReportCardData extends BaseChartData {
-  visualizationType: 'MLB_TEAM_REPORT_CARD';
+export interface TeamReportCardData extends BaseChartData {
+  visualizationType: 'MLB_TEAM_REPORT_CARD' | 'NFL_TEAM_REPORT_CARD';
   season: number;
+  seasonLabel?: string;
+  seasonPhase?: string; // "PRE", "REG", "POST"
+  seasonPhaseLabel?: string;
   topN: number;
+  categoryOrder?: string[];
   rankings: Record<string, RankingEntry[]>;
   playoffChances: PlayoffChanceEntry[];
   teams: Record<string, ReportCardTeam>;
@@ -697,7 +840,7 @@ export interface MatchupV2DataPoint {
   };
 }
 
-export type ChartData = ScatterPlotData | LineChartData | BarChartData | TableData | MatchupData | MatchupV2Data | NBAMatchupData | NHLMatchupData | MLBMatchupData | MLBTeamReportCardData;
+export type ChartData = ScatterPlotData | LineChartData | BarChartData | TableData | MatchupData | MatchupV2Data | NBAMatchupData | NHLMatchupData | MLBMatchupData | NFLMatchupData | TeamReportCardData;
 
 export interface RegistryEntry {
   interval: string;

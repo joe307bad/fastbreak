@@ -5,6 +5,7 @@ import { downloadChartAsPng, copyChartAsPng, QuadrantLegendItem } from '@/lib/ch
 import { ChartRenderer } from './ChartRenderer';
 import { ChartDataTable } from './ChartDataTable';
 import { ChartData, ScatterPlotData } from '@/types/chart';
+import { REPORT_CARD_TYPES } from '@/lib/charts';
 
 interface Props {
   data: ChartData;
@@ -290,7 +291,7 @@ export function ChartWithTable({ data, title, subtitle, source, lastUpdated }: P
   }, [data]);
 
   const isScatterPlot = data.visualizationType === 'SCATTER_PLOT';
-  const isReportCard = data.visualizationType === 'MLB_TEAM_REPORT_CARD';
+  const isReportCard = REPORT_CARD_TYPES.includes(data.visualizationType);
 
   return (
     <div className={`flex flex-col gap-4 h-full min-h-0 ${isReportCard ? '' : 'lg:flex-row'}`}>

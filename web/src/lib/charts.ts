@@ -3,7 +3,8 @@ import {
   MatchupData,
   MatchupV2Data,
   MLBMatchupData,
-  MLBTeamReportCardData,
+  NFLMatchupData,
+  TeamReportCardData,
   NBAMatchupData,
   NHLMatchupData,
   VisualizationType,
@@ -15,7 +16,8 @@ export type AnyMatchupData =
   | MatchupV2Data
   | NBAMatchupData
   | NHLMatchupData
-  | MLBMatchupData;
+  | MLBMatchupData
+  | NFLMatchupData;
 
 export const WEB_CHART_TYPES: VisualizationType[] = [
   'SCATTER_PLOT',
@@ -24,6 +26,12 @@ export const WEB_CHART_TYPES: VisualizationType[] = [
   'BAR_GRAPH',
   'TABLE',
   'MLB_TEAM_REPORT_CARD',
+  'NFL_TEAM_REPORT_CARD',
+];
+
+export const REPORT_CARD_TYPES: VisualizationType[] = [
+  'MLB_TEAM_REPORT_CARD',
+  'NFL_TEAM_REPORT_CARD',
 ];
 
 export const WEB_MATCHUP_TYPES: VisualizationType[] = [
@@ -32,12 +40,14 @@ export const WEB_MATCHUP_TYPES: VisualizationType[] = [
   'NBA_MATCHUP',
   'NHL_MATCHUP',
   'MLB_MATCHUP',
+  'NFL_MATCHUP',
 ];
 
 export const TOP_MATCHUP_TYPES: VisualizationType[] = [
   'NBA_MATCHUP',
   'NHL_MATCHUP',
   'MLB_MATCHUP',
+  'NFL_MATCHUP',
 ];
 
 const WEB_DISPLAYABLE_TYPES = new Set<VisualizationType>([
@@ -50,13 +60,13 @@ function hasMatchupV2Content(data: MatchupV2Data): boolean {
   return Object.keys(dataPointsObj ?? {}).length > 0;
 }
 
-function hasTeamReportCardContent(data: MLBTeamReportCardData): boolean {
+function hasTeamReportCardContent(data: TeamReportCardData): boolean {
   return Object.keys(data.teams ?? {}).length > 0;
 }
 
 export function hasDisplayableMatchupContent(data: ChartData): boolean {
   if (TOP_MATCHUP_TYPES.includes(data.visualizationType)) {
-    return selectTopMatchups(data as NBAMatchupData | NHLMatchupData | MLBMatchupData).length > 0;
+    return selectTopMatchups(data as NBAMatchupData | NHLMatchupData | MLBMatchupData | NFLMatchupData).length > 0;
   }
 
   if (data.visualizationType === 'MATCHUP_V2') {
@@ -106,8 +116,8 @@ export function isDisplayableChart(data: ChartData): boolean {
     return hasDisplayableMatchupContent(data);
   }
 
-  if (data.visualizationType === 'MLB_TEAM_REPORT_CARD') {
-    return hasTeamReportCardContent(data as MLBTeamReportCardData);
+  if (REPORT_CARD_TYPES.includes(data.visualizationType)) {
+    return hasTeamReportCardContent(data as TeamReportCardData);
   }
 
   return true;
@@ -137,5 +147,6 @@ export function filterChartsForSport(
 export function getTopMatchupMetricLabel(type: VisualizationType): string {
   if (type === 'NHL_MATCHUP') return 'Goal Diff';
   if (type === 'MLB_MATCHUP') return 'Run Diff';
+  if (type === 'NFL_MATCHUP') return 'Point Diff';
   return 'Net Rating';
 }

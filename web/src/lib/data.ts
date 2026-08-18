@@ -66,6 +66,8 @@ export function getManifest(): Manifest | null {
   return JSON.parse(content);
 }
 
+const DEFAULT_SPORT = 'nfl';
+
 export function getOrderedSportsWithCharts(): string[] {
   const chartRegistry = getChartRegistry();
   const sportsWithCharts = new Set<string>();
@@ -84,8 +86,10 @@ export function getOrderedSportsWithCharts(): string[] {
   }
 
   const ordered = getOrderedLeagues().filter(sport => sportsWithCharts.has(sport));
-  if (ordered.includes('mlb')) {
-    return ['mlb', ...ordered.filter(sport => sport !== 'mlb')];
+  // The first entry is both the leftmost tab and the sport the homepage opens
+  // on, so pin NFL there whenever it has charts.
+  if (ordered.includes(DEFAULT_SPORT)) {
+    return [DEFAULT_SPORT, ...ordered.filter(sport => sport !== DEFAULT_SPORT)];
   }
   return ordered;
 }

@@ -6,7 +6,7 @@ import { LineChart } from './LineChart';
 import { BarChart } from './BarChart';
 import { Table } from './Table';
 import { Matchup } from './Matchup';
-import { MLBTeamReportCard, MLBTeamReportCardSummary } from './MLBTeamReportCard';
+import { TeamReportCard, TeamReportCardSummary } from './TeamReportCard';
 
 interface Props {
   data: ChartData;
@@ -30,11 +30,12 @@ export function ChartRenderer({ data, highlightedLabels, selectedLabel, onSelect
     case 'MATCHUP':
       return <Matchup data={data} />;
     case 'MLB_TEAM_REPORT_CARD':
+    case 'NFL_TEAM_REPORT_CARD':
       return (
         <div className="h-full min-h-0">
           {compact
-            ? <MLBTeamReportCardSummary data={data} />
-            : <MLBTeamReportCard data={data} />}
+            ? <TeamReportCardSummary data={data} />
+            : <TeamReportCard data={data} />}
         </div>
       );
     default:

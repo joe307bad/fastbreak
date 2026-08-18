@@ -1,9 +1,9 @@
 'use client';
 
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
-import { MatchupData, MLBMatchupData, NBAMatchupData, NBAMatchupDataPoint, NHLMatchupData, NHLMatchupDataPoint, MatchupV2Data, MatchupV2DataPoint } from '@/types/chart';
+import { MatchupData, MLBMatchupData, NFLMatchupData, NBAMatchupData, NBAMatchupDataPoint, NHLMatchupData, NHLMatchupDataPoint, MatchupV2Data, MatchupV2DataPoint } from '@/types/chart';
 
-type AnyMatchupData = MatchupData | NBAMatchupData | NHLMatchupData | MLBMatchupData | MatchupV2Data;
+type AnyMatchupData = MatchupData | NBAMatchupData | NHLMatchupData | MLBMatchupData | NFLMatchupData | MatchupV2Data;
 
 interface MatchupNavProps {
   data: AnyMatchupData;
@@ -88,8 +88,9 @@ function groupMatchupsByDay(data: AnyMatchupData): DayGroup[] {
         label: `${matchup.awayTeam.abbreviation} @ ${matchup.homeTeam.abbreviation}`,
       });
     }
-  } else if (data.visualizationType === 'MLB_MATCHUP') {
-    const mlbData = data as MLBMatchupData;
+  } else if (data.visualizationType === 'MLB_MATCHUP' || data.visualizationType === 'NFL_MATCHUP') {
+    // Same dataPoints shape for both, so one branch groups either sport.
+    const mlbData = data as MLBMatchupData | NFLMatchupData;
     const sortedGames = [...mlbData.dataPoints]
       .sort((a, b) => new Date(a.gameDate).getTime() - new Date(b.gameDate).getTime());
 

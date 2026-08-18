@@ -1,6 +1,6 @@
 'use client';
 
-import { MatchupData, MLBMatchupData, MLBMatchupDataPoint, NBAMatchupData, NBAMatchupDataPoint, NHLMatchupData, NHLMatchupDataPoint, MatchupV2Data, MatchupV2DataPoint, MatchupV2Odds } from '@/types/chart';
+import { MatchupData, MLBMatchupData, MLBMatchupDataPoint, NBAMatchupData, NBAMatchupDataPoint, NFLMatchupData, NFLMatchupDataPoint, NHLMatchupData, NHLMatchupDataPoint, MatchupV2Data, MatchupV2DataPoint, MatchupV2Odds } from '@/types/chart';
 import { AnyMatchupData } from '@/lib/charts';
 import { formatRunDiff, getLeagueAbbrev, getRecordRank, getRunDiffPerGame } from '@/lib/mlbStats';
 
@@ -176,6 +176,60 @@ function NHLMatchupCard({ matchup }: { matchup: NHLMatchupDataPoint }) {
           <span> vs </span>
           <span className="font-mono">{matchup.homeTeam.stats.goalsAgainstPerGame.toFixed(2)}</span>
         </div>
+      </div>
+    </div>
+  );
+}
+
+// The NFL stat bag is free-form on the wire; read the few values this card
+// shows through one narrow accessor instead of typing the whole catalog.
+function nflCardStat(team: NFLMatchupDataPoint['homeTeam'], key: string): number | null {
+  const stat = team.stats?.[key] as { value?: number | null } | undefined;
+  return stat?.value ?? null;
+}
+
+function NFLGameCard({ matchup }: { matchup: NFLMatchupDataPoint }) {
+  const { date, time } = formatGameTime(matchup.gameDate);
+  const weekLabel = matchup.seasonType === 'REG'
+    ? matchup.week != null ? `Wk ${matchup.week}` : null
+    : matchup.seasonTypeLabel ?? matchup.seasonType ?? null;
+
+  const teamRow = (team: NFLMatchupDataPoint['homeTeam'], score?: number | null) => {
+    const diff = nflCardStat(team, 'pointDiffPerGame');
+    return (
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className="font-bold">{team.abbreviation}</span>
+          <span className="text-xs text-[var(--muted)]">({team.record ?? '-'})</span>
+        </div>
+        <div className="flex items-center gap-3 text-xs">
+          {score != null && <span className="font-mono font-bold">{score}</span>}
+          <span className={`font-mono w-12 text-right ${(diff ?? 0) >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+            {diff == null ? '-' : diff >= 0 ? `+${diff.toFixed(1)}` : diff.toFixed(1)}
+          </span>
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div className="border border-[var(--border)] rounded p-3 bg-[var(--card)]">
+      <div className="flex justify-between items-center text-xs text-[var(--muted)] mb-2">
+        <span>{[date, weekLabel].filter(Boolean).join(' · ')}</span>
+        <span>{matchup.gameCompleted ? 'Final' : time}</span>
+      </div>
+      <div className="space-y-2">
+        {teamRow(matchup.awayTeam, matchup.results?.awayScore)}
+        {teamRow(matchup.homeTeam, matchup.results?.homeScore)}
+      </div>
+      <div className="flex justify-between items-center mt-3 pt-2 border-t border-[var(--border)] text-xs text-[var(--muted)]">
+        <div>
+          <span>PPG: </span>
+          <span className="font-mono">{nflCardStat(matchup.awayTeam, 'pointsPerGame')?.toFixed(1) ?? '-'}</span>
+          <span> vs </span>
+          <span className="font-mono">{nflCardStat(matchup.homeTeam, 'pointsPerGame')?.toFixed(1) ?? '-'}</span>
+        </div>
+        {matchup.odds?.details && <div className="font-mono">{matchup.odds.details}</div>}
       </div>
     </div>
   );
@@ -460,7 +514,30 @@ export function UpcomingMatchups({ data }: Props) {
     );
   }
 
-  // Handle MATCHUP_V2 type (NFL style with object dataPoints)
+  // Handle NFL_MATCHUP type
+  if (data.visualizationType === 'NFL_MATCHUP') {
+    const nflData = data as NFLMatchupData;
+    const upcomingGames = nflData.dataPoints
+      .filter(m => !m.gameCompleted)
+      .sort((a, b) => new Date(a.gameDate).getTime() - new Date(b.gameDate).getTime());
+
+    const games = upcomingGames.length > 0
+      ? upcomingGames.slice(0, 12)
+      : nflData.dataPoints
+          .filter(m => m.gameCompleted)
+          .sort((a, b) => new Date(b.gameDate).getTime() - new Date(a.gameDate).getTime())
+          .slice(0, 8);
+
+    return (
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        {games.map(matchup => (
+          <NFLGameCard key={matchup.gameId} matchup={matchup} />
+        ))}
+      </div>
+    );
+  }
+
+  // Handle legacy MATCHUP_V2 type (older NFL payloads with object dataPoints)
   if (data.visualizationType === 'MATCHUP_V2') {
     const v2Data = data as MatchupV2Data;
     // dataPoints is an object keyed by matchup ID

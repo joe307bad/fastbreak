@@ -4,6 +4,7 @@ import {
   MatchupV2DataPoint,
   MLBMatchupData,
   NBAMatchupData,
+  NFLMatchupData,
   NHLMatchupData,
 } from '@/types/chart';
 import { getDateKey } from '@/lib/mlbMatchups';
@@ -13,6 +14,7 @@ type AnyMatchupData =
   | NBAMatchupData
   | NHLMatchupData
   | MLBMatchupData
+  | NFLMatchupData
   | MatchupV2Data;
 
 export function findPinnedMatchupIdForDay(
@@ -24,8 +26,9 @@ export function findPinnedMatchupIdForDay(
 
   const codes = pinnedTeamCodes.map(code => code.toUpperCase());
 
-  if (data.visualizationType === 'MLB_MATCHUP') {
-    const games = (data as MLBMatchupData).dataPoints.filter(
+  // MLB and NFL share the same dataPoints shape here, so one branch covers both.
+  if (data.visualizationType === 'MLB_MATCHUP' || data.visualizationType === 'NFL_MATCHUP') {
+    const games = (data as MLBMatchupData | NFLMatchupData).dataPoints.filter(
       game => getDateKey(new Date(game.gameDate)) === dayKey
     );
     for (const code of codes) {

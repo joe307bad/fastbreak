@@ -15,7 +15,7 @@ class HomeComponent(
 
     @Serializable
     private data class SavedState(
-        val selectedSport: Sport = Sport.MLB,
+        val selectedSport: Sport = Sport.NFL,
         val selectedTags: Set<String> = emptySet()
     )
 

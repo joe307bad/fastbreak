@@ -2,6 +2,17 @@ library(baseballr)
 library(dplyr)
 library(jsonlite)
 
+# Load FanGraphs retry helper
+# Get script directory - works with both source() and Rscript
+args <- commandArgs(trailingOnly = FALSE)
+file_arg <- grep("^--file=", args, value = TRUE)
+if (length(file_arg) > 0) {
+  script_dir <- dirname(sub("^--file=", "", file_arg))
+} else {
+  script_dir <- getwd()
+}
+source(file.path(script_dir, "..", "utils", "mlb_fangraphs.R"))
+
 # ============================================================================
 # MLB Hitting Leaders — scatter of wRC+ vs Barrel% for qualified hitters
 #
@@ -47,13 +58,11 @@ cat("Processing MLB Hitting Leaders for", mlb_season, "season\n")
 
 # Pull batter leaderboard from FanGraphs (qual="0" so we filter ourselves)
 batter_stats <- tryCatch({
-  suppressWarnings(suppressMessages(
-    fg_batter_leaders(
-      startseason = as.character(mlb_season),
-      endseason = as.character(mlb_season),
-      qual = "0"
-    )
-  ))
+  fg_retry(fg_batter_leaders,
+    startseason = as.character(mlb_season),
+    endseason = as.character(mlb_season),
+    qual = "0"
+  )
 }, error = function(e) {
   cat("Error loading batter stats:", e$message, "\n"); stop(e)
 })

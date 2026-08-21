@@ -17,6 +17,17 @@ library(jsonlite)
 library(rvest)
 library(httr)
 
+# Load FanGraphs retry helper
+# Get script directory - works with both source() and Rscript
+args <- commandArgs(trailingOnly = FALSE)
+file_arg <- grep("^--file=", args, value = TRUE)
+if (length(file_arg) > 0) {
+  script_dir <- dirname(sub("^--file=", "", file_arg))
+} else {
+  script_dir <- getwd()
+}
+source(file.path(script_dir, "..", "utils", "mlb_fangraphs.R"))
+
 # ============================================================================
 # Constants
 # ============================================================================
@@ -828,81 +839,69 @@ cat("=== MLB Team Report Card ===\n")
 cat("Season:", season_label, "\n")
 
 batter_stats <- tryCatch({
-  suppressWarnings(suppressMessages(
-    fg_batter_leaders(
-      startseason = as.character(mlb_season),
-      endseason = as.character(mlb_season),
-      qual = "0"
-    )
-  ))
+  fg_retry(fg_batter_leaders,
+    startseason = as.character(mlb_season),
+    endseason = as.character(mlb_season),
+    qual = "0"
+  )
 }, error = function(e) {
   cat("Error loading batter stats:", e$message, "\n")
   stop(e)
 })
 
 pitcher_stats <- tryCatch({
-  suppressWarnings(suppressMessages(
-    fg_pitcher_leaders(
-      startseason = as.character(mlb_season),
-      endseason = as.character(mlb_season),
-      qual = "0"
-    )
-  ))
+  fg_retry(fg_pitcher_leaders,
+    startseason = as.character(mlb_season),
+    endseason = as.character(mlb_season),
+    qual = "0"
+  )
 }, error = function(e) {
   cat("Error loading pitcher stats:", e$message, "\n")
   stop(e)
 })
 
 fielder_stats <- tryCatch({
-  suppressWarnings(suppressMessages(
-    fg_fielder_leaders(
-      startseason = as.character(mlb_season),
-      endseason = as.character(mlb_season),
-      qual = "0"
-    )
-  ))
+  fg_retry(fg_fielder_leaders,
+    startseason = as.character(mlb_season),
+    endseason = as.character(mlb_season),
+    qual = "0"
+  )
 }, error = function(e) {
   cat("Error loading fielder stats:", e$message, "\n")
   stop(e)
 })
 
 team_batting_stats <- tryCatch({
-  suppressWarnings(suppressMessages(
-    fg_team_batter(
-      startseason = as.character(mlb_season),
-      endseason = as.character(mlb_season),
-      lg = "all",
-      qual = "0"
-    )
-  ))
+  fg_retry(fg_team_batter,
+    startseason = as.character(mlb_season),
+    endseason = as.character(mlb_season),
+    lg = "all",
+    qual = "0"
+  )
 }, error = function(e) {
   cat("Error loading team batting stats:", e$message, "\n")
   stop(e)
 })
 
 team_fielding_stats <- tryCatch({
-  suppressWarnings(suppressMessages(
-    fg_team_fielder(
-      startseason = as.character(mlb_season),
-      endseason = as.character(mlb_season),
-      lg = "all",
-      qual = "0"
-    )
-  ))
+  fg_retry(fg_team_fielder,
+    startseason = as.character(mlb_season),
+    endseason = as.character(mlb_season),
+    lg = "all",
+    qual = "0"
+  )
 }, error = function(e) {
   cat("Error loading team fielding stats:", e$message, "\n")
   stop(e)
 })
 
 team_pitching_stats <- tryCatch({
-  suppressWarnings(suppressMessages(
-    fg_team_pitcher(
-      startseason = as.character(mlb_season),
-      endseason = as.character(mlb_season),
-      lg = "all",
-      qual = "0"
-    )
-  ))
+  fg_retry(fg_team_pitcher,
+    startseason = as.character(mlb_season),
+    endseason = as.character(mlb_season),
+    lg = "all",
+    qual = "0"
+  )
 }, error = function(e) {
   cat("Error loading team pitching stats:", e$message, "\n")
   stop(e)

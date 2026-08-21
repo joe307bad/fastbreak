@@ -2,6 +2,17 @@ library(baseballr)
 library(dplyr)
 library(jsonlite)
 
+# Load FanGraphs retry helper
+# Get script directory - works with both source() and Rscript
+args <- commandArgs(trailingOnly = FALSE)
+file_arg <- grep("^--file=", args, value = TRUE)
+if (length(file_arg) > 0) {
+  script_dir <- dirname(sub("^--file=", "", file_arg))
+} else {
+  script_dir <- getwd()
+}
+source(file.path(script_dir, "..", "utils", "mlb_fangraphs.R"))
+
 # ============================================================================
 # MLB Team Scoring Leaders — scatter of Runs Scored vs Runs Allowed
 #
@@ -18,25 +29,21 @@ mlb_season <- if (current_month >= 3) current_year else current_year - 1
 cat("Processing MLB Team Scoring Leaders for", mlb_season, "season\n")
 
 team_batting <- tryCatch({
-  suppressWarnings(suppressMessages(
-    fg_team_batter(
-      startseason = as.character(mlb_season),
-      endseason = as.character(mlb_season),
-      lg = "all",
-      qual = "0"
-    )
-  ))
+  fg_retry(fg_team_batter,
+    startseason = as.character(mlb_season),
+    endseason = as.character(mlb_season),
+    lg = "all",
+    qual = "0"
+  )
 }, error = function(e) { cat("Error loading team batting:", e$message, "\n"); stop(e) })
 
 team_pitching <- tryCatch({
-  suppressWarnings(suppressMessages(
-    fg_team_pitcher(
-      startseason = as.character(mlb_season),
-      endseason = as.character(mlb_season),
-      lg = "all",
-      qual = "0"
-    )
-  ))
+  fg_retry(fg_team_pitcher,
+    startseason = as.character(mlb_season),
+    endseason = as.character(mlb_season),
+    lg = "all",
+    qual = "0"
+  )
 }, error = function(e) { cat("Error loading team pitching:", e$message, "\n"); stop(e) })
 
 cat("Loaded", nrow(team_batting), "team batting rows and",

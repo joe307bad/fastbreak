@@ -18,6 +18,31 @@ export const MLB_MATCHUP_STAT_INFO = {
   ] satisfies StatInfoItem[],
   sections: [
     {
+      title: 'Post-game box score (vs season avg)',
+      items: [
+        {
+          label: '(+/-) numbers',
+          text: 'A plain add/subtract difference, not a percentage: the value in that game minus the team\u2019s season per-game average for the same stat, in the stat\u2019s own units.',
+        },
+        {
+          label: 'Example',
+          text: 'A team averaging 4.3 runs per game that scores 7 shows 7 (+2.7) \u2014 2.7 more runs than usual, not 2.7% more.',
+        },
+        {
+          label: 'Rate stats',
+          text: 'AVG, OBP, SLG and OPS use the same subtraction, shown to three decimals: .333 (+0.087) is 87 points above the season rate.',
+        },
+        {
+          label: 'Green vs red',
+          text: 'Green is above the season average, red is below \u2014 direction only, not good vs bad. For K, LOB, BB allowed and Pitches, a green + still means worse than usual.',
+        },
+        {
+          label: 'Season averages',
+          text: 'From full-season team stats. LOB and Pitches have no season-long feed, so those averages use the sample of games pulled for this chart.',
+        },
+      ],
+    },
+    {
       title: 'Batting',
       items: [
         { label: 'Runs/Game', text: 'Average runs scored per game.' },

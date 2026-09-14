@@ -4,6 +4,7 @@ import { ChartData, Registry, isChartEntry } from '@/types/chart';
 import { fileKeyToChartId } from '@/lib/registry';
 import { isDisplayableChart } from '@/lib/charts';
 import { getOrderedLeagues } from '@/lib/leagues';
+import type { DiagnosticsSnapshot } from '@/types/diagnostics';
 
 const DATA_DIR = path.join(process.cwd(), 'data');
 const CHARTS_DIR = path.join(DATA_DIR, 'charts');
@@ -63,6 +64,15 @@ export function getManifest(): Manifest | null {
     return null;
   }
   const content = fs.readFileSync(manifestPath, 'utf-8');
+  return JSON.parse(content);
+}
+
+export function getDiagnostics(): DiagnosticsSnapshot {
+  const diagnosticsPath = path.join(DATA_DIR, 'diagnostics.json');
+  if (!fs.existsSync(diagnosticsPath)) {
+    return { fetchedAt: '', fetchError: 'diagnostics.json not found. Run npm run download-charts first.', runs: [] };
+  }
+  const content = fs.readFileSync(diagnosticsPath, 'utf-8');
   return JSON.parse(content);
 }
 

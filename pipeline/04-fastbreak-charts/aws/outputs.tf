@@ -43,3 +43,8 @@ output "registry_url" {
   description = "URL for the registry API (via CloudFront)"
   value       = "https://${aws_cloudfront_distribution.fastbreak.domain_name}/registry"
 }
+
+output "scheduler_o11y_url" {
+  description = "URL for the scheduler-o11y API (via CloudFront)"
+  value       = "https://${aws_cloudfront_distribution.fastbreak.domain_name}/scheduler-o11y"
+}

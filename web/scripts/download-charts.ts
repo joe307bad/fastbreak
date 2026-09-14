@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { fileKeyToChartId, filterRegistryKeys, getRegistryPrefix } from '../src/lib/registry';
+import type { DiagnosticsSnapshot, SchedulerRun } from '../src/types/diagnostics';
 
 const BASE_URL = 'https://d2jyizt5xogu23.cloudfront.net';
 const DATA_DIR = path.join(process.cwd(), 'data');
@@ -18,6 +19,33 @@ type Registry = Record<string, RegistryEntry>;
 interface Manifest {
   downloadedAt: string;
   chartCount: number;
+}
+
+// Pull the pipeline's per-script run records for the /diagnostics page. This
+// is best-effort: a missing or failing endpoint must not break the site build.
+async function downloadDiagnostics() {
+  const url = `${BASE_URL}/scheduler-o11y`;
+  const env = getRegistryPrefix().replace(/\/$/, '');
+  const snapshot: DiagnosticsSnapshot = { fetchedAt: new Date().toISOString(), runs: [] };
+
+  console.log(`\nFetching scheduler-o11y records from ${url}`);
+  try {
+    const res = await fetch(url);
+    if (!res.ok) {
+      throw new Error(`HTTP ${res.status}`);
+    }
+    const body: { items?: SchedulerRun[] } = await res.json();
+    snapshot.runs = (body.items ?? []).filter((run) => run.env === env);
+    console.log(`Saved ${snapshot.runs.length} scheduler-o11y records (env=${env})`);
+  } catch (error) {
+    snapshot.fetchError = String(error);
+    console.warn(`  Could not fetch scheduler-o11y records: ${error}`);
+  }
+
+  fs.writeFileSync(
+    path.join(DATA_DIR, 'diagnostics.json'),
+    JSON.stringify(snapshot, null, 2)
+  );
 }
 
 async function main() {
@@ -75,6 +103,8 @@ async function main() {
       failCount++;
     }
   }
+
+  await downloadDiagnostics();
 
   // Write manifest
   const manifest: Manifest = {

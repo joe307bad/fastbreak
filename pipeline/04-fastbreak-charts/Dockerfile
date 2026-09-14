@@ -47,10 +47,11 @@ RUN chmod +x /app/Fastbreak.Daily
 # Copy cron configuration and startup script
 COPY crontab /etc/cron.d/r-cron
 COPY start.sh /app/start.sh
+COPY run-script.sh /app/run-script.sh
 
 # Give execution rights
 RUN chmod 0644 /etc/cron.d/r-cron && \
-    chmod +x /app/start.sh
+    chmod +x /app/start.sh /app/run-script.sh
 
 # Apply cron job
 RUN crontab /etc/cron.d/r-cron

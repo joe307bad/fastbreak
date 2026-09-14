@@ -102,6 +102,19 @@ resource "aws_cloudfront_distribution" "fastbreak" {
     }
   }
 
+  # Lambda origin for scheduler-o11y API
+  origin {
+    domain_name = replace(replace(aws_lambda_function_url.scheduler_o11y.function_url, "https://", ""), "/", "")
+    origin_id   = "Lambda-scheduler-o11y"
+
+    custom_origin_config {
+      http_port              = 80
+      https_port             = 443
+      origin_protocol_policy = "https-only"
+      origin_ssl_protocols   = ["TLSv1.2"]
+    }
+  }
+
   # Default behavior - S3 static files
   default_cache_behavior {
     allowed_methods        = ["GET", "HEAD", "OPTIONS"]
@@ -127,6 +140,26 @@ resource "aws_cloudfront_distribution" "fastbreak" {
     allowed_methods        = ["GET", "HEAD", "OPTIONS"]
     cached_methods         = ["GET", "HEAD"]
     target_origin_id       = "Lambda-registry"
+    viewer_protocol_policy = "redirect-to-https"
+
+    forwarded_values {
+      query_string = false
+      cookies {
+        forward = "none"
+      }
+    }
+
+    min_ttl     = 0
+    default_ttl = 0
+    max_ttl     = 0
+  }
+
+  # Scheduler o11y API behavior
+  ordered_cache_behavior {
+    path_pattern           = "/scheduler-o11y"
+    allowed_methods        = ["GET", "HEAD", "OPTIONS"]
+    cached_methods         = ["GET", "HEAD"]
+    target_origin_id       = "Lambda-scheduler-o11y"
     viewer_protocol_policy = "redirect-to-https"
 
     forwarded_values {
@@ -248,6 +281,85 @@ resource "aws_lambda_function" "registry" {
 # Lambda Function URL for public access
 resource "aws_lambda_function_url" "registry" {
   function_name      = aws_lambda_function.registry.function_name
+  authorization_type = "NONE"
+
+  cors {
+    allow_origins = ["*"]
+    allow_methods = ["GET"]
+    allow_headers = ["*"]
+  }
+}
+
+# Scheduler o11y Lambda: returns the per-script run records the pipeline
+# writes to the same DynamoDB table under the scheduler-o11y namespace.
+resource "aws_iam_role" "scheduler_o11y_lambda" {
+  name = "fastbreak-scheduler-o11y-lambda-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRole"
+        Effect = "Allow"
+        Principal = {
+          Service = "lambda.amazonaws.com"
+        }
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy" "scheduler_o11y_lambda" {
+  name = "fastbreak-scheduler-o11y-lambda-policy"
+  role = aws_iam_role.scheduler_o11y_lambda.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "dynamodb:Scan"
+        ]
+        Resource = aws_dynamodb_table.file_timestamps.arn
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "logs:CreateLogGroup",
+          "logs:CreateLogStream",
+          "logs:PutLogEvents"
+        ]
+        Resource = "arn:aws:logs:*:*:*"
+      }
+    ]
+  })
+}
+
+data "archive_file" "scheduler_o11y_lambda" {
+  type        = "zip"
+  source_dir  = "${path.module}/lambda/scheduler-o11y"
+  output_path = "${path.module}/lambda/scheduler-o11y.zip"
+}
+
+resource "aws_lambda_function" "scheduler_o11y" {
+  filename         = data.archive_file.scheduler_o11y_lambda.output_path
+  function_name    = "fastbreak-scheduler-o11y"
+  role             = aws_iam_role.scheduler_o11y_lambda.arn
+  handler          = "index.handler"
+  source_code_hash = data.archive_file.scheduler_o11y_lambda.output_base64sha256
+  runtime          = "nodejs20.x"
+  timeout          = 10
+
+  environment {
+    variables = {
+      DYNAMODB_TABLE = aws_dynamodb_table.file_timestamps.name
+    }
+  }
+}
+
+resource "aws_lambda_function_url" "scheduler_o11y" {
+  function_name      = aws_lambda_function.scheduler_o11y.function_name
   authorization_type = "NONE"
 
   cors {

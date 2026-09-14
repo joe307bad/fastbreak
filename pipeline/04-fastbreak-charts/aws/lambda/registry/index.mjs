@@ -6,8 +6,12 @@ const TABLE_NAME = process.env.DYNAMODB_TABLE || "fastbreak-file-timestamps";
 
 export const handler = async () => {
   try {
+    // Rows that carry a namespace (e.g. scheduler-o11y script runs) share this
+    // table but are not chart files, so keep them out of the registry.
     const command = new ScanCommand({
       TableName: TABLE_NAME,
+      FilterExpression: "attribute_not_exists(#ns)",
+      ExpressionAttributeNames: { "#ns": "namespace" },
     });
 
     const response = await client.send(command);

@@ -103,7 +103,7 @@ chmod 600 /app/env.sh
 if [ "$RUN_MODE" = "daily-only" ]; then
   echo -e "${BOLD}${CYAN}▶ Running Fastbreak.Daily (generate-and-enrich-topics)...${NC}"
   echo -e "${CYAN}────────────────────────────────────────${NC}"
-  if /app/Fastbreak.Daily generate-and-enrich-topics; then
+  if /app/run-script.sh topics /app/Fastbreak.Daily generate-and-enrich-topics; then
     echo -e "${GREEN}  ✓ Fastbreak.Daily completed successfully${NC}"
     exit 0
   else
@@ -147,7 +147,8 @@ run_scripts() {
       script_name=$(basename "$script")
       echo -e "${YELLOW}  ⏳ $script_name${NC}"
 
-      output=$(Rscript "$script" 2>&1)
+      # run-script.sh records the outcome in DynamoDB (scheduler-o11y)
+      output=$(/app/run-script.sh "$label" "$script" 2>&1)
       exit_code=$?
 
       if [ $exit_code -eq 0 ]; then
@@ -186,7 +187,7 @@ run_scripts "/app/weekly" "weekly"
 if [ "$RUN_MODE" != "scripts-only" ]; then
   echo -e "${BOLD}${CYAN}▶ Running Fastbreak.Daily (generate-and-enrich-topics)...${NC}"
   echo -e "${CYAN}────────────────────────────────────────${NC}"
-  if /app/Fastbreak.Daily generate-and-enrich-topics; then
+  if /app/run-script.sh topics /app/Fastbreak.Daily generate-and-enrich-topics; then
     echo -e "${GREEN}  ✓ Fastbreak.Daily completed successfully${NC}"
   else
     echo -e "${RED}  ✗ Fastbreak.Daily failed${NC}"

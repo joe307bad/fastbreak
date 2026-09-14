@@ -94,7 +94,10 @@ safe_div <- function(numerator, denominator) {
 # here use "LAR", and the app matches pinned teams by code.
 normalize_nfl_team <- function(team) {
   code <- as.character(team)
-  ifelse(is.na(code), NA_character_, ifelse(code == "LA", "LAR", code))
+  # Not ifelse(): on an empty or all-NA input it returns a logical vector,
+  # which breaks any later join on the team code.
+  code[!is.na(code) & code == "LA"] <- "LAR"
+  code
 }
 
 cat("=== NFL Matchup Stats Generation ===\n")

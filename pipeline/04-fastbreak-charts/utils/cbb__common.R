@@ -1,5 +1,6 @@
 #!/usr/bin/env Rscript
-# Common functions shared between cbb__bracket_stats.R and cbb__matchup_stats.R
+# Common functions shared between daily/cbb__bracket_stats.R and daily/cbb__matchup_stats.R.
+# Lives in utils/ so the scheduler does not run it as a script of its own.
 
 library(dplyr)
 library(tidyr)

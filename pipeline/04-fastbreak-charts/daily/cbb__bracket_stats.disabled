@@ -4,7 +4,7 @@
 args <- commandArgs(trailingOnly = FALSE)
 script_path <- sub("--file=", "", args[grep("--file=", args)])
 script_dir <- normalizePath(dirname(script_path))
-source(file.path(script_dir, "cbb__common.R"))
+source(file.path(script_dir, "..", "utils", "cbb__common.R"))
 
 # ============================================================================
 # Constants

@@ -54,10 +54,12 @@ REGULAR_SEASON_WEEKS <- 18
 # nfl__teams.json roster use "LAR", so normalize on the way in.
 normalize_nfl_team <- function(team) {
   code <- as.character(team)
-  code[is.na(code)] <- NA_character_
   # PFR rolls players who changed teams into 2TM/3TM rows; those are not teams.
   code[code %in% c("2TM", "3TM", "4TM")] <- NA_character_
-  ifelse(code == "LA", "LAR", code)
+  # Not ifelse(): on an empty or all-NA input (PFR tables early in the season)
+  # it returns a logical vector, and the later left_join on team_code fails.
+  code[!is.na(code) & code == "LA"] <- "LAR"
+  code
 }
 
 cat("=== NFL Team Report Card ===\n")

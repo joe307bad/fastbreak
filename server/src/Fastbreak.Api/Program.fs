@@ -19,7 +19,6 @@ open Saturn.Endpoint
 open api.Controllers.ProfileController
 open api.DailyJob.DailyJob
 open api.Controllers.LockCardController
-open api.Controllers.AuthController
 open Fastbreak.Shared.Entities
 
 Env.Load() |> ignore
@@ -127,9 +126,7 @@ BsonClassMap.RegisterClassMap<Event>(fun cm ->
 
 BsonClassMap.RegisterClassMap<api.Controllers.ProfileController.Profile>(fun cm ->
     cm.AutoMap()
-    cm.SetIgnoreExtraElements(true)
-    // Set default value for email field for backward compatibility with existing data
-    cm.GetMemberMap("email").SetDefaultValue(None) |> ignore)
+    cm.SetIgnoreExtraElements(true))
 |> ignore
 
 let mongoConnectionString =
@@ -345,7 +342,6 @@ let endpointPipe =
 
 let apiRouter =
     router {
-        forward "" (authRouter database)
         forward "" (lockCardRouter database)
         forward "" (dailyFastbreakRouter database)
         forward "" (profileRouter database)

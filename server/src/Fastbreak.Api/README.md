@@ -34,20 +34,19 @@ An F# API built with Saturn framework for managing daily fastbreak games and use
 
 ### Lock Card Management
 **POST /api/lock**
-- Saves user's game selections for the current day
-- Requires Google authentication via Authorization header
+- Saves a user's game selections for the current day
+- The `userId` in the request body identifies the user; no authentication
 - Creates or updates locked card with user's picks and total points
 
 ### User Profile
 **POST /api/profile**
-- Creates or updates user profile information
-- Requires Google authentication and validates user ownership
-- Updates username and maintains Google ID association
+- Creates or updates a user profile keyed by the `userId` in the request body
+- Updates username; no authentication
 
 **POST /api/profile/initialize**
-- Initializes new user profile with random username
-- Uses Google ID from authorization token to create unique user ID
-- Returns user profile data and any existing locked cards
+- With an empty body, creates a new profile with a random username and fresh userId
+- With `{ "userId": "..." }`, returns that existing profile and its most recent locked card
+- Returns `{userId, userName, lockedFastBreakCard}`
 
 ### Development Endpoints
 **POST /trigger/all-jobs** *(Debug builds only)*
@@ -55,39 +54,30 @@ An F# API built with Saturn framework for managing daily fastbreak games and use
 - Runs fastbreak card results → stat sheets → leaderboard calculations
 - Restricted to localhost requests only
 
-## Authentication & Data Flow
+## Data Flow
 
-### Google Authentication Flow
-The API uses Google JWT tokens for authentication. Protected endpoints require an `Authorization: Bearer <google_jwt_token>` header.
+There is no authentication. Clients identify themselves by the `userId` they receive from `/api/profile/initialize` and send it in request bodies.
 
 ### Initial User Registration Flow
-1. **Client authenticates with Google** and obtains JWT token
-2. **POST /api/profile/initialize** with Authorization header
-   - Extracts Google ID from JWT token to ensure security
+1. **POST /api/profile/initialize** with an empty body
    - Creates new user profile with random username
-   - Links Google ID to internal userId
    - Returns: `{userId, userName, lockedFastBreakCard}`
-3. Client stores userId for subsequent requests
+2. Client stores userId for subsequent requests (send it back to `/api/profile/initialize` to restore the profile later)
 
 ### Daily Game Flow
-1. **GET /api/day/{date}** (optional userId query param)
+1. **GET /api/day/{date}/schedule**
    - Retrieves daily fastbreak card with games
-   - Returns leaderboard, game options, user's locked selections, stat sheet
-   - No authentication required for basic data
 2. User selects game picks in client
-3. **POST /api/lock** with Authorization header
+3. **POST /api/lock** with `userId` in the body
    - Saves user's game selections and total points
-   - Requires authentication to link selections to user
 
-### Profile Management Flow  
-1. **POST /api/profile** with Authorization header
-   - Updates user profile (username, etc.)
-   - Validates user ownership via Google ID matching
+### Profile Management Flow
+1. **POST /api/profile** with `userId` and `userName` in the body
+   - Updates the profile's username
    - Returns success/failure response
 
 ### Data Relationships
-- **Google ID** → **Internal User ID** (via profiles collection)
-- **User ID** → **Locked Cards** (via locked-fastbreak-cards collection)  
+- **User ID** → **Locked Cards** (via locked-fastbreak-cards collection)
 - **User ID** → **Stat Sheets** (calculated from historical performance)
 - **Date** → **Leaderboard** (calculated daily with both daily and weekly totals, stored by Sunday date)
 
@@ -95,56 +85,7 @@ The API uses Google JWT tokens for authentication. Protected endpoints require a
 
 ⚠️ **CRITICAL**: This API has several security vulnerabilities that should be addressed before production use.
 
-### 1. User ID Exposure & Authorization Bypass ✅ **FIXED**
-**Issue**: 
-- `POST /api/profile/initialize/{userId}` expects userId in URL path
-- No validation that authenticated user owns the requested userId
-
-**Fix**:
-- ✅ Remove userId from URL paths - derive from authenticated JWT token instead
-- ✅ Change `POST /api/profile/initialize/{userId}` to `POST /api/profile/initialize`
-- ✅ Google ID now extracted directly from JWT token for security
-
-**Code Changes**:
-```fsharp
-// In ProfileController.fs - updated implementation
-post "/profile/initialize" (requireGoogleAuth >=> (initializeProfileHandler database))
-```
-
-### 2. Google ID Privacy Leak ✅ **FIXED**
-**Issue**:
-- Google IDs exposed in URL paths (`/api/profile/initialize/{googleId}`)
-- Google IDs logged in server logs, browser history, referrer headers
-- Violates user privacy and Google's best practices
-
-**Fix**:
-- ✅ Extract Google ID from validated JWT token only (already available in `ctx.Items["GoogleUser"]`)
-- ✅ Never pass Google IDs in URLs or request bodies
-- ✅ Removed userId parameter matching - now uses Google ID from token directly
-
-### 3. JWT Token Validation Issues
-**Issue**:
-- No audience validation on Google JWT tokens in `googleAuthPipeline.fs:12`
-- Missing issuer verification beyond Google's signature
-- No token expiration enforcement in application code
-
-**Fix**:
-```fsharp
-// In googleAuthPipeline.fs - add proper validation
-let validateGoogleToken (idToken: string) =
-    task {
-        try
-            let validationSettings = GoogleJsonWebSignature.ValidationSettings()
-            validationSettings.Audience <- [| "YOUR_GOOGLE_CLIENT_ID" |]
-            validationSettings.IssuedAtClockTolerance <- TimeSpan.FromMinutes(5.0)
-            let! payload = GoogleJsonWebSignature.ValidateAsync(idToken, validationSettings)
-            return Some payload
-        with ex ->
-            return None
-    }
-```
-
-### 4. MongoDB Injection Risks  
+### 1. MongoDB Injection Risks  
 **Issue**:
 - Direct string concatenation in MongoDB connection string (Program.fs:130)
 - User input passed to MongoDB filters without proper sanitization
@@ -168,28 +109,7 @@ let mongoConnectionString =
     builder.ToMongoUrl().ToString()
 ```
 
-### 5. Information Disclosure
-**Issue**:
-- Different error responses reveal system information (404 vs 401 in googleAuthPipeline.fs:43)
-- Debug endpoints exposed that could leak internal state
-- Inconsistent error handling across controllers
-
-**Fix**:
-- Standardize all authentication failures to return 401 with generic message
-- Remove or secure debug endpoints in production builds
-- Implement consistent error response format across all endpoints
-- Add request/response logging for security monitoring
-
-**Code Changes**:
-```fsharp
-// In googleAuthPipeline.fs - standardize error responses
-| _ ->
-    ctx.SetStatusCode 401
-    ctx.WriteJsonAsync({| error = "Authentication required" |}) |> ignore
-    return Some(ctx)
-```
-
-### 6. Rate Limiting & DoS Protection
+### 2. Rate Limiting & DoS Protection
 **Issue**:
 - No rate limiting on any endpoints
 - Background job trigger endpoint could be abused
@@ -199,7 +119,6 @@ let mongoConnectionString =
 - Add rate limiting middleware to Saturn application
 - Implement per-user and per-IP rate limits
 - Add request timeout and size limits
-- Secure job trigger endpoints with additional authentication
 
 **Implementation**:
 ```fsharp
@@ -210,14 +129,13 @@ let configureRateLimiting (services: IServiceCollection) =
     services
 ```
 
-### 7. Additional Security Hardening
+### 3. Additional Security Hardening
 **TODO**:
 - Add HTTPS enforcement and HSTS headers
 - Implement request logging and audit trails
 - Add input validation middleware for all endpoints
 - Set up monitoring for suspicious activity patterns
 - Add CORS configuration for production domains only
-- Implement proper session management and token refresh
 - Add database connection encryption and certificate validation
 
 ## Deployment Setup

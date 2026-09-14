@@ -8,18 +8,16 @@ open Saturn.Endpoint
 open Fastbreak.Shared.Entities
 open Fastbreak.Shared.Utils.DeserializeBody
 open Fastbreak.Shared.Utils.GenerateRandomUsername
-open Fastbreak.Shared.Utils.Profile
-open Fastbreak.Shared.Utils.TryGetSubject
-open Fastbreak.Shared.Utils.GoogleAuthPipeline
 
 [<BsonIgnoreExtraElements>]
 [<CLIMutable>]
 type Profile =
     { userId: string
-      googleId: string
       userName: string
-      email: string option
       updatedAt: DateTime }
+
+[<CLIMutable>]
+type InitializeProfileRequest = { userId: string }
 
 type SaveResponse = { success: bool; message: string }
 
@@ -32,131 +30,100 @@ let saveProfileHandler (database: IMongoDatabase) : HttpHandler =
     fun next ctx ->
         task {
             let! profile = deserializeBody<Profile> ctx
-            let googleId = tryGetSubject ctx
 
             return!
-                match googleId with
-                | Some authUserId ->
-                    match
-                        getUserIdFromProfile database authUserId
-                        |> Async.AwaitTask
-                        |> Async.RunSynchronously
-                    with
-                    | Some userId ->
-                        if profile.userId = userId then
-                            let collection: IMongoCollection<Profile> =
-                                database.GetCollection<Profile>("profiles")
-
-                            let filter = Builders<Profile>.Filter.Eq((_.userId), userId)
-
-                            let update =
-                                Builders<Profile>.Update
-                                    .Set((_.userName), profile.userName)
-                                    .Set((_.updatedAt), DateTime.Now)
-                                    .Set((_.googleId), authUserId)
-                                    .SetOnInsert((_.userId), userId)
-                                    .SetOnInsert((_.email), None)
-
-                            let updateOptions = UpdateOptions(IsUpsert = true)
-
-                            let result = collection.UpdateOne(filter, update, updateOptions)
-
-                            let response =
-                                { success = true
-                                  message = "Profile saved successfully" }
-
-                            Successful.ok (json response) next ctx
-                        else
-                            let response =
-                                { success = false
-                                  message = "Profile ID mismatch" }
-
-                            RequestErrors.BAD_REQUEST (json response) next ctx
-                    | None ->
-                        let response =
-                            { success = false
-                              message = "Authentication required" }
-
-                        RequestErrors.FORBIDDEN (json response) next ctx
-                | None ->
+                if String.IsNullOrWhiteSpace profile.userId then
                     let response =
                         { success = false
-                          message = "Authentication required" }
+                          message = "userId is required" }
 
-                    RequestErrors.FORBIDDEN (json response) next ctx
+                    RequestErrors.BAD_REQUEST (json response) next ctx
+                else
+                    let collection: IMongoCollection<Profile> =
+                        database.GetCollection<Profile>("profiles")
 
+                    let filter = Builders<Profile>.Filter.Eq((_.userId), profile.userId)
+
+                    let update =
+                        Builders<Profile>.Update
+                            .Set((_.userName), profile.userName)
+                            .Set((_.updatedAt), DateTime.Now)
+                            .SetOnInsert((_.userId), profile.userId)
+
+                    let updateOptions = UpdateOptions(IsUpsert = true)
+
+                    collection.UpdateOne(filter, update, updateOptions) |> ignore
+
+                    let response =
+                        { success = true
+                          message = "Profile saved successfully" }
+
+                    Successful.ok (json response) next ctx
         }
 
 let initializeProfileHandler (database: IMongoDatabase) : HttpHandler =
     fun next ctx ->
         task {
-            let authUserId = tryGetSubject ctx
+            // Body is optional: `{ "userId": "..." }` returns the existing profile, no body creates a new one
+            let! rawBody = getRawBody ctx
 
-            return!
-                match authUserId with
-                | Some userId ->
-                    let userNamesCollection: IMongoCollection<Profile> =
-                        database.GetCollection<Profile>("profiles")
+            let requestedUserId =
+                if String.IsNullOrWhiteSpace rawBody then
+                    None
+                else
+                    let request =
+                        System.Text.Json.JsonSerializer.Deserialize<InitializeProfileRequest>(
+                            rawBody,
+                            System.Text.Json.JsonSerializerOptions(PropertyNameCaseInsensitive = true)
+                        )
 
-                    let userFilter = Builders<Profile>.Filter.Eq((_.googleId), userId)
-                    let userNameDoc = userNamesCollection.Find(userFilter).ToList()
-                    let randomUserName = generateRandomUsername ()
-                    let newUserId = Guid.NewGuid().ToString()
+                    if isNull (box request) || String.IsNullOrWhiteSpace request.userId then
+                        None
+                    else
+                        Some request.userId
 
-                    if userNameDoc.Count = 0 then
-                        let newUserName =
-                            { userId = newUserId
-                              googleId = userId
-                              userName = randomUserName
-                              email = None
-                              updatedAt = DateTime.Now }
+            let profilesCollection: IMongoCollection<Profile> =
+                database.GetCollection<Profile>("profiles")
 
-                        userNamesCollection.InsertOne(newUserName)
+            let existingProfile =
+                requestedUserId
+                |> Option.bind (fun userId ->
+                    profilesCollection.Find(Builders<Profile>.Filter.Eq((_.userId), userId)).FirstOrDefault()
+                    |> Option.ofObj)
 
+            let response =
+                match existingProfile with
+                | Some profile ->
                     let lockedFastBreakCard =
-                        if userNameDoc.Count > 0 then
-                            database
-                                .GetCollection<FastbreakSelectionState>("locked-fastbreak-cards")
-                                .Find(
-                                    Builders<FastbreakSelectionState>.Filter
-                                        .And(
-                                            Builders<FastbreakSelectionState>.Filter
-                                                .Eq(_.userId, userNameDoc[0].userId)
-                                        )
-                                )
-                                .Sort(Builders<FastbreakSelectionState>.Sort.Descending("createdAt"))
-                                .FirstOrDefaultAsync()
-                            |> Async.AwaitTask
-                            |> Async.RunSynchronously
-                            |> Option.ofObj
-                        else
-                            None
+                        database
+                            .GetCollection<FastbreakSelectionState>("locked-fastbreak-cards")
+                            .Find(Builders<FastbreakSelectionState>.Filter.Eq(_.userId, profile.userId))
+                            .Sort(Builders<FastbreakSelectionState>.Sort.Descending("createdAt"))
+                            .FirstOrDefaultAsync()
+                        |> Async.AwaitTask
+                        |> Async.RunSynchronously
+                        |> Option.ofObj
 
-                    let response =
-                        { userId =
-                            if userNameDoc.Count = 0 then
-                                newUserId
-                            else
-                                userNameDoc[0].userId
-                          userName =
-                            if userNameDoc.Count = 0 then
-                                randomUserName
-                            else
-                                userNameDoc[0].userName
-                          lockedFastBreakCard = lockedFastBreakCard }
-
-                    Successful.ok (json response) next ctx
+                    { userId = profile.userId
+                      userName = profile.userName
+                      lockedFastBreakCard = lockedFastBreakCard }
                 | None ->
-                    let response =
-                        { success = false
-                          message = "Authentication required" }
+                    let newProfile =
+                        { userId = Guid.NewGuid().ToString()
+                          userName = generateRandomUsername ()
+                          updatedAt = DateTime.Now }
 
-                    RequestErrors.FORBIDDEN (json response) next ctx
+                    profilesCollection.InsertOne(newProfile)
+
+                    { userId = newProfile.userId
+                      userName = newProfile.userName
+                      lockedFastBreakCard = None }
+
+            return! Successful.ok (json response) next ctx
         }
 
 let profileRouter database =
     router {
-        pipe_through googleAuthPipeline
         post "/profile" (saveProfileHandler database)
         post "/profile/initialize" (initializeProfileHandler database)
     }

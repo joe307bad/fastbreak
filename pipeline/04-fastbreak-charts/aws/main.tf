@@ -11,6 +11,16 @@ terraform {
       version = "~> 2.0"
     }
   }
+
+  # Remote state so GitHub Actions can plan/apply. The bucket and lock table
+  # were created by hand (they have to exist before terraform can use them).
+  backend "s3" {
+    bucket         = "fastbreak-terraform-state-372400261891"
+    key            = "fastbreak-charts/terraform.tfstate"
+    region         = "us-east-1"
+    dynamodb_table = "fastbreak-terraform-locks"
+    encrypt        = true
+  }
 }
 
 provider "aws" {

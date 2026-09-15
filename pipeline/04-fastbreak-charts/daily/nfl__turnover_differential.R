@@ -1,5 +1,6 @@
 library(nflreadr)
 library(dplyr)
+library(tidyr)
 library(jsonlite)
 
 # Get the most recent available season
@@ -44,63 +45,61 @@ if (most_recent_week_available > 18) {
   cat("NOTE: Playoffs detected (week", most_recent_week_available, "). Using regular season data through week 18.\n")
 }
 
-cat("Processing NFL snap data for season:", current_season, "week:", most_recent_week, "\n")
+cat("Processing NFL Turnover Differential for season:", current_season, "week:", most_recent_week, "\n")
 
-# Calculate total offensive snaps by team (plays where team is on offense)
-offense_snaps <- pbp %>%
-  filter(week <= most_recent_week, !is.na(posteam)) %>%
-  group_by(posteam) %>%
-  summarise(offense_snaps = n(), .groups = "drop") %>%
-  rename(team = posteam) %>%
-  mutate(team = ifelse(team == "LA", "LAR", team))
-
-# Calculate total defensive snaps by team (plays where team is on defense)
-defense_snaps <- pbp %>%
-  filter(week <= most_recent_week, !is.na(defteam)) %>%
+# Calculate turnovers forced (defensive turnovers)
+turnovers_forced <- pbp %>%
+  filter(week <= most_recent_week) %>%
+  filter(interception == 1 | fumble_lost == 1) %>%
   group_by(defteam) %>%
-  summarise(defense_snaps = n(), .groups = "drop") %>%
+  summarise(turnovers_forced = n(), .groups = "drop") %>%
   rename(team = defteam) %>%
   mutate(team = ifelse(team == "LA", "LAR", team))
 
-# Combine offense and defense snaps with team info
-team_snaps <- offense_snaps %>%
-  left_join(defense_snaps, by = "team") %>%
-  left_join(teams_info, by = c("team" = "team_abbr")) %>%
-  arrange(team)
+# Calculate turnovers committed (offensive turnovers)
+turnovers_committed <- pbp %>%
+  filter(week <= most_recent_week) %>%
+  filter(interception == 1 | fumble_lost == 1) %>%
+  group_by(posteam) %>%
+  summarise(turnovers_committed = n(), .groups = "drop") %>%
+  rename(team = posteam) %>%
+  mutate(team = ifelse(team == "LA", "LAR", team))
 
-# Convert to list format for JSON matching ScatterPlotVisualization model
-# ScatterPlotDataPoint: label, x, y, sum, division, conference
-data_points <- team_snaps %>%
+# Combine and calculate differential
+turnover_diff <- turnovers_forced %>%
+  full_join(turnovers_committed, by = "team") %>%
+  left_join(teams_info, by = c("team" = "team_abbr")) %>%
+  mutate(
+    turnovers_forced = replace_na(turnovers_forced, 0),
+    turnovers_committed = replace_na(turnovers_committed, 0),
+    differential = turnovers_forced - turnovers_committed
+  ) %>%
+  filter(!is.na(team) & team != "") %>%
+  arrange(desc(differential))
+
+cat("Teams processed:", nrow(turnover_diff), "\n")
+
+# Convert to list format for JSON matching BarGraphVisualization model
+# BarGraphDataPoint: label, value, division, conference
+data_points <- turnover_diff %>%
   rowwise() %>%
   mutate(data_point = list(list(
     label = team,
-    x = as.integer(defense_snaps),
-    y = as.integer(offense_snaps),
-    sum = as.integer(offense_snaps + defense_snaps),
+    value = as.numeric(differential),
     division = team_division,
     conference = team_conf
   ))) %>%
   pull(data_point)
 
-# Create output object with metadata matching ScatterPlotVisualization model
+# Create output object with metadata matching BarGraphVisualization model
 output_data <- list(
   sport = "NFL",
-  visualizationType = "SCATTER_PLOT",
-  title = paste("NFL Team Snaps - Week", most_recent_week),
-  subtitle = "Total Offensive vs Defensive Snaps",
-  description = "This chart shows the total number of offensive and defensive snaps each team has played through the season. More snaps generally indicate longer, more competitive games and stronger time of possession. Teams with significantly more defensive snaps than offensive snaps may be struggling to maintain possession, while teams with more offensive snaps are likely controlling the game tempo.",
+  visualizationType = "BAR_GRAPH",
+  title = paste("Turnover Differential - Week", most_recent_week),
+  subtitle = "Turnovers Forced minus Turnovers Committed",
+  description = "Turnover differential measures a team's ability to protect the ball while taking it away from opponents. Positive values indicate a team forces more turnovers than they commit, which strongly correlates with winning. Teams at the top are winning the turnover battle, while teams at the bottom are giving the ball away more than they're taking it.",
   lastUpdated = format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC"),
-  xAxisLabel = "Defensive Snaps",
-  yAxisLabel = "Offensive Snaps",
-  xColumnLabel = "Def Snaps",
-  yColumnLabel = "Off Snaps",
-  invertYAxis = FALSE,
-  quadrantTopRight = list(color = "#9C27B0", label = "High D/High O"),
-  quadrantTopLeft = list(color = "#2196F3", label = "Low D/High O"),
-  quadrantBottomLeft = list(color = "#F44336", label = "Low D/Low O"),
-  quadrantBottomRight = list(color = "#FF9800", label = "High D/Low O"),
   source = "nflfastR / nflreadr",
-  subject = "TEAM",
   tags = list(
     list(label = "team", layout = "left", color = "#4CAF50"),
     list(label = "regular season", layout = "right", color = "#9C27B0")
@@ -121,9 +120,9 @@ if (!nzchar(s3_bucket)) {
 env <- toupper(Sys.getenv("ENV", "DEV"))
 
 s3_key <- if (env == "PROD") {
-  "prod/nfl__team_snaps.json"
+  "prod/nfl__turnover_differential.json"
 } else {
-  "dev/nfl__team_snaps.json"
+  "dev/nfl__turnover_differential.json"
 }
 
 # Write JSON to temp file and upload via AWS CLI
@@ -144,7 +143,7 @@ cat("Uploaded to S3:", s3_path, "\n")
 dynamodb_table <- Sys.getenv("AWS_DYNAMODB_TABLE", "fastbreak-file-timestamps")
 utc_timestamp <- format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC")
 chart_title <- output_data$title
-chart_interval <- "weekly"
+chart_interval <- "daily"
 
 dynamodb_item <- sprintf('{"file_key": {"S": "%s"}, "updatedAt": {"S": "%s"}, "title": {"S": "%s"}, "interval": {"S": "%s"}}', s3_key, utc_timestamp, chart_title, chart_interval)
 dynamodb_cmd <- sprintf(
@@ -161,4 +160,10 @@ if (dynamodb_result != 0) {
   cat("Updated DynamoDB:", dynamodb_table, "key:", s3_key, "updatedAt:", utc_timestamp, "title:", chart_title, "interval:", chart_interval, "\n")
 }
 
-cat("Total teams:", length(data_points), "\n")
+# Print summary
+cat("\nTurnover Differential Summary:\n")
+cat("Top 5 teams:\n")
+print(head(turnover_diff %>% select(team, turnovers_forced, turnovers_committed, differential), 5))
+cat("\nBottom 5 teams:\n")
+print(tail(turnover_diff %>% select(team, turnovers_forced, turnovers_committed, differential), 5))
+cat("\nTotal teams:", length(data_points), "\n")

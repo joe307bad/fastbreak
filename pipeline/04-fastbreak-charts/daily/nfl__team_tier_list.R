@@ -1,6 +1,5 @@
 library(nflreadr)
 library(dplyr)
-library(tidyr)
 library(jsonlite)
 
 # Get the most recent available season
@@ -45,61 +44,69 @@ if (most_recent_week_available > 18) {
   cat("NOTE: Playoffs detected (week", most_recent_week_available, "). Using regular season data through week 18.\n")
 }
 
-cat("Processing NFL Turnover Differential for season:", current_season, "week:", most_recent_week, "\n")
+cat("Processing NFL data for season:", current_season, "week:", most_recent_week, "\n")
 
-# Calculate turnovers forced (defensive turnovers)
-turnovers_forced <- pbp %>%
-  filter(week <= most_recent_week) %>%
-  filter(interception == 1 | fumble_lost == 1) %>%
-  group_by(defteam) %>%
-  summarise(turnovers_forced = n(), .groups = "drop") %>%
-  rename(team = defteam) %>%
-  mutate(team = ifelse(team == "LA", "LAR", team))
-
-# Calculate turnovers committed (offensive turnovers)
-turnovers_committed <- pbp %>%
-  filter(week <= most_recent_week) %>%
-  filter(interception == 1 | fumble_lost == 1) %>%
+# Calculate offensive EPA per play by team
+offense_epa <- pbp %>%
+  filter(week <= most_recent_week, !is.na(epa), !is.na(posteam)) %>%
   group_by(posteam) %>%
-  summarise(turnovers_committed = n(), .groups = "drop") %>%
+  summarise(offense_epa_per_play = mean(epa, na.rm = TRUE), .groups = "drop") %>%
   rename(team = posteam) %>%
   mutate(team = ifelse(team == "LA", "LAR", team))
 
-# Combine and calculate differential
-turnover_diff <- turnovers_forced %>%
-  full_join(turnovers_committed, by = "team") %>%
+# Calculate defensive EPA per play by team
+defense_epa <- pbp %>%
+  filter(week <= most_recent_week, !is.na(epa), !is.na(defteam)) %>%
+  group_by(defteam) %>%
+  summarise(defense_epa_per_play = mean(epa, na.rm = TRUE), .groups = "drop") %>%
+  rename(team = defteam) %>%
+  mutate(team = ifelse(team == "LA", "LAR", team))
+
+# Combine offense and defense EPA with team info
+team_epa <- offense_epa %>%
+  left_join(defense_epa, by = "team") %>%
   left_join(teams_info, by = c("team" = "team_abbr")) %>%
-  mutate(
-    turnovers_forced = replace_na(turnovers_forced, 0),
-    turnovers_committed = replace_na(turnovers_committed, 0),
-    differential = turnovers_forced - turnovers_committed
-  ) %>%
-  filter(!is.na(team) & team != "") %>%
-  arrange(desc(differential))
+  arrange(team)
 
-cat("Teams processed:", nrow(turnover_diff), "\n")
-
-# Convert to list format for JSON matching BarGraphVisualization model
-# BarGraphDataPoint: label, value, division, conference
-data_points <- turnover_diff %>%
+# Convert to list format for JSON matching ScatterPlotVisualization model
+# ScatterPlotDataPoint: label, x, y, sum, division, conference
+data_points <- team_epa %>%
   rowwise() %>%
   mutate(data_point = list(list(
     label = team,
-    value = as.numeric(differential),
+    x = round(offense_epa_per_play, 4),
+    y = round(defense_epa_per_play, 4),
+    # Net EPA: defensive EPA is the opponent's EPA, so lower is better and it
+    # is subtracted, not added.
+    sum = round(offense_epa_per_play - defense_epa_per_play, 4),
     division = team_division,
     conference = team_conf
   ))) %>%
   pull(data_point)
 
-# Create output object with metadata matching BarGraphVisualization model
+# Create output object with metadata matching ScatterPlotVisualization model
 output_data <- list(
   sport = "NFL",
-  visualizationType = "BAR_GRAPH",
-  title = paste("Turnover Differential - Week", most_recent_week),
-  subtitle = "Turnovers Forced minus Turnovers Committed",
-  description = "Turnover differential measures a team's ability to protect the ball while taking it away from opponents. Positive values indicate a team forces more turnovers than they commit, which strongly correlates with winning. Teams at the top are winning the turnover battle, while teams at the bottom are giving the ball away more than they're taking it.",
+  visualizationType = "SCATTER_PLOT",
+  title = paste("NFL Team Tier List - Week", most_recent_week),
+  subtitle = "Offensive vs Defensive EPA Analysis",
+  description = "Expected Points Added (EPA) measures the value of each play by comparing the expected points before and after the play. Offensive EPA per play shows how many points a team adds per offensive play on average, while defensive EPA per play (where lower is better) shows how many points a team allows per defensive play. Teams in the top-right quadrant have strong offenses and defenses, making them the most dominant teams. EPA calculations include only passing and running plays.",
   lastUpdated = format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC"),
+  xAxisLabel = "Offensive EPA per Play",
+  yAxisLabel = "Defensive EPA per Play",
+  xColumnLabel = "OEPA",
+  yColumnLabel = "DEPA",
+  invertYAxis = TRUE,
+  quadrantTopRight = list(color = "#4CAF50", label = "Good D/Good O"),
+  quadrantTopLeft = list(color = "#2196F3", label = "Good D/Bad O"),
+  quadrantBottomLeft = list(color = "#F44336", label = "Bad D/Bad O"),
+  quadrantBottomRight = list(
+    color = "#FFEB3B",
+    label = "Good O/Bad D",
+    lightModeColor = "#F57C00"
+  ),
   source = "nflfastR / nflreadr",
+  subject = "TEAM",
   tags = list(
     list(label = "team", layout = "left", color = "#4CAF50"),
     list(label = "regular season", layout = "right", color = "#9C27B0")
@@ -120,9 +127,9 @@ if (!nzchar(s3_bucket)) {
 env <- toupper(Sys.getenv("ENV", "DEV"))
 
 s3_key <- if (env == "PROD") {
-  "prod/nfl__turnover_differential.json"
+  "prod/nfl__team_tier_list.json"
 } else {
-  "dev/nfl__turnover_differential.json"
+  "dev/nfl__team_tier_list.json"
 }
 
 # Write JSON to temp file and upload via AWS CLI
@@ -143,7 +150,7 @@ cat("Uploaded to S3:", s3_path, "\n")
 dynamodb_table <- Sys.getenv("AWS_DYNAMODB_TABLE", "fastbreak-file-timestamps")
 utc_timestamp <- format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC")
 chart_title <- output_data$title
-chart_interval <- "weekly"
+chart_interval <- "daily"
 
 dynamodb_item <- sprintf('{"file_key": {"S": "%s"}, "updatedAt": {"S": "%s"}, "title": {"S": "%s"}, "interval": {"S": "%s"}}', s3_key, utc_timestamp, chart_title, chart_interval)
 dynamodb_cmd <- sprintf(
@@ -160,10 +167,4 @@ if (dynamodb_result != 0) {
   cat("Updated DynamoDB:", dynamodb_table, "key:", s3_key, "updatedAt:", utc_timestamp, "title:", chart_title, "interval:", chart_interval, "\n")
 }
 
-# Print summary
-cat("\nTurnover Differential Summary:\n")
-cat("Top 5 teams:\n")
-print(head(turnover_diff %>% select(team, turnovers_forced, turnovers_committed, differential), 5))
-cat("\nBottom 5 teams:\n")
-print(tail(turnover_diff %>% select(team, turnovers_forced, turnovers_committed, differential), 5))
-cat("\nTotal teams:", length(data_points), "\n")
+cat("Total teams:", length(data_points), "\n")

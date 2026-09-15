@@ -266,7 +266,7 @@ cat("\nUploaded to S3:", s3_path, "\n")
 dynamodb_table <- Sys.getenv("AWS_DYNAMODB_TABLE", "fastbreak-file-timestamps")
 utc_timestamp <- format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC")
 chart_title <- output_data$title
-chart_interval <- "weekly"
+chart_interval <- "daily"
 
 dynamodb_item <- sprintf('{"file_key": {"S": "%s"}, "updatedAt": {"S": "%s"}, "title": {"S": "%s"}, "interval": {"S": "%s"}}', s3_key, utc_timestamp, chart_title, chart_interval)
 dynamodb_cmd <- sprintf(

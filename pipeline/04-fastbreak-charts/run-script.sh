@@ -107,5 +107,66 @@ else
   echo "[scheduler-o11y] WARNING: failed to record $file_key in DynamoDB (non-fatal)"
 fi
 
-rm -f "$output_file" "$item_file"
+# Also refresh the suite-level row (scheduler-o11y/<env>/suite) that says when
+# the next daily and weekly cron runs are due, so /diagnostics can show it.
+# The times come from the installed crontab so they cannot drift from it.
+schedule_file=$(mktemp)
+ENV_NAME="$env_name" NAME="$name" FINISHED_AT="$finished_at" CRONTAB_FILE="${CRONTAB_FILE:-/etc/cron.d/r-cron}" \
+python3 - > "$schedule_file" <<'PY'
+import json, os, re
+from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
+
+TZ_NAME = os.environ.get("TZ") or "America/New_York"
+tz = ZoneInfo(TZ_NAME)
+now = datetime.now(tz)
+
+# Defaults match crontab; overridden by whatever the crontab actually says.
+crons = {"daily": "0 6 * * *", "weekly": "0 7 * * 0"}
+try:
+    with open(os.environ["CRONTAB_FILE"]) as f:
+        for line in f:
+            m = re.match(r"^\s*(\S+\s+\S+\s+\S+\s+\S+\s+\S+)\s+.*run-script\.sh\s+(daily|weekly)\b", line)
+            if m:
+                crons[m.group(2)] = m.group(1)
+except OSError:
+    pass
+
+def next_run(cron):
+    minute, hour, _, _, dow = cron.split()
+    minute, hour = int(minute), int(hour)
+    days = None if dow == "*" else {int(d) % 7 for d in dow.split(",")}  # cron: 0 = Sunday
+    candidate = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
+    for _ in range(8):
+        # Python weekday(): Monday = 0; cron: Sunday = 0
+        cron_dow = (candidate.weekday() + 1) % 7
+        if candidate > now and (days is None or cron_dow in days):
+            return candidate
+        candidate = (candidate + timedelta(days=1)).replace(hour=hour, minute=minute)
+    return candidate
+
+def s(v): return {"S": v}
+iso = lambda d: d.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+print(json.dumps({
+    "file_key":          s(f"scheduler-o11y/{os.environ['ENV_NAME']}/suite"),
+    "namespace":         s("scheduler-o11y"),
+    "kind":              s("schedule"),
+    "env":               s(os.environ["ENV_NAME"]),
+    "timezone":          s(TZ_NAME),
+    "dailyCron":         s(crons["daily"]),
+    "weeklyCron":        s(crons["weekly"]),
+    "nextDailyRunAt":    s(iso(next_run(crons["daily"]))),
+    "nextWeeklyRunAt":   s(iso(next_run(crons["weekly"]))),
+    "lastJobScript":     s(os.environ["NAME"]),
+    "lastJobFinishedAt": s(os.environ["FINISHED_AT"]),
+    "updatedAt":         s(os.environ["FINISHED_AT"]),
+}))
+PY
+
+if ! aws dynamodb put-item --table-name "$table" --item "file://$schedule_file" >/dev/null 2>&1; then
+  echo "[scheduler-o11y] WARNING: failed to refresh the suite schedule row (non-fatal)"
+fi
+
+rm -f "$output_file" "$item_file" "$schedule_file"
 exit "$exit_code"

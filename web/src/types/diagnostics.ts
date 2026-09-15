@@ -15,10 +15,26 @@ export interface SchedulerRun {
   error?: string;
 }
 
+/** The suite-level row (scheduler-o11y/<env>/suite): when cron will next run the scripts */
+export interface SchedulerSchedule {
+  file_key: string;
+  namespace: 'scheduler-o11y';
+  kind: 'schedule';
+  env: string;
+  timezone: string;
+  dailyCron: string;
+  weeklyCron: string;
+  nextDailyRunAt: string;
+  nextWeeklyRunAt: string;
+  lastJobScript: string;
+  lastJobFinishedAt: string;
+}
+
 /** Shape of data/diagnostics.json, written at build time by scripts/download-charts.ts */
 export interface DiagnosticsSnapshot {
   fetchedAt: string;
   /** Set when the scheduler-o11y endpoint could not be reached at build time */
   fetchError?: string;
   runs: SchedulerRun[];
+  schedule?: SchedulerSchedule;
 }

@@ -95,8 +95,8 @@ echo ""
 # Export environment variables for cron jobs (restricted permissions)
 # Include PATH so cron can find aws cli and other tools
 echo "export PATH=\"$PATH\"" > /app/env.sh
-printenv | grep -E "^(AWS_|ENV|GEMINI_)" >> /app/env.sh
-sed -i '/^AWS_\|^ENV\|^GEMINI_/s/^/export /' /app/env.sh
+printenv | grep -E "^(AWS_|ENV|GEMINI_|TZ=)" >> /app/env.sh
+sed -i '/^AWS_\|^ENV\|^GEMINI_\|^TZ=/s/^/export /' /app/env.sh
 chmod 600 /app/env.sh
 
 # Handle daily-only mode - just run Fastbreak.Daily and exit

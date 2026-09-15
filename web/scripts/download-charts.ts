@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { fileKeyToChartId, filterRegistryKeys, getRegistryPrefix } from '../src/lib/registry';
-import type { DiagnosticsSnapshot, SchedulerRun } from '../src/types/diagnostics';
+import type { DiagnosticsSnapshot, SchedulerRun, SchedulerSchedule } from '../src/types/diagnostics';
 
 const BASE_URL = 'https://d2jyizt5xogu23.cloudfront.net';
 const DATA_DIR = path.join(process.cwd(), 'data');
@@ -34,8 +34,10 @@ async function downloadDiagnostics() {
     if (!res.ok) {
       throw new Error(`HTTP ${res.status}`);
     }
-    const body: { items?: SchedulerRun[] } = await res.json();
-    snapshot.runs = (body.items ?? []).filter((run) => run.env === env);
+    const body: { items?: Array<SchedulerRun | SchedulerSchedule> } = await res.json();
+    const items = (body.items ?? []).filter((item) => item.env === env);
+    snapshot.runs = items.filter((item): item is SchedulerRun => (item as SchedulerSchedule).kind !== 'schedule');
+    snapshot.schedule = items.find((item): item is SchedulerSchedule => (item as SchedulerSchedule).kind === 'schedule');
     console.log(`Saved ${snapshot.runs.length} scheduler-o11y records (env=${env})`);
   } catch (error) {
     snapshot.fetchError = String(error);

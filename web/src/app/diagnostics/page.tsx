@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { pageMetadata } from '@/lib/og';
 import { getDiagnostics } from '@/lib/data';
 import { DiagnosticsTable } from '@/components/ui/DiagnosticsTable';
+import { NextRunCard } from '@/components/ui/NextRunCard';
 
 export const metadata = pageMetadata({
   title: 'Diagnostics - fastbreak',
@@ -9,7 +10,7 @@ export const metadata = pageMetadata({
 });
 
 export default function DiagnosticsPage() {
-  const { runs, fetchedAt, fetchError } = getDiagnostics();
+  const { runs, schedule, fetchedAt, fetchError } = getDiagnostics();
   const failed = runs.filter((run) => run.status === 'failed').length;
   const succeeded = runs.length - failed;
 
@@ -50,6 +51,8 @@ export default function DiagnosticsPage() {
           </span>
         )}
       </div>
+
+      {schedule && <NextRunCard schedule={schedule} />}
 
       {fetchError && (
         <p className="mb-6 px-3 py-2 text-sm border border-red-300 dark:border-red-800 rounded text-red-600 dark:text-red-400">

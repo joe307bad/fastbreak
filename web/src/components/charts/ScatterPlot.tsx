@@ -75,7 +75,8 @@ function createNodesLayer(
 
           return (
             <g key={node.id}>
-              {/* Selection ring - marching ants */}
+              {/* Selection ring: a faint solid ring so the outline never breaks,
+                  with animated dashes marching over it in the point's color */}
               {isSelected && (
                 <>
                   <circle
@@ -83,9 +84,9 @@ function createNodesLayer(
                     cy={node.y}
                     r={radius + 4}
                     fill="none"
-                    stroke="#000"
+                    stroke={color}
+                    strokeOpacity={0.3}
                     strokeWidth={3}
-                    strokeDasharray="6,6"
                   />
                   <circle
                     cx={node.x}
@@ -95,7 +96,6 @@ function createNodesLayer(
                     stroke={color}
                     strokeWidth={3}
                     strokeDasharray="6,6"
-                    strokeDashoffset={6}
                     style={{ animation: 'marching-ants 1s linear infinite' }}
                   />
                 </>

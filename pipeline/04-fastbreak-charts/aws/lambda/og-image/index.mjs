@@ -18,7 +18,6 @@ const WIDTH = 1200;
 const HEIGHT = 630;
 const SCALE = 2;
 const MAX_TITLE = 110;
-const MAX_SUBTITLE = 150;
 
 const fontRegular = asset("GeistMono-Regular.ttf");
 const fontBold = asset("GeistMono-Bold.ttf");
@@ -30,10 +29,12 @@ function ensureWasm() {
   return wasmReady;
 }
 
+// Subtitles are never cut: the site keeps them short on its side (see
+// web/src/lib/og.ts). Only the title has a hard cap, as a safety net.
 function clean(value, max, fallback) {
   const text = (value ?? "").toString().replace(/\s+/g, " ").trim();
   if (!text) return fallback;
-  return text.length > max ? `${text.slice(0, max - 1).trimEnd()}…` : text;
+  return max && text.length > max ? `${text.slice(0, max - 1).trimEnd()}…` : text;
 }
 
 // The logo sits top left, above the bottom-anchored text; the text column is
@@ -149,7 +150,7 @@ export async function render(title, subtitle) {
 export const handler = async (event) => {
   const params = event?.queryStringParameters ?? {};
   const title = clean(params.title, MAX_TITLE, "fastbreak");
-  const subtitle = clean(params.subtitle, MAX_SUBTITLE, "");
+  const subtitle = clean(params.subtitle, 0, "");
 
   try {
     const png = await render(title, subtitle);

@@ -3,7 +3,7 @@ import { pageMetadata } from '@/lib/og';
 
 export const metadata = pageMetadata({
   title: 'Privacy Policy - fastbreak',
-  description: 'Privacy policy for the fastbreak sports analytics dashboard',
+  description: 'Privacy policy for the fastbreak dashboard',
 });
 
 export default function PrivacyPolicy() {

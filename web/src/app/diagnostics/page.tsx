@@ -6,7 +6,7 @@ import { NextRunCard } from '@/components/ui/NextRunCard';
 
 export const metadata = pageMetadata({
   title: 'Diagnostics - fastbreak',
-  description: 'Status, timing, and errors for every scheduled chart pipeline script',
+  description: 'Status and timing for every pipeline script',
 });
 
 export default function DiagnosticsPage() {

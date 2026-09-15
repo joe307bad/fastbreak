@@ -28,6 +28,7 @@ export async function generateMetadata({ params }: Props) {
   return pageMetadata({
     title: data.title,
     description: data.description || data.subtitle,
+    subtitle: data.subtitle || data.title,
   });
 }
 

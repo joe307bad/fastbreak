@@ -21,7 +21,7 @@ export async function generateMetadata({ params }: Props) {
   const league = sport.toUpperCase();
   return pageMetadata({
     title: `${league} Charts`,
-    description: `${league} team and player charts, matchup worksheets, and report cards, updated daily`,
+    description: `${league} charts, matchups, and report cards`,
   });
 }
 

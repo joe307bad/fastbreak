@@ -16,14 +16,22 @@ export function ogImageUrl(title: string, subtitle?: string): string {
   return `${OG_ENDPOINT}?${params.toString()}`;
 }
 
+/**
+ * `description` is the HTML meta description (can be long). `subtitle` is what
+ * the OG card prints under the title; it defaults to the description, so pass
+ * one whenever the description would not fit on a line or two of the card.
+ * The card never truncates, so keep subtitles short (roughly under 60 chars).
+ */
 export function pageMetadata({
   title,
   description,
+  subtitle,
 }: {
   title: string;
   description?: string;
+  subtitle?: string;
 }): Metadata {
-  const imageUrl = ogImageUrl(title, description);
+  const imageUrl = ogImageUrl(title, subtitle ?? description);
 
   return {
     title,

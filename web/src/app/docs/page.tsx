@@ -10,7 +10,7 @@ import { pageMetadata } from '@/lib/og';
 
 export const metadata = pageMetadata({
   title: 'Documentation - fastbreak',
-  description: 'Documentation for the fastbreak sports analytics dashboard',
+  description: 'Documentation for the fastbreak dashboard',
 });
 
 const components: MDXComponents = {

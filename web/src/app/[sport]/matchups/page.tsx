@@ -19,7 +19,7 @@ export async function generateMetadata({ params }: Props) {
   const league = sport.toUpperCase();
   return pageMetadata({
     title: `${league} Matchups`,
-    description: `Head-to-head worksheets for upcoming ${league} games: season stats, recent form, and who has the edge`,
+    description: `Head-to-head worksheets for upcoming ${league} games`,
   });
 }
 

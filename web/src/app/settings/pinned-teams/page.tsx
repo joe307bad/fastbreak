@@ -4,7 +4,7 @@ import { PinnedTeamsManager } from '@/components/ui/PinnedTeamsManager';
 
 export const metadata = pageMetadata({
   title: 'Pinned Teams',
-  description: 'Pin your teams to bring their charts and matchups to the front across fastbreak',
+  description: 'Pin your teams to see their charts first',
 });
 
 export default async function PinnedTeamsPage() {

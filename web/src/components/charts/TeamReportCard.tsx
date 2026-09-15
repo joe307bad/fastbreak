@@ -277,10 +277,23 @@ function resolveTeamCode(
   return teams[0]?.teamCode ?? '';
 }
 
-function setHashTeamAbbrev(teamCode: string) {
-  const hash = teamCode.toUpperCase();
-  if (window.location.hash.slice(1).toUpperCase() !== hash) {
-    window.history.replaceState(null, '', `#${hash}`);
+// Team pages live at /{sport}/chart/{slug}/{team} so each team gets its own
+// OG card. Switching teams rewrites that last segment in place; on any other
+// route (or an old #PIT link) fall back to the hash.
+const TEAM_PATH_RE = /^(\/[^/]+\/chart\/[^/]+)(?:\/[^/]+)?\/?$/;
+
+function setUrlTeam(teamCode: string) {
+  const code = teamCode.toUpperCase();
+  const match = window.location.pathname.match(TEAM_PATH_RE);
+  if (match) {
+    const nextPath = `${match[1]}/${code.toLowerCase()}`;
+    if (window.location.pathname !== nextPath || window.location.hash) {
+      window.history.replaceState(null, '', nextPath);
+    }
+    return;
+  }
+  if (window.location.hash.slice(1).toUpperCase() !== code) {
+    window.history.replaceState(null, '', `#${code}`);
   }
 }
 
@@ -665,9 +678,11 @@ function TeamSummaryStat({
 
 interface Props {
   data: TeamReportCardData;
+  /** Team to open with, from the /{team} route segment; overrides hash and pinned teams */
+  initialTeamCode?: string;
 }
 
-export function TeamReportCard({ data }: Props) {
+export function TeamReportCard({ data, initialTeamCode }: Props) {
   const { getPinnedForSport, mounted } = usePinnedTeams();
 
   const sportKey = (data.sport ?? 'mlb').toLowerCase();
@@ -691,6 +706,14 @@ export function TeamReportCard({ data }: Props) {
   const [selectedTeamCode, setSelectedTeamCode] = useState<string | null>(null);
 
   useLayoutEffect(() => {
+    if (initialTeamCode) {
+      const fromRoute = teams.find(t => t.teamCode.toUpperCase() === initialTeamCode.toUpperCase());
+      if (fromRoute) {
+        setSelectedTeamCode(fromRoute.teamCode);
+        return;
+      }
+    }
+
     const hashAbbrev = getHashTeamAbbrev();
     if (hashAbbrev) {
       const fromHash = teams.find(t => t.teamCode.toUpperCase() === hashAbbrev);
@@ -702,7 +725,7 @@ export function TeamReportCard({ data }: Props) {
 
     if (!mounted) return;
     setSelectedTeamCode(resolveTeamCode(teams, pinnedCodes, ''));
-  }, [mounted, teams, pinnedCodes]);
+  }, [initialTeamCode, mounted, teams, pinnedCodes]);
 
   useEffect(() => {
     const handleHashChange = () => {
@@ -742,7 +765,7 @@ export function TeamReportCard({ data }: Props) {
 
   const handleTeamChange = (teamCode: string) => {
     setSelectedTeamCode(teamCode);
-    setHashTeamAbbrev(teamCode);
+    setUrlTeam(teamCode);
   };
 
   if (!selectedTeamCode || !team) {

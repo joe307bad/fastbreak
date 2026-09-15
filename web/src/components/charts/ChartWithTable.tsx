@@ -13,6 +13,8 @@ interface Props {
   subtitle?: string;
   source?: string;
   lastUpdated?: string;
+  /** Report cards only: team to open with */
+  initialTeamCode?: string;
 }
 
 // Helper to darken a hex color
@@ -208,7 +210,7 @@ function DownloadButton({ onClick }: { onClick: () => void }) {
   );
 }
 
-export function ChartWithTable({ data, title, subtitle, source, lastUpdated }: Props) {
+export function ChartWithTable({ data, title, subtitle, source, lastUpdated, initialTeamCode }: Props) {
   const [highlightedLabels, setHighlightedLabels] = useState<string[] | null>(null);
   const [selectedLabel, setSelectedLabel] = useState<string | null>(null);
   const [selectedQuadrant, setSelectedQuadrant] = useState<QuadrantKey | null>(null);
@@ -310,6 +312,7 @@ export function ChartWithTable({ data, title, subtitle, source, lastUpdated }: P
               highlightedLabels={effectiveHighlightedLabels}
               selectedLabel={selectedLabel}
               onSelect={handleSelect}
+              initialTeamCode={initialTeamCode}
             />
           </div>
           {isScatterPlot && (

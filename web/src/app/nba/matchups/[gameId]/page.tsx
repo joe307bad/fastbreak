@@ -43,7 +43,7 @@ export async function generateMetadata({ params }: Props) {
   const game = matchupData?.dataPoints.find(g => g.gameId === gameId);
 
   if (!game) {
-    return pageMetadata({ title: 'NBA Matchup' });
+    return pageMetadata({ title: 'NBA Matchup', description: 'Head-to-head NBA matchup worksheet on fastbreak' });
   }
 
   const title = `${game.awayTeam.abbreviation} @ ${game.homeTeam.abbreviation} - NBA Matchup`;

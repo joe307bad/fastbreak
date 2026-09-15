@@ -18,7 +18,11 @@ export async function generateStaticParams() {
 
 export async function generateMetadata({ params }: Props) {
   const { sport } = await params;
-  return pageMetadata({ title: sport.toUpperCase() });
+  const league = sport.toUpperCase();
+  return pageMetadata({
+    title: `${league} Charts`,
+    description: `${league} team and player charts, matchup worksheets, and report cards, updated daily`,
+  });
 }
 
 export default async function SportPage({ params }: Props) {

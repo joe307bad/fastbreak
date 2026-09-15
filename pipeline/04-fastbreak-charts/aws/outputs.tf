@@ -48,3 +48,8 @@ output "scheduler_o11y_url" {
   description = "URL for the scheduler-o11y API (via CloudFront)"
   value       = "https://${aws_cloudfront_distribution.fastbreak.domain_name}/scheduler-o11y"
 }
+
+output "og_image_url" {
+  description = "URL for the OG image renderer (via CloudFront); takes ?title= and ?subtitle="
+  value       = "https://${aws_cloudfront_distribution.fastbreak.domain_name}/og"
+}

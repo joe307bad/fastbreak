@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Header } from "@/components/ui";
-import { ogImageUrl } from "@/lib/og";
+import { pageMetadata } from "@/lib/og";
 
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
@@ -11,21 +11,10 @@ const geistMono = Geist_Mono({
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://fastbreak.joebad.com";
 
+// Every page inherits this card unless it exports its own pageMetadata().
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
-  title: "fastbreak",
-  description: "Fast sports analytics dashboard",
-  openGraph: {
-    title: "fastbreak",
-    description: "Fast sports analytics dashboard",
-    images: [ogImageUrl("fastbreak")],
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: "fastbreak",
-    description: "Fast sports analytics dashboard",
-    images: [ogImageUrl("fastbreak")],
-  },
+  ...pageMetadata({ title: "fastbreak", description: "Fast sports analytics dashboard" }),
 };
 
 export default function RootLayout({

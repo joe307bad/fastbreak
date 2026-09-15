@@ -1,0 +1,11 @@
+{
+  "name": "fastbreak-og-image-lambda",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "index.mjs",
+  "private": true,
+  "dependencies": {
+    "@resvg/resvg-wasm": "2.6.2",
+    "satori": "0.12.2"
+  }
+}

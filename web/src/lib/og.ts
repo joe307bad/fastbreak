@@ -1,51 +1,16 @@
 import type { Metadata } from 'next';
 
-const MAX_CHARS_PER_LINE = 32;
+// The card is rendered by the fastbreak-og-image Lambda behind CloudFront
+// (pipeline/04-fastbreak-charts/aws/lambda/og-image). It takes ?title= and
+// ?subtitle= and returns a 2400x1260 PNG; CloudFront caches on the query string.
+const OG_ENDPOINT = process.env.NEXT_PUBLIC_OG_IMAGE_URL || 'https://d2jyizt5xogu23.cloudfront.net/og';
+const OG_WIDTH = 2400;
+const OG_HEIGHT = 1260;
 
-function truncateWithEllipsis(text: string, maxLen: number): string {
-  if (text.length <= maxLen) return text;
-  if (maxLen <= 1) return '…';
-  return `${text.slice(0, maxLen - 1).trimEnd()}…`;
-}
-
-export function splitOgDescription(text: string): string[] {
-  const words = text.trim().split(/\s+/).filter(Boolean);
-  if (words.length === 0) return ['fastbreak'];
-
-  const lines: string[] = [];
-  let current = '';
-
-  for (let i = 0; i < words.length; i++) {
-    const word = words[i];
-    const candidate = current ? `${current} ${word}` : word;
-
-    if (candidate.length <= MAX_CHARS_PER_LINE) {
-      current = candidate;
-      continue;
-    }
-
-    if (current) {
-      lines.push(current);
-      if (lines.length === 2) {
-        const remainder = [word, ...words.slice(i + 1)].join(' ');
-        lines[1] = truncateWithEllipsis(`${lines[1]} ${remainder}`.trim(), MAX_CHARS_PER_LINE);
-        return lines;
-      }
-      current = word.length > MAX_CHARS_PER_LINE
-        ? truncateWithEllipsis(word, MAX_CHARS_PER_LINE)
-        : word;
-      continue;
-    }
-
-    current = truncateWithEllipsis(word, MAX_CHARS_PER_LINE);
-  }
-
-  if (current) lines.push(current);
-  return lines.slice(0, 2);
-}
-
-export function ogImageUrl(title: string): string {
-  return `/og?${new URLSearchParams({ description: title }).toString()}`;
+export function ogImageUrl(title: string, subtitle?: string): string {
+  const params = new URLSearchParams({ title });
+  if (subtitle) params.set('subtitle', subtitle);
+  return `${OG_ENDPOINT}?${params.toString()}`;
 }
 
 export function pageMetadata({
@@ -55,7 +20,7 @@ export function pageMetadata({
   title: string;
   description?: string;
 }): Metadata {
-  const imageUrl = ogImageUrl(title);
+  const imageUrl = ogImageUrl(title, description);
 
   return {
     title,
@@ -63,7 +28,7 @@ export function pageMetadata({
     openGraph: {
       title,
       ...(description ? { description } : {}),
-      images: [{ url: imageUrl, width: 1200, height: 630, alt: title }],
+      images: [{ url: imageUrl, width: OG_WIDTH, height: OG_HEIGHT, alt: title }],
     },
     twitter: {
       card: 'summary_large_image',

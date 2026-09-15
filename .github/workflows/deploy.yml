@@ -57,6 +57,15 @@ jobs:
           terraform_version: 1.5.7
           terraform_wrapper: false
 
+      # The og-image Lambda ships its node_modules inside the zip that
+      # archive_file builds at plan time, so install them first.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install og-image Lambda dependencies
+        run: npm ci --omit=dev --no-audit --no-fund
+        working-directory: pipeline/04-fastbreak-charts/aws/lambda/og-image
+
       - run: terraform init -input=false
 
       - run: terraform fmt -check -diff

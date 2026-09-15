@@ -125,6 +125,19 @@ resource "aws_cloudfront_distribution" "fastbreak" {
     }
   }
 
+  # Lambda origin for the OG image renderer
+  origin {
+    domain_name = replace(replace(aws_lambda_function_url.og_image.function_url, "https://", ""), "/", "")
+    origin_id   = "Lambda-og-image"
+
+    custom_origin_config {
+      http_port              = 80
+      https_port             = 443
+      origin_protocol_policy = "https-only"
+      origin_ssl_protocols   = ["TLSv1.2"]
+    }
+  }
+
   # Default behavior - S3 static files
   default_cache_behavior {
     allowed_methods        = ["GET", "HEAD", "OPTIONS"]
@@ -182,6 +195,27 @@ resource "aws_cloudfront_distribution" "fastbreak" {
     min_ttl     = 0
     default_ttl = 0
     max_ttl     = 0
+  }
+
+  # OG image behavior: the title/subtitle live in the query string, so cache on it
+  ordered_cache_behavior {
+    path_pattern           = "/og"
+    allowed_methods        = ["GET", "HEAD", "OPTIONS"]
+    cached_methods         = ["GET", "HEAD"]
+    target_origin_id       = "Lambda-og-image"
+    viewer_protocol_policy = "redirect-to-https"
+    compress               = false
+
+    forwarded_values {
+      query_string = true
+      cookies {
+        forward = "none"
+      }
+    }
+
+    min_ttl     = 0
+    default_ttl = 86400
+    max_ttl     = 604800
   }
 
   # Only allow .json files
@@ -370,6 +404,75 @@ resource "aws_lambda_function" "scheduler_o11y" {
 
 resource "aws_lambda_function_url" "scheduler_o11y" {
   function_name      = aws_lambda_function.scheduler_o11y.function_name
+  authorization_type = "NONE"
+
+  cors {
+    allow_origins = ["*"]
+    allow_methods = ["GET"]
+    allow_headers = ["*"]
+  }
+}
+
+# OG image Lambda: renders a dark title/subtitle card (satori + resvg) for
+# social unfurls. Its node_modules are installed before packaging (see the
+# deploy-infra job); it needs no AWS permissions beyond logging.
+resource "aws_iam_role" "og_image_lambda" {
+  name = "fastbreak-og-image-lambda-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRole"
+        Effect = "Allow"
+        Principal = {
+          Service = "lambda.amazonaws.com"
+        }
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy" "og_image_lambda" {
+  name = "fastbreak-og-image-lambda-policy"
+  role = aws_iam_role.og_image_lambda.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "logs:CreateLogGroup",
+          "logs:CreateLogStream",
+          "logs:PutLogEvents"
+        ]
+        Resource = "arn:aws:logs:*:*:*"
+      }
+    ]
+  })
+}
+
+data "archive_file" "og_image_lambda" {
+  type        = "zip"
+  source_dir  = "${path.module}/lambda/og-image"
+  output_path = "${path.module}/lambda/og-image.zip"
+  excludes    = [".gitignore"]
+}
+
+resource "aws_lambda_function" "og_image" {
+  filename         = data.archive_file.og_image_lambda.output_path
+  function_name    = "fastbreak-og-image"
+  role             = aws_iam_role.og_image_lambda.arn
+  handler          = "index.handler"
+  source_code_hash = data.archive_file.og_image_lambda.output_base64sha256
+  runtime          = "nodejs20.x"
+  timeout          = 15
+  memory_size      = 1024
+}
+
+resource "aws_lambda_function_url" "og_image" {
+  function_name      = aws_lambda_function.og_image.function_name
   authorization_type = "NONE"
 
   cors {

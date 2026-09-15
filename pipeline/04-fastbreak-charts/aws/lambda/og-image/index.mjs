@@ -1,4 +1,4 @@
-// Renders an Open Graph image (title + subtitle, dark, fastbreak logo top right).
+// Renders an Open Graph image (title + subtitle, dark, fastbreak logo top left).
 //   GET /og?title=...&subtitle=...
 // satori lays the card out as SVG; resvg rasterises it to PNG at 2x (2400x1260)
 // so the text stays crisp wherever Twitter/Slack/iMessage downscale it.
@@ -36,10 +36,11 @@ function clean(value, max, fallback) {
   return text.length > max ? `${text.slice(0, max - 1).trimEnd()}…` : text;
 }
 
-// The text column stops short of the logo's column (1200 - 72 - 132 - gap), so
-// nothing can run underneath it. Geist Mono glyphs are ~0.6em wide, so a size
-// of N fits about 1540/N characters per line of the 924px column. Step down so
-// short titles stay on one line and the longest fit in three.
+// The logo sits top left, above the bottom-anchored text; the text column is
+// capped so the tallest title + subtitle never climbs into it. Geist Mono
+// glyphs are ~0.6em wide, so a size of N fits about 1540/N characters per line
+// of the 924px column. Step down so short titles stay on one line and the
+// longest fit in three.
 const TEXT_WIDTH = 924;
 function titleSize(title) {
   if (title.length <= 19) return 80;
@@ -77,7 +78,7 @@ function card(title, subtitle) {
       src: logoDataUrl,
       width: 132,
       height: 134,
-      style: { position: "absolute", top: 56, right: 72 },
+      style: { position: "absolute", top: 56, left: 72 },
     }),
     h(
       "div",

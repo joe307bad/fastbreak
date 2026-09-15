@@ -88,10 +88,14 @@ function createNodesLayer(
                     strokeOpacity={0.3}
                     strokeWidth={3}
                   />
+                  {/* pathLength makes the ring exactly 60 units around, so the
+                      6+6 dash pattern tiles into five whole periods with no seam
+                      and the -12 keyframe advances exactly one period per loop */}
                   <circle
                     cx={node.x}
                     cy={node.y}
                     r={radius + 4}
+                    pathLength={60}
                     fill="none"
                     stroke={color}
                     strokeWidth={3}

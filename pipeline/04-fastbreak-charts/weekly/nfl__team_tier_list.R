@@ -76,7 +76,9 @@ data_points <- team_epa %>%
     label = team,
     x = round(offense_epa_per_play, 4),
     y = round(defense_epa_per_play, 4),
-    sum = round(offense_epa_per_play + defense_epa_per_play, 4),
+    # Net EPA: defensive EPA is the opponent's EPA, so lower is better and it
+    # is subtracted, not added.
+    sum = round(offense_epa_per_play - defense_epa_per_play, 4),
     division = team_division,
     conference = team_conf
   ))) %>%

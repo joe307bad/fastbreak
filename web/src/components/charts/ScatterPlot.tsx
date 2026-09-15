@@ -13,7 +13,10 @@ interface Props {
 
 interface NodeData {
   x: number;
+  /** Plotted value; negated when the chart inverts its Y axis */
   y: number;
+  /** The real Y value from the data, for display */
+  rawY: number;
   label?: string;
   teamCode?: string;
   isOutlier?: boolean;
@@ -327,6 +330,7 @@ export function ScatterPlot({ data, highlightedLabels, selectedLabel, onSelect }
       return {
         x: p.x,
         y: transformedY,
+        rawY: p.y,
         label: p.label,
         teamCode: p.teamCode,
         isOutlier,
@@ -369,6 +373,8 @@ export function ScatterPlot({ data, highlightedLabels, selectedLabel, onSelect }
           tickSize: 0,
           tickPadding: 8,
           tickRotation: 0,
+          // Inverted charts plot -y so "better" is up; show the real value on the ticks
+          format: (value: number) => String(data.invertYAxis ? 0 - value : value),
           legend: data.yAxisLabel,
           legendPosition: 'middle',
           legendOffset: -55,
@@ -414,7 +420,7 @@ export function ScatterPlot({ data, highlightedLabels, selectedLabel, onSelect }
                 {data.xColumnLabel || 'X'}: {node.xValue}
               </div>
               <div className="text-[var(--muted)]">
-                {data.yColumnLabel || 'Y'}: {node.yValue}
+                {data.yColumnLabel || 'Y'}: {d.rawY}
               </div>
             </div>
           );

@@ -147,7 +147,7 @@ output_data <- list(
   sport = "MLB",
   visualizationType = "SCATTER_PLOT",
   title = paste0("MLB Hitting Leaders - ", mlb_season, "-", substr(mlb_season + 1, 3, 4)),
-  subtitle = paste0("At least ", min_pa, " plate appearances"),
+  subtitle = "Qualified hitters by wRC+ and barrel rate.",
   description = paste0(
     "Top 50 hitters (min ", min_pa, " PA, ", min_g,
     " G) plotted by run production (wRC+) against elite contact rate (Barrel%). ",

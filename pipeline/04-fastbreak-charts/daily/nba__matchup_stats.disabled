@@ -3139,7 +3139,7 @@ output_data <- list(
   sport = "NBA",
   visualizationType = "NBA_MATCHUP",
   title = paste0("NBA Matchups - ", format(start_date, "%b %d"), " - ", format(end_date, "%b %d")),
-  subtitle = paste("Games from the past", DAYS_BEHIND, "days and next", DAYS_AHEAD, "days with results and stats"),
+  subtitle = "Head-to-head worksheets for recent and upcoming NBA games.",
   description = paste0(
     "Detailed matchup statistics including team performance metrics, player ",
     "stats, and betting odds. All stats are season totals through the ",

@@ -89,7 +89,7 @@ output_data <- list(
   sport = "NFL",
   visualizationType = "SCATTER_PLOT",
   title = paste("NFL Team Tier List - Week", most_recent_week),
-  subtitle = "Offensive vs Defensive EPA Analysis",
+  subtitle = "Every team's offense plotted against its defense by EPA.",
   description = "Expected Points Added (EPA) measures the value of each play by comparing the expected points before and after the play. Offensive EPA per play shows how many points a team adds per offensive play on average, while defensive EPA per play (where lower is better) shows how many points a team allows per defensive play. Teams in the top-right quadrant have strong offenses and defenses, making them the most dominant teams. EPA calculations include only passing and running plays.",
   lastUpdated = format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC"),
   xAxisLabel = "Offensive EPA per Play",

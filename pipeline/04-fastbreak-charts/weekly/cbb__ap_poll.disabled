@@ -156,7 +156,7 @@ output_data <- list(
   sport = "CBB",
   visualizationType = "LINE_CHART",
   title = paste("AP Poll Rankings - Week", most_recent_week),
-  subtitle = "Top 15 Teams Ranking Trend",
+  subtitle = "Weekly AP poll movement for the top 15 teams.",
   yAxisLabel = "AP Poll Ranking",
   description = paste0(
     "AP Poll rankings for the top 15 college basketball teams over the past ",

@@ -1557,7 +1557,7 @@ output_data <- list(
   sport = "MLB",
   visualizationType = "MLB_MATCHUP",
   title = paste0("MLB Matchups - ", format(start_date, "%b %d"), " - ", format(end_date, "%b %d")),
-  subtitle = paste("Games from the past", DAYS_BEHIND, "days and next", DAYS_AHEAD, "days"),
+  subtitle = "Head-to-head worksheets for recent and upcoming MLB games.",
   description = paste0(
     "MLB matchup statistics with team batting, pitching, and fielding ",
     "comparisons. Completed games include team box scores plus post-game ",

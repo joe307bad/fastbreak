@@ -173,7 +173,7 @@ output_data <- list(
   sport = "NBA",
   visualizationType = "BAR_GRAPH",
   title = paste0("NBA Offensive Rating - ", nba_season - 1, "-", substr(nba_season, 3, 4)),
-  subtitle = "Points Per 100 Possessions",
+  subtitle = "Points scored per 100 possessions, by team.",
   yAxisLabel = "ORtg",
   description = paste0(
     "Each team's offensive efficiency, sorted from best to worst. This ",

@@ -218,7 +218,7 @@ output_data <- list(
   sport = "NFL",
   visualizationType = "TABLE",
   title = paste("Playoff Odds -", current_week),
-  subtitle = "Probability of reaching each playoff round",
+  subtitle = "Each team's odds of reaching every playoff round.",
   description = "This table shows each team's probability of making the playoffs and advancing through each round. Data is sourced from PlayoffStatus.com which calculates odds based on current standings, remaining schedule, and historical performance patterns.",
   lastUpdated = format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC"),
   source = "PlayoffStatus.com",

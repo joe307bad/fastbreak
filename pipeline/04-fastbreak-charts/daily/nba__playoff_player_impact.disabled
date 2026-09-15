@@ -252,7 +252,7 @@ output_data <- list(
   sport = "NBA",
   visualizationType = "SCATTER_PLOT",
   title = paste0("NBA Playoff Efficiency - ", season_label),
-  subtitle = "Total Minutes vs True Shooting %",
+  subtitle = "Playoff minutes plotted against true shooting percentage.",
   description = paste0(
     "Playoff performers plotted by workload against scoring efficiency. The ",
     "top-right quadrant holds high-volume, efficient playoff scorers.\n\n",

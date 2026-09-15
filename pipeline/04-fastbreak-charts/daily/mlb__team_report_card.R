@@ -1931,7 +1931,7 @@ output_data <- list(
   sport = "MLB",
   visualizationType = "MLB_TEAM_REPORT_CARD",
   title = paste0("MLB Team Report Cards - ", season_label),
-  subtitle = paste0("Top ", TOP_N, " players per team by role (sorted by composite score)"),
+  subtitle = "Each team's top players graded by role.",
   description = paste0(
     "Per-team player report cards from FanGraphs advanced stats. Each team ",
     "surfaces its top ", TOP_N, " hitters, starters, relievers, and fielders ",

@@ -1649,10 +1649,7 @@ output_data <- list(
   sport = "NFL",
   visualizationType = "NFL_TEAM_REPORT_CARD",
   title = paste0("NFL Team Report Cards - ", season_label),
-  subtitle = paste0(
-    "Top ", TOP_N, " players per team by position group (sorted by composite score) · ",
-    season_phase_label
-  ),
+  subtitle = "Each team's top players graded by position group.",
   description = paste0(
     "Per-team player report cards from nflverse play-by-play, player stats and ",
     "Pro Football Reference advanced stats. Each team surfaces its top ", TOP_N,

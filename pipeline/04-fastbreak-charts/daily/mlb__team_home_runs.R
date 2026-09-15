@@ -82,7 +82,7 @@ output_data <- list(
   sport = "MLB",
   visualizationType = "BAR_GRAPH",
   title = paste0("MLB Team Home Runs - ", mlb_season, "-", substr(mlb_season + 1, 3, 4)),
-  subtitle = "Total Home Runs by Team",
+  subtitle = "Home runs hit by each team this season.",
   yAxisLabel = "Home Runs",
   description = paste0(
     "Total home runs hit by each team in the ", mlb_season,

@@ -83,7 +83,7 @@ output_data <- list(
   sport = "MLB",
   visualizationType = "BAR_GRAPH",
   title = paste0("MLB Team Strikeouts - ", mlb_season, "-", substr(mlb_season + 1, 3, 4)),
-  subtitle = "Total Strikeouts by Pitching Staff",
+  subtitle = "Strikeouts recorded by each pitching staff this season.",
   yAxisLabel = "Strikeouts",
   description = paste0(
     "Total strikeouts recorded by each team's pitching staff in the ",

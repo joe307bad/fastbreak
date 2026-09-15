@@ -1288,26 +1288,7 @@ window_label <- paste0(
 )
 chart_title <- paste0("NFL Matchups - ", window_label)
 
-weeks_covered <- selected_games %>%
-  distinct(season, week, game_type) %>%
-  arrange(season, week)
-week_summary <- paste(
-  apply(weeks_covered, 1, function(r) {
-    label <- unname(SEASON_TYPE_LABELS[trimws(r[["game_type"]])]) %||% trimws(r[["game_type"]])
-    if (identical(trimws(r[["game_type"]]), "REG")) {
-      paste0(trimws(r[["season"]]), " Week ", trimws(r[["week"]]))
-    } else {
-      paste0(trimws(r[["season"]]), " ", label)
-    }
-  }),
-  collapse = " · "
-)
-
-subtitle <- if (identical(window_mode, "window")) {
-  paste0("Games from the past ", DAYS_BEHIND, " days and next ", DAYS_AHEAD, " days · ", week_summary)
-} else {
-  paste0("Most recent results and the next scheduled slate · ", week_summary)
-}
+subtitle <- "Head-to-head worksheets for recent and upcoming NFL games."
 
 output_data <- list(
   sport = "NFL",

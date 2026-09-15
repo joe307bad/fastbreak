@@ -84,7 +84,7 @@ output_data <- list(
   sport = "MLB",
   visualizationType = "BAR_GRAPH",
   title = paste0("MLB Team Wins - ", mlb_season, "-", substr(mlb_season + 1, 3, 4)),
-  subtitle = "Total Wins by Team",
+  subtitle = "Wins by each team this season.",
   yAxisLabel = "Wins",
   description = paste0(
     "Total games won by each team in the ", mlb_season,

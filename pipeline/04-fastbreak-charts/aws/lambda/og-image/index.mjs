@@ -107,8 +107,11 @@ function card(title, subtitle) {
                 fontSize: 28,
                 lineHeight: 1.4,
                 color: "#a3a3a3",
-                display: "flex",
-                flexWrap: "wrap",
+                display: "block",
+                // Safety net only: subtitles are written to fit on one or two
+                // lines, but never let an unexpectedly long one push the title
+                // into the logo.
+                lineClamp: 3,
               },
             },
             subtitle

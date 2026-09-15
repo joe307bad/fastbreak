@@ -96,7 +96,7 @@ output_data <- list(
   sport = "NFL",
   visualizationType = "BAR_GRAPH",
   title = paste("Turnover Differential - Week", most_recent_week),
-  subtitle = "Turnovers Forced minus Turnovers Committed",
+  subtitle = "Turnovers forced minus turnovers committed, by team.",
   description = "Turnover differential measures a team's ability to protect the ball while taking it away from opponents. Positive values indicate a team forces more turnovers than they commit, which strongly correlates with winning. Teams at the top are winning the turnover battle, while teams at the bottom are giving the ball away more than they're taking it.",
   lastUpdated = format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC"),
   source = "nflfastR / nflreadr",

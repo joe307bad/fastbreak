@@ -132,7 +132,7 @@ output_data <- list(
   sport = "NHL",
   visualizationType = "SCATTER_PLOT",
   title = paste0("NHL Scoring Leaders - ", nhl_season_start, "-", substr(nhl_season_end, 3, 4)),
-  subtitle = "Goals vs Assists",
+  subtitle = "Goals plotted against assists for every skater.",
   description = paste0(
     "Top 50 NHL scorers plotted by goals against assists. Top-right players ",
     "both score and create; top-left are pure playmakers; bottom-right are ",

@@ -110,7 +110,7 @@ output_data <- list(
   sport = "MLB",
   visualizationType = "SCATTER_PLOT",
   title = paste0("MLB Team Scoring Leaders - ", mlb_season, "-", substr(mlb_season + 1, 3, 4)),
-  subtitle = "Runs Scored vs Runs Allowed",
+  subtitle = "Runs scored plotted against runs allowed for every team.",
   description = paste0(
     "All 30 MLB teams plotted by runs scored against runs allowed. Up and ",
     "to the right is dominant; teams above the diagonal score more than ",

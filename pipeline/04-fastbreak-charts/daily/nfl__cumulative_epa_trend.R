@@ -150,7 +150,7 @@ output_data <- list(
   sport = "NFL",
   visualizationType = "LINE_CHART",
   title = paste("Cumulative EPA Trend - Week", most_recent_week),
-  subtitle = "Top 10 Teams Net EPA Over the Season",
+  subtitle = "How the top ten teams' net EPA has trended.",
   description = "This chart tracks the cumulative Net EPA (Expected Points Added) for the top 10 NFL teams throughout the season. Net EPA combines offensive production with defensive efficiency - positive values mean the team is outperforming expectations. Teams with steeper upward slopes are playing at an elite level, while flat or declining lines indicate struggles. The gap between lines shows the relative dominance between top teams. EPA calculations include only passing and running plays.",
   lastUpdated = format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC"),
   source = "nflfastR / nflreadr",

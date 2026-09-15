@@ -119,7 +119,7 @@ output_data <- list(
   sport = "MLB",
   visualizationType = "SCATTER_PLOT",
   title = paste0("MLB Power Rankings - ", mlb_season, "-", substr(mlb_season + 1, 3, 4)),
-  subtitle = "Team wRC+ vs Team FIP-",
+  subtitle = "Every team's hitting plotted against its pitching.",
   description = paste0(
     "All 30 MLB teams plotted by offense against pitching. Up and to the ",
     "right is elite: a team strong on both sides of the ball after stripping ",

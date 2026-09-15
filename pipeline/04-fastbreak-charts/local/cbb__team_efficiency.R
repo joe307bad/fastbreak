@@ -104,7 +104,7 @@ output_data <- list(
   sport = "CBB",
   visualizationType = "SCATTER_PLOT",
   title = paste0("College Basketball Team Efficiency - ", year - 1, "-", substr(year, 3, 4)),
-  subtitle = "Offensive vs Defensive Rating (Top 64 Teams)",
+  subtitle = "Top 64 teams by offensive and defensive rating.",
   description = paste0(
     "Top 64 college basketball teams by net rating, plotted by offensive ",
     "efficiency against defensive efficiency. The top-right quadrant holds ",

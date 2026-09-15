@@ -140,7 +140,7 @@ output_data <- list(
   sport = "MLB",
   visualizationType = "SCATTER_PLOT",
   title = paste0("MLB Pitching Leaders - ", mlb_season, "-", substr(mlb_season + 1, 3, 4)),
-  subtitle = "K-BB% vs xFIP",
+  subtitle = "Qualified pitchers by K-BB% and xFIP.",
   description = paste0(
     "Top 50 starting pitchers (min ", min_ip, " IP, ", min_gs,
     " GS) plotted by swing-and-miss command against luck-independent run ",

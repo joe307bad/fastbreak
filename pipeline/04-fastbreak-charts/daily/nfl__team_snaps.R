@@ -87,7 +87,7 @@ output_data <- list(
   sport = "NFL",
   visualizationType = "SCATTER_PLOT",
   title = paste("NFL Team Snaps - Week", most_recent_week),
-  subtitle = "Total Offensive vs Defensive Snaps",
+  subtitle = "Offensive snaps plotted against defensive snaps for every team.",
   description = "This chart shows the total number of offensive and defensive snaps each team has played through the season. More snaps generally indicate longer, more competitive games and stronger time of possession. Teams with significantly more defensive snaps than offensive snaps may be struggling to maintain possession, while teams with more offensive snaps are likely controlling the game tempo.",
   lastUpdated = format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC"),
   xAxisLabel = "Defensive Snaps",

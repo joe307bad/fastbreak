@@ -233,7 +233,7 @@ output_data <- list(
   sport = "CBB",
   visualizationType = "CBB_MATCHUP",
   title = paste0("College Basketball Matchups - ", format(today, "%b %d"), " - ", format(end_date, "%b %d")),
-  subtitle = paste("AP Top 25 vs Top 25 matchups for the next", DAYS_AHEAD, "days"),
+  subtitle = "Head-to-head worksheets for upcoming Top 25 matchups.",
   description = paste0(
     "Matchup statistics for games where BOTH teams are AP Top 25.\n\n",
     "OFFENSIVE STATS:\n",

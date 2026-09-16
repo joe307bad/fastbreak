@@ -20,6 +20,10 @@
 #  - Secondary:   INTs + passes defensed + completion rate allowed + yards per
 #                 target allowed + passer rating allowed
 #
+# The pressure, missed tackle and coverage stats come from Pro Football
+# Reference's advanced tables. PFR only publishes its season summaries after the
+# season wraps, so in-season those are rolled up from the weekly tables here.
+#
 # Differences from the MLB card, per product direction:
 #  - No playoff picture (no NFL playoff odds source wired up yet)
 #  - No 4-week trend
@@ -436,21 +440,110 @@ snap_counts <- load_or_warn(
   nflreadr::load_snap_counts(nfl_season) %>% filter(game_type == "REG"),
   NULL
 )
-pfr_def <- load_or_warn(
-  "PFR defensive advanced stats",
-  nflreadr::load_pfr_advstats(nfl_season, stat_type = "def", summary_level = "season"),
-  NULL
-)
-pfr_pass <- load_or_warn(
-  "PFR passing advanced stats",
-  nflreadr::load_pfr_advstats(nfl_season, stat_type = "pass", summary_level = "season"),
-  NULL
-)
-pfr_rush <- load_or_warn(
-  "PFR rushing advanced stats",
-  nflreadr::load_pfr_advstats(nfl_season, stat_type = "rush", summary_level = "season"),
-  NULL
-)
+
+# PFR advanced stats. The season-level tables nflreadr serves are empty until
+# the season is over, so the weekly game logs are rolled up to season totals
+# and reshaped to the season table's column names. The season table is only a
+# fallback for when the weekly feed is unavailable.
+load_pfr <- function(stat_type, summary_level) {
+  load_or_warn(
+    paste("PFR", stat_type, summary_level, "advanced stats"),
+    nflreadr::load_pfr_advstats(nfl_season, stat_type = stat_type, summary_level = summary_level),
+    NULL
+  )
+}
+
+pfr_weekly <- function(stat_type) {
+  weekly <- load_pfr(stat_type, "week")
+  if (is.null(weekly) || nrow(weekly) == 0) return(NULL)
+  weekly <- weekly %>% filter(game_type == "REG")
+  if (nrow(weekly) == 0) NULL else weekly
+}
+
+# The team a player logged the most games for, so a mid-season trade does not
+# split him across two rows the way PFR's 2TM rows do.
+pfr_primary_team <- function(weekly) {
+  weekly %>%
+    group_by(pfr_player_id, team) %>%
+    summarise(games = n(), last_week = max(week, na.rm = TRUE), .groups = "drop") %>%
+    group_by(pfr_player_id) %>%
+    arrange(desc(games), desc(last_week), .by_group = TRUE) %>%
+    slice(1) %>%
+    ungroup() %>%
+    select(pfr_player_id, team)
+}
+
+# NFL passer rating, used to recompute PFR's "passer rating allowed" from the
+# summed coverage totals.
+passer_rating <- function(cmp, att, yds, td, int) {
+  clamp <- function(x) pmin(pmax(x, 0), 2.375)
+  a <- clamp((cmp / att - 0.3) * 5)
+  b <- clamp((yds / att - 3) * 0.25)
+  c <- clamp(td / att * 20)
+  d <- clamp(2.375 - int / att * 25)
+  ifelse(is.na(att) | att == 0, NA_real_, (a + b + c + d) / 6 * 100)
+}
+
+pfr_def <- {
+  weekly <- pfr_weekly("def")
+  if (is.null(weekly)) {
+    load_pfr("def", "season")
+  } else {
+    weekly %>%
+      group_by(pfr_player_id) %>%
+      summarise(
+        tgt = sum(def_targets, na.rm = TRUE),
+        cmp = sum(def_completions_allowed, na.rm = TRUE),
+        yds = sum(def_yards_allowed, na.rm = TRUE),
+        td = sum(def_receiving_td_allowed, na.rm = TRUE),
+        int = sum(def_ints, na.rm = TRUE),
+        prss = sum(def_pressures, na.rm = TRUE),
+        comb = sum(def_tackles_combined, na.rm = TRUE),
+        m_tkl = sum(def_missed_tackles, na.rm = TRUE),
+        .groups = "drop"
+      ) %>%
+      mutate(
+        cmp_percent = safe_div(cmp, tgt),
+        yds_tgt = safe_div(yds, tgt),
+        rat = passer_rating(cmp, tgt, yds, td, int),
+        # PFR's MT% is missed tackles over combined plus missed tackles.
+        m_tkl_percent = safe_div(m_tkl, comb + m_tkl)
+      ) %>%
+      inner_join(pfr_primary_team(weekly), by = "pfr_player_id") %>%
+      rename(pfr_id = pfr_player_id, tm = team)
+  }
+}
+
+pfr_pass <- {
+  weekly <- pfr_weekly("pass")
+  if (is.null(weekly)) {
+    load_pfr("pass", "season")
+  } else {
+    # The weekly pass table also carries receivers (for drops); only the passer
+    # rows have a pressure count.
+    weekly %>%
+      filter(!is.na(times_pressured)) %>%
+      group_by(pfr_player_id, team) %>%
+      summarise(times_pressured = sum(times_pressured, na.rm = TRUE), .groups = "drop") %>%
+      rename(pfr_id = pfr_player_id)
+  }
+}
+
+pfr_rush <- {
+  weekly <- pfr_weekly("rush")
+  if (is.null(weekly)) {
+    load_pfr("rush", "season")
+  } else {
+    weekly %>%
+      group_by(pfr_player_id, team) %>%
+      summarise(
+        att = sum(carries, na.rm = TRUE),
+        ybc = sum(rushing_yards_before_contact, na.rm = TRUE),
+        .groups = "drop"
+      ) %>%
+      rename(pfr_id = pfr_player_id, tm = team)
+  }
+}
 players_ids <- load_or_warn(
   "player id crosswalk",
   # Distinct on both ids: this crosswalk is joined in both directions below, and
@@ -466,6 +559,9 @@ players_ids <- load_or_warn(
 cat("Loaded", nrow(player_stats_raw), "player stat rows,",
     nrow(pbp), "regular season plays,",
     if (is.null(snap_counts)) 0 else nrow(snap_counts), "snap count rows\n")
+cat("PFR advanced stats — def:", if (is.null(pfr_def)) 0 else nrow(pfr_def),
+    "| pass:", if (is.null(pfr_pass)) 0 else nrow(pfr_pass),
+    "| rush:", if (is.null(pfr_rush)) 0 else nrow(pfr_rush), "\n")
 
 player_stats <- player_stats_raw %>%
   mutate(
@@ -490,7 +586,6 @@ join_pfr <- function(pfr_df, team_col) {
 }
 
 pfr_def_joined <- join_pfr(pfr_def, "tm")
-pfr_rush_joined <- join_pfr(pfr_rush, "tm")
 
 # ============================================================================
 # Play-by-play derived rates
@@ -701,7 +796,7 @@ pfr_def_stats <- if (is.null(pfr_def_joined)) {
     transmute(
       player_id = gsis_id,
       pressures = as.numeric(prss),
-      missed_tackle_pct = as.numeric(m_tkl_percent),
+      missed_tackle_pct = as.numeric(m_tkl_percent) * 100,
       cmp_pct_allowed = as.numeric(cmp_percent) * 100,
       yards_per_target_allowed = as.numeric(yds_tgt),
       passer_rating_allowed = as.numeric(rat),
@@ -820,6 +915,15 @@ team_receivers <- player_stats %>%
 # The line's team card measures actual line play. Individual linemen have no
 # public per-snap grade in the nflverse feeds, so their table is availability
 # plus penalties while the team row carries protection and run-blocking rates.
+# PFR's pressure rate is pressures over dropbacks, and dropbacks (including
+# scrambles) come straight from play-by-play.
+team_dropbacks <- pbp %>%
+  filter(qb_dropback == 1, !is.na(posteam)) %>%
+  mutate(team_code = normalize_nfl_team(posteam)) %>%
+  filter(!is.na(team_code)) %>%
+  group_by(team_code) %>%
+  summarise(dropbacks = n(), .groups = "drop")
+
 team_pressure_allowed <- if (is.null(pfr_pass)) {
   tibble(team_code = character(), pressure_rate_allowed = numeric())
 } else {
@@ -827,13 +931,9 @@ team_pressure_allowed <- if (is.null(pfr_pass)) {
     mutate(team_code = normalize_nfl_team(team)) %>%
     filter(!is.na(team_code)) %>%
     group_by(team_code) %>%
-    summarise(
-      pressure_rate_allowed = safe_div(
-        sum(times_pressured, na.rm = TRUE),
-        sum(pass_attempts, na.rm = TRUE)
-      ) * 100,
-      .groups = "drop"
-    )
+    summarise(pressures_allowed = sum(times_pressured, na.rm = TRUE), .groups = "drop") %>%
+    inner_join(team_dropbacks, by = "team_code") %>%
+    transmute(team_code, pressure_rate_allowed = safe_div(pressures_allowed, dropbacks) * 100)
 }
 
 team_ybc <- if (is.null(pfr_rush)) {
@@ -904,11 +1004,12 @@ team_secondary <- summarise_defense_group("DB") %>%
          yards_per_target_allowed, passer_rating_allowed)
 
 # ============================================================================
-# Below-replacement performers
+# Negative EPA players
 # ============================================================================
-# The NFL analogue of MLB's negative-WAR regulars: skill players who cost their
-# offense expected points across a real workload. Team share is the fraction of
-# offensive touches those players absorbed.
+# The NFL analogue of MLB's below-replacement (negative-WAR) regulars: skill
+# players who cost their offense expected points across a real workload. Team
+# share is the fraction of offensive touches those players absorbed. The
+# category keeps MLB's `belowReplacement` key so both cards share one layout.
 skill_plays <- player_stats %>%
   filter(position_group %in% c("QB", "RB", "WR", "TE")) %>%
   mutate(
@@ -1358,9 +1459,9 @@ CATEGORY_SPECS <- list(
   )
 )
 
-# The seven position groups feed the overall composite. Below-replacement and
-# the injury report are diagnostics, not quality ratings, so they sit outside it
-# exactly as they do on the MLB card.
+# The seven position groups feed the overall composite. Negative EPA players
+# and the injury report are diagnostics, not quality ratings, so they sit
+# outside it exactly as below-replacement does on the MLB card.
 POSITION_GROUP_KEYS <- vapply(CATEGORY_SPECS, function(spec) spec$key, character(1))
 
 spec_team_stat_cols <- function(spec) spec$team_stat_cols %||% spec$stat_cols
@@ -1440,7 +1541,7 @@ team_overall <- rank_and_assign(team_overall, "overall_composite")
 # ============================================================================
 below_replacement_labels <- c(plays = "Plays", total_epa = "EPA")
 below_replacement_digits <- list(plays = 0, total_epa = 1)
-below_replacement_team_labels <- c(below_replacement_play_pct = "BR Play%")
+below_replacement_team_labels <- c(below_replacement_play_pct = "Neg EPA Play%")
 below_replacement_team_digits <- list(below_replacement_play_pct = 1)
 injury_labels <- c(injured_count = "Injured", injury_snap_share = "Snaps Lost")
 injury_digits <- list(injured_count = 0, injury_snap_share = 1)
@@ -1516,16 +1617,18 @@ teams_json <- lapply(ALL_TEAMS, function(team) {
   )
 
   categories$belowReplacement <- list(
-    label = "Below-replacement performers",
+    label = "Negative EPA players",
     description = paste0(
       "Skill players with negative total EPA on at least ",
       MIN_BELOW_REPLACEMENT_PLAYS, " offensive plays, worst EPA first. ",
-      "BR Play% is the share of the team's dropbacks, carries and targets those ",
-      "players absorbed. Higher composite = fewer below-replacement snaps. Rank 1 = best."
+      "Neg EPA Play% is the share of the team's dropbacks, carries and targets ",
+      "those players absorbed. Rank 1 = smallest share."
     ),
     statKeys = list("below_replacement_play_pct"),
     playerStatKeys = list("plays", "total_epa"),
     showPlayerRankAndComposite = FALSE,
+    # WAR is MLB-only; the shared layout would otherwise render an empty column.
+    showWarColumn = FALSE,
     showTeamComposite = FALSE,
     team = build_team_category_stats(
       team_below_replacement, team, c("below_replacement_play_pct"),
@@ -1684,8 +1787,8 @@ output_data <- list(
     " • PD / INT: Passes defensed and interceptions. Higher is better.\n\n",
     " • Cmp% / Y/Tgt / Rtg (secondary): Completion rate, yards per target, and ",
     "passer rating allowed in coverage. Lower is better.\n\n",
-    " • Below-replacement performers: Skill players with negative total EPA on at ",
-    "least ", MIN_BELOW_REPLACEMENT_PLAYS, " plays. BR Play% is the share of the ",
+    " • Negative EPA players: Skill players with negative total EPA on at least ",
+    MIN_BELOW_REPLACEMENT_PLAYS, " plays. Neg EPA Play% is the share of the ",
     "team's offensive plays they absorbed — rank 1 = fewest.\n\n",
     " • Injury Report: ESPN injury designations weighted by severity and by the ",
     "player's season snap share. Rank 1 is the most injured team.\n\n",

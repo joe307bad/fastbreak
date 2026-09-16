@@ -63,6 +63,8 @@ const CATEGORY_SHOW_STATUS_COLUMN: Record<string, boolean> = {
   injuries: true,
 };
 
+// WAR is a baseball stat. The NFL card shares the belowReplacement key for its
+// negative-EPA table but carries no WAR, so the fallback also requires a value.
 const CATEGORY_SHOW_WAR_COLUMN: Record<string, boolean> = {
   belowReplacement: true,
 };
@@ -110,7 +112,10 @@ function resolveCategoryConfig(
       CATEGORY_SHOW_PLAYER_RANK_AND_COMPOSITE[categoryKey] ??
       true,
     showStatusColumn: category.showStatusColumn ?? CATEGORY_SHOW_STATUS_COLUMN[categoryKey] ?? false,
-    showWarColumn: category.showWarColumn ?? CATEGORY_SHOW_WAR_COLUMN[categoryKey] ?? false,
+    showWarColumn:
+      category.showWarColumn ??
+      ((CATEGORY_SHOW_WAR_COLUMN[categoryKey] ?? false) &&
+        category.players.some(player => player.war != null)),
     showTeamComposite:
       category.showTeamComposite ?? CATEGORY_SHOW_TEAM_COMPOSITE[categoryKey] ?? true,
     compositeRankingKey: category.compositeRankingKey ?? CATEGORY_COMPOSITE_RANKING_KEYS[categoryKey],
@@ -954,7 +959,9 @@ function TeamSummaryRow({ team }: { team: ReportCardTeam }) {
       <span className="font-bold">{team.teamCode}</span>
       <span className="text-[var(--muted)] truncate">{team.teamName}</span>
       <span className="text-[var(--muted)] text-right">
-        {team.wins != null && team.losses != null ? `${team.wins}-${team.losses}` : '-'}
+        {team.wins != null && team.losses != null
+          ? `${team.wins}-${team.losses}${team.ties ? `-${team.ties}` : ''}`
+          : '-'}
       </span>
       <span className="font-mono text-right">{team.overallComposite?.toFixed(1) ?? '-'}</span>
       <div className="flex justify-end">

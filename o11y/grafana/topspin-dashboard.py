@@ -16,8 +16,10 @@ error before the first visit arrives:
 
     topspin_pageview   env, section, value, timestamp
     topspin_login      env, provider, value, timestamp
+    topspin_mcp        env, tool, resource, value, timestamp
 
-Seven charts, one per thing being counted, which is how they were asked for.
+Nine charts: one per counted page section, one for logins, and two for the MCP
+server — mutations broken down by what they changed, and by which tool did it.
 """
 
 from __future__ import annotations
@@ -36,21 +38,41 @@ DASHBOARD_UID = "topspin-usage"
 # hardcoded, so a rebuilt datasource with a new uid needs no edit here.
 DATASOURCE_TYPE = "questdb-questdb-datasource"
 
-# title, table, an extra WHERE clause, and the sentence shown on the panel's
-# tooltip. Adding a counted section is one line, plus the section name in
-# topspin's own `shared/src/paths/usage-section.ts`.
+# title, table, an extra WHERE clause, the sentence shown on the panel's tooltip,
+# and a symbol column to draw one series per value of. Adding a counted section
+# is one line, plus the section name in topspin's own
+# `shared/src/paths/usage-section.ts`.
 PANELS = [
-    ("Docs visits", "topspin_pageview", "section = 'docs'", "/docs/"),
-    ("Tool visits", "topspin_pageview", "section = 'tool'", "/tool/ and anything under it"),
-    ("Workspace visits", "topspin_pageview", "section = 'workspace'", "/workspace/"),
-    ("Dashboard visits", "topspin_pageview", "section = 'dashboard'", "/dashboard/"),
-    ("Query visits", "topspin_pageview", "section = 'query'", "/query/"),
-    ("Post visits", "topspin_pageview", "section = 'post'", "/post/"),
+    ("Docs visits", "topspin_pageview", "section = 'docs'", "/docs/", None),
+    ("Tool visits", "topspin_pageview", "section = 'tool'", "/tool/ and anything under it", None),
+    ("Workspace visits", "topspin_pageview", "section = 'workspace'", "/workspace/", None),
+    ("Dashboard visits", "topspin_pageview", "section = 'dashboard'", "/dashboard/", None),
+    ("Query visits", "topspin_pageview", "section = 'query'", "/query/", None),
+    ("Post visits", "topspin_pageview", "section = 'post'", "/post/", None),
     (
         "Logins",
         "topspin_login",
         None,
         "Completed sign-ins, counted server-side where the session cookie is set",
+        None,
+    ),
+    # The MCP server, twice: once by what was changed and once by what did the
+    # changing. Reads are not in this table at all — `run_query` and the `list_`
+    # tools write nothing, so counting them would make these a measure of how
+    # often a model looked rather than how often it acted.
+    (
+        "MCP mutations by resource",
+        "topspin_mcp",
+        None,
+        "Tool calls that changed a workspace, query, post or dashboard. Reads are not counted.",
+        "resource",
+    ),
+    (
+        "MCP mutations by tool",
+        "topspin_mcp",
+        None,
+        "The same calls, by which tool made them.",
+        "tool",
     ),
 ]
 
@@ -60,6 +82,9 @@ TABLES = [
     "TIMESTAMP(timestamp) PARTITION BY DAY",
     "CREATE TABLE IF NOT EXISTS topspin_login "
     "(env SYMBOL, provider SYMBOL, value LONG, timestamp TIMESTAMP) "
+    "TIMESTAMP(timestamp) PARTITION BY DAY",
+    "CREATE TABLE IF NOT EXISTS topspin_mcp "
+    "(env SYMBOL, tool SYMBOL, resource SYMBOL, value LONG, timestamp TIMESTAMP) "
     "TIMESTAMP(timestamp) PARTITION BY DAY",
 ]
 
@@ -122,12 +147,17 @@ def run_sql(uid: str, statement: str) -> dict:
     return call("/grafana/api/ds/query", body, "POST")["results"]["A"]
 
 
-def sql_for(table: str, where: str | None) -> str:
+def sql_for(table: str, where: str | None, group: str | None) -> str:
     clauses = ["$__timeFilter(timestamp)", "env = 'prod'"]
     if where:
         clauses.append(where)
+    # A symbol in the select beside the timestamp becomes a series per value:
+    # QuestDB groups a SAMPLE BY on it, and the plugin reads the string column as
+    # the series name. Nothing else about the query changes.
+    selected = "  timestamp AS time,\n" + (f"  {group},\n" if group else "")
+    measure = "mutations" if table == "topspin_mcp" else "visits"
     return (
-        "SELECT\n  timestamp AS time,\n  COUNT(*) AS visits\n"
+        f"SELECT\n{selected}  COUNT(*) AS {measure}\n"
         f"FROM {table}\nWHERE " + "\n  AND ".join(clauses) +
         # FILL before ALIGN TO. The other order parses in most SQL dialects and
         # is rejected by QuestDB with "unexpected token [FILL]", which reaches a
@@ -140,7 +170,7 @@ def build(uid: str) -> dict:
     datasource = {"type": DATASOURCE_TYPE, "uid": uid}
     panels = []
 
-    for index, (title, table, where, description) in enumerate(PANELS):
+    for index, (title, table, where, description, group) in enumerate(PANELS):
         panels.append(
             {
                 "id": index + 1,
@@ -156,7 +186,7 @@ def build(uid: str) -> dict:
                         "refId": "A",
                         "datasource": datasource,
                         "queryType": "sql",
-                        "rawSql": sql_for(table, where),
+                        "rawSql": sql_for(table, where, group),
                         "format": 0,
                         "selectedFormat": 2,
                     }
@@ -169,14 +199,22 @@ def build(uid: str) -> dict:
                             "lineWidth": 0,
                             "barAlignment": 0,
                             "axisSoftMin": 0,
+                            **({"stacking": {"mode": "normal", "group": "A"}} if group else {}),
                         },
                         "unit": "short",
                         "decimals": 0,
                         "min": 0,
-                        "color": {
-                            "mode": "fixed",
-                            "fixedColor": "blue" if table == "topspin_pageview" else "green",
-                        },
+                        # A grouped panel draws several series and has to colour
+                        # them apart; a single-series one is one colour so the
+                        # six page charts read as one family.
+                        "color": (
+                            {"mode": "palette-classic"}
+                            if group
+                            else {
+                                "mode": "fixed",
+                                "fixedColor": "blue" if table == "topspin_pageview" else "green",
+                            }
+                        ),
                     },
                     "overrides": [],
                 },
@@ -184,12 +222,14 @@ def build(uid: str) -> dict:
                     # The total is the number being asked for; the bars are how
                     # it arrived. Both on screen at once.
                     "legend": {
-                        "displayMode": "list",
+                        # A grouped panel's legend is a table, so each series can
+                        # carry its own total beside its name.
+                        "displayMode": "table" if group else "list",
                         "placement": "bottom",
                         "showLegend": True,
                         "calcs": ["sum"],
                     },
-                    "tooltip": {"mode": "single", "sort": "none"},
+                    "tooltip": {"mode": "multi" if group else "single", "sort": "desc" if group else "none"},
                 },
             }
         )

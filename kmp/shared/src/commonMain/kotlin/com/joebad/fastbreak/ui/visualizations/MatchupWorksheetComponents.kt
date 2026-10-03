@@ -1240,6 +1240,34 @@ private fun rankingEntryLabel(entry: RankingEntry): String =
 private fun entriesArePlayerRankings(entries: List<RankingEntry>): Boolean =
     entries.any { !it.player.isNullOrBlank() }
 
+/**
+ * Footer for a share image: the sources get the whole first line (ellipsized
+ * when they run long) so fbrk.app can sit on its own line underneath instead of
+ * being squeezed into a vertical stack of letters.
+ */
+@Composable
+private fun ShareImageFooter(source: String, dimColor: Color) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Text(
+            source,
+            fontSize = 9.sp,
+            color = dimColor,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.fillMaxWidth()
+        )
+        Text(
+            "fbrk.app",
+            fontSize = 9.sp,
+            fontWeight = FontWeight.Bold,
+            color = dimColor,
+            maxLines = 1,
+            textAlign = TextAlign.End,
+            modifier = Modifier.fillMaxWidth()
+        )
+    }
+}
+
 @Composable
 private fun StatRankingsShareImage(
     statLabel: String,
@@ -1340,10 +1368,7 @@ private fun StatRankingsShareImage(
             }
         }
         Spacer(modifier = Modifier.height(8.dp))
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(source, fontSize = 9.sp, color = dimColor, maxLines = 1)
-            Text("fbrk.app", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = dimColor)
-        }
+        ShareImageFooter(source, dimColor)
     }
 }
 
@@ -1504,10 +1529,7 @@ private fun PlayoffChancesShareImage(
         }
 
         Spacer(modifier = Modifier.height(8.dp))
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(source, fontSize = 9.sp, color = dimColor, maxLines = 1)
-            Text("fbrk.app", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = dimColor)
-        }
+        ShareImageFooter(source, dimColor)
     }
 }
 

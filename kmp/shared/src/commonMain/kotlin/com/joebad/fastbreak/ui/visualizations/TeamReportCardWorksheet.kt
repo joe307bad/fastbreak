@@ -200,11 +200,15 @@ private data class ReportCardLabelIndex(
     val categoryLabels: Map<String, String> = emptyMap(),
     val statLabels: Map<String, String> = emptyMap()
 ) {
+    // The API can hand back an empty label, so fall back on blank as well as on
+    // null - otherwise the blank lands in a ranking title as a dangling slash.
     fun categoryLabel(categoryKey: String): String =
-        categoryLabels[categoryKey] ?: formatReportCardCategoryLabel(categoryKey)
+        categoryLabels[categoryKey]?.takeIf { it.isNotBlank() }
+            ?: formatReportCardCategoryLabel(categoryKey)
 
     fun statLabel(categoryKey: String, statKey: String): String =
-        statLabels["$categoryKey.$statKey"] ?: reportCardStatLabel(categoryKey, statKey)
+        statLabels["$categoryKey.$statKey"]?.takeIf { it.isNotBlank() }
+            ?: reportCardStatLabel(categoryKey, statKey)
 }
 
 private fun buildReportCardLabelIndex(teams: Collection<ReportCardTeam>): ReportCardLabelIndex {
@@ -302,21 +306,32 @@ private fun isReportCardRankingPct(key: String): Boolean {
         key.endsWith(".below_replacement_play_pct")
 }
 
+/** Joins the parts of a ranking title, skipping blanks so no slash is left dangling. */
+private fun joinRankingLabel(vararg parts: String): String =
+    parts.filter { it.isNotBlank() }.joinToString(" / ")
+
 private fun formatReportCardRankingLabel(
     seasonLabel: String,
     key: String,
     labels: ReportCardLabelIndex = ReportCardLabelIndex()
 ): String {
     parseReportCardRankingKey(key)?.let { parsed ->
-        return "$seasonLabel / ${labels.categoryLabel(parsed.categoryKey)} / ${labels.statLabel(parsed.categoryKey, parsed.statKey)}"
+        return joinRankingLabel(
+            seasonLabel,
+            labels.categoryLabel(parsed.categoryKey),
+            labels.statLabel(parsed.categoryKey, parsed.statKey)
+        )
     }
-    if (key == "record") return "$seasonLabel / Record"
-    if (key == "overallComposite") return "$seasonLabel / Overall Composite"
+    if (key == "record") return joinRankingLabel(seasonLabel, "Record")
+    if (key == "overallComposite") return joinRankingLabel(seasonLabel, "Overall Composite")
     if (key.endsWith("Composite")) {
         val categoryKey = key.removeSuffix("Composite")
-        return "$seasonLabel / ${labels.categoryLabel(categoryKey)} Composite"
+        return joinRankingLabel(
+            seasonLabel,
+            "${labels.categoryLabel(categoryKey)} Composite".trim()
+        )
     }
-    return "$seasonLabel / $key"
+    return joinRankingLabel(seasonLabel, key)
 }
 
 private fun buildCategoryCompositeRanking(

@@ -688,7 +688,7 @@ private fun MLBMatchupMetaRows(
 }
 
 // MLB rank colors (30 teams)
-private fun mlbRankColor(rank: Int?): Color {
+internal fun mlbRankColor(rank: Int?): Color {
     if (rank == null || rank <= 0) return Color.Transparent
     return when {
         rank <= 5 -> { val r = (rank - 1) / 4f; Color((0 + r * 80).toInt(), (150 - r * 25).toInt(), (42 - r * 32).toInt()) }
@@ -701,7 +701,7 @@ private fun mlbRankColor(rank: Int?): Color {
 // One Month Trend
 // ============================================================================
 
-private data class MLBMonthTrendData(
+internal data class MLBMonthTrendData(
     val wins: Int,
     val losses: Int,
     val recordRank: Int?,
@@ -723,9 +723,12 @@ private data class MLBMonthTrendData(
     val hrsPerGameRankDisplay: String?
 )
 
-private fun parseMLBMonthTrend(stats: JsonObject?): MLBMonthTrendData? {
+internal fun parseMLBMonthTrend(
+    stats: JsonObject?,
+    key: String = "monthTrend"
+): MLBMonthTrendData? {
     if (stats == null) return null
-    val monthTrend = stats["monthTrend"]
+    val monthTrend = stats[key]
     if (monthTrend !is JsonObject) return null
 
     val record = monthTrend["record"] as? JsonObject
@@ -770,7 +773,7 @@ private data class MLBWeeklyPerformance(
 )
 
 // Helper to parse cumulative run differential by week (for line chart)
-private fun parseCumRunDiffByWeek(stats: JsonObject?): List<LineChartDataPoint> {
+internal fun parseCumRunDiffByWeek(stats: JsonObject?): List<LineChartDataPoint> {
     val dataPoints = mutableListOf<LineChartDataPoint>()
     if (stats == null) return dataPoints
 
@@ -941,7 +944,7 @@ private fun MLBChartsTab(
 }
 
 @Composable
-private fun MLBCumRunDiffChart(
+internal fun MLBCumRunDiffChart(
     awayTeam: String,
     homeTeam: String,
     awayStats: JsonObject?,
@@ -1032,7 +1035,7 @@ private fun MLBCumRunDiffChart(
 }
 
 @Composable
-private fun MLBWeeklyPerformanceChart(
+internal fun MLBWeeklyPerformanceChart(
     awayTeam: String,
     homeTeam: String,
     awayStats: JsonObject?,

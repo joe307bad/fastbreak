@@ -107,10 +107,19 @@ internal class PlayoffBracketPositions(isPortrait: Boolean) {
 // Data conversion (generic, works for any sport using PlayoffMatchupInfo)
 // ============================================================================
 
-internal fun convertPlayoffConference(conf: PlayoffConferenceInfo): PlayoffBracketConference {
+/**
+ * [expectedPerRound] is the matchup count each round should render, which
+ * differs by sport: the NBA and NHL open with four first-round series per
+ * conference, while MLB's top two seeds get a bye and the Wild Card round has
+ * only two. Short rounds are padded with empty (TBD) matchups so the bracket
+ * still has a node everywhere the layout expects one.
+ */
+internal fun convertPlayoffConference(
+    conf: PlayoffConferenceInfo,
+    expectedPerRound: List<Int> = listOf(4, 2, 1)
+): PlayoffBracketConference {
     val color = parsePlayoffHexColor(conf.colorHex) ?: Color.Gray
-    val expectedPerRound = listOf(4, 2, 1)
-    val rounds = (0 until 3).map { roundIdx ->
+    val rounds = expectedPerRound.indices.map { roundIdx ->
         val roundInfo = conf.rounds.getOrNull(roundIdx)
         val expected = expectedPerRound[roundIdx]
         val games = roundInfo?.games?.map { convertPlayoffMatchupToGame(it) } ?: emptyList()

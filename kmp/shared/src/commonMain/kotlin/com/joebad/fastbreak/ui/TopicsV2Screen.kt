@@ -100,7 +100,7 @@ private fun stringToVizType(vizType: String): VizType? =
     }
 
 // Returns the playoff bracket deep-link target for a topic, when one exists.
-// Currently NBA and NHL ship a playoff bracket chart; MLB / NFL / CBB do not.
+// Currently NBA, NHL and MLB ship a playoff bracket chart; NFL / CBB do not.
 private data class BracketTarget(val chartId: String, val sport: Sport, val vizType: VizType)
 
 private fun bracketTargetFor(league: String, category: String): BracketTarget? {
@@ -108,6 +108,7 @@ private fun bracketTargetFor(league: String, category: String): BracketTarget? {
     return when (league.uppercase()) {
         "NBA" -> BracketTarget("nba__playoff_bracket", Sport.NBA, VizType.NBA_PLAYOFF_BRACKET)
         "NHL" -> BracketTarget("nhl__playoff_bracket", Sport.NHL, VizType.NHL_PLAYOFF_BRACKET)
+        "MLB" -> BracketTarget("mlb__playoff_bracket", Sport.MLB, VizType.MLB_PLAYOFF_BRACKET)
         else -> null
     }
 }

@@ -1862,6 +1862,29 @@ data class NBAPlayoffBracketVisualization(
 ) : VisualizationType
 
 @Serializable
+data class MLBPlayoffBracketVisualization(
+    override val sport: String,
+    override val visualizationType: String,
+    override val title: String,
+    override val subtitle: String,
+    override val description: String,
+    override val lastUpdated: Instant,
+    override val source: String? = null,
+    @Serializable(with = TagListSerializer::class)
+    override val tags: List<Tag>? = null,
+    override val sortOrder: Int? = null,
+    val season: Int? = null,
+    val bracketStatus: String? = null,
+    val leagueCumRunDiffStats: LeagueCumRunDiffStats? = null,
+    val leagueWeeklyStats: LeagueWeeklyStats? = null,
+    val scatterPlotQuadrants: ScatterPlotQuadrants? = null,
+    // "conferences" here are the two leagues (AL / NL); the field name is shared
+    // with the NBA/NHL brackets so the common bracket types can be reused.
+    val conferences: List<PlayoffConferenceInfo> = emptyList(),
+    val finals: PlayoffMatchupInfo? = null
+) : VisualizationType
+
+@Serializable
 data class NHLPlayoffBracketVisualization(
     override val sport: String,
     override val visualizationType: String,

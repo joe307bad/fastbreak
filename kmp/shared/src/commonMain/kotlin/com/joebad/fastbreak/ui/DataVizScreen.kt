@@ -475,6 +475,7 @@ private fun SuccessContent(
             && visualization !is NCAABracketVisualization
             && visualization !is NBAPlayoffBracketVisualization
             && visualization !is NHLPlayoffBracketVisualization
+            && visualization !is MLBPlayoffBracketVisualization
             && visualization !is HelloWorldVisualization) {
             val scrollState = rememberScrollState()
             Row(
@@ -685,6 +686,12 @@ private fun RenderVisualization(
             modifier = Modifier.fillMaxSize(),
             onNavigationToggleHandlerChanged = onBracketNavigationToggleHandlerChanged
         )
+    } else if (visualization is MLBPlayoffBracketVisualization) {
+        MLBPlayoffBracket(
+            visualization = visualization,
+            modifier = Modifier.fillMaxSize(),
+            onNavigationToggleHandlerChanged = onBracketNavigationToggleHandlerChanged
+        )
     } else if (visualization is HelloWorldVisualization) {
         // Placeholder bracket (for development)
         NCAABracket(
@@ -799,6 +806,9 @@ private fun RenderVisualization(
                             }
                             is NHLPlayoffBracketVisualization -> {
                                 // Handled by NHLPlayoffBracket above
+                            }
+                            is MLBPlayoffBracketVisualization -> {
+                                // Handled by MLBPlayoffBracket above
                             }
                             is HelloWorldVisualization -> {
                                 // Handled above

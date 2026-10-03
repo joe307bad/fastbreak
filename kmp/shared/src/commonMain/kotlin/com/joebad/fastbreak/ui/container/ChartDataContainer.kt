@@ -8,6 +8,7 @@ import com.joebad.fastbreak.data.model.MatchupVisualization
 import com.joebad.fastbreak.data.model.MatchupV2Visualization
 import com.joebad.fastbreak.data.model.NBAMatchupVisualization
 import com.joebad.fastbreak.data.model.NBAPlayoffBracketVisualization
+import com.joebad.fastbreak.data.model.MLBPlayoffBracketVisualization
 import com.joebad.fastbreak.data.model.MLBMatchupVisualization
 import com.joebad.fastbreak.data.model.NFLMatchupVisualization
 import com.joebad.fastbreak.data.model.TeamReportCardVisualization
@@ -137,6 +138,9 @@ class ChartDataContainer(
                     }
                     com.joebad.fastbreak.data.model.VizType.NHL_PLAYOFF_BRACKET -> {
                         json.decodeFromString<NHLPlayoffBracketVisualization>(cached.dataJson)
+                    }
+                    com.joebad.fastbreak.data.model.VizType.MLB_PLAYOFF_BRACKET -> {
+                        json.decodeFromString<MLBPlayoffBracketVisualization>(cached.dataJson)
                     }
                     com.joebad.fastbreak.data.model.VizType.HELLO_WORLD -> {
                         json.decodeFromString<HelloWorldVisualization>(cached.dataJson)

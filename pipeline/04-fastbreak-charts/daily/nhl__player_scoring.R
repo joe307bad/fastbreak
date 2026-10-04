@@ -71,9 +71,11 @@ team_conferences <- c(
   "VGK" = "Western", "WSH" = "Eastern", "WPG" = "Western"
 )
 
-# Filter to players with significant playing time (at least 20 games)
-# and get top scorers by points
-min_games <- 20
+# Filter to players with significant playing time and get top scorers by
+# points. The bar is 20 games, but early in the season nobody has played 20,
+# so it scales to half of the most games any skater has played
+max_games_played <- max(as.numeric(skater_stats$gamesPlayed), 0, na.rm = TRUE)
+min_games <- min(20, max(1, floor(max_games_played / 2)))
 
 qualified_players <- skater_stats %>%
   mutate(
@@ -91,6 +93,10 @@ qualified_players <- skater_stats %>%
   )
 
 cat("\nQualified players (>=", min_games, "games):", nrow(qualified_players), "\n")
+
+if (nrow(qualified_players) == 0) {
+  stop("No skaters have played a game yet this season")
+}
 
 # Select top 50 players by points for a cleaner visualization
 top_players <- qualified_players %>%

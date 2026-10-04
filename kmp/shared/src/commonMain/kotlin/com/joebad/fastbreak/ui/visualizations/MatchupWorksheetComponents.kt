@@ -295,6 +295,29 @@ fun getMLBPlayerRankColor(rank: Int?): Color {
 }
 
 /**
+ * NFL player ranks (league-wide within a position group, ~32-100 players):
+ * 1-10 green, 11-20 dark amber, 21-32 orange, 33+ red — only a top-ten player reads green
+ */
+fun getNFLPlayerRankColor(rank: Int?): Color {
+    if (rank == null || rank <= 0) return Color.Transparent
+    return when {
+        rank <= 10 -> {
+            val ratio = (rank - 1) / 9f
+            Color((0 + ratio * 50).toInt(), (150 - ratio * 35).toInt(), 0)
+        }
+        rank <= 20 -> {
+            val ratio = (rank - 11) / 9f
+            Color((175 + ratio * 55).toInt(), (125 - ratio * 45).toInt(), 0)
+        }
+        rank <= 32 -> {
+            val ratio = (rank - 21) / 11f
+            Color((230 - ratio * 52).toInt(), (95 - ratio * 60).toInt(), 0)
+        }
+        else -> Color(178, 0, 0)
+    }
+}
+
+/**
  * MLB team ranks (30 teams) for report card team/composite rankings.
  * Top 10 green, middle third orange, bottom third red.
  */

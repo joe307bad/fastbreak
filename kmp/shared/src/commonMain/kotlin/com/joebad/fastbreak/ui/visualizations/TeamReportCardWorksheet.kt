@@ -189,6 +189,9 @@ private fun parseReportCardRankingKey(key: String): ParsedReportCardRankingKey? 
     return null
 }
 
+private fun reportCardPlayerRankColorFn(sport: String?): (Int?) -> Color =
+    if (sport.equals("nfl", ignoreCase = true)) ::getNFLPlayerRankColor else ::getMLBPlayerRankColor
+
 private fun isReportCardPlayerRankingKey(key: String): Boolean =
     key.contains(".player.")
 
@@ -715,7 +718,8 @@ fun TeamReportCardWorksheet(
                         showTeamComposite = config.showTeamComposite,
                         compositeRankingKey = config.compositeRankingKey,
                         rankings = reportCardRankings,
-                        onRankingClick = { selectedRankingKey = it }
+                        onRankingClick = { selectedRankingKey = it },
+                        playerRankColorFn = reportCardPlayerRankColorFn(visualization.sport)
                     )
                     if (index < categories.lastIndex) {
                         Spacer(modifier = Modifier.height(12.dp))
@@ -774,7 +778,7 @@ fun TeamReportCardWorksheet(
                     entries = entries,
                     onDismiss = { selectedRankingKey = null },
                     rankColorFn = if (isReportCardPlayerRankingKey(key)) {
-                        ::getMLBPlayerRankColor
+                        reportCardPlayerRankColorFn(visualization.sport)
                     } else {
                         ::getMLBTeamRankColor
                     },
@@ -828,7 +832,8 @@ fun TeamReportCardWorksheet(
                                 request.target.categoryKey
                             ),
                             categories = teamShareCategoryEntries(team, request.target),
-                            showSummary = request.target.categoryKey == null
+                            showSummary = request.target.categoryKey == null,
+                            playerRankColorFn = reportCardPlayerRankColorFn(visualization.sport)
                         )
                     }
                 }
@@ -976,7 +981,8 @@ private fun ReportCardCategorySection(
     compositeRankingKey: String? = null,
     rankings: Map<String, List<RankingEntry>> = emptyMap(),
     onRankingClick: ((String) -> Unit)? = null,
-    expandStatsForShare: Boolean = false
+    expandStatsForShare: Boolean = false,
+    playerRankColorFn: (Int?) -> Color = ::getMLBPlayerRankColor
 ) {
     val teamStats = category.team?.stats.orEmpty()
     val primaryStats = statKeys.mapNotNull { key -> teamStats[key]?.let { key to it } }
@@ -1040,7 +1046,8 @@ private fun ReportCardCategorySection(
             showWarColumn = showWarColumn,
             rankings = rankings,
             onRankingClick = onRankingClick,
-            expandStatsForShare = expandStatsForShare
+            expandStatsForShare = expandStatsForShare,
+            playerRankColorFn = playerRankColorFn
         )
     }
 
@@ -1058,7 +1065,8 @@ private fun ReportCardPlayersSection(
     showWarColumn: Boolean = true,
     rankings: Map<String, List<RankingEntry>> = emptyMap(),
     onRankingClick: ((String) -> Unit)? = null,
-    expandStatsForShare: Boolean = false
+    expandStatsForShare: Boolean = false,
+    playerRankColorFn: (Int?) -> Color = ::getMLBPlayerRankColor
 ) {
     val scrollState = rememberScrollState()
     val statLabels = statKeys.map { key ->
@@ -1078,7 +1086,8 @@ private fun ReportCardPlayersSection(
         showWarColumn = showWarColumn,
         rankings = rankings,
         onRankingClick = onRankingClick,
-        expandStatsForShare = expandStatsForShare
+        expandStatsForShare = expandStatsForShare,
+        playerRankColorFn = playerRankColorFn
     )
 
     players.forEach { player ->
@@ -1095,7 +1104,8 @@ private fun ReportCardPlayersSection(
             showWarColumn = showWarColumn,
             rankings = rankings,
             onRankingClick = onRankingClick,
-            expandStatsForShare = expandStatsForShare
+            expandStatsForShare = expandStatsForShare,
+            playerRankColorFn = playerRankColorFn
         )
     }
 }
@@ -1114,7 +1124,8 @@ private fun ReportCardPlayerLine(
     showWarColumn: Boolean = true,
     rankings: Map<String, List<RankingEntry>> = emptyMap(),
     onRankingClick: ((String) -> Unit)? = null,
-    expandStatsForShare: Boolean = false
+    expandStatsForShare: Boolean = false,
+    playerRankColorFn: (Int?) -> Color = ::getMLBPlayerRankColor
 ) {
     Row(
         modifier = Modifier
@@ -1160,7 +1171,8 @@ private fun ReportCardPlayerLine(
                     showStatusColumn = showStatusColumn,
                     showWarColumn = showWarColumn,
                     rankings = rankings,
-                    onRankingClick = onRankingClick
+                    onRankingClick = onRankingClick,
+                    playerRankColorFn = playerRankColorFn
                 )
             }
         } else {
@@ -1181,7 +1193,8 @@ private fun ReportCardPlayerLine(
                     showStatusColumn = showStatusColumn,
                     showWarColumn = showWarColumn,
                     rankings = rankings,
-                    onRankingClick = onRankingClick
+                    onRankingClick = onRankingClick,
+                    playerRankColorFn = playerRankColorFn
                 )
             }
         }
@@ -1199,7 +1212,8 @@ private fun ReportCardPlayerStatsColumns(
     showStatusColumn: Boolean = false,
     showWarColumn: Boolean = true,
     rankings: Map<String, List<RankingEntry>> = emptyMap(),
-    onRankingClick: ((String) -> Unit)? = null
+    onRankingClick: ((String) -> Unit)? = null,
+    playerRankColorFn: (Int?) -> Color = ::getMLBPlayerRankColor
 ) {
     val isHeader = player == null
     val headerStyle = MaterialTheme.typography.labelSmall
@@ -1271,7 +1285,7 @@ private fun ReportCardPlayerStatsColumns(
                             MatchupRankBadge(
                                 rank = stat?.rank,
                                 rankDisplay = stat?.rankDisplay,
-                                rankColorFn = ::getMLBPlayerRankColor,
+                                rankColorFn = playerRankColorFn,
                                 usePlayerRanks = true,
                                 useNBARanks = false,
                                 emptyPlaceholder = ""
@@ -1699,7 +1713,8 @@ private fun TeamReportCardShareImage(
     seasonLabel: String,
     source: String,
     categories: List<Pair<String, ReportCardCategory>>,
-    showSummary: Boolean
+    showSummary: Boolean,
+    playerRankColorFn: (Int?) -> Color = ::getMLBPlayerRankColor
 ) {
     val bg = MaterialTheme.colorScheme.background
     val onBg = MaterialTheme.colorScheme.onSurface
@@ -1766,7 +1781,8 @@ private fun TeamReportCardShareImage(
                 showStatusColumn = config.showStatusColumn,
                 showWarColumn = config.showWarColumn,
                 showTeamComposite = config.showTeamComposite,
-                expandStatsForShare = true
+                expandStatsForShare = true,
+                playerRankColorFn = playerRankColorFn
             )
         }
 

@@ -26,6 +26,15 @@ function playerRankColor(rank: number | null | undefined): string {
   return 'bg-red-600';
 }
 
+// NFL position groups rank ~32-100 players, so green is reserved for the top ten
+function nflPlayerRankColor(rank: number | null | undefined): string {
+  if (rank == null) return 'bg-[var(--muted)]';
+  if (rank <= 10) return 'bg-green-600';
+  if (rank <= 20) return 'bg-amber-600';
+  if (rank <= 32) return 'bg-orange-500';
+  return 'bg-red-600';
+}
+
 function rankingEntryLabel(entry: RankingEntry): string {
   return entry.player?.trim() ? entry.player : rankingTeamCode(entry);
 }
@@ -288,12 +297,18 @@ function RankBadge({
   rank,
   display,
   playerRankings = false,
+  sport,
 }: {
   rank: number;
   display?: string | null;
   playerRankings?: boolean;
+  sport?: string;
 }) {
-  const colorFn = playerRankings ? playerRankColor : teamRankColor;
+  const colorFn = !playerRankings
+    ? teamRankColor
+    : sport === 'nfl'
+      ? nflPlayerRankColor
+      : playerRankColor;
   // Filter out invalid display values like "null", "NA", etc.
   const validDisplay = display && !['null', 'NA', 'undefined', 'nul'].includes(display) ? display : null;
   return (
@@ -325,6 +340,7 @@ export function StatRankingsSheet({
   isPct = false,
   subtitle = 'Season Rankings',
   source,
+  sport,
 }: {
   open: boolean;
   onClose: () => void;
@@ -334,6 +350,7 @@ export function StatRankingsSheet({
   isPct?: boolean;
   subtitle?: string;
   source?: string;
+  sport?: string;
 }) {
   const [selectedTeams, setSelectedTeams] = useState<Set<string>>(() => new Set([highlightedTeam.toUpperCase()]));
 
@@ -395,6 +412,7 @@ export function StatRankingsSheet({
                 rank={entry.rank}
                 display={entry.rankDisplay}
                 playerRankings={isPlayerRankings}
+                sport={sport}
               />
             </div>
             <span

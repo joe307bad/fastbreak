@@ -197,40 +197,61 @@ function RankBadge({ rank, display }: { rank?: number | null; display?: string |
   return <span className={teamRankBadgeClasses(rank)}>{value}</span>;
 }
 
-function playerRankBadgeClasses(rank: number | null | undefined): string {
+function playerRankBadgeClasses(rank: number | null | undefined, sport?: string): string {
   const base = 'inline-flex items-center justify-center min-w-7 h-4 px-1 rounded text-[10px] font-medium';
   if (rank == null) return `${base} bg-[var(--muted)]/20 text-[var(--muted)]`;
+  // NFL position groups rank ~32-100 players, so green is reserved for the top ten
+  if (sport === 'nfl') {
+    if (rank <= 10) return `${base} bg-green-500/20 text-green-500`;
+    if (rank <= 20) return `${base} bg-amber-500/20 text-amber-600 dark:text-amber-400`;
+    if (rank <= 32) return `${base} bg-orange-500/20 text-orange-500`;
+    return `${base} bg-red-500/20 text-red-500`;
+  }
   if (rank <= 30) return `${base} bg-green-500/20 text-green-500`;
   if (rank <= 60) return `${base} bg-lime-500/20 text-lime-600 dark:text-lime-400`;
   if (rank <= 100) return `${base} bg-orange-500/20 text-orange-500`;
   return `${base} bg-red-500/20 text-red-500`;
 }
 
-function PlayerRankBadge({ rank, display }: { rank?: number | null; display?: string | null }) {
+function PlayerRankBadge({
+  rank,
+  display,
+  sport,
+}: {
+  rank?: number | null;
+  display?: string | null;
+  sport?: string;
+}) {
   if (rank == null && !display) return null;
   // Filter out invalid display values like "null", "NA", etc.
   const validDisplay = display && !['null', 'NA', 'undefined', 'nul'].includes(display) ? display : null;
   const value = validDisplay ?? (rank != null ? String(rank) : '');
   if (!value) return null;
-  return <span className={playerRankBadgeClasses(rank)}>{value}</span>;
+  return <span className={playerRankBadgeClasses(rank, sport)}>{value}</span>;
 }
 
 function StatCell({
   stat,
   playerRank,
   showRank = true,
+  sport,
   onClick,
 }: {
   stat?: ReportCardStatValue;
   playerRank?: boolean;
   showRank?: boolean;
+  sport?: string;
   onClick?: () => void;
 }) {
-  const Badge = playerRank ? PlayerRankBadge : RankBadge;
   const content = (
     <div className="flex items-center justify-end gap-1.5 whitespace-nowrap">
       <span className="font-mono text-sm">{formatStatValue(stat)}</span>
-      {showRank && <Badge rank={stat?.rank} display={stat?.rankDisplay} />}
+      {showRank &&
+        (playerRank ? (
+          <PlayerRankBadge rank={stat?.rank} display={stat?.rankDisplay} sport={sport} />
+        ) : (
+          <RankBadge rank={stat?.rank} display={stat?.rankDisplay} />
+        ))}
     </div>
   );
 
@@ -343,6 +364,7 @@ function CategoryPanel({
   compositeRankingKey,
   rankings,
   onRankingClick,
+  sport,
 }: {
   categoryKey: CategoryKey;
   title: string;
@@ -357,6 +379,7 @@ function CategoryPanel({
   compositeRankingKey?: string;
   rankings: TeamReportCardData['rankings'];
   onRankingClick: (key: string) => void;
+  sport?: string;
 }) {
   const statLabels = Object.fromEntries(
     [...teamStatKeys, ...playerStatKeys].map(key => [
@@ -420,6 +443,7 @@ function CategoryPanel({
           showPlayerRankAndComposite={showPlayerRankAndComposite}
           showStatusColumn={showStatusColumn}
           showWarColumn={showWarColumn}
+          sport={sport}
         />
       )}
     </div>
@@ -550,6 +574,7 @@ function PlayerTable({
   showPlayerRankAndComposite = true,
   showStatusColumn = false,
   showWarColumn = false,
+  sport,
 }: {
   players: ReportCardPlayer[];
   statKeys: string[];
@@ -561,6 +586,7 @@ function PlayerTable({
   showPlayerRankAndComposite?: boolean;
   showStatusColumn?: boolean;
   showWarColumn?: boolean;
+  sport?: string;
 }) {
   return (
     <div className="min-w-0 max-w-full overflow-x-auto overscroll-x-contain">
@@ -618,6 +644,7 @@ function PlayerTable({
                       stat={player.stats[key]}
                       playerRank={showPlayerRankAndComposite}
                       showRank={showPlayerRankAndComposite}
+                      sport={sport}
                       onClick={hasRankings ? () => onRankingClick(rankingKey) : undefined}
                     />
                   </td>
@@ -629,6 +656,7 @@ function PlayerTable({
                     stat={player.stats[PLAYER_COMPOSITE_KEY]}
                     playerRank
                     showRank
+                    sport={sport}
                   />
                 </td>
               )}
@@ -875,6 +903,7 @@ export function TeamReportCard({ data, initialTeamCode, updateSchedule }: Props)
                   compositeRankingKey={config.compositeRankingKey}
                   rankings={data.rankings}
                   onRankingClick={setRankingSheetKey}
+                  sport={sportKey}
                 />
               );
             }),
@@ -896,6 +925,7 @@ export function TeamReportCard({ data, initialTeamCode, updateSchedule }: Props)
             isReportCardPlayerRankingKey(rankingSheetKey) ? 'Player Rankings' : 'Season Rankings'
           }
           source={data.source}
+          sport={sportKey}
         />
       )}
 

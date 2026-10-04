@@ -9,7 +9,6 @@ import androidx.compose.material.icons.filled.TrendingUp
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
@@ -22,7 +21,6 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -106,6 +104,13 @@ private class MLBBracketPositions(isPortrait: Boolean) {
     val finalsX = centerX
     val finalsY = centerY
 
+    // How far the league labels sit off the divider line, in y units. Landscape
+    // spans more y units across a much shorter viewport, so a unit there is
+    // worth roughly a third of the pixels it is in portrait and the labels end
+    // up sitting on the line. Portrait's 0.15 reads well; landscape needs about
+    // three times that to match it.
+    val leagueLabelOffsetY = if (isPortrait) 0.15f else 0.45f
+
     fun allX(): List<Float> = alWcX + nlWcX + listOf(finalsX)
     fun allY(): List<Float> = alWcY + nlWcY + listOf(alLcsY, nlLcsY, finalsY)
 }
@@ -125,78 +130,19 @@ fun MLBPlayoffBracket(
     }
     val worldSeries = remember(visualization) { convertPlayoffMatchupToGame(visualization.finals) }
     var selectedMatchup by remember { mutableStateOf<MLBMatchupSheetData?>(null) }
-    var bracketCaptureRequested by remember { mutableStateOf(false) }
-
-    val bracketLayer = rememberGraphicsLayer()
-    val imageExporter = remember { getImageExporter() }
 
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
         val isPortrait = maxWidth < maxHeight
         val pos = remember(isPortrait) { MLBBracketPositions(isPortrait) }
 
-        Box(modifier = Modifier.fillMaxSize()) {
-            MLBBracketCanvas(
-                leagues = leagues,
-                worldSeriesGame = worldSeries,
-                pos = pos,
-                onMatchupClick = { mu, leagueName, roundName, color ->
-                    selectedMatchup = MLBMatchupSheetData(mu, leagueName, color, roundName, visualization)
-                }
-            )
-
-            ShareFab(
-                onClick = { bracketCaptureRequested = true },
-                modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp)
-            )
-        }
-    }
-
-    // Off-screen capture of the whole bracket. The bracket is laid out at a
-    // fixed portrait size rather than reusing the on-screen one so the shared
-    // image is identical regardless of the device it was shared from.
-    if (bracketCaptureRequested) {
-        val sharePos = remember { MLBBracketPositions(isPortrait = true) }
-
-        LaunchedEffect(Unit) {
-            // The off-screen bracket needs to compose, lay out and draw before
-            // the layer has anything in it: one frame to draw, one for the
-            // graph to settle, plus a beat for the first composition.
-            kotlinx.coroutines.delay(50)
-            withFrameNanos { }
-            withFrameNanos { }
-            try {
-                val bitmap = bracketLayer.toImageBitmap()
-                imageExporter.shareImage(bitmap, visualization.title)
-            } catch (e: Exception) {
-                e.printStackTrace()
-            } finally {
-                bracketCaptureRequested = false
+        MLBBracketCanvas(
+            leagues = leagues,
+            worldSeriesGame = worldSeries,
+            pos = pos,
+            onMatchupClick = { mu, leagueName, roundName, color ->
+                selectedMatchup = MLBMatchupSheetData(mu, leagueName, color, roundName, visualization)
             }
-        }
-
-        CompositionLocalProvider(LocalDensity provides Density(2f, 1f)) {
-            Box(
-                modifier = Modifier
-                    .requiredWidth(760.dp)
-                    .requiredHeight(1180.dp)
-                    .offset { IntOffset(-10000, 0) }
-                    .drawWithContent {
-                        bracketLayer.record {
-                            this@drawWithContent.drawContent()
-                        }
-                        drawLayer(bracketLayer)
-                    }
-            ) {
-                MLBBracketShareImage(
-                    title = visualization.title,
-                    subtitle = visualization.subtitle,
-                    source = visualization.source,
-                    leagues = leagues,
-                    worldSeriesGame = worldSeries,
-                    pos = sharePos
-                )
-            }
-        }
+        )
     }
 
     selectedMatchup?.let { data ->
@@ -242,8 +188,8 @@ private fun MLBBracketCanvas(
     leagues: List<PlayoffBracketConference>,
     worldSeriesGame: PlayoffBracketGame,
     pos: MLBBracketPositions,
-    modifier: Modifier = Modifier,
-    onMatchupClick: ((PlayoffMatchupInfo, String, String, Color) -> Unit)? = null
+    onMatchupClick: (PlayoffMatchupInfo, String, String, Color) -> Unit,
+    modifier: Modifier = Modifier
 ) {
     val backgroundColor = MaterialTheme.colorScheme.background
     val textColor = MaterialTheme.colorScheme.onBackground
@@ -290,17 +236,25 @@ private fun MLBBracketCanvas(
             data = listOf(DefaultPoint(dividerLeft, pos.finalsY), DefaultPoint(dividerRight, pos.finalsY)),
             lineStyle = dottedLine
         )
-        val labelOffset = 0.15f
+        val labelOffset = pos.leagueLabelOffsetY
+        // Symbols are centred on their data point, so anchoring the label at the
+        // divider's left end renders half of "AMERICAN LEAGUE" outside the plot
+        // and the graph clips it. Centre it in the gap between the left edge and
+        // the World Series node instead — the only node sitting on the divider.
+        val worldSeriesLeftEdge = pos.centerX - 1.0f
+        val leagueLabelX = (xMin + worldSeriesLeftEdge) / 2f
         leagues.getOrNull(0)?.let { al ->
-            LinePlot(data = listOf(DefaultPoint(dividerLeft, pos.finalsY + labelOffset)), lineStyle = noLine, symbol = {
+            LinePlot(data = listOf(DefaultPoint(leagueLabelX, pos.finalsY + labelOffset)), lineStyle = noLine, symbol = {
                 Text(mlbLeagueLabel(al.name), style = MaterialTheme.typography.labelSmall,
-                    fontSize = 8.sp, color = lineColor, fontWeight = FontWeight.Medium)
+                    fontSize = 8.sp, color = lineColor, fontWeight = FontWeight.Medium,
+                    maxLines = 1, softWrap = false)
             })
         }
         leagues.getOrNull(1)?.let { nl ->
-            LinePlot(data = listOf(DefaultPoint(dividerLeft, pos.finalsY - labelOffset)), lineStyle = noLine, symbol = {
+            LinePlot(data = listOf(DefaultPoint(leagueLabelX, pos.finalsY - labelOffset)), lineStyle = noLine, symbol = {
                 Text(mlbLeagueLabel(nl.name), style = MaterialTheme.typography.labelSmall,
-                    fontSize = 8.sp, color = lineColor, fontWeight = FontWeight.Medium)
+                    fontSize = 8.sp, color = lineColor, fontWeight = FontWeight.Medium,
+                    maxLines = 1, softWrap = false)
             })
         }
 
@@ -346,7 +300,7 @@ private fun MLBBracketCanvas(
                 LinePlot(data = listOf(DefaultPoint(wcX[gi], wcY[gi])), lineStyle = noLine, symbol = {
                     PlayoffMatchupBoxSymbol(game, league.color, textColor, backgroundColor) {
                         game.sourceMatchup?.let {
-                            onMatchupClick?.invoke(it, mlbLeagueName(league.name),
+                            onMatchupClick(it, mlbLeagueName(league.name),
                                 it.roundName ?: "Wild Card Series", league.color)
                         }
                     }
@@ -362,7 +316,7 @@ private fun MLBBracketCanvas(
                 LinePlot(data = listOf(DefaultPoint(dsX[armIdx], dsY[armIdx])), lineStyle = noLine, symbol = {
                     PlayoffMatchupBoxSymbol(game, league.color, textColor, backgroundColor) {
                         game.sourceMatchup?.let {
-                            onMatchupClick?.invoke(it, mlbLeagueName(league.name),
+                            onMatchupClick(it, mlbLeagueName(league.name),
                                 it.roundName ?: "Division Series", league.color)
                         }
                     }
@@ -373,7 +327,7 @@ private fun MLBBracketCanvas(
                 LinePlot(data = listOf(DefaultPoint(lcsX, lcsY)), lineStyle = noLine, symbol = {
                     PlayoffMatchupBoxSymbol(game, league.color, textColor, backgroundColor) {
                         game.sourceMatchup?.let {
-                            onMatchupClick?.invoke(it, mlbLeagueName(league.name),
+                            onMatchupClick(it, mlbLeagueName(league.name),
                                 it.roundName ?: "League Championship Series", league.color)
                         }
                     }
@@ -384,7 +338,7 @@ private fun MLBBracketCanvas(
         LinePlot(data = listOf(DefaultPoint(pos.finalsX, pos.finalsY)), lineStyle = noLine, symbol = {
             PlayoffMatchupBoxSymbol(worldSeriesGame, Color(0xFFFFD700), textColor, backgroundColor) {
                 worldSeriesGame.sourceMatchup?.let {
-                    onMatchupClick?.invoke(it, "World Series", it.roundName ?: "World Series", Color(0xFFFFD700))
+                    onMatchupClick(it, "World Series", it.roundName ?: "World Series", Color(0xFFFFD700))
                 }
             }
         })
@@ -400,63 +354,6 @@ private fun mlbLeagueName(name: String): String = when (name.uppercase()) {
 
 /** All-caps league name for the divider label on the bracket canvas. */
 private fun mlbLeagueLabel(name: String): String = mlbLeagueName(name).uppercase()
-
-// ============================================================================
-// Bracket share image
-// ============================================================================
-
-@Composable
-private fun MLBBracketShareImage(
-    title: String,
-    subtitle: String,
-    source: String?,
-    leagues: List<PlayoffBracketConference>,
-    worldSeriesGame: PlayoffBracketGame,
-    pos: MLBBracketPositions
-) {
-    val backgroundColor = MaterialTheme.colorScheme.background
-    val onBackground = MaterialTheme.colorScheme.onBackground
-    val dimColor = onBackground.copy(alpha = 0.6f)
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(backgroundColor)
-            .padding(16.dp)
-    ) {
-        Text(title, style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold, color = onBackground, maxLines = 1)
-        if (subtitle.isNotBlank()) {
-            Spacer(modifier = Modifier.height(2.dp))
-            Text(subtitle, style = MaterialTheme.typography.bodySmall, color = dimColor, maxLines = 1)
-        }
-        Spacer(modifier = Modifier.height(8.dp))
-
-        Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
-            // No click handler: the shared image is a picture, not a surface.
-            MLBBracketCanvas(
-                leagues = leagues,
-                worldSeriesGame = worldSeriesGame,
-                pos = pos,
-                onMatchupClick = null
-            )
-        }
-
-        Spacer(modifier = Modifier.height(8.dp))
-        // Sources take the whole first line so fbrk.app can sit on its own line
-        // beneath rather than being squeezed into a stack of letters.
-        Column(modifier = Modifier.fillMaxWidth()) {
-            source?.takeIf { it.isNotBlank() }?.let {
-                Text(it, style = MaterialTheme.typography.labelSmall, fontSize = 9.sp,
-                    color = dimColor, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.fillMaxWidth())
-            }
-            Text("fbrk.app", style = MaterialTheme.typography.labelSmall, fontSize = 9.sp,
-                fontWeight = FontWeight.Bold, color = dimColor, maxLines = 1,
-                textAlign = TextAlign.End, modifier = Modifier.fillMaxWidth())
-        }
-    }
-}
 
 // ============================================================================
 // Matchup bottom sheet

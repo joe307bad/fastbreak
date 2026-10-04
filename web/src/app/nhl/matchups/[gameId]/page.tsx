@@ -174,8 +174,8 @@ function formatPctDiff(diff: number | undefined): string {
 
 interface BoxStatRowProps {
   label: string;
-  awayValue: number;
-  homeValue: number;
+  awayValue: number | null | undefined;
+  homeValue: number | null | undefined;
   awayVsAvg?: VsSeasonAvgStat;
   homeVsAvg?: VsSeasonAvgStat;
   higherIsBetter?: boolean;
@@ -183,9 +183,11 @@ interface BoxStatRowProps {
 }
 
 function BoxStatRow({ label, awayValue, homeValue, awayVsAvg, homeVsAvg, higherIsBetter = true, isPct = false }: BoxStatRowProps) {
-  const awayBetter = higherIsBetter ? awayValue > homeValue : awayValue < homeValue;
-  const homeBetter = higherIsBetter ? homeValue > awayValue : homeValue < awayValue;
-  const formatVal = isPct ? (v: number) => `${v.toFixed(1)}%` : (v: number) => String(v);
+  const comparable = awayValue != null && homeValue != null;
+  const awayBetter = comparable && (higherIsBetter ? awayValue > homeValue : awayValue < homeValue);
+  const homeBetter = comparable && (higherIsBetter ? homeValue > awayValue : homeValue < awayValue);
+  const formatVal = (v: number | null | undefined) =>
+    v == null ? '-' : isPct ? `${v.toFixed(1)}%` : String(v);
   const formatVsAvg = isPct ? formatPctDiff : formatDiff;
 
   return (

@@ -392,7 +392,8 @@ export interface NHLBoxScore {
   takeaways: number;
   faceoffWinPct: number;
   saves: number;
-  savePct: number;
+  // Absent when the pipeline can't find the starting goalie's save percentage
+  savePct?: number | null;
 }
 
 export interface NHLMatchupResults {

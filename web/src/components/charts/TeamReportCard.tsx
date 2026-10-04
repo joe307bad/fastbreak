@@ -11,6 +11,7 @@ import {
   ReportCardTeam,
 } from '@/types/chart';
 import { usePinnedTeams } from '@/lib/usePinnedTeams';
+import type { ChartUpdateSchedule } from '@/lib/diagnostics';
 import {
   buildReportCardLabelIndex,
   ChartInfoSheet,
@@ -685,9 +686,11 @@ interface Props {
   data: TeamReportCardData;
   /** Team to open with, from the /{team} route segment; overrides hash and pinned teams */
   initialTeamCode?: string;
+  /** When the pipeline last wrote this card and when it runs next, from diagnostics.json */
+  updateSchedule?: ChartUpdateSchedule | null;
 }
 
-export function TeamReportCard({ data, initialTeamCode }: Props) {
+export function TeamReportCard({ data, initialTeamCode, updateSchedule }: Props) {
   const { getPinnedForSport, mounted } = usePinnedTeams();
 
   const sportKey = (data.sport ?? 'mlb').toLowerCase();
@@ -912,6 +915,7 @@ export function TeamReportCard({ data, initialTeamCode }: Props) {
           title={data.title}
           description={data.description!}
           source={data.source}
+          updateSchedule={updateSchedule}
         />
       )}
     </div>

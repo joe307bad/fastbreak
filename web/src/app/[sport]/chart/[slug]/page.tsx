@@ -32,6 +32,7 @@ export async function generateMetadata({ params }: Props) {
 
 export default async function ChartPage({ params }: Props) {
   const { slug } = await params;
-  const data = await fetchChartData(slugToKey(slug));
-  return <ChartPageBody data={data} />;
+  const key = slugToKey(slug);
+  const data = await fetchChartData(key);
+  return <ChartPageBody chartKey={key} data={data} />;
 }

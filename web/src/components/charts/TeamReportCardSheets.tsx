@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { BottomSheet } from '@/components/ui/BottomSheet';
+import type { ChartUpdateSchedule } from '@/lib/diagnostics';
+import { describeElapsed, describeRelative, formatUtc, useClockNow } from '@/lib/schedulerTime';
 import { PlayoffChanceEntry, RankingEntry, ReportCardTeam } from '@/types/chart';
 
 function rankingTeamCode(entry: RankingEntry | PlayoffChanceEntry): string {
@@ -685,24 +687,73 @@ export function PlayoffChancesSheet({
   );
 }
 
+function UpdateScheduleRow({
+  label,
+  at,
+  relative,
+}: {
+  label: string;
+  at: string;
+  relative: string | null;
+}) {
+  return (
+    <div className="flex flex-col">
+      <span className="text-xs font-medium text-[var(--muted)] uppercase tracking-wider">{label}</span>
+      <span className="text-sm font-semibold">
+        {formatUtc(at)}
+        {relative && <span className="ml-2 font-normal text-[var(--muted)]">{relative}</span>}
+      </span>
+      {relative && <span className="text-xs text-[var(--muted)]">{new Date(at).toLocaleString()} local</span>}
+    </div>
+  );
+}
+
+function UpdateSchedule({ schedule }: { schedule: ChartUpdateSchedule }) {
+  const now = useClockNow();
+  const { lastUpdatedAt, nextUpdateAt } = schedule;
+  if (!lastUpdatedAt && !nextUpdateAt) return null;
+  return (
+    <div className="mt-4 pt-4 border-t border-[var(--border)] grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-3">
+      {lastUpdatedAt && (
+        <UpdateScheduleRow
+          label="Last updated"
+          at={lastUpdatedAt}
+          relative={now === null ? null : describeElapsed(lastUpdatedAt, now)}
+        />
+      )}
+      {nextUpdateAt && (
+        <UpdateScheduleRow
+          label="Next update"
+          at={nextUpdateAt}
+          relative={now === null ? null : describeRelative(nextUpdateAt, now)}
+        />
+      )}
+    </div>
+  );
+}
+
 export function ChartInfoSheet({
   open,
   onClose,
   title,
   description,
   source,
+  updateSchedule,
 }: {
   open: boolean;
   onClose: () => void;
   title: string;
   description: string;
   source?: string;
+  updateSchedule?: ChartUpdateSchedule | null;
 }) {
   return (
     <BottomSheet open={open} onClose={onClose} title={title} source={source}>
-      <p className="text-sm text-[var(--muted)] leading-relaxed whitespace-pre-wrap pb-6">
+      <p className="text-sm text-[var(--muted)] leading-relaxed whitespace-pre-wrap">
         {description}
       </p>
+      {updateSchedule && <UpdateSchedule schedule={updateSchedule} />}
+      <div className="pb-6" />
     </BottomSheet>
   );
 }

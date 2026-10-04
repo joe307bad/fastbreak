@@ -56,8 +56,9 @@ export async function generateMetadata({ params }: Props) {
 
 export default async function ChartTeamPage({ params }: Props) {
   const { slug, team: teamParam } = await params;
-  const data = await fetchChartData(slugToKey(slug));
+  const key = slugToKey(slug);
+  const data = await fetchChartData(key);
   const team = isReportCard(data) ? findTeam(data, teamParam) : undefined;
   if (!team) notFound();
-  return <ChartPageBody data={data} initialTeamCode={team.teamCode} />;
+  return <ChartPageBody chartKey={key} data={data} initialTeamCode={team.teamCode} />;
 }

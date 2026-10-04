@@ -1,13 +1,24 @@
-import { fetchOrderedSportsWithCharts } from '@/lib/api';
+import { fetchOrderedSportsWithCharts, keyToSlug } from '@/lib/api';
+import { getDiagnostics } from '@/lib/data';
+import { getChartUpdateSchedule } from '@/lib/diagnostics';
 import { ChartWithTable } from '@/components/charts/ChartWithTable';
 import { SportTabs } from '@/components/ui/SportTabs';
 import { REPORT_CARD_TYPES } from '@/lib/charts';
 import type { ChartData } from '@/types/chart';
 
 /** Shared by /[sport]/chart/[slug] and its /[team] child, which differ only in metadata and the opening team. */
-export async function ChartPageBody({ data, initialTeamCode }: { data: ChartData; initialTeamCode?: string }) {
+export async function ChartPageBody({
+  chartKey,
+  data,
+  initialTeamCode,
+}: {
+  chartKey: string;
+  data: ChartData;
+  initialTeamCode?: string;
+}) {
   const orderedSports = await fetchOrderedSportsWithCharts();
   const isReportCard = REPORT_CARD_TYPES.includes(data.visualizationType);
+  const updateSchedule = isReportCard ? getChartUpdateSchedule(getDiagnostics(), keyToSlug(chartKey)) : null;
 
   return (
     <main
@@ -26,6 +37,7 @@ export async function ChartPageBody({ data, initialTeamCode }: { data: ChartData
             source={data.source}
             lastUpdated={data.lastUpdated}
             initialTeamCode={initialTeamCode}
+            updateSchedule={updateSchedule}
           />
         </div>
       </div>

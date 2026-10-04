@@ -6,6 +6,7 @@ import { ChartRenderer } from './ChartRenderer';
 import { ChartDataTable } from './ChartDataTable';
 import { ChartData, ScatterPlotData } from '@/types/chart';
 import { REPORT_CARD_TYPES } from '@/lib/charts';
+import type { ChartUpdateSchedule } from '@/lib/diagnostics';
 
 interface Props {
   data: ChartData;
@@ -15,6 +16,8 @@ interface Props {
   lastUpdated?: string;
   /** Report cards only: team to open with */
   initialTeamCode?: string;
+  /** Report cards only: when the pipeline last wrote this chart and when it runs next */
+  updateSchedule?: ChartUpdateSchedule | null;
 }
 
 // Helper to darken a hex color
@@ -210,7 +213,7 @@ function DownloadButton({ onClick }: { onClick: () => void }) {
   );
 }
 
-export function ChartWithTable({ data, title, subtitle, source, lastUpdated, initialTeamCode }: Props) {
+export function ChartWithTable({ data, title, subtitle, source, lastUpdated, initialTeamCode, updateSchedule }: Props) {
   const [highlightedLabels, setHighlightedLabels] = useState<string[] | null>(null);
   const [selectedLabel, setSelectedLabel] = useState<string | null>(null);
   const [selectedQuadrant, setSelectedQuadrant] = useState<QuadrantKey | null>(null);
@@ -313,6 +316,7 @@ export function ChartWithTable({ data, title, subtitle, source, lastUpdated, ini
               selectedLabel={selectedLabel}
               onSelect={handleSelect}
               initialTeamCode={initialTeamCode}
+              updateSchedule={updateSchedule}
             />
           </div>
           {isScatterPlot && (

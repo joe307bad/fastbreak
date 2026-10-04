@@ -1,25 +1,32 @@
 #!/usr/bin/env python3
-"""Provision the "Topspin" usage dashboard.
+"""Provision the "Plaintext Pantry" usage dashboard.
 
-    cd o11y && python3 grafana/topspin-dashboard.py
+    cd o11y && python3 grafana/plaintextpantry-dashboard.py
 
-Idempotent: it overwrites the dashboard at uid `topspin-usage` every run, so this
-file is the definition and Grafana holds a copy rather than the other way round.
-Edit here, re-run, and anything changed by hand in the UI is replaced.
+Idempotent, like its sibling `topspin-dashboard.py`: it overwrites the
+dashboard at uid `plaintextpantry-usage` every run, so this file is the
+definition and Grafana holds a copy rather than the other way round. Edit
+here, re-run, and anything changed by hand in the UI is replaced.
 
-The rows come from topspin.blog, which counts its own page views and writes them
-through its backend to the `/write` endpoint on this host — see
-`app/src/backend/lib/usage-metrics.ts` in that repository for why the browser
-does not write here directly. Two tables, created by
-`CREATE TABLE IF NOT EXISTS` below so the dashboard reads zero rather than an
-error before the first visit arrives:
+The rows come from plaintextpantry.com, whose F# server writes them to the
+`/write` endpoint on this host in line protocol - see
+`app/src/Server/Usage.fs` in that repository, which also says why the browser
+does not write here directly. Three tables, created by `CREATE TABLE IF NOT
+EXISTS` below so the panels read zero rather than an error before the first
+row arrives:
 
-    topspin_pageview   env, section, value, timestamp
-    topspin_login      env, provider, value, timestamp
-    topspin_mcp        env, tool, resource, value, timestamp
+    ptp_pageview   env, section, value, timestamp
+    ptp_login      env, provider, value, timestamp
+    ptp_write      env, source, resource, action, value, timestamp
 
-Nine charts: one per counted page section, one for logins, and two for the MCP
-server — mutations broken down by what they changed, and by which tool did it.
+Every row carries a count in `value` rather than standing for one event -
+saving a recipe writes one row for its dozen shopping items - so the panels
+sum that column instead of counting rows.
+
+Seven charts: the login page and the pages behind it, sign-ins, recipes made,
+pantries shared, what an assistant changed through the MCP server, and what
+the app itself changed. They are drawn like the other dashboards on this
+Grafana rather than to their own taste - see `build` below.
 """
 
 from __future__ import annotations
@@ -32,59 +39,75 @@ import urllib.error
 import urllib.request
 
 HOST = os.environ.get("O11Y_HOST", "https://fastbreak-o11y.fly.dev")
-DASHBOARD_UID = "topspin-usage"
+DASHBOARD_UID = "plaintextpantry-usage"
 
 # The QuestDB datasource this Grafana already has. Looked up by type rather than
 # hardcoded, so a rebuilt datasource with a new uid needs no edit here.
 DATASOURCE_TYPE = "questdb-questdb-datasource"
 
-# title, table, an extra WHERE clause, the sentence shown on the panel's tooltip,
-# and a symbol column to draw one series per value of. Adding a counted section
-# is one line, plus the section name in topspin's own
-# `shared/src/paths/usage-section.ts`.
+# title, table, an extra WHERE clause, the sentence on the panel's tooltip, and
+# a symbol column to draw one series per value of.
 PANELS = [
-    ("Docs visits", "topspin_pageview", "section = 'docs'", "/docs/", None),
-    ("Tool visits", "topspin_pageview", "section = 'tool'", "/tool/ and anything under it", None),
-    ("Workspace visits", "topspin_pageview", "section = 'workspace'", "/workspace/", None),
-    ("Dashboard visits", "topspin_pageview", "section = 'dashboard'", "/dashboard/", None),
-    ("Query visits", "topspin_pageview", "section = 'query'", "/query/", None),
-    ("Post visits", "topspin_pageview", "section = 'post'", "/post/", None),
     (
-        "Logins",
-        "topspin_login",
-        None,
-        "Completed sign-ins, counted server-side where the session cookie is set",
+        "Login page",
+        "ptp_pageview",
+        "section = 'login'",
+        "Times the signed-out screen was shown - every visit by someone with no session, not only the ones that went on to sign in.",
         None,
     ),
-    # The MCP server, twice: once by what was changed and once by what did the
-    # changing. Reads are not in this table at all — `run_query` and the `list_`
-    # tools write nothing, so counting them would make these a measure of how
-    # often a model looked rather than how often it acted.
     (
-        "MCP mutations by resource",
-        "topspin_mcp",
+        "Page visits",
+        "ptp_pageview",
         None,
-        "Tool calls that changed a workspace, query, post or dashboard. Reads are not counted.",
+        "Every page the app opened, counted where the page changed. `recipe` is any one recipe's page.",
+        "section",
+    ),
+    (
+        "Logins",
+        "ptp_login",
+        None,
+        "Sessions begun, counted server-side in the OIDC callback. A session that renews itself daily for a year is one login.",
+        None,
+    ),
+    (
+        "Recipes created",
+        "ptp_write",
+        "resource = 'recipes' AND action = 'create'",
+        "New recipes, whether typed into the app or written by an assistant through the MCP server.",
+        None,
+    ),
+    (
+        "Pantries shared",
+        "ptp_write",
+        "resource = 'pantry_members'",
+        "`create` is somebody scanning a pantry's code and asking to join; `approve` is the owner letting them in, which is the share actually happening.",
+        "action",
+    ),
+    (
+        "MCP mutations",
+        "ptp_write",
+        "source = 'mcp'",
+        "Tool calls that changed something, by the area they changed. Reads are not counted: a `list_` or `get_` tool writes nothing, so counting them would measure how often a model looked rather than how often it acted.",
         "resource",
     ),
     (
-        "MCP mutations by tool",
-        "topspin_mcp",
-        None,
-        "The same calls, by which tool made them.",
-        "tool",
+        "Changes from the app",
+        "ptp_write",
+        "source = 'app'",
+        "Everything the app itself wrote, by what it changed - the other half of the MCP panel above. Counted as the database took them, so a refused write is not in here.",
+        "resource",
     ),
 ]
 
 TABLES = [
-    "CREATE TABLE IF NOT EXISTS topspin_pageview "
+    "CREATE TABLE IF NOT EXISTS ptp_pageview "
     "(env SYMBOL, section SYMBOL, value LONG, timestamp TIMESTAMP) "
     "TIMESTAMP(timestamp) PARTITION BY DAY",
-    "CREATE TABLE IF NOT EXISTS topspin_login "
+    "CREATE TABLE IF NOT EXISTS ptp_login "
     "(env SYMBOL, provider SYMBOL, value LONG, timestamp TIMESTAMP) "
     "TIMESTAMP(timestamp) PARTITION BY DAY",
-    "CREATE TABLE IF NOT EXISTS topspin_mcp "
-    "(env SYMBOL, tool SYMBOL, resource SYMBOL, value LONG, timestamp TIMESTAMP) "
+    "CREATE TABLE IF NOT EXISTS ptp_write "
+    "(env SYMBOL, source SYMBOL, resource SYMBOL, action SYMBOL, value LONG, timestamp TIMESTAMP) "
     "TIMESTAMP(timestamp) PARTITION BY DAY",
 ]
 
@@ -155,9 +178,12 @@ def sql_for(table: str, where: str | None, group: str | None) -> str:
     # QuestDB groups a SAMPLE BY on it, and the plugin reads the string column as
     # the series name. Nothing else about the query changes.
     selected = "  timestamp AS time,\n" + (f"  {group},\n" if group else "")
-    measure = "mutations" if table == "topspin_mcp" else "visits"
+    measure = "changes" if table == "ptp_write" else "visits" if table == "ptp_pageview" else "logins"
     return (
-        f"SELECT\n{selected}  COUNT(*) AS {measure}\n"
+        # SUM, not COUNT: one row can stand for several changes (see the
+        # module docstring), and for the tables where it never does, the
+        # value is 1 and the two agree.
+        f"SELECT\n{selected}  SUM(value) AS {measure}\n"
         f"FROM {table}\nWHERE " + "\n  AND ".join(clauses) +
         # FILL before ALIGN TO. The other order parses in most SQL dialects and
         # is rejected by QuestDB with "unexpected token [FILL]", which reaches a
@@ -178,8 +204,8 @@ def build(uid: str) -> dict:
                 "title": title,
                 "description": description,
                 "datasource": datasource,
-                # Two across. Seven panels, so logins sit alone on the last row,
-                # which suits the one number here that is not a page view.
+                # Two across; seven panels, so the app's own writes sit alone
+                # on the last row under the MCP panel they are the other half of.
                 "gridPos": {"h": 8, "w": 12, "x": (index % 2) * 12, "y": (index // 2) * 8},
                 "targets": [
                     {
@@ -193,11 +219,11 @@ def build(uid: str) -> dict:
                 ],
                 "fieldConfig": {
                     "defaults": {
-                        # Drawn the way the Fastbreak dashboard next door draws
-                        # its own: a thin unfilled line, linear between points,
-                        # classic palette. Two dashboards on one Grafana that
-                        # look like two products is a worse result than either
-                        # style on its own.
+                        # Drawn the way the Fastbreak and Topspin dashboards
+                        # next door draw theirs: a thin unfilled line, linear
+                        # between points, classic palette. Three dashboards on
+                        # one Grafana that look like three products is a worse
+                        # result than any of the styles on its own.
                         "custom": {
                             "drawStyle": "line",
                             "lineWidth": 1,
@@ -219,11 +245,10 @@ def build(uid: str) -> dict:
                     "overrides": [],
                 },
                 "options": {
-                    # The one deliberate difference from Fastbreak's panels,
-                    # which show no calcs: the question here was "how many
-                    # visits", so each series carries its own total for the
-                    # window. The line is how it arrived; the total is the
-                    # answer.
+                    # The same deliberate difference from Fastbreak's panels
+                    # that Topspin's make: the question here is "how many", so
+                    # each series carries its own total for the window. The
+                    # line is how it arrived; the total is the answer.
                     "legend": {
                         # A grouped panel's legend is a table, so each series can
                         # carry its own total beside its name.
@@ -239,18 +264,19 @@ def build(uid: str) -> dict:
 
     return {
         "uid": DASHBOARD_UID,
-        "title": "Topspin",
-        "tags": ["topspin"],
+        "title": "Plaintext Pantry",
+        "tags": ["plaintextpantry"],
         "timezone": "browser",
         "schemaVersion": 39,
         "refresh": "5m",
         "time": {"from": "now-30d", "to": "now"},
         "editable": True,
         "description": (
-            "Usage counters for topspin.blog. Page views are counted by the client "
-            "on every route change and written through that app's own backend; "
-            "logins are counted server-side where the session is created. Totals, "
-            "not unique users. Defined by o11y/grafana/topspin-dashboard.py."
+            "Usage counters for plaintextpantry.com. Pages are counted by the app "
+            "where the page changes and written through its own server; sign-ins, "
+            "recipes, shares and MCP calls are counted server-side where they "
+            "happen. Totals, not unique users - nothing here says who did any of "
+            "it. Defined by o11y/grafana/plaintextpantry-dashboard.py."
         ),
         "panels": panels,
     }
@@ -270,7 +296,7 @@ for statement in TABLES:
 
 result = call(
     "/grafana/api/dashboards/db",
-    {"dashboard": build(uid), "overwrite": True, "message": "Topspin usage counters"},
+    {"dashboard": build(uid), "overwrite": True, "message": "Plaintext Pantry usage counters"},
     "POST",
 )
 print(f"dashboard {result['status']} v{result['version']} -> {HOST}{result['url']}")
@@ -289,6 +315,6 @@ for panel in build(uid)["panels"]:
     outcome = run_sql(uid, raw)
     ok = outcome["status"] == 200
     failures += 0 if ok else 1
-    print(f"  {panel['title']:<20} {outcome['status']} {'' if ok else outcome.get('error', '')}")
+    print(f"  {panel['title']:<22} {outcome['status']} {'' if ok else outcome.get('error', '')}")
 
 sys.exit(1 if failures else 0)

@@ -81,6 +81,27 @@ GitHub secrets:
 - `OTEL_ENDPOINT`: `https://fastbreak-o11y.fly.dev`
 - `OTEL_AUTH_TOKEN`: The `API_KEY` from step 2
 
+## Dashboards
+
+Grafana is at `/grafana` and its dashboards are defined as code here, one
+script each, rather than edited in the UI:
+
+| Script | Dashboard | Written by |
+|---|---|---|
+| `grafana/topspin-dashboard.py` | Topspin | topspin.blog's backend |
+| `grafana/plaintextpantry-dashboard.py` | Plaintext Pantry | plaintextpantry.com's F# server |
+
+Each one is idempotent: it creates its tables if they are missing, overwrites
+its dashboard, then runs every panel's query against QuestDB and fails if one
+of them does not draw. Edit the script and re-run it; anything changed by hand
+in the UI is replaced.
+
+```sh
+cd o11y && python3 grafana/plaintextpantry-dashboard.py
+```
+
+It needs `GF_SECURITY_ADMIN_PASSWORD`, from the environment or from `.env`.
+
 ## Access Web Console
 
 1. Open `https://fastbreak-o11y.fly.dev`

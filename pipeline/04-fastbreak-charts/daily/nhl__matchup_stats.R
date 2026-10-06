@@ -103,6 +103,27 @@ add_nst_delay <- function() {
   Sys.sleep(delay)
 }
 
+# Natural Stat Trick sits behind Cloudflare, which turns away requests that
+# don't look like a browser: a bare read_html(url) fails with "cannot open the
+# connection". A browser User-Agent plus a same-site Referer gets through.
+NST_USER_AGENT <- "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36"
+
+read_nst_html <- function(url) {
+  resp <- GET(
+    url,
+    user_agent(NST_USER_AGENT),
+    add_headers(
+      Referer = "https://www.naturalstattrick.com/",
+      Accept = "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+      `Accept-Language` = "en-US,en;q=0.9"
+    )
+  )
+  if (status_code(resp) != 200) {
+    stop(sprintf("NST returned HTTP %d", status_code(resp)))
+  }
+  read_html(content(resp, as = "text", encoding = "UTF-8"))
+}
+
 # NHL team abbreviation mapping
 TEAM_ABBREVS <- c(
   "Anaheim Ducks" = "ANA", "Arizona Coyotes" = "ARI", "Boston Bruins" = "BOS",
@@ -114,6 +135,7 @@ TEAM_ABBREVS <- c(
   "New Jersey Devils" = "NJD", "New York Islanders" = "NYI", "New York Rangers" = "NYR",
   "Ottawa Senators" = "OTT", "Philadelphia Flyers" = "PHI", "Pittsburgh Penguins" = "PIT",
   "San Jose Sharks" = "SJS", "Seattle Kraken" = "SEA", "St. Louis Blues" = "STL",
+  "St Louis Blues" = "STL",  # Natural Stat Trick's spelling
   "Tampa Bay Lightning" = "TBL", "Toronto Maple Leafs" = "TOR",
   "Utah Hockey Club" = "UTA", "Utah Mammoth" = "UTA",
   "Vancouver Canucks" = "VAN", "Vegas Golden Knights" = "VGK", "Washington Capitals" = "WSH",
@@ -332,6 +354,40 @@ detect_nhl_season_type <- function() {
   })
 }
 
+# Opening night is not on a fixed date, so read it off the season record rather
+# than assuming the start of October.
+fetch_nhl_season_start <- function() {
+  fallback <- as.Date(paste0(NHL_SEASON_START, "-10-01"))
+  tryCatch({
+    url <- sprintf("https://api.nhle.com/stats/rest/en/season?cayenneExp=id=%s", NHL_SEASON_ID)
+    resp <- GET(url)
+    if (status_code(resp) != 200) stop("NHL season API error")
+    season <- fromJSON(content(resp, "text", encoding = "UTF-8"))$data
+    if (is.null(season) || length(season) == 0 || is.null(season$startDate)) {
+      stop("no startDate in season record")
+    }
+    start <- as.Date(substr(season$startDate[1], 1, 10))
+    if (is.na(start)) stop("unparseable startDate")
+    cat("NHL season start:", format(start), "\n")
+    start
+  }, error = function(e) {
+    cat("Warning: Could not fetch NHL season start (", e$message, ") - assuming",
+        format(fallback), "\n")
+    fallback
+  })
+}
+
+# A date window that selects no games - an idle week such as the All-Star break
+# - makes NST fall back to season-to-date numbers instead of returning nothing.
+# No team can play more games than the window has days, so an impossible games
+# played count is the tell that the filter was dropped.
+nst_window_honored <- function(data, from_date, to_date) {
+  if (is.null(data) || nrow(data) == 0) return(TRUE)
+  if (all(is.na(data$gp))) return(TRUE)
+  window_days <- as.integer(as.Date(to_date) - as.Date(from_date)) + 1L
+  max(data$gp, na.rm = TRUE) <= window_days
+}
+
 # Helper function to scrape team xG data from Natural Stat Trick
 scrape_nst_team_xg <- function(from_date, to_date, season_id) {
   tryCatch({
@@ -343,7 +399,7 @@ scrape_nst_team_xg <- function(from_date, to_date, season_id) {
     )
 
     add_nst_delay()
-    page <- read_html(url)
+    page <- read_nst_html(url)
 
     tables <- page %>% html_elements("table")
     if (length(tables) == 0) {
@@ -406,40 +462,67 @@ scrape_nst_team_xg <- function(from_date, to_date, season_id) {
   })
 }
 
+# Every cell in NST's game tables stacks the per-period values above the Final
+# total, so the running total is the cell's last line.
+nst_cell_total <- function(cell_text) {
+  parts <- trimws(unlist(strsplit(cell_text, "\n")))
+  parts <- parts[parts != ""]
+  if (length(parts) == 0) return(NA_real_)
+  suppressWarnings(as.numeric(parts[length(parts)]))
+}
+
 # Helper function to scrape per-game xG data from Natural Stat Trick
-scrape_nst_game_xg <- function(nhl_game_id) {
+scrape_nst_game_xg <- function(nhl_game_id, home_abbrev, away_abbrev) {
   tryCatch({
+    # NST identifies a game by game type + game number - the last five digits of
+    # the NHL game id - not the full id.
+    nst_game <- substr(as.character(nhl_game_id), 6, 10)
     url <- sprintf("https://www.naturalstattrick.com/game.php?season=%s&game=%s&view=limited",
-                   NHL_SEASON_ID, nhl_game_id)
+                   NHL_SEASON_ID, nst_game)
 
     add_nst_delay()
-    page <- read_html(url)
+    page <- read_nst_html(url)
 
-    tables <- page %>% html_elements("table")
-    if (length(tables) == 0) {
+    # 5v5 team summary, matching the situation used for the season xG% stats
+    headers <- page %>%
+      html_elements("table#tbts5v5 > thead > tr > th") %>%
+      html_text(trim = TRUE)
+    xgf_col <- which(headers == "xGF")[1]
+    xga_col <- which(headers == "xGA")[1]
+    if (is.na(xgf_col) || is.na(xga_col)) {
       return(NULL)
     }
 
-    # Look for 5v5 team summary table - typically has xGF/xGA columns
-    for (tbl_el in tables) {
-      tbl <- html_table(tbl_el, fill = TRUE)
-      col_names <- colnames(tbl)
-
-      if ("xGF" %in% col_names && "xGA" %in% col_names && nrow(tbl) >= 2) {
-        # First row is usually away, second row is home (or vice versa - check Team col)
-        away_row <- 1
-        home_row <- 2
-
-        return(list(
-          away_xgf = as.numeric(tbl$xGF[away_row]),
-          away_xga = as.numeric(tbl$xGA[away_row]),
-          home_xgf = as.numeric(tbl$xGF[home_row]),
-          home_xga = as.numeric(tbl$xGA[home_row])
-        ))
-      }
+    rows <- page %>% html_elements("table#tbts5v5 > tbody > tr")
+    if (length(rows) < 2) {
+      return(NULL)
     }
 
-    return(NULL)
+    # NST labels the rows by nickname and does not guarantee home/away order
+    by_team <- list()
+    for (row in rows) {
+      cells <- row %>% html_elements("td") %>% html_text()
+      if (length(cells) < max(xgf_col, xga_col)) next
+      abbrev <- NHL_TEAM_NAME_TO_ABBREV[trimws(cells[1])]
+      if (is.na(abbrev)) next
+      by_team[[abbrev]] <- list(
+        xgf = nst_cell_total(cells[xgf_col]),
+        xga = nst_cell_total(cells[xga_col])
+      )
+    }
+
+    home <- by_team[[home_abbrev]]
+    away <- by_team[[away_abbrev]]
+    if (is.null(home) || is.null(away)) {
+      return(NULL)
+    }
+
+    return(list(
+      away_xgf = away$xgf,
+      away_xga = away$xga,
+      home_xgf = home$xgf,
+      home_xga = home$xga
+    ))
   }, error = function(e) {
     cat("Warning: Could not scrape game xG for", nhl_game_id, ":", e$message, "\n")
     return(NULL)
@@ -1093,6 +1176,11 @@ month_games_data <- tryCatch({
               if (is.null(game_state) || is.na(game_state)) next
 
               if (game_state %in% c("OFF", "FINAL")) {
+                # Skip preseason (gameType 1) - the season stats these trends
+                # are compared against only count regular season and playoffs
+                game_type <- game$gameType
+                if (!is.null(game_type) && !is.na(game_type) && as.integer(game_type) == 1) next
+
                 home_abbrev <- game$homeTeam.abbrev
                 away_abbrev <- game$awayTeam.abbrev
 
@@ -1311,8 +1399,10 @@ end_timer()
 start_timer("STEP 1c: Fetch NST xG data")
 cat("\n1c. Fetching Expected Goals (xG) data from Natural Stat Trick...\n")
 
-# Season start date for NHL (first game typically early October)
-nhl_season_start <- as.Date(paste0(NHL_SEASON_START, "-10-01"))
+# Season start date for NHL. Opening night moves around - 2026-27 started on
+# September 29 - and assuming October 1 would drop the first games from the
+# season-to-date xG, so ask the API and only fall back on the assumption.
+nhl_season_start <- fetch_nhl_season_start()
 
 # 1. Season-to-date xG
 nst_season_xg <- scrape_nst_team_xg(nhl_season_start, today, NHL_SEASON_ID)
@@ -1344,6 +1434,12 @@ for (week_num in 1:NUM_TREND_WEEKS) {
   week_end <- trend_start + weeks(week_num)
   if (week_end > today) week_end <- today
 
+  # Early in the season most of the 10-week window predates the first game.
+  # NST ignores a date filter that selects no games and answers with
+  # season-to-date numbers instead, so asking for those weeks would invent a
+  # flat history rather than leave the chart short.
+  if (week_end < nhl_season_start) next
+
   week_key <- paste0("week-", week_num)
 
   # Cumulative: season start through this week
@@ -1361,8 +1457,12 @@ for (week_num in 1:NUM_TREND_WEEKS) {
   }
 
   # Weekly snapshot: just this week's 7-day window
-  week_start <- week_end - days(6)
+  week_start <- max(week_end - days(6), nhl_season_start)
   snap_data <- scrape_nst_team_xg(week_start, week_end, NHL_SEASON_ID)
+  if (!nst_window_honored(snap_data, week_start, week_end)) {
+    cat("Skipping week-by-week xG% for", week_key, "- NST ignored the date filter\n")
+    snap_data <- NULL
+  }
   if (!is.null(snap_data) && nrow(snap_data) > 0) {
     for (i in seq_len(nrow(snap_data))) {
       team <- snap_data$team_abbreviation[i]
@@ -2531,7 +2631,7 @@ for (game in all_games) {
     matchup$results <- build_game_results(game, home_stats_row, away_stats_row)
 
     # Add per-game xG from NST
-    game_xg <- scrape_nst_game_xg(game$game_id)
+    game_xg <- scrape_nst_game_xg(game$game_id, game$home_team_abbrev, game$away_team_abbrev)
     if (!is.null(game_xg)) {
       matchup$results$teamBoxScore$home$xgf <- round(game_xg$home_xgf, 2)
       matchup$results$teamBoxScore$home$xga <- round(game_xg$home_xga, 2)

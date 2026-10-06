@@ -53,6 +53,50 @@ add_api_delay <- function() Sys.sleep(0.3)
 safe_num <- function(x) if (is_valid_value(x)) as.numeric(x) else NA_real_
 add_nst_delay <- function() { Sys.sleep(runif(1, min = 5, max = 10)) }
 
+# Natural Stat Trick sits behind Cloudflare, which turns away requests that
+# don't look like a browser: a bare read_html(url) fails with "cannot open the
+# connection". A browser User-Agent plus a same-site Referer gets through.
+NST_USER_AGENT <- "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36"
+
+# Opening night is not on a fixed date, so read it off the season record rather
+# than assuming the start of October.
+fetch_nhl_season_start <- function() {
+  fallback <- as.Date(paste0(NHL_SEASON_START, "-10-01"))
+  tryCatch({
+    url <- sprintf("https://api.nhle.com/stats/rest/en/season?cayenneExp=id=%s", NHL_SEASON_ID)
+    resp <- GET(url)
+    if (status_code(resp) != 200) stop("NHL season API error")
+    season <- fromJSON(content(resp, "text", encoding = "UTF-8"))$data
+    if (is.null(season) || length(season) == 0 || is.null(season$startDate)) {
+      stop("no startDate in season record")
+    }
+    start <- as.Date(substr(season$startDate[1], 1, 10))
+    if (is.na(start)) stop("unparseable startDate")
+    cat("NHL season start:", format(start), "\n")
+    start
+  }, error = function(e) {
+    cat("Warning: Could not fetch NHL season start (", e$message, ") - assuming",
+        format(fallback), "\n")
+    fallback
+  })
+}
+
+read_nst_html <- function(url) {
+  resp <- GET(
+    url,
+    user_agent(NST_USER_AGENT),
+    add_headers(
+      Referer = "https://www.naturalstattrick.com/",
+      Accept = "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+      `Accept-Language` = "en-US,en;q=0.9"
+    )
+  )
+  if (status_code(resp) != 200) {
+    stop(sprintf("NST returned HTTP %d", status_code(resp)))
+  }
+  read_html(content(resp, as = "text", encoding = "UTF-8"))
+}
+
 TEAM_ABBREVS <- c(
   "Anaheim Ducks" = "ANA", "Arizona Coyotes" = "ARI", "Boston Bruins" = "BOS",
   "Buffalo Sabres" = "BUF", "Calgary Flames" = "CGY", "Carolina Hurricanes" = "CAR",
@@ -148,7 +192,7 @@ scrape_nst_team_xg <- function(from_date, to_date, season_id) {
   )
   tryCatch({
     add_nst_delay()
-    page <- read_html(url)
+    page <- read_nst_html(url)
     tables <- page %>% html_elements("table")
     if (length(tables) == 0) return(NULL)
     df <- tables[[1]] %>% html_table(fill = TRUE)
@@ -171,8 +215,20 @@ scrape_nst_team_xg <- function(from_date, to_date, season_id) {
       xgf <- as.numeric(df[["xGF"]]); xga <- as.numeric(df[[xga_col]])
       df$xgf_pct <- xgf / (xgf + xga)
     } else { return(NULL) }
-    df %>% select(team_abbreviation, xgf_pct) %>% filter(!is.na(xgf_pct))
+    df$gp <- if ("GP" %in% names(df)) as.integer(df[["GP"]]) else NA_integer_
+    df %>% select(team_abbreviation, xgf_pct, gp) %>% filter(!is.na(xgf_pct))
   }, error = function(e) { cat("NST scrape error:", e$message, "\n"); NULL })
+}
+
+# A date window that selects no games - an idle week such as the All-Star break
+# - makes NST fall back to season-to-date numbers instead of returning nothing.
+# No team can play more games than the window has days, so an impossible games
+# played count is the tell that the filter was dropped.
+nst_window_honored <- function(data, from_date, to_date) {
+  if (is.null(data) || nrow(data) == 0) return(TRUE)
+  if (all(is.na(data$gp))) return(TRUE)
+  window_days <- as.integer(as.Date(to_date) - as.Date(from_date)) + 1L
+  max(data$gp, na.rm = TRUE) <= window_days
 }
 
 cat("=== NHL Playoff Bracket Generation ===\n")
@@ -232,7 +288,7 @@ if (!is.null(realtime_stats)) {
 
 # Season xG% from Natural Stat Trick
 today <- Sys.Date()
-nhl_season_start <- as.Date(paste0(NHL_SEASON_START, "-10-01"))
+nhl_season_start <- fetch_nhl_season_start()
 cat("Fetching season xG% from Natural Stat Trick...\n")
 nst_season_xg <- scrape_nst_team_xg(nhl_season_start, today, NHL_SEASON_ID)
 
@@ -292,6 +348,13 @@ trend_start <- today - weeks(NUM_TREND_WEEKS)
 
 for (week_num in 1:NUM_TREND_WEEKS) {
   week_end <- min(trend_start + weeks(week_num), today)
+
+  # Early in the season most of the 10-week window predates the first game.
+  # NST ignores a date filter that selects no games and answers with
+  # season-to-date numbers instead, so asking for those weeks would invent a
+  # flat history rather than leave the chart short.
+  if (week_end < nhl_season_start) next
+
   week_key <- paste0("week-", week_num)
 
   cum_data <- scrape_nst_team_xg(nhl_season_start, week_end, NHL_SEASON_ID)
@@ -305,7 +368,12 @@ for (week_num in 1:NUM_TREND_WEEKS) {
     }
   }
 
-  snap_data <- scrape_nst_team_xg(week_end - days(6), week_end, NHL_SEASON_ID)
+  week_start <- max(week_end - days(6), nhl_season_start)
+  snap_data <- scrape_nst_team_xg(week_start, week_end, NHL_SEASON_ID)
+  if (!nst_window_honored(snap_data, week_start, week_end)) {
+    cat("Skipping weekly xG% for", week_key, "- NST ignored the date filter\n")
+    snap_data <- NULL
+  }
   if (!is.null(snap_data)) {
     for (i in seq_len(nrow(snap_data))) {
       team <- snap_data$team_abbreviation[i]

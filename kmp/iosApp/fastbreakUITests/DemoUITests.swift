@@ -23,20 +23,42 @@ final class DemoUITests: XCTestCase {
     /// so this reaches the WireMock the capture script starts.
     private static let mockBaseUrl = "http://127.0.0.1:8089"
 
-    /// Launch with a chosen look. Every screenshot picks its own so the set on
-    /// the listing shows the app in light, in dark, and in a few team palettes
-    /// rather than eleven shots of one theme.
+    /// Team palettes come out of the roster feed, which syncs in the
+    /// background after launch. The theme is read while the app composes, so
+    /// on a simulator that has never cached a roster the first screenshots
+    /// render in the default palette however the override is set. One warm-up
+    /// launch per simulator fixes that: sync once, then relaunch and let the
+    /// theme resolve against cached colours.
+    private static var rostersWarmed = false
+
+    /// Launch with a chosen look. Every screenshot picks its own team palette,
+    /// so the set on the listing shows ten different colour schemes rather than
+    /// ten shots of the same purple. All dark for now: a team's light-mode
+    /// accent is not being applied, so a light shot would silently fall back to
+    /// the default and lose the variety.
     private func launch(theme: String, teamTheme: String = "none") throws {
-        app = XCUIApplication()
-        setupSnapshot(app)
-        app.launchArguments += [
-            "UI_TESTING",
-            "-fastbreakBaseUrl", DemoUITests.mockBaseUrl,
-            "-fastbreakTheme", theme,
-            "-fastbreakTeamTheme", teamTheme,
-        ]
-        app.launch()
-        try waitForChartList()
+        func start() throws {
+            app = XCUIApplication()
+            setupSnapshot(app)
+            app.launchArguments += [
+                "UI_TESTING",
+                "-fastbreakBaseUrl", DemoUITests.mockBaseUrl,
+                "-fastbreakTheme", theme,
+                "-fastbreakTeamTheme", teamTheme,
+            ]
+            app.launch()
+            try waitForChartList()
+        }
+
+        try start()
+
+        if !DemoUITests.rostersWarmed {
+            // The rosters are cached by the time the chart list settled; this
+            // second launch is the one whose theme can see them.
+            DemoUITests.rostersWarmed = true
+            app.terminate()
+            try start()
+        }
     }
 
     override func setUpWithError() throws {
@@ -220,19 +242,19 @@ final class DemoUITests: XCTestCase {
     // point in the calendar and would photograph an empty grid.
 
     func testScreenshot_01_Home() throws {
-        try launch(theme: "light", teamTheme: "nfl:KC")
+        try launch(theme: "dark", teamTheme: "nfl:KC")
         snapshot("01-Home")
     }
 
     func testScreenshot_02_ScoringLeaders() throws {
-        try launch(theme: "light", teamTheme: "nhl:PIT")
+        try launch(theme: "dark", teamTheme: "mlb:LAD")
         try openChartOrSkip(sport: "NHL", matching: "Scoring Leaders", "scoring leaders")
         settle(2)
         snapshot("02-ScoringLeaders")
     }
 
     func testScreenshot_03_HighlightDataPoints() throws {
-        try launch(theme: "light", teamTheme: "mlb:LAD")
+        try launch(theme: "dark", teamTheme: "mlb:BOS")
         try openChartOrSkip(sport: "MLB", matching: "Hitting Leaders", "hitting leaders")
 
         // Tapping a team badge filters the plot to that team.
@@ -242,7 +264,7 @@ final class DemoUITests: XCTestCase {
     }
 
     func testScreenshot_04_DivisionFilter() throws {
-        try launch(theme: "dark", teamTheme: "nhl:BOS")
+        try launch(theme: "dark", teamTheme: "nhl:VGK")
         try openChartOrSkip(sport: "NHL", matching: "Team Efficiency", "team efficiency")
 
         tapIfPresent(containing("Division"), timeout: 6, "division filter")
@@ -268,14 +290,14 @@ final class DemoUITests: XCTestCase {
     }
 
     func testScreenshot_06_MatchupWorksheet() throws {
-        try launch(theme: "light", teamTheme: "nfl:SF")
+        try launch(theme: "dark", teamTheme: "nba:GSW")
         try openChartOrSkip(sport: "NFL", matching: "Matchups", "NFL matchups")
         settle(2)
         snapshot("06-MatchupWorksheet")
     }
 
     func testScreenshot_07_ReportCard() throws {
-        try launch(theme: "dark", teamTheme: "nba:GSW")
+        try launch(theme: "dark", teamTheme: "nba:MIA")
         try openReportCard()
         snapshot("07-ReportCard")
     }
@@ -283,7 +305,7 @@ final class DemoUITests: XCTestCase {
     /// The expandable percentile rankings: tapping a player's stat opens a
     /// bottom sheet ranking every qualified player in that group league-wide.
     func testScreenshot_08_RankingSheet() throws {
-        try launch(theme: "light", teamTheme: "mlb:BOS")
+        try launch(theme: "dark", teamTheme: "nba:BOS")
         try openReportCard()
 
         guard openRankingSheet() else {
@@ -295,7 +317,7 @@ final class DemoUITests: XCTestCase {
     }
 
     func testScreenshot_09_ManageTeams() throws {
-        try launch(theme: "dark", teamTheme: "nhl:VGK")
+        try launch(theme: "dark", teamTheme: "nhl:COL")
         guard tapIfPresent(described("Menu"), timeout: 8, "menu") else {
             throw XCTSkip("drawer menu not reachable")
         }
@@ -309,7 +331,7 @@ final class DemoUITests: XCTestCase {
     }
 
     func testScreenshot_10_Topics() throws {
-        try launch(theme: "light", teamTheme: "nba:BOS")
+        try launch(theme: "dark", teamTheme: "nfl:SEA")
 
         // Topics sits behind the header's list icon, with the drawer as the
         // fallback route.

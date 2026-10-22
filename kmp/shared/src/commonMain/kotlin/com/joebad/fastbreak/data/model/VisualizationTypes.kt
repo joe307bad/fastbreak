@@ -1660,7 +1660,11 @@ data class HelloWorldVisualization(
 @Serializable
 data class BracketTeamInfo(
     val seed: Int,
-    val name: String,
+    // Defaulted rather than non-null-without-one: a projected matchup whose
+    // opponent is undecided ships "name": null, and coerceInputValues can only
+    // turn that into a default if there is one. Without it the whole bracket
+    // fails to deserialize and the app reports a failed chart sync.
+    val name: String = "",
     val abbreviation: String? = null,
     val logo: String? = null,
     val score: Int? = null,

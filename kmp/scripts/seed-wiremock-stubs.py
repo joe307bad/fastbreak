@@ -38,6 +38,9 @@ def fetch(url: str) -> bytes:
 
 
 def write_mapping(name: str, url_path: str, body_file: str) -> None:
+    # WireMock only loads mappings/*.json, so the suffix is not optional.
+    if not name.endswith(".json"):
+        name = f"{name}.json"
     (MAPPINGS / name).write_text(json.dumps({
         "request": {"method": "GET", "urlPath": url_path},
         "response": {

@@ -28,10 +28,49 @@ platform :ios do
 
     capture_ios_screenshots
 
+    # Target the release this build is for, so the shots do not land on
+    # whatever App Store Connect happens to consider current. Same source of
+    # truth as the beta lane: VERSION_NAME, else gradle.properties.
+    version = ENV["VERSION_NAME"] || File.read("../../gradle.properties")[/VERSION_NAME=(.+)/, 1]&.strip
+    UI.message("Uploading screenshots to App Store version #{version}")
+
     # Screenshots only: no binary, no metadata, and nothing submitted for
-    # review. The shots land on the current editable App Store version for
-    # someone to look at before they go anywhere.
+    # review. The shots land on that version for someone to look at before
+    # they go anywhere.
     options = {
+      app_version: version,
+      skip_binary_upload: true,
+      skip_metadata: true,
+      skip_screenshots: false,
+      overwrite_screenshots: true,
+      submit_for_review: false,
+      precheck_include_in_app_purchases: false,
+      force: true
+    }
+    options[:api_key] = api_key if api_key
+
+    upload_to_app_store(options)
+  end
+
+  desc "Upload the screenshots already in fastlane/screenshots, without recapturing"
+  lane :screenshots_upload_only do
+    api_key = nil
+    if ENV["APP_STORE_CONNECT_API_KEY_KEY_ID"] &&
+       ENV["APP_STORE_CONNECT_API_KEY_ISSUER_ID"] &&
+       ENV["APP_STORE_CONNECT_API_KEY_KEY"]
+      api_key = app_store_connect_api_key(
+        key_id: ENV["APP_STORE_CONNECT_API_KEY_KEY_ID"],
+        issuer_id: ENV["APP_STORE_CONNECT_API_KEY_ISSUER_ID"],
+        key_content: ENV["APP_STORE_CONNECT_API_KEY_KEY"],
+        is_key_content_base64: true
+      )
+    end
+
+    version = ENV["VERSION_NAME"] || File.read("../../gradle.properties")[/VERSION_NAME=(.+)/, 1]&.strip
+    UI.message("Uploading existing screenshots to App Store version #{version}")
+
+    options = {
+      app_version: version,
       skip_binary_upload: true,
       skip_metadata: true,
       skip_screenshots: false,

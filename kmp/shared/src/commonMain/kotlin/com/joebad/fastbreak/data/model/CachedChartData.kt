@@ -85,7 +85,10 @@ data class CachedChartData(
             VizType.NHL_MATCHUP -> json.decodeFromString<NHLMatchupVisualization>(dataJson)
             VizType.MLB_MATCHUP -> json.decodeFromString<MLBMatchupVisualization>(dataJson)
             VizType.NFL_MATCHUP -> json.decodeFromString<NFLMatchupVisualization>(dataJson)
-            VizType.MLB_TEAM_REPORT_CARD, VizType.NFL_TEAM_REPORT_CARD -> json.decodeFromString<TeamReportCardVisualization>(dataJson)
+            VizType.MLB_TEAM_REPORT_CARD,
+            VizType.NFL_TEAM_REPORT_CARD,
+            VizType.NBA_TEAM_REPORT_CARD,
+            VizType.NHL_TEAM_REPORT_CARD -> json.decodeFromString<TeamReportCardVisualization>(dataJson)
             VizType.CBB_MATCHUP -> json.decodeFromString<CBBMatchupVisualization>(dataJson)
             VizType.NCAA_BRACKET -> json.decodeFromString<NCAABracketVisualization>(dataJson)
             VizType.NBA_PLAYOFF_BRACKET -> json.decodeFromString<NBAPlayoffBracketVisualization>(dataJson)

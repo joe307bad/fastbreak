@@ -124,7 +124,9 @@ class ChartDataContainer(
                         json.decodeFromString<NFLMatchupVisualization>(cached.dataJson)
                     }
                     com.joebad.fastbreak.data.model.VizType.MLB_TEAM_REPORT_CARD,
-                    com.joebad.fastbreak.data.model.VizType.NFL_TEAM_REPORT_CARD -> {
+                    com.joebad.fastbreak.data.model.VizType.NFL_TEAM_REPORT_CARD,
+                    com.joebad.fastbreak.data.model.VizType.NBA_TEAM_REPORT_CARD,
+                    com.joebad.fastbreak.data.model.VizType.NHL_TEAM_REPORT_CARD -> {
                         json.decodeFromString<TeamReportCardVisualization>(cached.dataJson)
                     }
                     com.joebad.fastbreak.data.model.VizType.CBB_MATCHUP -> {

@@ -27,11 +27,15 @@ export const WEB_CHART_TYPES: VisualizationType[] = [
   'TABLE',
   'MLB_TEAM_REPORT_CARD',
   'NFL_TEAM_REPORT_CARD',
+  'NBA_TEAM_REPORT_CARD',
+  'NHL_TEAM_REPORT_CARD',
 ];
 
 export const REPORT_CARD_TYPES: VisualizationType[] = [
   'MLB_TEAM_REPORT_CARD',
   'NFL_TEAM_REPORT_CARD',
+  'NBA_TEAM_REPORT_CARD',
+  'NHL_TEAM_REPORT_CARD',
 ];
 
 export const WEB_MATCHUP_TYPES: VisualizationType[] = [

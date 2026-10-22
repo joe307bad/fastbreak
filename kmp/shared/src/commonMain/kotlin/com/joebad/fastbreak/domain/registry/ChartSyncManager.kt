@@ -307,7 +307,10 @@ class ChartSyncManager(
                 VizType.NHL_MATCHUP -> json.decodeFromString<NHLMatchupVisualization>(rawJson)
                 VizType.MLB_MATCHUP -> json.decodeFromString<MLBMatchupVisualization>(rawJson)
                 VizType.NFL_MATCHUP -> json.decodeFromString<NFLMatchupVisualization>(rawJson)
-                VizType.MLB_TEAM_REPORT_CARD, VizType.NFL_TEAM_REPORT_CARD -> json.decodeFromString<TeamReportCardVisualization>(rawJson)
+                VizType.MLB_TEAM_REPORT_CARD,
+                VizType.NFL_TEAM_REPORT_CARD,
+                VizType.NBA_TEAM_REPORT_CARD,
+                VizType.NHL_TEAM_REPORT_CARD -> json.decodeFromString<TeamReportCardVisualization>(rawJson)
                 VizType.CBB_MATCHUP -> json.decodeFromString<CBBMatchupVisualization>(rawJson)
                 VizType.NCAA_BRACKET -> json.decodeFromString<NCAABracketVisualization>(rawJson)
                 VizType.NBA_PLAYOFF_BRACKET -> json.decodeFromString<NBAPlayoffBracketVisualization>(rawJson)

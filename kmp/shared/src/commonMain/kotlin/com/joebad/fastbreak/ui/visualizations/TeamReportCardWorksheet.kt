@@ -61,7 +61,7 @@ private fun filterReportCardTeams(
     }
 }
 
-// Layout for one category's table. NFL payloads (and every payload written
+// Layout for one category's table. NFL, NBA and NHL payloads (and everything written
 // after this file was generalized) carry their own keys and flags; the map
 // below is the fallback for MLB cards cached before that.
 private data class CategoryConfig(
@@ -189,17 +189,33 @@ private fun parseReportCardRankingKey(key: String): ParsedReportCardRankingKey? 
     return null
 }
 
-// NFL badges shade against the pool a rank came from, so the colour function is
-// resolved per ranking key; MLB pools are deep enough for one fixed scale.
+// MLB keeps its original fixed cutoffs: its card shipped with them and every
+// hitter/pitcher pool is large enough that they read the same way.
+private val POOL_RELATIVE_RANK_SPORTS = setOf("nfl", "nba", "nhl")
+
+private fun usesPoolRelativeRanks(sport: String?): Boolean =
+    sport?.lowercase() in POOL_RELATIVE_RANK_SPORTS
+
+// Outside MLB a badge shades against the pool its rank came from, so the colour
+// function is resolved per ranking key rather than once for the whole card.
 private fun reportCardPlayerRankColorFactory(
     sport: String?,
     rankings: Map<String, List<RankingEntry>>
 ): (String) -> ((Int?) -> Color) =
-    if (sport.equals("nfl", ignoreCase = true)) {
-        { key -> nflPlayerRankColorFn(rankings[key]?.size) }
+    if (usesPoolRelativeRanks(sport)) {
+        { key -> poolRelativePlayerRankColorFn(rankings[key]?.size) }
     } else {
         { _ -> ::getMLBPlayerRankColor }
     }
+
+// Header for the playoff sheet's championship-probability column, per sport.
+private fun reportCardChampLabel(sport: String?): String = when (sport?.lowercase()) {
+    "mlb" -> "WS"
+    "nba" -> "Title"
+    "nhl" -> "Cup"
+    "nfl" -> "SB"
+    else -> "Title"
+}
 
 private fun isReportCardPlayerRankingKey(key: String): Boolean =
     key.contains(".player.")
@@ -587,7 +603,7 @@ fun TeamReportCardWorksheet(
             if (showPlayoffChances) {
                 PlayoffChancesBottomSheet(
                     title = "$seasonLabel / Playoff Chances",
-                    champLabel = "WS",
+                    champLabel = reportCardChampLabel(visualization.sport),
                     entries = displayPlayoffChances,
                     onDismiss = { showPlayoffChances = false },
                     probColorFn = ::getMLBPlayoffProbabilityColor,
@@ -1385,7 +1401,8 @@ private fun ReportCardStatText(
 
 private fun formatTeamRecord(wins: Int?, losses: Int?, ties: Int? = null): String? {
     if (wins == null || losses == null) return null
-    // The NFL is the only sport here that ties; MLB payloads carry no ties field.
+    // The third number is an NFL tie or an NHL overtime loss; MLB and NBA
+    // payloads carry no ties field at all.
     return if (ties != null && ties > 0) "$wins-$losses-$ties" else "$wins-$losses"
 }
 
@@ -2023,17 +2040,25 @@ private fun ReportCardGameLogSection(
     }
 }
 
-// Scores come from the league feed (MLB Stats API / nflverse schedules), not
-// from the advanced-stat providers, so credit only that one on the game log.
+// Scores come from the league feed, not from the advanced-stat providers or the
+// playoff-odds scrape, so credit only that one on the game log. One entry per
+// sport: MLB Stats API, nflverse schedules, ESPN box scores for the NBA, and
+// the NHL's own stats API.
+private val LEAGUE_FEED_SOURCE_MARKERS = listOf(
+    "MLB Stats",
+    "nflverse",
+    "nflreadr",
+    "hoopR",
+    "NHL Stats"
+)
+
 private fun buildReportCardGameLogShareSource(
     visualization: TeamReportCardVisualization
 ): String {
     val raw = visualization.source ?: ""
     val sources = parseReportCardSources(raw)
         .filter { source ->
-            source.contains("MLB Stats", ignoreCase = true) ||
-                source.contains("nflverse", ignoreCase = true) ||
-                source.contains("nflreadr", ignoreCase = true)
+            LEAGUE_FEED_SOURCE_MARKERS.any { marker -> source.contains(marker, ignoreCase = true) }
         }
         .distinct()
     return sources.joinToString(" • ").ifBlank { raw.ifBlank { "League feed" } }

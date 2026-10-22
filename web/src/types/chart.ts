@@ -1,4 +1,4 @@
-export type VisualizationType = 'SCATTER_PLOT' | 'LINE_CHART' | 'BAR_CHART' | 'BAR_GRAPH' | 'TABLE' | 'MATCHUP' | 'MATCHUP_V2' | 'NBA_MATCHUP' | 'NHL_MATCHUP' | 'MLB_MATCHUP' | 'NFL_MATCHUP' | 'MLB_TEAM_REPORT_CARD' | 'NFL_TEAM_REPORT_CARD';
+export type VisualizationType = 'SCATTER_PLOT' | 'LINE_CHART' | 'BAR_CHART' | 'BAR_GRAPH' | 'TABLE' | 'MATCHUP' | 'MATCHUP_V2' | 'NBA_MATCHUP' | 'NHL_MATCHUP' | 'MLB_MATCHUP' | 'NFL_MATCHUP' | 'MLB_TEAM_REPORT_CARD' | 'NFL_TEAM_REPORT_CARD' | 'NBA_TEAM_REPORT_CARD' | 'NHL_TEAM_REPORT_CARD';
 
 export interface QuadrantConfig {
   color: string;
@@ -686,7 +686,7 @@ export interface NFLMatchupData extends BaseChartData {
   dataPoints: NFLMatchupDataPoint[];
 }
 
-// Team Report Card types. Shared by MLB and NFL: categories are an ordered
+// Team Report Card types. Shared by every sport: categories are an ordered
 // record so each sport declares its own groups, and every category carries the
 // stat keys and display flags its table needs.
 export interface ReportCardStatValue {
@@ -808,7 +808,11 @@ export interface PlayoffChanceEntry {
 }
 
 export interface TeamReportCardData extends BaseChartData {
-  visualizationType: 'MLB_TEAM_REPORT_CARD' | 'NFL_TEAM_REPORT_CARD';
+  visualizationType:
+    | 'MLB_TEAM_REPORT_CARD'
+    | 'NFL_TEAM_REPORT_CARD'
+    | 'NBA_TEAM_REPORT_CARD'
+    | 'NHL_TEAM_REPORT_CARD';
   season: number;
   seasonLabel?: string;
   seasonPhase?: string; // "PRE", "REG", "POST"

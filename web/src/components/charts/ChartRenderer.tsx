@@ -36,6 +36,8 @@ export function ChartRenderer({ data, highlightedLabels, selectedLabel, onSelect
       return <Matchup data={data} />;
     case 'MLB_TEAM_REPORT_CARD':
     case 'NFL_TEAM_REPORT_CARD':
+    case 'NBA_TEAM_REPORT_CARD':
+    case 'NHL_TEAM_REPORT_CARD':
       return (
         <div className="h-full min-h-0">
           {compact

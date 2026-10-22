@@ -19,13 +19,14 @@ import {
   formatReportCardStatLabel,
   isReportCardPlayerRankingKey,
   isReportCardRankingPct,
-  nflRankBands,
+  poolRankBands,
   PlayoffChancesSheet,
   StatRankingsSheet,
+  usesPoolRelativeRanks,
 } from '@/components/charts/TeamReportCardSheets';
 
 // Fallback table layout for MLB cards published before the payload carried its
-// own keys and flags. Anything newer — including every NFL card — drives the
+// own keys and flags. Anything newer — the NFL, NBA and NHL cards — drives the
 // layout from the category itself, so no sport needs an entry here.
 type CategoryKey = string;
 
@@ -152,6 +153,14 @@ function teamGameLog(team: ReportCardTeam): ReportCardGameLog | undefined {
 
 const PLAYER_COMPOSITE_KEY = 'aggregate';
 
+// Header for the playoff sheet's championship column, per sport.
+const CHAMP_COLUMN_LABELS: Record<string, string> = {
+  mlb: 'WS',
+  nba: 'Title',
+  nhl: 'Cup',
+  nfl: 'SB',
+};
+
 const PLAYER_NAME_MIN_WIDTH = 'min-w-[6.75rem] w-[6.75rem]';
 const STICKY_PLAYER_CELL = `sticky left-0 z-10 ${PLAYER_NAME_MIN_WIDTH} shrink-0 border-r border-[var(--border)] bg-[var(--card)] group-hover:bg-[var(--foreground)]/5`;
 const STAT_COL = 'min-w-[5.5rem] px-2 whitespace-nowrap';
@@ -163,11 +172,15 @@ function formatStatValue(stat: ReportCardStatValue | undefined): string {
   // Filter out invalid displayValue strings like "null", "NA", etc.
   if (stat.displayValue && !INVALID_DISPLAY_VALUES.includes(stat.displayValue)) return stat.displayValue;
   if (stat.value == null) return '-';
-  if (stat.label === 'Run Diff/G') {
+  // Every sport's recent-form panel carries a differential per game — run,
+  // point or goal — and a differential reads as a signed number.
+  if (stat.label.endsWith('Diff/G')) {
     const formatted = stat.value.toFixed(2);
     return stat.value >= 0 ? `+${formatted}` : formatted;
   }
-  if (stat.label.toLowerCase().includes('%') || stat.label.includes('+')) {
+  // endsWith, not includes: wRC+ and OPS+ want a decimal, but the NBA and NHL
+  // plus-minus column is labelled "+/-" and is a whole number of goals.
+  if (stat.label.toLowerCase().includes('%') || stat.label.endsWith('+')) {
     return stat.value.toFixed(1);
   }
   if (stat.label === 'AVG') {
@@ -205,8 +218,8 @@ function playerRankBadgeClasses(
 ): string {
   const base = 'inline-flex items-center justify-center min-w-7 h-4 px-1 rounded text-[10px] font-medium';
   if (rank == null) return `${base} bg-[var(--muted)]/20 text-[var(--muted)]`;
-  if (sport === 'nfl') {
-    const [greenMax, limeMax, orangeMax] = nflRankBands(poolSize);
+  if (usesPoolRelativeRanks(sport)) {
+    const [greenMax, limeMax, orangeMax] = poolRankBands(poolSize);
     if (rank <= greenMax) return `${base} bg-green-500/20 text-green-500`;
     if (rank <= limeMax) return `${base} bg-amber-500/20 text-amber-600 dark:text-amber-400`;
     if (rank <= orangeMax) return `${base} bg-orange-500/20 text-orange-500`;
@@ -951,6 +964,7 @@ export function TeamReportCard({ data, initialTeamCode, updateSchedule }: Props)
         entries={data.playoffChances}
         teams={data.teams}
         highlightedTeam={activeTeamCode}
+        champLabel={CHAMP_COLUMN_LABELS[sportKey] ?? 'Title'}
       />
 
       {hasDescription && (

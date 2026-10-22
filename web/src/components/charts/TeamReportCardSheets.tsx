@@ -26,19 +26,28 @@ function playerRankColor(rank: number | null | undefined): string {
   return 'bg-red-600';
 }
 
-// An NFL position group is roughly one qualified player per team plus whatever
-// backups cleared the threshold, so the pool is 37 quarterbacks but 134
-// receivers. Fixed cutoffs flatter the small pools - a 30th-ranked quarterback
-// is a backup, not a mid-tier starter - so the bands are percentiles of the
-// pool the rank came from, the same ones the 32-team composite badge uses: top
-// ~31% green, two narrow middle bands, and the back third red.
-const NFL_RANK_BAND_FRACTIONS = [10 / 32, 15 / 32, 20 / 32];
-const NFL_RANK_DEFAULT_POOL = 32;
+// A position group's pool is roughly one qualified player per team plus
+// whatever backups cleared the threshold, so an NFL card ranks 37 quarterbacks
+// but 134 receivers, and an NHL card 400-odd forwards against 65 goalies.
+// Fixed cutoffs flatter the small pools - a 30th-ranked quarterback is a
+// backup, not a mid-tier starter - so the bands are percentiles of the pool the
+// rank came from, the same ones the 32-team composite badge uses: top ~31%
+// green, two narrow middle bands, and the back third red.
+const POOL_RANK_BAND_FRACTIONS = [10 / 32, 15 / 32, 20 / 32];
+const POOL_RANK_DEFAULT_POOL = 32;
 
-export function nflRankBands(poolSize?: number | null): [number, number, number] {
-  const n = poolSize != null && poolSize > 0 ? poolSize : NFL_RANK_DEFAULT_POOL;
+// MLB keeps its original fixed cutoffs: its card shipped with them and every
+// hitter/pitcher pool is large enough that they read the same way.
+const POOL_RELATIVE_RANK_SPORTS = new Set(['nfl', 'nba', 'nhl']);
+
+export function usesPoolRelativeRanks(sport?: string): boolean {
+  return POOL_RELATIVE_RANK_SPORTS.has((sport ?? '').toLowerCase());
+}
+
+export function poolRankBands(poolSize?: number | null): [number, number, number] {
+  const n = poolSize != null && poolSize > 0 ? poolSize : POOL_RANK_DEFAULT_POOL;
   let floor = 1;
-  const bands = NFL_RANK_BAND_FRACTIONS.map(fraction => {
+  const bands = POOL_RANK_BAND_FRACTIONS.map(fraction => {
     const max = Math.max(floor, Math.round(n * fraction));
     floor = max + 1;
     return max;
@@ -46,9 +55,9 @@ export function nflRankBands(poolSize?: number | null): [number, number, number]
   return [bands[0], bands[1], bands[2]];
 }
 
-function nflPlayerRankColor(rank: number | null | undefined, poolSize?: number): string {
+function poolPlayerRankColor(rank: number | null | undefined, poolSize?: number): string {
   if (rank == null) return 'bg-[var(--muted)]';
-  const [greenMax, amberMax, orangeMax] = nflRankBands(poolSize);
+  const [greenMax, amberMax, orangeMax] = poolRankBands(poolSize);
   if (rank <= greenMax) return 'bg-green-600';
   if (rank <= amberMax) return 'bg-amber-600';
   if (rank <= orangeMax) return 'bg-orange-500';
@@ -328,8 +337,8 @@ function RankBadge({
 }) {
   const colorFn = !playerRankings
     ? teamRankColor
-    : sport === 'nfl'
-      ? (value: number | null | undefined) => nflPlayerRankColor(value, poolSize)
+    : usesPoolRelativeRanks(sport)
+      ? (value: number | null | undefined) => poolPlayerRankColor(value, poolSize)
       : playerRankColor;
   // Filter out invalid display values like "null", "NA", etc.
   const validDisplay = display && !['null', 'NA', 'undefined', 'nul'].includes(display) ? display : null;
@@ -471,12 +480,14 @@ function PlayoffStandingsSection({
   selectedTeams,
   onToggleTeam,
   wildCardPlayoffCutoff = 3,
+  champLabel,
 }: {
   conference: string;
   sections: ReadonlyArray<readonly [string, PlayoffChanceEntry[]]>;
   selectedTeams: Set<string>;
   onToggleTeam: (team: string) => void;
   wildCardPlayoffCutoff?: number;
+  champLabel: string;
 }) {
   const showGamesBackColumn = sections.some(([, sectionEntries]) =>
     sectionEntries.some(entry => entry.gamesBackFromPlayoff != null)
@@ -501,7 +512,7 @@ function PlayoffStandingsSection({
             <div className="text-right">Win%</div>
             {showGamesBackColumn && <div className="text-right">GB</div>}
             <div className="text-center pl-2">Playoff</div>
-            <div className="text-center pl-2">WS</div>
+            <div className="text-center pl-2">{champLabel}</div>
           </div>
           {sectionEntries.map((entry, index) => {
             const seed = sectionName === 'Wild Card' ? index + 1 : entry.divisionRank ?? index + 1;
@@ -557,12 +568,14 @@ function PlayoffConferenceSection({
   selectedTeams,
   onToggleTeam,
   playoffCutoff,
+  champLabel,
 }: {
   conference: string;
   entries: PlayoffChanceEntry[];
   selectedTeams: Set<string>;
   onToggleTeam: (team: string) => void;
   playoffCutoff: number;
+  champLabel: string;
 }) {
   return (
     <div className="mb-4 last:mb-0">
@@ -573,7 +586,7 @@ function PlayoffConferenceSection({
         <div className="text-right">W-L</div>
         <div className="text-right">Win%</div>
         <div className="text-center pl-2">Playoff</div>
-        <div className="text-center pl-2">WS</div>
+        <div className="text-center pl-2">{champLabel}</div>
       </div>
       {entries.map((entry, index) => {
         const seed = index + 1;
@@ -621,6 +634,7 @@ export function PlayoffChancesSheet({
   source = 'PlayoffStatus.com',
   playoffCutoff = 6,
   wildCardPlayoffCutoff = 3,
+  champLabel = 'WS',
 }: {
   open: boolean;
   onClose: () => void;
@@ -632,6 +646,8 @@ export function PlayoffChancesSheet({
   source?: string;
   playoffCutoff?: number;
   wildCardPlayoffCutoff?: number;
+  /** Header for the championship-probability column: WS, Title, Cup, SB. */
+  champLabel?: string;
 }) {
   const [selectedTeams, setSelectedTeams] = useState<Set<string>>(() => new Set([highlightedTeam.toUpperCase()]));
 
@@ -702,6 +718,7 @@ export function PlayoffChancesSheet({
             selectedTeams={selectedTeams}
             onToggleTeam={toggleTeam}
             wildCardPlayoffCutoff={wildCardPlayoffCutoff}
+            champLabel={champLabel}
           />
         ))
       ) : conferenceGroups ? (
@@ -713,6 +730,7 @@ export function PlayoffChancesSheet({
             selectedTeams={selectedTeams}
             onToggleTeam={toggleTeam}
             playoffCutoff={playoffCutoff}
+            champLabel={champLabel}
           />
         ))
       ) : (
@@ -722,6 +740,7 @@ export function PlayoffChancesSheet({
           selectedTeams={selectedTeams}
           onToggleTeam={toggleTeam}
           playoffCutoff={playoffCutoff}
+          champLabel={champLabel}
         />
       )}
     </BottomSheet>
@@ -1006,12 +1025,39 @@ export function formatReportCardStatLabel(categoryKey: string, statKey: string):
   }
 }
 
+// Stats whose ranking sheet reads as a percentage. MLB and NFL keys are listed
+// one by one because those cards shipped that way; the NBA and NHL cards name
+// every rate stat they publish.
+const PCT_RANKING_SUFFIXES = [
+  // MLB
+  '.K-BB_pct',
+  '.Barrel_pct',
+  '.below_replacement_pa_pct',
+  // NFL
+  '.below_replacement_play_pct',
+  // NBA
+  '.ts_pct',
+  '.fg_pct',
+  '.fg3_pct',
+  '.efg_pct',
+  '.tov_pct',
+  '.oreb_pct',
+  '.dreb_pct',
+  '.opp_efg_pct',
+  '.opp_tov_pct',
+  '.below_replacement_min_pct',
+  '.fg_pct_recent',
+  '.fg3_pct_recent',
+  // NHL
+  '.shooting_pct',
+  '.sat_pct',
+  '.save_pct',
+  '.quality_start_pct',
+  '.power_play_pct',
+  '.penalty_kill_pct',
+  '.below_replacement_toi_pct',
+];
+
 export function isReportCardRankingPct(key: string): boolean {
-  return (
-    key === 'record' ||
-    key.endsWith('.K-BB_pct') ||
-    key.endsWith('.Barrel_pct') ||
-    key.endsWith('.below_replacement_pa_pct') ||
-    key.endsWith('.below_replacement_play_pct')
-  );
+  return key === 'record' || PCT_RANKING_SUFFIXES.some(suffix => key.endsWith(suffix));
 }

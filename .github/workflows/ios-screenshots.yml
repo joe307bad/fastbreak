@@ -63,6 +63,7 @@ jobs:
       # The jar is gitignored, so it is fetched rather than checked out.
       - name: Fetch WireMock
         run: |
+          mkdir -p scripts/wiremock
           curl -fsSL -o scripts/wiremock/wiremock-standalone.jar \
             https://repo1.maven.org/maven2/org/wiremock/wiremock-standalone/3.9.1/wiremock-standalone-3.9.1.jar
 

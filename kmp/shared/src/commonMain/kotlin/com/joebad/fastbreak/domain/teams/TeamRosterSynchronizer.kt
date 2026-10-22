@@ -2,6 +2,7 @@ package com.joebad.fastbreak.domain.teams
 
 import com.joebad.fastbreak.config.AppConfig
 import com.joebad.fastbreak.data.api.HttpClientFactory
+import com.joebad.fastbreak.data.api.RegistryApi
 import com.joebad.fastbreak.data.model.TeamRoster
 import com.joebad.fastbreak.data.repository.TeamRosterRepository
 import io.ktor.client.*
@@ -25,7 +26,9 @@ class TeamRosterSynchronizer(
     }
 
     companion object {
-        private const val CLOUDFRONT_URL = "https://d2jyizt5xogu23.cloudfront.net"
+        // Same host as the registry, including when a UI test redirects it.
+        private val CLOUDFRONT_URL: String
+            get() = RegistryApi.BASE_URL
         private val SUPPORTED_SPORTS = listOf("NFL", "NBA", "NHL", "MLB")
     }
 

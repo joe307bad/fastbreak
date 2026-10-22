@@ -7,20 +7,31 @@ platform :ios do
 
   desc "Capture App Store screenshots and upload them to App Store Connect"
   lane :screenshots_upload do
-    api_key = app_store_connect_api_key(
-      key_id: ENV["APP_STORE_CONNECT_API_KEY_KEY_ID"],
-      issuer_id: ENV["APP_STORE_CONNECT_API_KEY_ISSUER_ID"],
-      key_content: ENV["APP_STORE_CONNECT_API_KEY_KEY"],
-      is_key_content_base64: true
-    )
+    # CI passes an App Store Connect API key; a laptop usually has only the
+    # Apple ID session fastlane stores after its first interactive sign-in.
+    # Take the key when it is there and fall back to the session when it is
+    # not, rather than making the key a hard requirement for a local run.
+    api_key = nil
+    if ENV["APP_STORE_CONNECT_API_KEY_KEY_ID"] &&
+       ENV["APP_STORE_CONNECT_API_KEY_ISSUER_ID"] &&
+       ENV["APP_STORE_CONNECT_API_KEY_KEY"]
+      api_key = app_store_connect_api_key(
+        key_id: ENV["APP_STORE_CONNECT_API_KEY_KEY_ID"],
+        issuer_id: ENV["APP_STORE_CONNECT_API_KEY_ISSUER_ID"],
+        key_content: ENV["APP_STORE_CONNECT_API_KEY_KEY"],
+        is_key_content_base64: true
+      )
+      UI.message("Authenticating with the App Store Connect API key")
+    else
+      UI.message("No API key in the environment; using the stored Apple ID session")
+    end
 
     capture_ios_screenshots
 
     # Screenshots only: no binary, no metadata, and nothing submitted for
     # review. The shots land on the current editable App Store version for
     # someone to look at before they go anywhere.
-    upload_to_app_store(
-      api_key: api_key,
+    options = {
       skip_binary_upload: true,
       skip_metadata: true,
       skip_screenshots: false,
@@ -28,7 +39,10 @@ platform :ios do
       submit_for_review: false,
       precheck_include_in_app_purchases: false,
       force: true
-    )
+    }
+    options[:api_key] = api_key if api_key
+
+    upload_to_app_store(options)
   end
 
   desc "Push a new beta build to TestFlight"

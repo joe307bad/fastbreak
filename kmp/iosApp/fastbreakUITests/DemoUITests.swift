@@ -19,18 +19,28 @@ final class DemoUITests: XCTestCase {
 
     var app: XCUIApplication!
 
-    /// Charts stream in from the CDN on first launch, so the first flow to run
-    /// waits for them. Static so the wait is paid once per simulator, not once
-    /// per flow.
-    private static var chartsSynced = false
+    /// Where the mock API listens. The simulator shares the host's loopback,
+    /// so this reaches the WireMock the capture script starts.
+    private static let mockBaseUrl = "http://127.0.0.1:8089"
+
+    /// Launch with a chosen look. Every screenshot picks its own so the set on
+    /// the listing shows the app in light, in dark, and in a few team palettes
+    /// rather than eleven shots of one theme.
+    private func launch(theme: String, teamTheme: String = "none") throws {
+        app = XCUIApplication()
+        setupSnapshot(app)
+        app.launchArguments += [
+            "UI_TESTING",
+            "-fastbreakBaseUrl", DemoUITests.mockBaseUrl,
+            "-fastbreakTheme", theme,
+            "-fastbreakTeamTheme", teamTheme,
+        ]
+        app.launch()
+        try waitForChartList()
+    }
 
     override func setUpWithError() throws {
         continueAfterFailure = false
-        app = XCUIApplication()
-        setupSnapshot(app)
-        app.launchArguments += ["UI_TESTING"]
-        app.launch()
-        try waitForChartsOnce()
     }
 
     override func tearDownWithError() throws {
@@ -93,40 +103,60 @@ final class DemoUITests: XCTestCase {
 
     // MARK: - Chart sync
 
-    /// Mirrors testHelper_SyncChartsForDemo: the app is useless for screenshots
-    /// until the registry has been pulled and at least one chart is cached.
-    private func waitForChartsOnce() throws {
-        guard !DemoUITests.chartsSynced else { return }
-
-        print("⏱ waiting for charts to cache...")
-        let deadline = Date().addingTimeInterval(240)
-
+    /// No screenshot may contain a loading state, so every flow waits for the
+    /// chart list to settle before it does anything. Against the local mock
+    /// that takes moments; if it never happens the run should fail rather than
+    /// photograph a spinner.
+    private func waitForChartList() throws {
+        let deadline = Date().addingTimeInterval(90)
         while Date() < deadline {
-            if containing(" ago").exists || containing("just now").exists {
-                print("✓ cached charts visible")
-                DemoUITests.chartsSynced = true
-                return
-            }
+            if chartListIsSettled() { return }
             if exactly("no charts available").exists || exactly("Retry").exists {
-                print("  → empty list, tapping refresh")
-                tapIfPresent(described("Refresh"), timeout: 3, "Refresh")
-                tapIfPresent(exactly("Retry"), timeout: 3, "Retry")
+                tapIfPresent(described("Refresh"), timeout: 2, "Refresh")
+                tapIfPresent(exactly("Retry"), timeout: 2, "Retry")
             }
-            sleep(5)
+            usleep(500_000)
         }
+        XCTFail("Chart list never settled - a screenshot here would show a loading state")
+    }
 
-        // Not fatal: a flow may still have something worth capturing, and
-        // failing setUp would lose every later flow too.
-        print("⚠ charts never reported as cached; capturing anyway")
-        DemoUITests.chartsSynced = true
+    /// Nothing on screen is still loading.
+    private func waitUntilLoaded(timeout: TimeInterval = 20) {
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            let loading = containing("Syncing charts").exists
+                || containing("loading").exists
+                || containing("Loading").exists
+                || app.activityIndicators.firstMatch.exists
+            if !loading { return }
+            usleep(500_000)
+        }
+        print("⚠ something still looks like it is loading")
+    }
+
+    /// A chart list with cached rows and no sync banner over them.
+    private func chartListIsSettled() -> Bool {
+        let syncing = containing("Syncing charts").exists
+            || containing("loading registry").exists
+        let cached = containing(" ago").exists || containing("just now").exists
+        return cached && !syncing
     }
 
     /// Back out to the chart list between flows.
     private func returnToChartList() {
         for _ in 0..<3 {
-            if containing(" ago").exists || containing("just now").exists { return }
+            if chartListIsSettled() { return }
             if !tapIfPresent(described("Back"), timeout: 3, "Back") { break }
             settle()
+        }
+    }
+
+    /// Switch to a league tab. The app opens on NFL, which carries no
+    /// efficiency chart and no bracket, so a flow that wants one has to say
+    /// which league it is looking in.
+    private func openSport(_ code: String) {
+        if tapIfPresent(exactly(code), timeout: 8, "\(code) tab") {
+            settle(2)
         }
     }
 
@@ -155,6 +185,7 @@ final class DemoUITests: XCTestCase {
         return app.otherElements.element(boundBy: 0)
     }
 
+    @discardableResult
     private func openFirstChart(matching keyword: String, _ what: String) -> Bool {
         let matches = allContaining(keyword)
         guard let target = matches.first(where: { $0.isHittable }) ?? matches.first else {
@@ -164,21 +195,66 @@ final class DemoUITests: XCTestCase {
         return tapIfPresent(target, timeout: 8, what)
     }
 
-    // MARK: - 01 Home
+    /// Open a chart or abandon the flow. Skipping leaves a visible gap in the
+    /// run instead of a screenshot of the chart list standing in for the
+    /// feature it was meant to show.
+    private func openChartOrSkip(
+        sport: String,
+        matching keyword: String,
+        _ what: String
+    ) throws {
+        openSport(sport)
+        guard openFirstChart(matching: keyword, what) else {
+            throw XCTSkip("\(what) not present on the \(sport) tab")
+        }
+        waitUntilLoaded()
+    }
+
+    // MARK: - Flows
+    //
+    // Ten screenshots, which is Apple's per-device maximum. Every one runs in
+    // its own team palette so the listing reads as colourful rather than ten
+    // shots of the same purple, and the palette matches whatever league is on
+    // screen. The chart behind each is chosen from a payload that actually has
+    // data: NBA player efficiency and every playoff bracket are empty at this
+    // point in the calendar and would photograph an empty grid.
 
     func testScreenshot_01_Home() throws {
-        settle(2)
+        try launch(theme: "light", teamTheme: "nfl:KC")
         snapshot("01-Home")
     }
 
-    // MARK: - 02 Pinch to zoom and pan (Android: testDemo_PinchToZoomAndPan)
-
-    func testScreenshot_02_ChartZoom() throws {
-        guard openFirstChart(matching: "Efficiency", "efficiency chart") else {
-            snapshot("02-ChartZoom")
-            return
-        }
+    func testScreenshot_02_ScoringLeaders() throws {
+        try launch(theme: "light", teamTheme: "nhl:PIT")
+        try openChartOrSkip(sport: "NHL", matching: "Scoring Leaders", "scoring leaders")
         settle(2)
+        snapshot("02-ScoringLeaders")
+    }
+
+    func testScreenshot_03_HighlightDataPoints() throws {
+        try launch(theme: "light", teamTheme: "mlb:LAD")
+        try openChartOrSkip(sport: "MLB", matching: "Hitting Leaders", "hitting leaders")
+
+        // Tapping a team badge filters the plot to that team.
+        tapIfPresent(exactly("LAD"), timeout: 6, "LAD badge")
+        settle(2)
+        snapshot("03-HighlightDataPoints")
+    }
+
+    func testScreenshot_04_DivisionFilter() throws {
+        try launch(theme: "dark", teamTheme: "nhl:BOS")
+        try openChartOrSkip(sport: "NHL", matching: "Team Efficiency", "team efficiency")
+
+        tapIfPresent(containing("Division"), timeout: 6, "division filter")
+        settle()
+        tapIfPresent(containing("Metropolitan"), timeout: 4, "Metropolitan")
+        settle(2)
+        snapshot("04-DivisionFilter")
+    }
+
+    func testScreenshot_05_ChartZoom() throws {
+        try launch(theme: "dark", teamTheme: "nfl:PHI")
+        try openChartOrSkip(sport: "NFL", matching: "Team Tier List", "team tier list")
 
         let chart = chartCanvas()
         if chart.exists {
@@ -187,165 +263,119 @@ final class DemoUITests: XCTestCase {
             drag(chart, from: CGVector(dx: 0.65, dy: 0.25), to: CGVector(dx: 0.45, dy: 0.25))
             settle()
         }
-        snapshot("02-ChartZoom")
-        returnToChartList()
+        waitUntilLoaded()
+        snapshot("05-ChartZoom")
     }
 
-    // MARK: - 03 Highlighting data points (Android: testDemo_HighlightingDataPoints)
+    func testScreenshot_06_MatchupWorksheet() throws {
+        try launch(theme: "light", teamTheme: "nfl:SF")
+        try openChartOrSkip(sport: "NFL", matching: "Matchups", "NFL matchups")
+        settle(2)
+        snapshot("06-MatchupWorksheet")
+    }
 
-    func testScreenshot_03_HighlightDataPoints() throws {
-        guard openFirstChart(matching: "Player Efficiency", "player efficiency chart") else {
-            snapshot("03-HighlightDataPoints")
-            return
+    func testScreenshot_07_ReportCard() throws {
+        try launch(theme: "dark", teamTheme: "nba:GSW")
+        try openReportCard()
+        snapshot("07-ReportCard")
+    }
+
+    /// The expandable percentile rankings: tapping a player's stat opens a
+    /// bottom sheet ranking every qualified player in that group league-wide.
+    func testScreenshot_08_RankingSheet() throws {
+        try launch(theme: "light", teamTheme: "mlb:BOS")
+        try openReportCard()
+
+        guard openRankingSheet() else {
+            throw XCTSkip("no tappable player stat found on the report card")
         }
-        settle(2)
-
-        // Tapping a team badge filters the plot to that team.
-        tapIfPresent(exactly("PHI"), timeout: 6, "PHI badge")
+        waitUntilLoaded()
         settle()
-        tapIfPresent(exactly("LAL"), timeout: 4, "LAL badge")
-        settle(2)
-
-        snapshot("03-HighlightDataPoints")
-        returnToChartList()
+        snapshot("08-RankingSheet")
     }
 
-    // MARK: - 04 Division filter (Android: testDemo_HighlightingDataPoints, second half)
-
-    func testScreenshot_04_DivisionFilter() throws {
-        guard openFirstChart(matching: "Efficiency", "efficiency chart") else {
-            snapshot("04-DivisionFilter")
-            return
-        }
-        settle(2)
-
-        tapIfPresent(containing("Division"), timeout: 6, "division filter")
-        settle()
-        tapIfPresent(containing("Southwest"), timeout: 4, "Southwest")
-        settle(2)
-
-        snapshot("04-DivisionFilter")
-        returnToChartList()
-    }
-
-    // MARK: - 05 Manage teams (Android: testDemo_ManageTeamsAndFilter)
-
-    func testScreenshot_05_ManageTeams() throws {
-        settle()
+    func testScreenshot_09_ManageTeams() throws {
+        try launch(theme: "dark", teamTheme: "nhl:VGK")
         guard tapIfPresent(described("Menu"), timeout: 8, "menu") else {
-            snapshot("05-ManageTeams")
-            return
+            throw XCTSkip("drawer menu not reachable")
         }
         settle()
         tapIfPresent(containing("settings"), timeout: 6, "settings")
         settle()
         tapIfPresent(containing("manage teams"), timeout: 6, "manage teams")
-        settle(2)
-
-        snapshot("05-ManageTeams")
-
-        tapIfPresent(described("Back"), timeout: 4, "back")
-        returnToChartList()
-    }
-
-    // MARK: - 06 Chart info sheet (Android: testDemo_NavigateChartsAndShowInfo)
-
-    func testScreenshot_06_ChartInfo() throws {
-        guard openFirstChart(matching: "Efficiency", "efficiency chart") else {
-            snapshot("06-ChartInfo")
-            return
-        }
-        settle(2)
-
-        // The info control carries an "Info"/"About" description depending on
-        // the screen; try both before giving up on the sheet.
-        if !tapIfPresent(described("Info"), timeout: 5, "info") {
-            tapIfPresent(described("About"), timeout: 3, "about")
-        }
-        settle(2)
-
-        snapshot("06-ChartInfo")
-        returnToChartList()
-    }
-
-    // MARK: - 07 Matchup worksheet (Android: testDemo_MatchupWorksheet)
-
-    func testScreenshot_07_MatchupWorksheet() throws {
-        var opened = openFirstChart(matching: "Matchup Worksheet", "matchup worksheet")
-        if !opened { opened = openFirstChart(matching: "Matchups", "matchups") }
-        guard opened else {
-            snapshot("07-MatchupWorksheet")
-            return
-        }
-        settle(3)
-
-        snapshot("07-MatchupWorksheet")
-        returnToChartList()
-    }
-
-    // MARK: - 08 Matchup charts tab (Android: testDemo_MatchupWorksheet, charts tab)
-
-    func testScreenshot_08_MatchupCharts() throws {
-        var opened = openFirstChart(matching: "Matchup Worksheet", "matchup worksheet")
-        if !opened { opened = openFirstChart(matching: "Matchups", "matchups") }
-        guard opened else {
-            snapshot("08-MatchupCharts")
-            return
-        }
-        settle(2)
-
-        tapIfPresent(containing("Charts"), timeout: 6, "charts tab")
-        settle(3)
-
-        snapshot("08-MatchupCharts")
-        returnToChartList()
-    }
-
-    // MARK: - 09 Topics (Android: testDemo_TopicsWalkthrough)
-
-    func testScreenshot_09_Topics() throws {
+        waitUntilLoaded()
         settle()
-        if !tapIfPresent(containing("Topics"), timeout: 8, "topics") {
+        snapshot("09-ManageTeams")
+    }
+
+    func testScreenshot_10_Topics() throws {
+        try launch(theme: "light", teamTheme: "nba:BOS")
+
+        // Topics sits behind the header's list icon, with the drawer as the
+        // fallback route.
+        if !tapIfPresent(described("Topics"), timeout: 6, "topics icon") {
             tapIfPresent(described("Menu"), timeout: 4, "menu")
             settle()
-            tapIfPresent(containing("Topics"), timeout: 4, "topics via menu")
+            guard tapIfPresent(containing("Topics"), timeout: 5, "topics via menu") else {
+                throw XCTSkip("topics not reachable")
+            }
         }
-        settle(3)
-
-        snapshot("09-Topics")
-        returnToChartList()
+        waitUntilLoaded()
+        settle(2)
+        snapshot("10-Topics")
     }
 
-    // MARK: - 10 Report card (Android: testDemo_MLBReportCardWalkthrough)
+    // MARK: - Shared steps
 
-    func testScreenshot_10_ReportCard() throws {
-        guard openFirstChart(matching: "Report Card", "report card") else {
-            snapshot("10-ReportCard")
-            return
-        }
-
-        // The card is only worth capturing once a category has rendered.
-        let ready = exactly("Hitters").waitForExistence(timeout: 20)
-            || exactly("Forwards").waitForExistence(timeout: 5)
-            || exactly("Guards").waitForExistence(timeout: 5)
+    private func openReportCard() throws {
+        try openChartOrSkip(sport: "NFL", matching: "Report Card", "report card")
+        let ready = exactly("Quarterbacks").waitForExistence(timeout: 20)
             || containing("Composite").waitForExistence(timeout: 5)
         print(ready ? "✓ report card rendered" : "⚠ report card never rendered")
-        settle(2)
-
-        snapshot("10-ReportCard")
-        returnToChartList()
+        waitUntilLoaded()
+        settle()
     }
 
-    // MARK: - 11 Playoff bracket (Android: testDemo_BracketInteraction)
+    /// The sheet titles itself "Player Rankings" or "Season Rankings". Checked
+    /// for hittability rather than existence: XCUITest reports an element as
+    /// existing while it is still off screen, which made an earlier version
+    /// believe a sheet had opened when nothing had.
+    private func rankingSheetIsOpen() -> Bool {
+        let title = app.descendants(matching: .any)
+            .matching(NSPredicate(
+                format: "label ==[c] 'Player Rankings' OR label ==[c] 'Season Rankings'"
+            ))
+            .firstMatch
+        return title.exists && title.isHittable
+    }
 
-    func testScreenshot_11_Bracket() throws {
-        guard openFirstChart(matching: "Bracket", "bracket") else {
-            snapshot("11-Bracket")
-            return
+    /// Tap a stat cell to raise the league-wide ranking sheet. Every cell in a
+    /// player row is clickable, so this walks the numeric cells until one of
+    /// them actually produces a sheet.
+    @discardableResult
+    private func openRankingSheet() -> Bool {
+        let numeric = NSPredicate(format: "label MATCHES %@", "^-?[0-9]+\\.[0-9]{1,2}$")
+
+        for attempt in 0..<3 {
+            // Work down the card: the first screen is team rows, the player
+            // tables sit under them.
+            if attempt > 0 {
+                app.swipeUp()
+                settle()
+            }
+
+            let candidates = app.staticTexts.matching(numeric).allElementsBoundByIndex
+            for candidate in candidates.prefix(12) where candidate.isHittable {
+                candidate.tap()
+                settle(2)
+                if rankingSheetIsOpen() {
+                    print("✓ ranking sheet open")
+                    return true
+                }
+            }
         }
-        settle(3)
 
-        snapshot("11-Bracket")
-        returnToChartList()
+        print("⚠ no stat cell opened a ranking sheet")
+        return false
     }
 }

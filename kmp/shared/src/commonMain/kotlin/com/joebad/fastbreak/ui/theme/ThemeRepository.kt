@@ -1,5 +1,6 @@
 package com.joebad.fastbreak.ui.theme
 
+import com.joebad.fastbreak.testing.UiTestOverrides
 import com.russhwolf.settings.Settings
 import com.russhwolf.settings.get
 import com.russhwolf.settings.set
@@ -90,6 +91,9 @@ class ThemeRepository(
     }
 
     fun getInitialTheme(): ThemeMode {
+        // A screenshot run picks the theme per capture, so it wins over both
+        // the persisted choice and the simulator's own setting.
+        UiTestOverrides.themeMode?.let { return it }
         return getSavedTheme() ?: getSystemTheme()
     }
 
@@ -106,6 +110,10 @@ class ThemeRepository(
      * Returns null if no team theme is selected (using default app theme).
      */
     fun getSelectedTeamTheme(): SelectedTeamTheme? {
+        // "Set to none" is a real instruction from a screenshot run, so the
+        // check is whether the override was given at all, not whether it is
+        // non-null.
+        if (UiTestOverrides.teamThemeWasSet) return UiTestOverrides.teamTheme
         val savedValue = settings.getStringOrNull(KEY_TEAM_THEME) ?: return null
         val parts = savedValue.split(":")
         return if (parts.size == 2) {

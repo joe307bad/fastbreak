@@ -52,5 +52,12 @@
 	<array>
 		<string>_http._tcp</string>
 	</array>
+	<!-- Screenshot runs point the app at a WireMock on the host, which is
+	     plain HTTP. Local networking only: remote hosts still require TLS. -->
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
 </dict>
 </plist>

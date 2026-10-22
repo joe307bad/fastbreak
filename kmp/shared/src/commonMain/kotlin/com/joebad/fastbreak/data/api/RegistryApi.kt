@@ -2,6 +2,7 @@ package com.joebad.fastbreak.data.api
 
 import com.joebad.fastbreak.config.AppConfig
 import com.joebad.fastbreak.data.model.RegistryEntry
+import com.joebad.fastbreak.testing.UiTestOverrides
 import com.joebad.fastbreak.logging.SentryLogger
 import com.joebad.fastbreak.logging.SentryLevel
 import com.joebad.fastbreak.logging.SpanStatus
@@ -20,7 +21,15 @@ class RegistryApi(
     private val httpClient: HttpClient = HttpClientFactory.create()
 ) {
     companion object {
-        const val BASE_URL = "https://d2jyizt5xogu23.cloudfront.net"
+        private const val DEFAULT_BASE_URL = "https://d2jyizt5xogu23.cloudfront.net"
+
+        /**
+         * The CDN host, unless a UI test pointed the app at a mock. Resolved on
+         * every read rather than captured once, because the override is set
+         * from launch arguments before the first request but after class load.
+         */
+        val BASE_URL: String
+            get() = UiTestOverrides.baseUrl ?: DEFAULT_BASE_URL
         private const val REGISTRY_ENDPOINT = "/registry"
         private const val DEV_PREFIX = "dev/"
         private const val PROD_PREFIX = "prod/"

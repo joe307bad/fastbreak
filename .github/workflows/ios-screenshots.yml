@@ -13,9 +13,14 @@ on:
         description: "App Store version to attach them to (blank = gradle.properties)"
         type: string
         default: ""
+      upload_committed:
+        description: "Skip capturing and upload the committed screenshot set instead"
+        type: boolean
+        default: false
 
 jobs:
   screenshots:
+    if: ${{ !inputs.upload_committed }}
     runs-on: macos-26
     timeout-minutes: 60
     defaults:
@@ -124,3 +129,38 @@ jobs:
           name: ios-screenshots
           path: kmp/iosApp/fastlane/screenshots/
           if-no-files-found: warn
+
+  upload-only:
+    # Simulator-free: uploads the screenshot set committed under
+    # iosApp/fastlane/screenshots. The capture job needs a simulator, and the
+    # runner's cannot reliably launch the app - but the upload is only an App
+    # Store Connect API call, so it does not need one.
+    if: inputs.upload_committed
+    runs-on: macos-26
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: kmp/iosApp
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.1'
+          bundler-cache: true
+          working-directory: kmp/iosApp
+
+      - name: Show what will be uploaded
+        run: |
+          find fastlane/screenshots -name "*.png" -exec basename {} \; | sort
+          echo "total: $(find fastlane/screenshots -name '*.png' | wc -l | tr -d ' ') screenshots"
+
+      - name: Upload to App Store Connect
+        env:
+          APP_STORE_CONNECT_API_KEY_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          APP_STORE_CONNECT_API_KEY_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          APP_STORE_CONNECT_API_KEY_KEY: ${{ secrets.ASC_PRIVATE_KEY }}
+          VERSION_NAME: ${{ inputs.app_version }}
+        run: bundle exec fastlane ios screenshots_upload_only

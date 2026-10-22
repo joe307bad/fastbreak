@@ -2,21 +2,47 @@
 
 import { StatComparison as StatComparisonType } from '@/types/chart';
 
+/**
+ * How a sport writes a percentage on the wire. Basketball, hockey and baseball
+ * send a 0-1 fraction; football sends the percentage itself, so multiplying
+ * would read 2780% where the team converted 27.8% of its third downs.
+ */
+export type PercentScale = 'fraction' | 'percent';
+
 interface StatRowProps {
   stat: StatComparisonType;
   awayAbbrev: string;
   homeAbbrev: string;
+  percentScale?: PercentScale;
 }
 
-function formatValue(value: number | null | undefined, label: string): string {
+/**
+ * How many decimals a row should carry. A stat that lives entirely under one -
+ * a batting average, an EPA per play - says nothing at a single decimal, where
+ * -.122 and -.050 both round to -0.1. Decided from both sides of the row at
+ * once so the two numbers are written the same way.
+ */
+export function matchupValueDecimals(...values: Array<number | null | undefined>): number {
+  const numbers = values.filter((value): value is number => value != null);
+  if (numbers.length === 0) return 1;
+  return numbers.every(value => Math.abs(value) < 1) ? 3 : 1;
+}
+
+export function formatMatchupStatValue(
+  value: number | null | undefined,
+  label: string,
+  percentScale: PercentScale = 'fraction',
+  decimals = 1
+): string {
   if (value == null) return '-';
   // Format percentages
   if (label.toLowerCase().includes('%') || label.toLowerCase().includes('pct')) {
-    return `${(value * 100).toFixed(1)}%`;
+    const pct = percentScale === 'fraction' ? value * 100 : value;
+    return `${pct.toFixed(1)}%`;
   }
   // Format ratings and per-game stats
   if (value % 1 !== 0) {
-    return value.toFixed(1);
+    return value.toFixed(decimals);
   }
   return value.toString();
 }
@@ -28,9 +54,10 @@ function getRankBadgeClasses(rank: number): string {
   return `${base} bg-[var(--muted)]/20 text-[var(--muted)]`;
 }
 
-function StatRow({ stat }: StatRowProps) {
-  const awayValue = formatValue(stat.away.value, stat.label);
-  const homeValue = formatValue(stat.home.value, stat.label);
+function StatRow({ stat, percentScale }: StatRowProps) {
+  const decimals = matchupValueDecimals(stat.away.value, stat.home.value);
+  const awayValue = formatMatchupStatValue(stat.away.value, stat.label, percentScale, decimals);
+  const homeValue = formatMatchupStatValue(stat.home.value, stat.label, percentScale, decimals);
 
   // Determine edge based on rank (lower rank = better)
   const awayHasEdge = stat.away.rank < stat.home.rank;
@@ -77,9 +104,10 @@ interface StatComparisonProps {
   awayAbbrev: string;
   homeAbbrev: string;
   title?: string;
+  percentScale?: PercentScale;
 }
 
-export function StatComparisonTable({ stats, awayAbbrev, homeAbbrev, title }: StatComparisonProps) {
+export function StatComparisonTable({ stats, awayAbbrev, homeAbbrev, title, percentScale }: StatComparisonProps) {
   const statEntries = Object.entries(stats);
 
   if (statEntries.length === 0) return null;
@@ -101,6 +129,7 @@ export function StatComparisonTable({ stats, awayAbbrev, homeAbbrev, title }: St
             stat={stat}
             awayAbbrev={awayAbbrev}
             homeAbbrev={homeAbbrev}
+            percentScale={percentScale}
           />
         ))}
       </div>
@@ -113,14 +142,16 @@ interface FullComparisonProps {
     sideBySide?: {
       offense?: Record<string, StatComparisonType>;
       defense?: Record<string, StatComparisonType>;
+      overall?: Record<string, StatComparisonType>;
       misc?: Record<string, StatComparisonType>;
     };
   };
   awayAbbrev: string;
   homeAbbrev: string;
+  percentScale?: PercentScale;
 }
 
-export function FullStatComparison({ comparisons, awayAbbrev, homeAbbrev }: FullComparisonProps) {
+export function FullStatComparison({ comparisons, awayAbbrev, homeAbbrev, percentScale }: FullComparisonProps) {
   const { sideBySide } = comparisons;
 
   if (!sideBySide) return null;
@@ -133,6 +164,7 @@ export function FullStatComparison({ comparisons, awayAbbrev, homeAbbrev }: Full
           awayAbbrev={awayAbbrev}
           homeAbbrev={homeAbbrev}
           title="Offense"
+          percentScale={percentScale}
         />
       )}
       {sideBySide.defense && (
@@ -141,6 +173,16 @@ export function FullStatComparison({ comparisons, awayAbbrev, homeAbbrev }: Full
           awayAbbrev={awayAbbrev}
           homeAbbrev={homeAbbrev}
           title="Defense"
+          percentScale={percentScale}
+        />
+      )}
+      {sideBySide.overall && (
+        <StatComparisonTable
+          stats={sideBySide.overall}
+          awayAbbrev={awayAbbrev}
+          homeAbbrev={homeAbbrev}
+          title="Overall"
+          percentScale={percentScale}
         />
       )}
       {sideBySide.misc && (
@@ -149,6 +191,7 @@ export function FullStatComparison({ comparisons, awayAbbrev, homeAbbrev }: Full
           awayAbbrev={awayAbbrev}
           homeAbbrev={homeAbbrev}
           title="Other"
+          percentScale={percentScale}
         />
       )}
     </div>

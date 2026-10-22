@@ -187,6 +187,9 @@ export interface NBAComparisons {
   sideBySide?: {
     offense?: Record<string, StatComparison>;
     defense?: Record<string, StatComparison>;
+    // Football carries a third section for the stats that belong to neither
+    // side of the ball - point differential, net EPA, penalties.
+    overall?: Record<string, StatComparison>;
     misc?: Record<string, StatComparison>;
   };
   homeOffVsAwayDef?: OffDefComparison;
@@ -563,6 +566,10 @@ export interface NFLMatchupStat {
 
 export interface NFLMatchupTeamStats {
   gamesPlayed?: number;
+  // The weekly series the matchup charts plot. Everything else in the bag is
+  // a NFLMatchupStat read by key, so the index signature stays.
+  cumPointDiffByWeek?: Record<string, number>;
+  performanceByWeek?: Record<string, { pointsScored: number; pointsAllowed: number }>;
   [key: string]: unknown;
 }
 

@@ -2,7 +2,12 @@
 
 import { useState } from 'react';
 import { NBAComparisons, OffDefComparison, OffDefStatEntry } from '@/types/chart';
-import { FullStatComparison } from './StatComparison';
+import {
+  formatMatchupStatValue,
+  FullStatComparison,
+  matchupValueDecimals,
+  PercentScale,
+} from './StatComparison';
 
 type ComparisonTab = 'team' | 'homeOffVsAwayDef' | 'awayOffVsHomeDef';
 
@@ -34,20 +39,10 @@ function getRankBadgeClasses(rank: number): string {
   return `${base} bg-[var(--muted)]/20 text-[var(--muted)]`;
 }
 
-function formatValue(value: number | null | undefined, label: string): string {
-  if (value == null) return '-';
-  if (label.toLowerCase().includes('%') || label.toLowerCase().includes('pct')) {
-    return `${(value * 100).toFixed(1)}%`;
-  }
-  if (value % 1 !== 0) {
-    return value.toFixed(1);
-  }
-  return value.toString();
-}
-
-function OffDefRow({ stat }: { stat: OffDefStatEntry }) {
-  const offValue = formatValue(stat.offense.value, stat.offLabel);
-  const defValue = formatValue(stat.defense.value, stat.defLabel);
+function OffDefRow({ stat, percentScale }: { stat: OffDefStatEntry; percentScale?: PercentScale }) {
+  const decimals = matchupValueDecimals(stat.offense.value, stat.defense.value);
+  const offValue = formatMatchupStatValue(stat.offense.value, stat.offLabel, percentScale, decimals);
+  const defValue = formatMatchupStatValue(stat.defense.value, stat.defLabel, percentScale, decimals);
 
   // Defense has edge when they allow LESS than offense typically scores
   // Offense has edge when defense allows MORE than offense typically scores
@@ -93,9 +88,10 @@ interface OffDefTableProps {
   offAbbrev: string;
   defAbbrev: string;
   title: string;
+  percentScale?: PercentScale;
 }
 
-function OffDefComparisonTable({ stats, offAbbrev, defAbbrev, title }: OffDefTableProps) {
+function OffDefComparisonTable({ stats, offAbbrev, defAbbrev, title, percentScale }: OffDefTableProps) {
   const statEntries = Object.entries(stats).filter(([, v]) => v !== undefined) as [string, OffDefStatEntry][];
 
   if (statEntries.length === 0) return null;
@@ -109,7 +105,7 @@ function OffDefComparisonTable({ stats, offAbbrev, defAbbrev, title }: OffDefTab
       </div>
       <div className="px-2">
         {statEntries.map(([key, stat]) => (
-          <OffDefRow key={key} stat={stat} />
+          <OffDefRow key={key} stat={stat} percentScale={percentScale} />
         ))}
       </div>
     </div>
@@ -120,9 +116,10 @@ interface MatchupComparisonsProps {
   comparisons: NBAComparisons;
   awayAbbrev: string;
   homeAbbrev: string;
+  percentScale?: PercentScale;
 }
 
-export function MatchupComparisons({ comparisons, awayAbbrev, homeAbbrev }: MatchupComparisonsProps) {
+export function MatchupComparisons({ comparisons, awayAbbrev, homeAbbrev, percentScale }: MatchupComparisonsProps) {
   const [activeTab, setActiveTab] = useState<ComparisonTab>('team');
 
   const hasHomeOffVsAwayDef = comparisons.homeOffVsAwayDef &&
@@ -161,6 +158,7 @@ export function MatchupComparisons({ comparisons, awayAbbrev, homeAbbrev }: Matc
           comparisons={{ sideBySide: comparisons.sideBySide }}
           awayAbbrev={awayAbbrev}
           homeAbbrev={homeAbbrev}
+          percentScale={percentScale}
         />
       )}
 
@@ -170,6 +168,7 @@ export function MatchupComparisons({ comparisons, awayAbbrev, homeAbbrev }: Matc
           offAbbrev={`${homeAbbrev} Off`}
           defAbbrev={`${awayAbbrev} Def`}
           title="Matchup"
+          percentScale={percentScale}
         />
       )}
 
@@ -179,6 +178,7 @@ export function MatchupComparisons({ comparisons, awayAbbrev, homeAbbrev }: Matc
           offAbbrev={`${awayAbbrev} Off`}
           defAbbrev={`${homeAbbrev} Def`}
           title="Matchup"
+          percentScale={percentScale}
         />
       )}
     </div>

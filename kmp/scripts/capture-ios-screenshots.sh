@@ -89,7 +89,8 @@ if [ "$UPLOAD" -eq 1 ]; then
         echo -e "  auth:     ${GREEN}App Store Connect API key${NC}"
     elif [ "$HAVE_SESSION" -eq 1 ]; then
         echo -e "  auth:     ${YELLOW}stored Apple ID session ($APPLE_ID)${NC}"
-        echo -e "            ${YELLOW}Apple may prompt for a 2FA code.${NC}"
+        echo -e "            ${YELLOW}Sessions expire after about a month; if the upload${NC}"
+        echo -e "            ${YELLOW}returns Unauthorized Access, re-run spaceauth.${NC}"
     else
         echo -e "${RED}✗ --upload has no way to authenticate${NC}"
         echo ""
@@ -186,7 +187,23 @@ echo -e "${YELLOW}  Two devices, ten screenshots each. Most of the time goes on$
 echo -e "${YELLOW}  building the app once per device.${NC}"
 echo ""
 
-$FASTLANE_CMD ios "$LANE"
+if ! $FASTLANE_CMD ios "$LANE"; then
+    echo ""
+    if [ "$UPLOAD" -eq 1 ] && [ "${HAVE_KEY:-0}" -eq 0 ]; then
+        echo -e "${RED}✗ The lane failed.${NC} If it said ${YELLOW}Unauthorized Access${NC}, the stored"
+        echo -e "  Apple ID session has expired. Sign in once, then re-run:"
+        echo ""
+        echo -e "    ${YELLOW}cd kmp/iosApp && fastlane spaceauth -u ${APPLE_ID:-<your-apple-id>}${NC}"
+        echo -e "    ${YELLOW}./scripts/capture-ios-screenshots.sh --upload${NC}"
+        echo ""
+        echo -e "  Or export the API key the deploy workflow uses, which does not expire:"
+        echo -e "    APP_STORE_CONNECT_API_KEY_KEY_ID / _ISSUER_ID / _KEY"
+        echo ""
+        echo -e "  The screenshots are already captured, so to send them without"
+        echo -e "  recapturing: ${YELLOW}cd kmp/iosApp && fastlane ios screenshots_upload_only${NC}"
+    fi
+    exit 1
+fi
 
 # --- Report -----------------------------------------------------------------
 

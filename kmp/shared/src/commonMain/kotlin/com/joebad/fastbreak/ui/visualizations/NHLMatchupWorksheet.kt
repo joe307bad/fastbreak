@@ -687,7 +687,9 @@ fun NHLMatchupWorksheet(
                                     }
                                     drawLayer(graphicsLayer)
                                 }
-                                .background(MaterialTheme.colorScheme.background)
+                                // Paired with the onSurface text inside, the way
+                                // the pre-game share image is painted
+                                .background(MaterialTheme.colorScheme.surface)
                         ) {
                             NHLPostGameShareImage(
                                 matchup = selectedMatchup,
@@ -992,11 +994,11 @@ private fun NHLPostGameShareImage(
     val awayWon = !finalScore.homeWon
     val winner = if (finalScore.homeWon) matchup.homeTeam.abbreviation else matchup.awayTeam.abbreviation
 
-    // Detect dark mode and use pure black/white
-    val bg = MaterialTheme.colorScheme.background
-    val isDark = (0.299f * bg.red + 0.587f * bg.green + 0.114f * bg.blue) < 0.5f
-    val textColor = if (isDark) Color.White else Color.Black
-    val secondaryTextColor = if (isDark) Color.LightGray else Color.DarkGray
+    // The share image is captured against the themed background, so its text has
+    // to come from the theme too - a team palette paints that background in team
+    // colours, and guessing black or white from its luminance loses them.
+    val textColor = MaterialTheme.colorScheme.onSurface
+    val secondaryTextColor = MaterialTheme.colorScheme.onSurfaceVariant
 
     Column(
         modifier = modifier
@@ -1151,6 +1153,11 @@ private fun NHLPostGameShareImage(
     }
 }
 
+// Box-score accents carry meaning rather than theme: a gain over the season
+// average is green and a drop is red in either palette.
+private val diffUpColor = Color(0xFF4CAF50)
+private val diffDownColor = Color(0xFFF44336)
+
 /**
  * Compact stat row for NHL box score - same pattern as NBA CompactStatRow
  */
@@ -1173,11 +1180,11 @@ private fun NHLCompactStatRow(
         if (higherIsBetter) homeRaw > awayRaw else homeRaw < awayRaw
     } else false
 
-    // Detect dark mode and use pure black/white
-    val bg = MaterialTheme.colorScheme.background
-    val isDark = (0.299f * bg.red + 0.587f * bg.green + 0.114f * bg.blue) < 0.5f
-    val textColor = if (isDark) Color.White else Color.Black
-    val secondaryTextColor = if (isDark) Color.LightGray else Color.DarkGray
+    // The share image is captured against the themed background, so its text has
+    // to come from the theme too - a team palette paints that background in team
+    // colours, and guessing black or white from its luminance loses them.
+    val textColor = MaterialTheme.colorScheme.onSurface
+    val secondaryTextColor = MaterialTheme.colorScheme.onSurfaceVariant
 
     Row(
         modifier = Modifier
@@ -1209,7 +1216,7 @@ private fun NHLCompactStatRow(
         Text(
             text = awayDiff?.let { diff -> "(${if (diff >= 0) "+" else ""}${diff.formatStat(1)})" } ?: "",
             style = MaterialTheme.typography.labelSmall,
-            color = if ((awayDiff ?: 0.0) >= 0) Color(0xFF4CAF50) else Color(0xFFF44336),
+            color = if ((awayDiff ?: 0.0) >= 0) diffUpColor else diffDownColor,
             maxLines = 1,
             modifier = Modifier.weight(0.6f),
             textAlign = TextAlign.Start
@@ -1230,7 +1237,7 @@ private fun NHLCompactStatRow(
         Text(
             text = homeDiff?.let { diff -> "(${if (diff >= 0) "+" else ""}${diff.formatStat(1)})" } ?: "",
             style = MaterialTheme.typography.labelSmall,
-            color = if ((homeDiff ?: 0.0) >= 0) Color(0xFF4CAF50) else Color(0xFFF44336),
+            color = if ((homeDiff ?: 0.0) >= 0) diffUpColor else diffDownColor,
             maxLines = 1,
             modifier = Modifier.weight(0.6f),
             textAlign = TextAlign.End

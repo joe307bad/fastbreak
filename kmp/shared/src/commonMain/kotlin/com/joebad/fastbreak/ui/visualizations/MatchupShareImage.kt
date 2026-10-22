@@ -804,10 +804,14 @@ fun GenericMatchupShareImage(
                             }
                         }
 
-                        // Format: "wins - losses / rank in Conference"
-                        val recordParts = gameInfo.awayRecord?.split("-")
-                        val wins = recordParts?.getOrNull(0) ?: ""
-                        val losses = recordParts?.getOrNull(1) ?: ""
+                        // Format: "wins - losses / rank in Conference". Joined
+                        // rather than read off the first two parts: an NHL record
+                        // carries overtime losses and an NFL one can carry ties,
+                        // and taking wins and losses alone dropped them.
+                        val record = gameInfo.awayRecord
+                            ?.split("-")
+                            ?.joinToString(" - ")
+                            ?: ""
 
                         val rankText = gameInfo.awayConferenceRank?.let { rank ->
                             val ordinal = when (rank) {
@@ -823,7 +827,7 @@ fun GenericMatchupShareImage(
                         } ?: ""
 
                         Text(
-                            text = "$wins - $losses$rankText",
+                            text = "$record$rankText",
                             fontSize = 36.sp,
                             color = textColor.copy(alpha = 0.8f)
                         )
@@ -840,9 +844,10 @@ fun GenericMatchupShareImage(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         // Format: "rank in Conference / wins - losses" (flipped order for home team)
-                        val recordParts = gameInfo.homeRecord?.split("-")
-                        val wins = recordParts?.getOrNull(0) ?: ""
-                        val losses = recordParts?.getOrNull(1) ?: ""
+                        val record = gameInfo.homeRecord
+                            ?.split("-")
+                            ?.joinToString(" - ")
+                            ?: ""
 
                         val rankText = gameInfo.homeConferenceRank?.let { rank ->
                             val ordinal = when (rank) {
@@ -858,7 +863,7 @@ fun GenericMatchupShareImage(
                         } ?: ""
 
                         Text(
-                            text = "$rankText$wins - $losses",
+                            text = "$rankText$record",
                             fontSize = 36.sp,
                             color = textColor.copy(alpha = 0.8f)
                         )

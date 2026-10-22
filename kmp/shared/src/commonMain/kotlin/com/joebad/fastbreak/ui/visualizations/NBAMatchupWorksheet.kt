@@ -36,6 +36,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.joebad.fastbreak.data.model.LeagueCumNetRatingStats
@@ -575,9 +576,13 @@ fun NBAMatchupWorksheet(
         // On-demand capture: off-screen content only composed when capturing
         // This prevents stale graphics layer state on iOS app resume
         captureRequest?.let { request ->
-            val (captureWidth, captureHeight) = when (request.target) {
-                NbaCaptureTarget.PRE_GAME -> 3400.dp to 1900.dp
-                NbaCaptureTarget.POST_GAME -> 400.dp to 540.dp
+            // Width is fixed so the stat grid has a known column width to lay out
+            // against; height is whatever the content comes to. A fixed height
+            // stretched six stat boxes down a 1900dp canvas no matter how little
+            // they had in them.
+            val captureWidth = when (request.target) {
+                NbaCaptureTarget.PRE_GAME -> 3400.dp
+                NbaCaptureTarget.POST_GAME -> 400.dp
             }
 
             // Capture after content is drawn
@@ -601,10 +606,12 @@ fun NBAMatchupWorksheet(
                         Box(
                             modifier = Modifier
                                 .requiredWidth(captureWidth)
-                                .requiredHeight(captureHeight)
+                                .wrapContentSize(unbounded = true)
                                 .offset { IntOffset(-10000, 0) }
                                 .drawWithContent {
-                                    graphicsLayer.record {
+                                    graphicsLayer.record(
+                                        size = IntSize(size.width.toInt(), size.height.toInt())
+                                    ) {
                                         this@drawWithContent.drawContent()
                                     }
                                     drawLayer(graphicsLayer)
@@ -986,7 +993,12 @@ fun NBAMatchupWorksheet(
                                 gameInfo = gameInfo,
                                 odds = odds,
                                 statBoxes = finalStatBoxes.take(6),
-                                modifier = Modifier.fillMaxSize()
+                                modifier = Modifier.requiredWidth(captureWidth).wrapContentHeight(),
+                                // Rows no longer stretch to fill the canvas, so they
+                                // need real spacing between them - the same figure the
+                                // MLB and NFL share images use at this width.
+                                rowSpacing = 48.dp,
+                                dynamicHeight = true
                             )
                         }
                     }
@@ -997,10 +1009,12 @@ fun NBAMatchupWorksheet(
                         Box(
                             modifier = Modifier
                                 .requiredWidth(captureWidth)
-                                .requiredHeight(captureHeight)
+                                .wrapContentSize(unbounded = true)
                                 .offset { IntOffset(-10000, 0) }
                                 .drawWithContent {
-                                    graphicsLayer.record {
+                                    graphicsLayer.record(
+                                        size = IntSize(size.width.toInt(), size.height.toInt())
+                                    ) {
                                         this@drawWithContent.drawContent()
                                     }
                                     drawLayer(graphicsLayer)
@@ -1019,7 +1033,7 @@ fun NBAMatchupWorksheet(
                             } else {
                                 // Placeholder for games not yet completed
                                 Box(
-                                    modifier = Modifier.fillMaxSize(),
+                                    modifier = Modifier.fillMaxWidth().padding(24.dp),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Text(
@@ -1066,7 +1080,7 @@ private fun PostGameShareContent(
 
     Column(
         modifier = Modifier
-            .fillMaxSize()
+            .fillMaxWidth()
             .padding(12.dp)
     ) {
         // Score row: Away left, margin center, Home right

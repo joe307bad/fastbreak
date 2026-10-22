@@ -145,12 +145,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Ruby
-        uses: ruby/setup-ruby@v1
-        with:
-          ruby-version: '3.1'
-          bundler-cache: true
-          working-directory: kmp/iosApp
+      # Deliberately not bundler: Gemfile.lock pins fastlane 2.229.1, which
+      # predates the 6.9" iPhone and 13" iPad screenshot sizes and rejects the
+      # whole set as "Invalid screen size". The runner's own fastlane knows
+      # them. The plugins the Fastfile declares still have to be present,
+      # because fastlane loads the Pluginfile whichever lane runs.
+      - name: Install fastlane plugins
+        run: fastlane install_plugins
 
       - name: Show what will be uploaded
         run: |
@@ -163,4 +164,4 @@ jobs:
           APP_STORE_CONNECT_API_KEY_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
           APP_STORE_CONNECT_API_KEY_KEY: ${{ secrets.ASC_PRIVATE_KEY }}
           VERSION_NAME: ${{ inputs.app_version }}
-        run: bundle exec fastlane ios screenshots_upload_only
+        run: fastlane ios screenshots_upload_only

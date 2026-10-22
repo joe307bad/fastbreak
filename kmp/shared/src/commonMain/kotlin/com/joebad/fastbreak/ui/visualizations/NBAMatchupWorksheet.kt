@@ -1005,7 +1005,9 @@ fun NBAMatchupWorksheet(
                                     }
                                     drawLayer(graphicsLayer)
                                 }
-                                .background(MaterialTheme.colorScheme.background)
+                                // Paired with the onSurface text inside, the way
+                                // the pre-game share image is painted
+                                .background(MaterialTheme.colorScheme.surface)
                         ) {
                             // Post game results content
                             if (selectedMatchup.gameCompleted && selectedMatchup.results != null) {
@@ -1056,11 +1058,11 @@ private fun PostGameShareContent(
     val awayWon = !finalScore.homeWon
     val winner = if (finalScore.homeWon) matchup.homeTeam.abbreviation else matchup.awayTeam.abbreviation
 
-    // Detect dark mode and use pure black/white
-    val bg = MaterialTheme.colorScheme.background
-    val isDark = (0.299f * bg.red + 0.587f * bg.green + 0.114f * bg.blue) < 0.5f
-    val textColor = if (isDark) Color.White else Color.Black
-    val secondaryTextColor = if (isDark) Color.LightGray else Color.DarkGray
+    // The share image is captured against the themed background, so its text has
+    // to come from the theme too - a team palette paints that background in team
+    // colours, and guessing black or white from its luminance loses them.
+    val textColor = MaterialTheme.colorScheme.onSurface
+    val secondaryTextColor = MaterialTheme.colorScheme.onSurfaceVariant
 
     Column(
         modifier = Modifier
@@ -1207,6 +1209,22 @@ private fun PostGameShareContent(
     }
 }
 
+// Box-score accents carry meaning rather than theme: a gain over the season
+// average is green, a shortfall red.
+private val diffUpColor = Color(0xFF4CAF50)
+private val diffDownColor = Color(0xFFF44336)
+
+/**
+ * A vs-season-average difference, or null when it rounds to zero at the one
+ * decimal we show. On a team's first game the season average is that game, so
+ * every difference should be zero; a "(-0.0)" painted red reads as a shortfall
+ * that never happened, and a blank matches the rows that carry no average.
+ */
+private fun formatVsAvgDiff(diff: Double?): String? {
+    if (diff == null || kotlin.math.abs(diff) < 0.05) return null
+    return "(${if (diff > 0) "+" else ""}${diff.formatStat(1)})"
+}
+
 /**
  * Compact stat row for box score with edge indicator - columns: edge|value|diff | label | diff|value|edge
  */
@@ -1231,11 +1249,11 @@ private fun CompactStatRow(
         if (higherIsBetter) homeRaw > awayRaw else homeRaw < awayRaw
     } else false
 
-    // Detect dark mode and use pure black/white
-    val bg = MaterialTheme.colorScheme.background
-    val isDark = (0.299f * bg.red + 0.587f * bg.green + 0.114f * bg.blue) < 0.5f
-    val textColor = if (isDark) Color.White else Color.Black
-    val secondaryTextColor = if (isDark) Color.LightGray else Color.DarkGray
+    // The share image is captured against the themed background, so its text has
+    // to come from the theme too - a team palette paints that background in team
+    // colours, and guessing black or white from its luminance loses them.
+    val textColor = MaterialTheme.colorScheme.onSurface
+    val secondaryTextColor = MaterialTheme.colorScheme.onSurfaceVariant
 
     Row(
         modifier = Modifier
@@ -1271,11 +1289,12 @@ private fun CompactStatRow(
 
         Spacer(modifier = Modifier.width(4.dp))
 
-        // Away: diff column
+        // Away: diff column (blank when the game matched the season average)
+        val awayDiffText = formatVsAvgDiff(awayDiff)
         Text(
-            text = awayDiff?.let { diff -> "(${if (diff >= 0) "+" else ""}${diff.formatStat(1)})" } ?: "",
+            text = awayDiffText.orEmpty(),
             style = MaterialTheme.typography.labelSmall,
-            color = if ((awayDiff ?: 0.0) >= 0) Color(0xFF4CAF50) else Color(0xFFF44336),
+            color = if ((awayDiff ?: 0.0) >= 0) diffUpColor else diffDownColor,
             maxLines = 1,
             modifier = Modifier.weight(0.6f),
             textAlign = TextAlign.Start
@@ -1292,11 +1311,12 @@ private fun CompactStatRow(
             textAlign = TextAlign.Center
         )
 
-        // Home: diff column
+        // Home: diff column (blank when the game matched the season average)
+        val homeDiffText = formatVsAvgDiff(homeDiff)
         Text(
-            text = homeDiff?.let { diff -> "(${if (diff >= 0) "+" else ""}${diff.formatStat(1)})" } ?: "",
+            text = homeDiffText.orEmpty(),
             style = MaterialTheme.typography.labelSmall,
-            color = if ((homeDiff ?: 0.0) >= 0) Color(0xFF4CAF50) else Color(0xFFF44336),
+            color = if ((homeDiff ?: 0.0) >= 0) diffUpColor else diffDownColor,
             maxLines = 1,
             modifier = Modifier.weight(0.6f),
             textAlign = TextAlign.End
@@ -1341,11 +1361,11 @@ private fun CompactStatRow(
     homeMade: String,
     homeAttempted: String
 ) {
-    // Detect dark mode and use pure black/white
-    val bg = MaterialTheme.colorScheme.background
-    val isDark = (0.299f * bg.red + 0.587f * bg.green + 0.114f * bg.blue) < 0.5f
-    val textColor = if (isDark) Color.White else Color.Black
-    val secondaryTextColor = if (isDark) Color.LightGray else Color.DarkGray
+    // The share image is captured against the themed background, so its text has
+    // to come from the theme too - a team palette paints that background in team
+    // colours, and guessing black or white from its luminance loses them.
+    val textColor = MaterialTheme.colorScheme.onSurface
+    val secondaryTextColor = MaterialTheme.colorScheme.onSurfaceVariant
 
     Row(
         modifier = Modifier

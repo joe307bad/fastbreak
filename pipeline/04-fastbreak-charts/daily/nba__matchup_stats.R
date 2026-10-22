@@ -438,10 +438,15 @@ build_game_results <- function(game, home_season_stats, away_season_stats, team_
           } else NULL
         }
 
-        # Helper to convert ESPN percentage (0-100) to decimal (0-1)
-        pct_to_decimal <- function(x) {
-          val <- safe_num(x)
-          if (is.null(val)) NULL else round(val / 100, 4)
+        # Shooting percentages are recomputed from makes and attempts rather
+        # than read off ESPN's rounded percentage field. The season average is
+        # built from those same makes and attempts, so a team's first game of
+        # the season has to net out to exactly zero against it; ESPN's rounded
+        # field leaves a hundredth of a percent behind, which the box score
+        # then shows as a red "-0.0".
+        ratio_to_decimal <- function(made, attempted) {
+          if (is.null(made) || is.null(attempted) || attempted == 0) NULL
+          else round(made / attempted, 4)
         }
 
         # Home team box score
@@ -452,6 +457,9 @@ build_game_results <- function(game, home_season_stats, away_season_stats, team_
         home_fg3a <- safe_int(home_box$three_point_field_goals_attempted)
         home_ftm <- safe_int(home_box$free_throws_made)
         home_fta <- safe_int(home_box$free_throws_attempted)
+        home_fg_pct <- ratio_to_decimal(home_fgm, home_fga)
+        home_fg3_pct <- ratio_to_decimal(home_fg3m, home_fg3a)
+        home_ft_pct <- ratio_to_decimal(home_ftm, home_fta)
 
         # Away team box score
         away_pts <- safe_int(away_box$team_score)
@@ -461,19 +469,22 @@ build_game_results <- function(game, home_season_stats, away_season_stats, team_
         away_fg3a <- safe_int(away_box$three_point_field_goals_attempted)
         away_ftm <- safe_int(away_box$free_throws_made)
         away_fta <- safe_int(away_box$free_throws_attempted)
+        away_fg_pct <- ratio_to_decimal(away_fgm, away_fga)
+        away_fg3_pct <- ratio_to_decimal(away_fg3m, away_fg3a)
+        away_ft_pct <- ratio_to_decimal(away_ftm, away_fta)
 
         result$teamBoxScore <- list(
           home = list(
             pts = home_pts,
             fgm = home_fgm,
             fga = home_fga,
-            fgPct = pct_to_decimal(home_box$field_goal_pct),
+            fgPct = home_fg_pct,
             fg3m = home_fg3m,
             fg3a = home_fg3a,
-            fg3Pct = pct_to_decimal(home_box$three_point_field_goal_pct),
+            fg3Pct = home_fg3_pct,
             ftm = home_ftm,
             fta = home_fta,
-            ftPct = pct_to_decimal(home_box$free_throw_pct),
+            ftPct = home_ft_pct,
             oreb = safe_int(home_box$offensive_rebounds),
             dreb = safe_int(home_box$defensive_rebounds),
             reb = safe_int(home_box$total_rebounds),
@@ -497,13 +508,13 @@ build_game_results <- function(game, home_season_stats, away_season_stats, team_
             pts = away_pts,
             fgm = away_fgm,
             fga = away_fga,
-            fgPct = pct_to_decimal(away_box$field_goal_pct),
+            fgPct = away_fg_pct,
             fg3m = away_fg3m,
             fg3a = away_fg3a,
-            fg3Pct = pct_to_decimal(away_box$three_point_field_goal_pct),
+            fg3Pct = away_fg3_pct,
             ftm = away_ftm,
             fta = away_fta,
-            ftPct = pct_to_decimal(away_box$free_throw_pct),
+            ftPct = away_ft_pct,
             oreb = safe_int(away_box$offensive_rebounds),
             dreb = safe_int(away_box$defensive_rebounds),
             reb = safe_int(away_box$total_rebounds),
@@ -526,37 +537,39 @@ build_game_results <- function(game, home_season_stats, away_season_stats, team_
         )
 
         # Compare to season averages
-        # All percentage stats use 0-1 decimal scale with 4 decimal places
-        # ESPN returns percentages as 0-100, so divide by 100
-        # ts_pct and efg_pct from NBA API are already 0-1 decimals
+        # All percentage stats use 0-1 decimal scale with 4 decimal places.
+        # Both sides of every comparison come from the same box-score makes and
+        # attempts - season percentages are totals over totals, TS% and eFG%
+        # use ts_pct_box/efg_pct_box rather than the NBA API's own figures - so
+        # a team's first game of the season differs from its average by zero.
         result$vsSeasonAvg <- list(
           home = list(
             points = compare_to_season_avg(game$home_score, home_season_stats$points_per_game, "points"),
-            fieldGoalPct = compare_to_season_avg(safe_num(home_box$field_goal_pct) / 100, home_season_stats$fg_pct / 100, "fg_pct", decimals = 4),
-            threePtPct = compare_to_season_avg(safe_num(home_box$three_point_field_goal_pct) / 100, home_season_stats$three_pt_pct / 100, "three_pt_pct", decimals = 4),
-            freeThrowPct = compare_to_season_avg(safe_num(home_box$free_throw_pct) / 100, home_season_stats$ft_pct / 100, "ft_pct", decimals = 4),
+            fieldGoalPct = compare_to_season_avg(home_fg_pct, home_season_stats$fg_pct / 100, "fg_pct", decimals = 4),
+            threePtPct = compare_to_season_avg(home_fg3_pct, home_season_stats$three_pt_pct / 100, "three_pt_pct", decimals = 4),
+            freeThrowPct = compare_to_season_avg(home_ft_pct, home_season_stats$ft_pct / 100, "ft_pct", decimals = 4),
             rebounds = compare_to_season_avg(safe_num(home_box$total_rebounds), home_season_stats$rebounds_per_game, "rebounds"),
             offRebounds = compare_to_season_avg(safe_num(home_box$offensive_rebounds), home_season_stats$offensive_rebounds_total / home_season_stats$games_played, "oreb"),
             assists = compare_to_season_avg(safe_num(home_box$assists), home_season_stats$assists_per_game, "assists"),
             steals = compare_to_season_avg(safe_num(home_box$steals), home_season_stats$steals_per_game, "steals"),
             blocks = compare_to_season_avg(safe_num(home_box$blocks), home_season_stats$blocks_per_game, "blocks"),
             turnovers = compare_to_season_avg(safe_num(home_box$turnovers), home_season_stats$turnovers_per_game, "turnovers", higher_is_better = FALSE),
-            tsPct = compare_to_season_avg(calc_ts_pct(home_pts, home_fga, home_fta), home_season_stats$ts_pct, "ts_pct", decimals = 4),
-            efgPct = compare_to_season_avg(calc_efg_pct(home_fgm, home_fg3m, home_fga), home_season_stats$efg_pct, "efg_pct", decimals = 4)
+            tsPct = compare_to_season_avg(calc_ts_pct(home_pts, home_fga, home_fta), home_season_stats$ts_pct_box, "ts_pct", decimals = 4),
+            efgPct = compare_to_season_avg(calc_efg_pct(home_fgm, home_fg3m, home_fga), home_season_stats$efg_pct_box, "efg_pct", decimals = 4)
           ),
           away = list(
             points = compare_to_season_avg(game$away_score, away_season_stats$points_per_game, "points"),
-            fieldGoalPct = compare_to_season_avg(safe_num(away_box$field_goal_pct) / 100, away_season_stats$fg_pct / 100, "fg_pct", decimals = 4),
-            threePtPct = compare_to_season_avg(safe_num(away_box$three_point_field_goal_pct) / 100, away_season_stats$three_pt_pct / 100, "three_pt_pct", decimals = 4),
-            freeThrowPct = compare_to_season_avg(safe_num(away_box$free_throw_pct) / 100, away_season_stats$ft_pct / 100, "ft_pct", decimals = 4),
+            fieldGoalPct = compare_to_season_avg(away_fg_pct, away_season_stats$fg_pct / 100, "fg_pct", decimals = 4),
+            threePtPct = compare_to_season_avg(away_fg3_pct, away_season_stats$three_pt_pct / 100, "three_pt_pct", decimals = 4),
+            freeThrowPct = compare_to_season_avg(away_ft_pct, away_season_stats$ft_pct / 100, "ft_pct", decimals = 4),
             rebounds = compare_to_season_avg(safe_num(away_box$total_rebounds), away_season_stats$rebounds_per_game, "rebounds"),
             offRebounds = compare_to_season_avg(safe_num(away_box$offensive_rebounds), away_season_stats$offensive_rebounds_total / away_season_stats$games_played, "oreb"),
             assists = compare_to_season_avg(safe_num(away_box$assists), away_season_stats$assists_per_game, "assists"),
             steals = compare_to_season_avg(safe_num(away_box$steals), away_season_stats$steals_per_game, "steals"),
             blocks = compare_to_season_avg(safe_num(away_box$blocks), away_season_stats$blocks_per_game, "blocks"),
             turnovers = compare_to_season_avg(safe_num(away_box$turnovers), away_season_stats$turnovers_per_game, "turnovers", higher_is_better = FALSE),
-            tsPct = compare_to_season_avg(calc_ts_pct(away_pts, away_fga, away_fta), away_season_stats$ts_pct, "ts_pct", decimals = 4),
-            efgPct = compare_to_season_avg(calc_efg_pct(away_fgm, away_fg3m, away_fga), away_season_stats$efg_pct, "efg_pct", decimals = 4)
+            tsPct = compare_to_season_avg(calc_ts_pct(away_pts, away_fga, away_fta), away_season_stats$ts_pct_box, "ts_pct", decimals = 4),
+            efgPct = compare_to_season_avg(calc_efg_pct(away_fgm, away_fg3m, away_fga), away_season_stats$efg_pct_box, "efg_pct", decimals = 4)
           )
         )
       }
@@ -850,6 +863,13 @@ team_stats <- team_box %>%
     fg_pct = field_goals_made / field_goals_attempted * 100,
     three_pt_pct = three_point_field_goals_made / three_point_field_goals_attempted * 100,
     ft_pct = free_throws_made / free_throws_attempted * 100,
+
+    # TS% and eFG% over season totals, by the same formulas a single game uses.
+    # The NBA API's ts_pct/efg_pct (joined below) stay the numbers the stat
+    # boxes and ranks show; these exist only so the post-game "vs avg" column
+    # compares a game against an average built from the same box scores.
+    ts_pct_box = points / (2 * (field_goals_attempted + 0.44 * free_throws_attempted)),
+    efg_pct_box = (field_goals_made + 0.5 * three_point_field_goals_made) / field_goals_attempted,
     rebounds_per_game = (offensive_rebounds_total + defensive_rebounds_total) / games_played,
     assists_per_game = assists_total / games_played,
     steals_per_game = steals_total / games_played,

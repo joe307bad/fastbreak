@@ -1,0 +1,30 @@
+# Devices to capture. App Store Connect accepts a 6.9" iPhone set for every
+# iPhone size and a 13" iPad set for every iPad size, so two devices cover the
+# whole listing.
+devices([
+  "iPhone 16 Pro Max",
+  "iPad Pro 13-inch (M4)"
+])
+
+languages(["en-US"])
+
+scheme("Fastbreak")
+workspace("./iosApp.xcworkspace")
+
+# Only the screenshot flows. Every other test in the target is a demo recorder
+# or a launch test and would just cost simulator time.
+only_testing(["fastbreakUITests/DemoUITests"])
+
+output_directory("./fastlane/screenshots")
+clear_previous_screenshots(true)
+
+# The charts have to finish syncing before the first capture, and the sync hits
+# the live CDN, so the flows wait minutes rather than seconds.
+test_without_building(false)
+concurrent_simulators(false)
+stop_after_first_error(false)
+
+# A clean status bar: full bars, full battery, 9:41.
+override_status_bar(true)
+
+launch_arguments(["-UI_TESTING YES"])

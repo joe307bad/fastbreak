@@ -1,6 +1,56 @@
-# Automated Demo Recording
+# Automated Demo Recording and Screenshots
 
-This directory contains scripts for automatically recording demos of the fastbreak iOS app and converting them to optimized GIFs for documentation.
+This directory contains two separate things:
+
+| What | Command | Output |
+|------|---------|--------|
+| **App Store screenshots** (stills, iOS) | `./scripts/capture-ios-screenshots.sh` | `iosApp/fastlane/screenshots/` |
+| **Documentation demos** (GIFs, Android) | `./scripts/record-all-demos.sh` | `screenshots/demos/` |
+| **Documentation demos** (GIFs, iOS) | `./scripts/record-ios-demo.sh` | `screenshots/demos/` |
+
+## App Store screenshots
+
+One command captures every screenshot the listing needs and, with `--upload`,
+publishes them:
+
+```bash
+cd kmp
+./scripts/capture-ios-screenshots.sh           # capture only, review locally
+./scripts/capture-ios-screenshots.sh --upload  # capture, then upload to App Store Connect
+```
+
+It runs `DemoUITests` in `iosApp/fastbreakUITests/` through fastlane's
+`capture_ios_screenshots`, on an iPhone 16 Pro Max and an iPad Pro 13-inch -
+the two sizes App Store Connect accepts for the whole listing. Devices,
+languages and the output directory live in `iosApp/fastlane/Snapfile`; the
+lanes are `screenshots` and `screenshots_upload` in `iosApp/fastlane/Fastfile`.
+
+The flows are the iOS port of the Android demos in
+`androidApp/src/androidTest/kotlin/com/joebad/fastbreak/DemoUITests.kt`, so both
+platforms walk the same ground. Each one drives the app to a state and calls
+`snapshot("NN-Name")`; the numbering matters because `deliver` uploads a
+device's screenshots in alphabetical order, and that is the order the listing
+shows.
+
+`--upload` needs the same three App Store Connect variables the deploy workflow
+passes to `fastlane ios beta`: `APP_STORE_CONNECT_API_KEY_KEY_ID`,
+`APP_STORE_CONNECT_API_KEY_ISSUER_ID` and `APP_STORE_CONNECT_API_KEY_KEY`. It
+replaces the screenshots on the current editable App Store version and submits
+nothing for review.
+
+### Adding or changing a shot
+
+Add a `testScreenshot_NN_Name` method to `iosApp/fastbreakUITests/DemoUITests.swift`
+and call `snapshot("NN-Name")` where the screen looks right. Element lookup
+helpers (`exactly`, `containing`, `described`) mirror UI Automator's
+`By.text`, `By.textContains` and `By.desc` so a flow can be ported across
+almost line for line.
+
+---
+
+# Demo GIFs
+
+The rest of this document covers recording demos of the fastbreak iOS app and converting them to optimized GIFs for documentation.
 
 ## Overview
 

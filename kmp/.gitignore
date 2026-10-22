@@ -29,3 +29,8 @@ build/
 *.kotlin_metadata
 
 .kotlinfastbreak.keystore
+
+# fastlane screenshot captures are build output, not source
+iosApp/fastlane/screenshots/
+iosApp/fastlane/test_output/
+iosApp/fastlane/report.xml

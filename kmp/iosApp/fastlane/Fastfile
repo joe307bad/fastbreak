@@ -1,4 +1,36 @@
 platform :ios do
+  desc "Capture App Store screenshots in the simulator"
+  lane :screenshots do
+    capture_ios_screenshots
+    UI.success("Screenshots written to fastlane/screenshots")
+  end
+
+  desc "Capture App Store screenshots and upload them to App Store Connect"
+  lane :screenshots_upload do
+    api_key = app_store_connect_api_key(
+      key_id: ENV["APP_STORE_CONNECT_API_KEY_KEY_ID"],
+      issuer_id: ENV["APP_STORE_CONNECT_API_KEY_ISSUER_ID"],
+      key_content: ENV["APP_STORE_CONNECT_API_KEY_KEY"],
+      is_key_content_base64: true
+    )
+
+    capture_ios_screenshots
+
+    # Screenshots only: no binary, no metadata, and nothing submitted for
+    # review. The shots land on the current editable App Store version for
+    # someone to look at before they go anywhere.
+    upload_to_app_store(
+      api_key: api_key,
+      skip_binary_upload: true,
+      skip_metadata: true,
+      skip_screenshots: false,
+      overwrite_screenshots: true,
+      submit_for_review: false,
+      precheck_include_in_app_purchases: false,
+      force: true
+    )
+  end
+
   desc "Push a new beta build to TestFlight"
   lane :beta do
     api_key = app_store_connect_api_key(

@@ -19,6 +19,7 @@ import {
   formatReportCardStatLabel,
   isReportCardPlayerRankingKey,
   isReportCardRankingPct,
+  nflRankBands,
   PlayoffChancesSheet,
   StatRankingsSheet,
 } from '@/components/charts/TeamReportCardSheets';
@@ -197,14 +198,18 @@ function RankBadge({ rank, display }: { rank?: number | null; display?: string |
   return <span className={teamRankBadgeClasses(rank)}>{value}</span>;
 }
 
-function playerRankBadgeClasses(rank: number | null | undefined, sport?: string): string {
+function playerRankBadgeClasses(
+  rank: number | null | undefined,
+  sport?: string,
+  poolSize?: number
+): string {
   const base = 'inline-flex items-center justify-center min-w-7 h-4 px-1 rounded text-[10px] font-medium';
   if (rank == null) return `${base} bg-[var(--muted)]/20 text-[var(--muted)]`;
-  // NFL position groups rank ~32-100 players, so green is reserved for the top ten
   if (sport === 'nfl') {
-    if (rank <= 10) return `${base} bg-green-500/20 text-green-500`;
-    if (rank <= 20) return `${base} bg-amber-500/20 text-amber-600 dark:text-amber-400`;
-    if (rank <= 32) return `${base} bg-orange-500/20 text-orange-500`;
+    const [greenMax, limeMax, orangeMax] = nflRankBands(poolSize);
+    if (rank <= greenMax) return `${base} bg-green-500/20 text-green-500`;
+    if (rank <= limeMax) return `${base} bg-amber-500/20 text-amber-600 dark:text-amber-400`;
+    if (rank <= orangeMax) return `${base} bg-orange-500/20 text-orange-500`;
     return `${base} bg-red-500/20 text-red-500`;
   }
   if (rank <= 30) return `${base} bg-green-500/20 text-green-500`;
@@ -217,17 +222,19 @@ function PlayerRankBadge({
   rank,
   display,
   sport,
+  poolSize,
 }: {
   rank?: number | null;
   display?: string | null;
   sport?: string;
+  poolSize?: number;
 }) {
   if (rank == null && !display) return null;
   // Filter out invalid display values like "null", "NA", etc.
   const validDisplay = display && !['null', 'NA', 'undefined', 'nul'].includes(display) ? display : null;
   const value = validDisplay ?? (rank != null ? String(rank) : '');
   if (!value) return null;
-  return <span className={playerRankBadgeClasses(rank, sport)}>{value}</span>;
+  return <span className={playerRankBadgeClasses(rank, sport, poolSize)}>{value}</span>;
 }
 
 function StatCell({
@@ -235,12 +242,14 @@ function StatCell({
   playerRank,
   showRank = true,
   sport,
+  poolSize,
   onClick,
 }: {
   stat?: ReportCardStatValue;
   playerRank?: boolean;
   showRank?: boolean;
   sport?: string;
+  poolSize?: number;
   onClick?: () => void;
 }) {
   const content = (
@@ -248,7 +257,12 @@ function StatCell({
       <span className="font-mono text-sm">{formatStatValue(stat)}</span>
       {showRank &&
         (playerRank ? (
-          <PlayerRankBadge rank={stat?.rank} display={stat?.rankDisplay} sport={sport} />
+          <PlayerRankBadge
+            rank={stat?.rank}
+            display={stat?.rankDisplay}
+            sport={sport}
+            poolSize={poolSize}
+          />
         ) : (
           <RankBadge rank={stat?.rank} display={stat?.rankDisplay} />
         ))}
@@ -645,6 +659,7 @@ function PlayerTable({
                       playerRank={showPlayerRankAndComposite}
                       showRank={showPlayerRankAndComposite}
                       sport={sport}
+                      poolSize={rankings[rankingKey]?.length}
                       onClick={hasRankings ? () => onRankingClick(rankingKey) : undefined}
                     />
                   </td>

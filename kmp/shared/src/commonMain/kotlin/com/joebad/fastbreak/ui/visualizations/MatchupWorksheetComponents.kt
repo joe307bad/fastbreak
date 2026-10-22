@@ -294,28 +294,53 @@ fun getMLBPlayerRankColor(rank: Int?): Color {
     }
 }
 
+// An NFL position group is roughly one qualified player per team plus whatever
+// backups cleared the snap threshold, so the pool is 37 quarterbacks but 134
+// receivers. Fixed cutoffs flatter the small pools - a 30th-ranked quarterback
+// is a backup, not a mid-tier starter - so the bands are percentiles of the pool
+// the rank came from, the same ones the 32-team composite badge uses: top ~31%
+// green, two narrow middle bands, and the back third red.
+private const val NFL_RANK_GREEN_FRACTION = 10f / 32f
+private const val NFL_RANK_AMBER_FRACTION = 15f / 32f
+private const val NFL_RANK_ORANGE_FRACTION = 20f / 32f
+private const val NFL_RANK_DEFAULT_POOL = 32
+
+private fun nflRankBandMax(poolSize: Int, fraction: Float, floor: Int): Int =
+    maxOf(floor, kotlin.math.round(poolSize * fraction).toInt())
+
+private fun nflRankBandRatio(rank: Int, first: Int, last: Int): Float =
+    if (last <= first) 0f else (rank - first).toFloat() / (last - first).toFloat()
+
 /**
- * NFL player ranks (league-wide within a position group, ~32-100 players):
- * 1-10 green, 11-20 dark amber, 21-32 orange, 33+ red — only a top-ten player reads green
+ * NFL player ranks, shaded against the size of the ranked pool: top ~31% green,
+ * then dark amber and orange, with the back third red.
  */
-fun getNFLPlayerRankColor(rank: Int?): Color {
+fun getNFLPlayerRankColor(rank: Int?, poolSize: Int?): Color {
     if (rank == null || rank <= 0) return Color.Transparent
+    val pool = if (poolSize != null && poolSize > 0) poolSize else NFL_RANK_DEFAULT_POOL
+    val greenMax = nflRankBandMax(pool, NFL_RANK_GREEN_FRACTION, 1)
+    val amberMax = nflRankBandMax(pool, NFL_RANK_AMBER_FRACTION, greenMax + 1)
+    val orangeMax = nflRankBandMax(pool, NFL_RANK_ORANGE_FRACTION, amberMax + 1)
     return when {
-        rank <= 10 -> {
-            val ratio = (rank - 1) / 9f
+        rank <= greenMax -> {
+            val ratio = nflRankBandRatio(rank, 1, greenMax)
             Color((0 + ratio * 50).toInt(), (150 - ratio * 35).toInt(), 0)
         }
-        rank <= 20 -> {
-            val ratio = (rank - 11) / 9f
+        rank <= amberMax -> {
+            val ratio = nflRankBandRatio(rank, greenMax + 1, amberMax)
             Color((175 + ratio * 55).toInt(), (125 - ratio * 45).toInt(), 0)
         }
-        rank <= 32 -> {
-            val ratio = (rank - 21) / 11f
+        rank <= orangeMax -> {
+            val ratio = nflRankBandRatio(rank, amberMax + 1, orangeMax)
             Color((230 - ratio * 52).toInt(), (95 - ratio * 60).toInt(), 0)
         }
         else -> Color(178, 0, 0)
     }
 }
+
+/** Binds an NFL rank pool size so the badge keeps taking a bare rank. */
+fun nflPlayerRankColorFn(poolSize: Int?): (Int?) -> Color =
+    { rank -> getNFLPlayerRankColor(rank, poolSize) }
 
 /**
  * MLB team ranks (30 teams) for report card team/composite rankings.

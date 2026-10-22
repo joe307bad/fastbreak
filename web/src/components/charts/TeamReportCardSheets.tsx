@@ -26,12 +26,32 @@ function playerRankColor(rank: number | null | undefined): string {
   return 'bg-red-600';
 }
 
-// NFL position groups rank ~32-100 players, so green is reserved for the top ten
-function nflPlayerRankColor(rank: number | null | undefined): string {
+// An NFL position group is roughly one qualified player per team plus whatever
+// backups cleared the threshold, so the pool is 37 quarterbacks but 134
+// receivers. Fixed cutoffs flatter the small pools - a 30th-ranked quarterback
+// is a backup, not a mid-tier starter - so the bands are percentiles of the
+// pool the rank came from, the same ones the 32-team composite badge uses: top
+// ~31% green, two narrow middle bands, and the back third red.
+const NFL_RANK_BAND_FRACTIONS = [10 / 32, 15 / 32, 20 / 32];
+const NFL_RANK_DEFAULT_POOL = 32;
+
+export function nflRankBands(poolSize?: number | null): [number, number, number] {
+  const n = poolSize != null && poolSize > 0 ? poolSize : NFL_RANK_DEFAULT_POOL;
+  let floor = 1;
+  const bands = NFL_RANK_BAND_FRACTIONS.map(fraction => {
+    const max = Math.max(floor, Math.round(n * fraction));
+    floor = max + 1;
+    return max;
+  });
+  return [bands[0], bands[1], bands[2]];
+}
+
+function nflPlayerRankColor(rank: number | null | undefined, poolSize?: number): string {
   if (rank == null) return 'bg-[var(--muted)]';
-  if (rank <= 10) return 'bg-green-600';
-  if (rank <= 20) return 'bg-amber-600';
-  if (rank <= 32) return 'bg-orange-500';
+  const [greenMax, amberMax, orangeMax] = nflRankBands(poolSize);
+  if (rank <= greenMax) return 'bg-green-600';
+  if (rank <= amberMax) return 'bg-amber-600';
+  if (rank <= orangeMax) return 'bg-orange-500';
   return 'bg-red-600';
 }
 
@@ -298,16 +318,18 @@ function RankBadge({
   display,
   playerRankings = false,
   sport,
+  poolSize,
 }: {
   rank: number;
   display?: string | null;
   playerRankings?: boolean;
   sport?: string;
+  poolSize?: number;
 }) {
   const colorFn = !playerRankings
     ? teamRankColor
     : sport === 'nfl'
-      ? nflPlayerRankColor
+      ? (value: number | null | undefined) => nflPlayerRankColor(value, poolSize)
       : playerRankColor;
   // Filter out invalid display values like "null", "NA", etc.
   const validDisplay = display && !['null', 'NA', 'undefined', 'nul'].includes(display) ? display : null;
@@ -413,6 +435,7 @@ export function StatRankingsSheet({
                 display={entry.rankDisplay}
                 playerRankings={isPlayerRankings}
                 sport={sport}
+                poolSize={entries.length}
               />
             </div>
             <span

@@ -70,8 +70,22 @@ jobs:
       - name: Seed mock API stubs
         run: python3 scripts/seed-wiremock-stubs.py --refresh
 
-      - name: Show available simulators
-        run: xcrun simctl list devices available | grep -E "iPhone 16 Pro Max|iPad Pro 13" || true
+      # Device names move with the Xcode version, so pick from what this
+      # runner actually has rather than hardcoding a generation.
+      - name: Pick simulators
+        id: sims
+        run: |
+          AVAILABLE=$(xcrun simctl list devices available)
+          echo "$AVAILABLE" | grep -E "iPhone|iPad Pro" || true
+          PHONE=$(echo "$AVAILABLE" | grep -oE "iPhone [0-9]+ Pro Max" | sort -V | tail -1)
+          [ -z "$PHONE" ] && PHONE=$(echo "$AVAILABLE" | grep -oE "iPhone [0-9]+ Pro" | sort -V | tail -1)
+          PAD=$(echo "$AVAILABLE" | grep -oE "iPad Pro 13-inch \(M[0-9]+\)" | sort -V | tail -1)
+          if [ -z "$PHONE" ] || [ -z "$PAD" ]; then
+            echo "::error::could not find an iPhone Pro Max and an iPad Pro 13-inch simulator"
+            exit 1
+          fi
+          echo "devices=${PHONE},${PAD}" >> $GITHUB_OUTPUT
+          echo "Capturing on: ${PHONE} and ${PAD}"
 
       - name: Capture screenshots
         working-directory: kmp/iosApp
@@ -80,6 +94,7 @@ jobs:
           APP_STORE_CONNECT_API_KEY_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
           APP_STORE_CONNECT_API_KEY_KEY: ${{ secrets.ASC_PRIVATE_KEY }}
           VERSION_NAME: ${{ steps.build_info.outputs.version_name }}
+          SNAPSHOT_DEVICES: ${{ steps.sims.outputs.devices }}
           ORG_GRADLE_PROJECT_dev_mode: "false"
         run: |
           java -jar ../scripts/wiremock/wiremock-standalone.jar \

@@ -1,10 +1,15 @@
 # Devices to capture. App Store Connect accepts a 6.9" iPhone set for every
 # iPhone size and a 13" iPad set for every iPad size, so two devices cover the
 # whole listing.
-devices([
-  "iPhone 16 Pro Max",
-  "iPad Pro 13-inch (M4)"
-])
+# Simulator names differ by machine: a laptop on Xcode 16.2 has an
+# "iPhone 16 Pro Max" and an "iPad Pro 13-inch (M4)", while the macos-26 runner
+# ships an "iPhone 17 Pro Max" and an "iPad Pro 13-inch (M5)". The caller picks,
+# and the default is whatever this laptop has.
+devices(
+  (ENV["SNAPSHOT_DEVICES"] || "iPhone 16 Pro Max,iPad Pro 13-inch (M4)")
+    .split(",")
+    .map(&:strip)
+)
 
 languages(["en-US"])
 

@@ -33,6 +33,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.joebad.fastbreak.data.model.LineChartDataPoint
@@ -573,9 +574,13 @@ fun NHLMatchupWorksheet(
 
         // On-demand capture
         captureRequest?.let { request ->
-            val (captureWidth, captureHeight) = when (request.target) {
-                NhlCaptureTarget.PRE_GAME -> 3400.dp to 1950.dp
-                NhlCaptureTarget.POST_GAME -> 400.dp to 360.dp
+            // Width is fixed so the stat grid has a known column width to lay out
+            // against; height is whatever the content comes to. A fixed height
+            // stretched six stat boxes down a 1950dp canvas no matter how little
+            // they had in them.
+            val captureWidth = when (request.target) {
+                NhlCaptureTarget.PRE_GAME -> 3400.dp
+                NhlCaptureTarget.POST_GAME -> 400.dp
             }
 
             LaunchedEffect(request) {
@@ -597,10 +602,12 @@ fun NHLMatchupWorksheet(
                         Box(
                             modifier = Modifier
                                 .requiredWidth(captureWidth)
-                                .requiredHeight(captureHeight)
+                                .wrapContentSize(unbounded = true)
                                 .offset { IntOffset(-10000, 0) }
                                 .drawWithContent {
-                                    graphicsLayer.record {
+                                    graphicsLayer.record(
+                                        size = IntSize(size.width.toInt(), size.height.toInt())
+                                    ) {
                                         this@drawWithContent.drawContent()
                                     }
                                     drawLayer(graphicsLayer)
@@ -655,7 +662,12 @@ fun NHLMatchupWorksheet(
                                 gameInfo = gameInfo,
                                 odds = odds,
                                 statBoxes = statBoxes,
-                                modifier = Modifier.fillMaxSize()
+                                modifier = Modifier.requiredWidth(captureWidth).wrapContentHeight(),
+                                // Rows no longer stretch to fill the canvas, so they
+                                // need real spacing between them - the same figure the
+                                // MLB and NFL share images use at this width.
+                                rowSpacing = 48.dp,
+                                dynamicHeight = true
                             )
                         }
                     }
@@ -665,10 +677,12 @@ fun NHLMatchupWorksheet(
                         Box(
                             modifier = Modifier
                                 .requiredWidth(captureWidth)
-                                .requiredHeight(captureHeight)
+                                .wrapContentSize(unbounded = true)
                                 .offset { IntOffset(-10000, 0) }
                                 .drawWithContent {
-                                    graphicsLayer.record {
+                                    graphicsLayer.record(
+                                        size = IntSize(size.width.toInt(), size.height.toInt())
+                                    ) {
                                         this@drawWithContent.drawContent()
                                     }
                                     drawLayer(graphicsLayer)
@@ -678,7 +692,7 @@ fun NHLMatchupWorksheet(
                             NHLPostGameShareImage(
                                 matchup = selectedMatchup,
                                 formattedDate = formattedDate,
-                                modifier = Modifier.fillMaxSize()
+                                modifier = Modifier.requiredWidth(captureWidth)
                             )
                         }
                     }
@@ -986,7 +1000,7 @@ private fun NHLPostGameShareImage(
 
     Column(
         modifier = modifier
-            .fillMaxSize()
+            .fillMaxWidth()
             .padding(12.dp)
     ) {
         // Score row: Away left, margin center, Home right

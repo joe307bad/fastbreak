@@ -1,0 +1,110 @@
+name: iOS Screenshots
+
+# Manual only. Capturing is harmless, but the upload replaces the screenshots
+# on the editable App Store version, so nobody wants it firing on every push.
+on:
+  workflow_dispatch:
+    inputs:
+      upload:
+        description: "Upload to App Store Connect after capturing"
+        type: boolean
+        default: true
+      app_version:
+        description: "App Store version to attach them to (blank = gradle.properties)"
+        type: string
+        default: ""
+
+jobs:
+  screenshots:
+    runs-on: macos-26
+    timeout-minutes: 60
+    defaults:
+      run:
+        working-directory: kmp
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Same Xcode the TestFlight job pins, so the simulator set matches.
+      - name: Select Xcode 26.2
+        run: sudo xcode-select -s /Applications/Xcode_26.2.app/Contents/Developer
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.1'
+          bundler-cache: true
+          working-directory: kmp/iosApp
+
+      - name: Resolve version
+        id: build_info
+        run: |
+          VERSION_NAME="${{ inputs.app_version }}"
+          if [ -z "$VERSION_NAME" ]; then
+            VERSION_NAME=$(grep "VERSION_NAME=" gradle.properties | cut -d'=' -f2)
+          fi
+          echo "version_name=${VERSION_NAME}" >> $GITHUB_OUTPUT
+          echo "Screenshots will be attached to version $VERSION_NAME"
+
+      - name: Install CocoaPods
+        working-directory: kmp/iosApp
+        run: bundle exec pod install
+
+      # The flows capture against a local WireMock rather than the CDN, so a run
+      # is reproducible and no shot can catch a sync banner. The stubs are built
+      # from the live payloads here, since the web build's copies are not in the
+      # checkout.
+      # The jar is gitignored, so it is fetched rather than checked out.
+      - name: Fetch WireMock
+        run: |
+          curl -fsSL -o scripts/wiremock/wiremock-standalone.jar \
+            https://repo1.maven.org/maven2/org/wiremock/wiremock-standalone/3.9.1/wiremock-standalone-3.9.1.jar
+
+      - name: Seed mock API stubs
+        run: python3 scripts/seed-wiremock-stubs.py --refresh
+
+      - name: Show available simulators
+        run: xcrun simctl list devices available | grep -E "iPhone 16 Pro Max|iPad Pro 13" || true
+
+      - name: Capture screenshots
+        working-directory: kmp/iosApp
+        env:
+          APP_STORE_CONNECT_API_KEY_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          APP_STORE_CONNECT_API_KEY_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          APP_STORE_CONNECT_API_KEY_KEY: ${{ secrets.ASC_PRIVATE_KEY }}
+          VERSION_NAME: ${{ steps.build_info.outputs.version_name }}
+          ORG_GRADLE_PROJECT_dev_mode: "false"
+        run: |
+          java -jar ../scripts/wiremock/wiremock-standalone.jar \
+            --port 8089 --root-dir ../scripts/wiremock --disable-banner &
+          echo $! > /tmp/wiremock.pid
+          for _ in $(seq 1 30); do
+            curl -sf -m 2 http://127.0.0.1:8089/registry > /dev/null && break
+            sleep 1
+          done
+          curl -sf -m 2 http://127.0.0.1:8089/registry > /dev/null \
+            || { echo "::error::mock API never answered"; exit 1; }
+
+          if [ "${{ inputs.upload }}" = "true" ]; then
+            bundle exec fastlane ios screenshots_upload
+          else
+            bundle exec fastlane ios screenshots
+          fi
+
+      - name: Stop mock API
+        if: always()
+        run: kill "$(cat /tmp/wiremock.pid)" 2>/dev/null || true
+
+      - name: Upload screenshots as an artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-screenshots
+          path: kmp/iosApp/fastlane/screenshots/
+          if-no-files-found: warn

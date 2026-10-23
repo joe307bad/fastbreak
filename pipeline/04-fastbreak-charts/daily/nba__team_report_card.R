@@ -358,6 +358,8 @@ resolve_season_context <- function() {
     return(list(
       stats_season = current_season,
       boxes = current_boxes,
+      schedule_season = current_season,
+      schedule_boxes = current_boxes,
       phase = if (in_postseason) "POST" else "REG",
       started_season = NULL
     ))
@@ -369,9 +371,16 @@ resolve_season_context <- function() {
   for (season in (current_season - 1):(current_season - 3)) {
     boxes <- load_season_boxes(season)
     if (min_team_games(boxes) > 0) {
+      # Two seasons, deliberately. Ranking players needs a season with enough
+      # games behind it, but "how is my team doing" means right now - so the
+      # record, the form panel and the game log follow the season in progress
+      # as soon as it has a single game, while the player and unit rankings
+      # stay on the completed one.
       return(list(
         stats_season = season,
         boxes = boxes,
+        schedule_season = if (current_started) current_season else season,
+        schedule_boxes = if (current_started) current_boxes else boxes,
         phase = if (current_started) "EARLY" else "PRE",
         started_season = current_season
       ))
@@ -385,6 +394,10 @@ nba_season <- season_ctx$stats_season
 season_phase <- season_ctx$phase
 started_season <- season_ctx$started_season
 team_box_all <- season_ctx$boxes$team_box
+schedule_season <- season_ctx$schedule_season
+schedule_box_all <- season_ctx$schedule_boxes$team_box
+schedule_season_label <- paste0(schedule_season - 1, "-", substr(schedule_season, 3, 4))
+schedule_is_current <- !identical(schedule_season, nba_season)
 player_box_all <- season_ctx$boxes$player_box
 
 season_phase_label <- switch(
@@ -403,6 +416,13 @@ cat("Season:", season_label, "| phase:", season_phase_label, "\n")
 
 team_box <- team_box_all %>% filter(season_type == 2)
 player_box <- player_box_all %>% filter(season_type == 2)
+# Records, recent form and the game log are built from this one.
+schedule_box <- schedule_box_all %>% filter(season_type == 2)
+
+if (schedule_is_current) {
+  cat("Records, form and game log come from the season in progress:",
+      schedule_season_label, "|", nrow(schedule_box), "team-game rows\n")
+}
 
 games_played <- min_team_games(season_ctx$boxes)
 season_fraction <- max(min(games_played / REGULAR_SEASON_GAMES, 1), 1 / REGULAR_SEASON_GAMES)
@@ -552,35 +572,45 @@ cat("Qualified pools — guards:", nrow(guards),
 # Team units: offense and defense
 # ============================================================================
 # One row per team per game with the opponent's line attached, so both ends of
-# the floor come out of the same source of truth.
-team_games <- team_box %>%
-  transmute(
-    game_id, game_date, team_id, team_code = team_abbreviation,
-    opponent_team_id, opponent_code = opponent_team_abbreviation,
-    is_home = team_home_away == "home",
-    team_score, opponent_team_score, won = team_winner,
-    fga = field_goals_attempted, fgm = field_goals_made,
-    tpm = three_point_field_goals_made,
-    tpa = three_point_field_goals_attempted,
-    fta = free_throws_attempted,
-    oreb = offensive_rebounds, dreb = defensive_rebounds,
-    tov = coalesce(total_turnovers, turnovers),
-    pts = team_score
-  )
+# the floor come out of the same source of truth. Built twice: the four factors
+# rank the season the player pools come from, while the record, the form panel
+# and the game log describe the season in progress.
+build_team_games <- function(box) {
+  games <- box %>%
+    transmute(
+      game_id, game_date, team_id, team_code = team_abbreviation,
+      opponent_team_id, opponent_code = opponent_team_abbreviation,
+      is_home = team_home_away == "home",
+      team_score, opponent_team_score, won = team_winner,
+      fga = field_goals_attempted, fgm = field_goals_made,
+      tpm = three_point_field_goals_made,
+      tpa = three_point_field_goals_attempted,
+      fta = free_throws_attempted,
+      oreb = offensive_rebounds, dreb = defensive_rebounds,
+      tov = coalesce(total_turnovers, turnovers),
+      pts = team_score
+    )
 
-opponent_lines <- team_games %>%
-  transmute(
-    game_id, opponent_of = team_id,
-    opp_fga = fga, opp_fgm = fgm, opp_tpm = tpm, opp_tpa = tpa, opp_fta = fta,
-    opp_oreb = oreb, opp_dreb = dreb, opp_tov = tov, opp_pts = pts
-  )
+  opponent_lines <- games %>%
+    transmute(
+      game_id, opponent_of = team_id,
+      opp_fga = fga, opp_fgm = fgm, opp_tpm = tpm, opp_tpa = tpa, opp_fta = fta,
+      opp_oreb = oreb, opp_dreb = dreb, opp_tov = tov, opp_pts = pts
+    )
 
-team_games <- team_games %>%
-  left_join(opponent_lines, by = c("game_id", "opponent_team_id" = "opponent_of"))
+  games %>%
+    left_join(opponent_lines, by = c("game_id", "opponent_team_id" = "opponent_of"))
+}
+
+# The four factors, from the same season the rankings use.
+stats_team_games <- build_team_games(team_box)
+
+# Everything schedule-shaped, from the season in progress.
+team_games <- if (schedule_is_current) build_team_games(schedule_box) else stats_team_games
 
 possessions <- function(fga, fta, oreb, tov) fga + 0.44 * fta - oreb + tov
 
-team_unit_totals <- team_games %>%
+team_unit_totals <- stats_team_games %>%
   group_by(team_code) %>%
   summarise(
     games = n(),
@@ -1330,10 +1360,16 @@ teams_json <- lapply(ALL_TEAMS, function(team) {
   categories$recentTrend <- list(
     label = paste(LAST_TEN_COUNT, "Game Trend"),
     description = paste0(
-      "The team's last ", LAST_TEN_COUNT, " games: record, point differential ",
-      "per game, points scored and allowed per game, and shooting from the ",
-      "field and from three. Ranked against every other team's last ",
-      LAST_TEN_COUNT, "."
+      "The team's last ", LAST_TEN_COUNT, " games of the ", schedule_season_label,
+      " season: record, point differential per game, points scored and allowed ",
+      "per game, and shooting from the field and from three. Ranked against ",
+      "every other team's last ", LAST_TEN_COUNT,
+      if (schedule_is_current) {
+        paste0(". Early in a season this covers however many games have been ",
+               "played, which is fewer than ", LAST_TEN_COUNT, ".")
+      } else {
+        "."
+      }
     ),
     statKeys = as.list(TREND_STAT_COLS),
     playerStatKeys = list(),
@@ -1480,10 +1516,13 @@ phase_note <- switch(
     season_label, " season."
   ),
   EARLY = paste0(
-    "The new season has tipped off but no team has played the ",
+    "Two seasons are on this page. The record, the ", LAST_TEN_COUNT,
+    " game trend and the game log are the ", schedule_season_label,
+    " season now in progress. The player groups, the offense and defense ",
+    "panels and every composite are the completed ", season_label,
+    " season, because no team has yet played the ",
     MIN_TEAM_GAMES_FOR_CURRENT_SEASON,
-    " games a league-wide ranking needs, so this card still covers the ",
-    "completed ", season_label, " season."
+    " games a league-wide ranking needs."
   ),
   REG = paste0("The ", season_label, " regular season is in progress."),
   POST = paste0("The ", season_label, " postseason has begun."),
@@ -1526,7 +1565,8 @@ output_data <- list(
     "defense panel shows the same four as allowed, so a high ",
     "Opp TOV% (turnovers forced) is good and a high Opp eFG% is not.\n\n",
     " • ", LAST_TEN_COUNT, " Game Trend: The team's last ", LAST_TEN_COUNT,
-    " games only, ranked against every other team's last ", LAST_TEN_COUNT,
+    " games of the ", schedule_season_label, " season, ranked against every ",
+    "other team's last ", LAST_TEN_COUNT,
     ". A form read, so it stays out of the overall composite.\n\n",
     " • Below-replacement performers: Rotation players the team was outscored ",
     "with — a negative plus-minus among players clearing the same bar as the ",
@@ -1536,8 +1576,9 @@ output_data <- list(
     "the player's share of the team's minutes. Rank 1 is the most injured ",
     "team.\n\n",
     " • Last ", LAST_TEN_COUNT, " Games: The most recent ", LAST_TEN_COUNT,
-    " results in order. Each row shows the opponent (vs = home, @ = away), ",
-    "both scores, and the point differential.\n\n",
+    " results of the ", schedule_season_label, " season, in order. Each row ",
+    "shows the opponent (vs = home, @ = away), both scores, and the point ",
+    "differential.\n\n",
     "Player and team stats cover the regular season so rates stay comparable ",
     "across the league."
   ),

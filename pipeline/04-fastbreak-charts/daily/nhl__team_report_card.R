@@ -339,6 +339,7 @@ resolve_season_context <- function() {
       start_year = current_year,
       season_id = season_id_for(current_year),
       team_summary = current$summary,
+      schedule_year = current_year,
       phase = if (in_postseason) "POST" else "REG",
       started_season = NULL
     ))
@@ -350,10 +351,15 @@ resolve_season_context <- function() {
   for (year in (current_year - 1):(current_year - 3)) {
     prev <- season_team_games(season_id_for(year))
     if (prev$games > 0) {
+      # Two seasons, deliberately. Ranking players needs a season with enough
+      # games behind it, but "how is my team doing" means right now - so the
+      # form panel and the game log follow the season in progress as soon as it
+      # has a single game, while the player rankings stay on the completed one.
       return(list(
         start_year = year,
         season_id = season_id_for(year),
         team_summary = prev$summary,
+        schedule_year = if (current$games > 0) current_year else year,
         phase = if (current$games > 0) "EARLY" else "PRE",
         started_season = current_year
       ))
@@ -365,6 +371,10 @@ resolve_season_context <- function() {
 season_ctx <- resolve_season_context()
 season_start_year <- season_ctx$start_year
 season_id <- season_ctx$season_id
+schedule_year <- season_ctx$schedule_year
+schedule_season_id <- season_id_for(schedule_year)
+schedule_season_label <- paste0(schedule_year, "-", substr(schedule_year + 1, 3, 4))
+schedule_is_current <- !identical(schedule_season_id, season_id)
 season_phase <- season_ctx$phase
 started_season <- season_ctx$started_season
 team_summary_raw <- season_ctx$team_summary
@@ -719,7 +729,8 @@ cat("Qualified pools — forwards:", nrow(forwards),
 PLAYED_GAME_STATES <- c(5, 6, 7)
 
 games_payload <- nhl_get_json(sprintf(
-  "https://api.nhle.com/stats/rest/en/game?cayenneExp=season=%s%%20and%%20gameType=2", season_id
+  "https://api.nhle.com/stats/rest/en/game?cayenneExp=season=%s%%20and%%20gameType=2",
+  schedule_season_id
 ))
 
 team_game_rows <- if (is.null(games_payload$data) || length(games_payload$data) == 0) {
@@ -1444,10 +1455,10 @@ teams_json <- lapply(ALL_TEAMS, function(team) {
   categories$recentTrend <- list(
     label = paste(LAST_TEN_COUNT, "Game Trend"),
     description = paste0(
-      "The team's last ", LAST_TEN_COUNT, " games: record (wins-losses-OT ",
-      "losses, ranked on points percentage), goal differential per game, and ",
-      "goals scored and allowed per game. Ranked against every other team's ",
-      "last ", LAST_TEN_COUNT, "."
+      "The team's last ", LAST_TEN_COUNT, " games of the ", schedule_season_label,
+      " season: record (wins-losses-OT losses, ranked on points percentage), ",
+      "goal differential per game, and goals scored and allowed per game. ",
+      "Ranked against every other team's last ", LAST_TEN_COUNT, "."
     ),
     statKeys = as.list(TREND_STAT_COLS),
     playerStatKeys = list(),
@@ -1598,10 +1609,12 @@ phase_note <- switch(
     season_label, " season."
   ),
   EARLY = paste0(
-    "The new season has opened but no team has played the ",
+    "Two seasons are on this page. The ", LAST_TEN_COUNT,
+    " game trend and the game log are the ", schedule_season_label,
+    " season now in progress. The position groups and every composite are the ",
+    "completed ", season_label, " season, because no team has yet played the ",
     MIN_TEAM_GAMES_FOR_CURRENT_SEASON,
-    " games a league-wide ranking needs, so this card still covers the ",
-    "completed ", season_label, " season."
+    " games a league-wide ranking needs."
   ),
   REG = paste0("The ", season_label, " regular season is in progress."),
   POST = paste0("The ", season_label, " postseason has begun."),

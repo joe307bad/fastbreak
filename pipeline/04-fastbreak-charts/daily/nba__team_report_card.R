@@ -418,6 +418,7 @@ team_box <- team_box_all %>% filter(season_type == 2)
 player_box <- player_box_all %>% filter(season_type == 2)
 # Records, recent form and the game log are built from this one.
 schedule_box <- schedule_box_all %>% filter(season_type == 2)
+schedule_player_box <- season_ctx$schedule_boxes$player_box %>% filter(season_type == 2)
 
 if (schedule_is_current) {
   cat("Records, form and game log come from the season in progress:",
@@ -451,12 +452,29 @@ player_games <- player_box %>%
   filter(!is.na(minutes), minutes > 0) %>%
   mutate(plus_minus = suppressWarnings(as.numeric(sub("^\\+", "", plus_minus))))
 
+# The team a player logged the most minutes for in the ranked season.
 primary_team <- player_games %>%
   group_by(athlete_id, team_abbreviation) %>%
   summarise(team_minutes = sum(minutes), .groups = "drop") %>%
   arrange(athlete_id, desc(team_minutes)) %>%
   distinct(athlete_id, .keep_all = TRUE) %>%
-  transmute(athlete_id, team_code = team_abbreviation)
+  transmute(athlete_id, stats_team_code = team_abbreviation)
+
+# Which is not where they play now. A card built on last season's stats was
+# also listing last season's rosters, so a player traded over the summer showed
+# up on the team he left. Stats stay with the season they were earned in; the
+# team comes from where he has actually suited up this season.
+current_team <- if (schedule_is_current && nrow(schedule_player_box) > 0) {
+  schedule_player_box %>%
+    filter(!is.na(minutes), minutes > 0) %>%
+    group_by(athlete_id, team_abbreviation) %>%
+    summarise(team_minutes = sum(minutes), .groups = "drop") %>%
+    arrange(athlete_id, desc(team_minutes)) %>%
+    distinct(athlete_id, .keep_all = TRUE) %>%
+    transmute(athlete_id, current_team_code = team_abbreviation)
+} else {
+  tibble(athlete_id = integer(), current_team_code = character())
+}
 
 primary_position <- player_games %>%
   filter(!is.na(athlete_position_abbreviation), nzchar(athlete_position_abbreviation)) %>%
@@ -498,7 +516,11 @@ player_totals <- player_games %>%
     .groups = "drop"
   ) %>%
   left_join(primary_team, by = "athlete_id") %>%
+  left_join(current_team, by = "athlete_id") %>%
   left_join(primary_position, by = "athlete_id") %>%
+  # A player who has not appeared yet this season keeps last season's team,
+  # which is the best guess available.
+  mutate(team_code = coalesce(current_team_code, stats_team_code)) %>%
   filter(!is.na(team_code)) %>%
   mutate(
     player_id = as.character(athlete_id),
@@ -520,6 +542,15 @@ add_rate_stats <- function(df, min_three_attempts) {
       fg_pct = safe_div(fgm * 100, fga),
       fg3_pct = ifelse(tpa >= min_three_attempts, safe_div(tpm * 100, tpa), NA_real_)
     )
+}
+
+if (schedule_is_current) {
+  moved <- player_totals %>%
+    filter(!is.na(current_team_code), current_team_code != stats_team_code)
+  cat("Rosters: ", nrow(player_totals %>% filter(!is.na(current_team_code))),
+      " players placed by their ", schedule_season_label, " team, ",
+      nrow(moved), " of them on a different team than in ", season_label, "\n",
+      sep = "")
 }
 
 player_rates <- add_rate_stats(player_totals, MIN_THREE_ATTEMPTS)

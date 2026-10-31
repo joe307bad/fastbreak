@@ -148,7 +148,7 @@
     "sections": {
       "howToUse": "Navigate to the Topics screen from the main menu. Scroll through the daily topics to see statistically grounded insights about your favorite sports. Each topic contains data points that link directly to relevant charts - tap any underlined data point to jump to that visualization.",
       "whatItDoes": [
-        { "type": "text", "value": "Topics provides summaries and insights about what's happening across different sports. The content is generated everyday at 6am ET using " },
+        { "type": "text", "value": "Topics provides summaries and insights about what's happening across different sports. The content is generated everyday at 9am ET using " },
         { "type": "link", "value": "Google's Gemini with Grounded Search", "url": "https://docs.cloud.google.com/vertex-ai/generative-ai/docs/grounding/overview" },
         { "type": "text", "value": ", which ensures factual accuracy by verifying information against Google Search results. Each topic highlights key statistics and trends, with direct links to the underlying charts and visualizations." }
       ],

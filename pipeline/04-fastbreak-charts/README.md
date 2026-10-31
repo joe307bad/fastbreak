@@ -4,8 +4,8 @@ Simple Docker-based R script scheduler using cron.
 
 ## Structure
 
-- `daily/` - R scripts that run every day at midnight
-- `weekly/` - R scripts that run every Sunday at midnight
+- `daily/` - R scripts that run every day at 9am ET
+- `weekly/` - R scripts that run every Sunday at 10am ET
 - Output mounts to `/Users/joebad/Source/fastbreak/server/nginx/static`
 
 ## Build
@@ -22,8 +22,8 @@ docker run -d --env-file .env --name fastbreak-charts fastbreak-charts
 
 ## How It Works
 
-- Cron runs daily scripts at `0 0 * * *` (midnight daily)
-- Cron runs weekly scripts at `0 0 * * 0` (midnight Sunday)
+- Cron runs daily scripts at `0 9 * * *` (9am ET daily)
+- Cron runs weekly scripts at `0 10 * * 0` (10am ET Sunday)
 - All R scripts in respective folders execute automatically
 - Scripts run immediately on container startup
 - JSON output saved to `/app/output` (mounted to `/Users/joebad/Source/fastbreak/server/nginx/static`)

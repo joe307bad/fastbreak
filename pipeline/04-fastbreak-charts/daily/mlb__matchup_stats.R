@@ -807,6 +807,93 @@ build_comparisons <- function(home_stats, away_stats, home_abbrev, away_abbrev) 
 # Accumulator for LOB / pitches from fetched box scores (filled by build_mlb_game_results)
 mlb_box_accum <- list()
 
+# ----------------------------------------------------------------------------
+# Traditional team "left on base" (men left on base) from play-by-play.
+#
+# ESPN's team-level batting stat `runnersLeftOnBase` is the SUM of the individual
+# batters' LOB, which materially overstates the traditional box-score figure
+# ("Pirates 8" everywhere else showed up as 15 in Fastbreak). The traditional
+# team LOB is the number of runners still on base when each half-inning ends, so
+# we reconstruct it from the play-by-play: for every half-inning, count the
+# runners on base on that half-inning's final play, and sum per batting team.
+#
+# ESPN `summary` plays carry `period$number` (inning), `period$type`
+# ("Top"/"Bottom" -> away/home batting), running `awayScore`/`homeScore`, and the
+# post-play base occupancy `onFirst`/`onSecond`/`onThird`. The result is only
+# trusted when it validates against reality (see the guards at the call site):
+# base-state fields must be present, every run must have scored during the
+# expected batting half (guards against reversed Top/Bottom semantics), and the
+# derived total must not exceed ESPN's summed value (traditional LOB <= sum of
+# per-batter LOB). When any check fails we leave ESPN's value untouched.
+derive_team_lob_from_plays <- function(plays) {
+  if (is.null(plays) || length(plays) == 0) return(NULL)
+
+  has_base_state <- any(vapply(plays, function(p)
+    !is.null(p$onFirst) || !is.null(p$onSecond) || !is.null(p$onThird),
+    logical(1)))
+  if (!has_base_state) return(NULL)
+
+  as_occupied <- function(x) {
+    if (is.null(x) || length(x) == 0) return(FALSE)
+    isTRUE(x[1]) || identical(x[1], "true") ||
+      (is.numeric(x[1]) && !is.na(x[1]) && x[1] != 0)
+  }
+
+  last_state <- list()      # half-inning key -> c(onFirst, onSecond, onThird)
+  side_of_key <- list()     # half-inning key -> "home"/"away"
+  order_keys <- character(0)
+  prev_away <- 0; prev_home <- 0
+  runs_away <- 0; runs_home <- 0
+  label_ok <- TRUE
+
+  for (p in plays) {
+    per <- p$period
+    if (is.null(per) || is.null(per$number)) next
+    inn <- suppressWarnings(as.integer(per$number))
+    if (is.na(inn)) next
+    half <- tolower(as.character(per$type %||% ""))
+    is_top <- startsWith(half, "top")
+    is_bot <- startsWith(half, "bot")
+    if (!is_top && !is_bot) next
+    side <- if (is_top) "away" else "home"
+    key <- paste0(inn, "-", side)
+
+    if (is.null(side_of_key[[key]])) {
+      side_of_key[[key]] <- side
+      order_keys <- c(order_keys, key)
+    }
+    # Plays are chronological, so the last one seen for a half-inning is the one
+    # that ended it; its base occupancy is the runners stranded that inning.
+    last_state[[key]] <- c(as_occupied(p$onFirst), as_occupied(p$onSecond), as_occupied(p$onThird))
+
+    a <- suppressWarnings(as.numeric(p$awayScore))
+    h <- suppressWarnings(as.numeric(p$homeScore))
+    if (!is.na(a)) {
+      if (a > prev_away) { runs_away <- runs_away + (a - prev_away); if (side != "away") label_ok <- FALSE }
+      prev_away <- a
+    }
+    if (!is.na(h)) {
+      if (h > prev_home) { runs_home <- runs_home + (h - prev_home); if (side != "home") label_ok <- FALSE }
+      prev_home <- h
+    }
+  }
+
+  lob_home <- 0L; lob_away <- 0L
+  for (key in order_keys) {
+    stranded <- sum(last_state[[key]], na.rm = TRUE)
+    if (side_of_key[[key]] == "away") lob_away <- lob_away + stranded
+    else lob_home <- lob_home + stranded
+  }
+
+  list(
+    home = as.integer(lob_home),
+    away = as.integer(lob_away),
+    runs_home = as.integer(runs_home),
+    runs_away = as.integer(runs_away),
+    label_ok = label_ok
+  )
+}
+
 build_mlb_game_results <- function(game, home_season_stats, away_season_stats) {
   game_id <- game$game_id
   cat("  Fetching box score for game", game_id, "...\n")
@@ -886,6 +973,29 @@ build_mlb_game_results <- function(game, home_season_stats, away_season_stats) {
 
   home_box <- extract_box(home_bs)
   away_box <- extract_box(away_bs)
+
+  # Replace ESPN's inflated team `runnersLeftOnBase` (sum of per-batter LOB) with
+  # the traditional men-left-on-base figure derived from play-by-play, but only
+  # when the reconstruction validates against the game (see helper for details).
+  # Runs must reconcile to the final score and the derived value must not exceed
+  # ESPN's summed value; otherwise we keep ESPN's number rather than risk a worse
+  # one. Applied before the box scores are used anywhere else so the season LOB
+  # sample (mlb_box_accum) and vs-average comparisons stay consistent.
+  lob_rec <- derive_team_lob_from_plays(data$plays)
+  if (!is.null(lob_rec) && isTRUE(lob_rec$label_ok) &&
+      !is.na(lob_rec$runs_home) && !is.na(lob_rec$runs_away) &&
+      lob_rec$runs_home == as.integer(game$home_score) &&
+      lob_rec$runs_away == as.integer(game$away_score)) {
+    apply_lob <- function(box, derived) {
+      if (is.null(derived) || is.na(derived) || derived < 0 || derived > 30) return(box)
+      # Traditional LOB can never exceed the sum of per-batter LOB ESPN reports.
+      if (!is.null(box$runnersLOB) && !is.na(box$runnersLOB) && derived > box$runnersLOB) return(box)
+      box$runnersLOB <- as.integer(derived)
+      box
+    }
+    home_box <- apply_lob(home_box, lob_rec$home)
+    away_box <- apply_lob(away_box, lob_rec$away)
+  }
 
   result$teamBoxScore <- list(
     home = home_box,

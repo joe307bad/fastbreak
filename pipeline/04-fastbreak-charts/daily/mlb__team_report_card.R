@@ -1256,7 +1256,10 @@ build_trend_category_stats <- function(trend_df, team) {
   empty_stat <- function(label) {
     list(label = label, value = NULL, rank = NULL, rankDisplay = NULL, displayValue = NULL)
   }
-  if (nrow(row) == 0 || is.na(row$win_pct[1])) {
+  # In the offseason no games fall in the trend window, so team_trend has only
+  # team_code and row$win_pct is NULL; is.na(NULL[1]) is logical(0), which `||`
+  # can't use. Check the column exists before reading it.
+  if (nrow(row) == 0 || !"win_pct" %in% names(row) || is.na(row$win_pct[1])) {
     return(list(stats = setNames(
       lapply(names(trend_labels), function(key) empty_stat(trend_labels[[key]])),
       names(trend_labels)
@@ -1280,7 +1283,7 @@ build_trend_category_stats <- function(trend_df, team) {
 }
 
 build_trend_rankings <- function(trend_df) {
-  if (nrow(trend_df) == 0 || all(is.na(trend_df$win_pct))) return(list())
+  if (nrow(trend_df) == 0 || !"win_pct" %in% names(trend_df) || all(is.na(trend_df$win_pct))) return(list())
   ranked_df <- trend_df %>% filter(!is.na(win_pct))
   stat_rankings <- setNames(
     lapply(names(trend_stat_cols), function(key) {

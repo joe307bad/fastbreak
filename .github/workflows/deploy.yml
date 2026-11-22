@@ -7,15 +7,13 @@ on:
       - main
     paths:
       - 'kmp/**'
-      - 'pipeline/04-fastbreak-charts/**'
-      - 'server/src/Fastbreak.Daily/**'
+      - 'pipeline/04-fastbreak-charts/aws/**'
 
 jobs:
   detect-changes:
     runs-on: ubuntu-latest
     outputs:
       kmp: ${{ steps.changes.outputs.kmp }}
-      charts: ${{ steps.changes.outputs.charts }}
       infra: ${{ steps.changes.outputs.infra }}
     steps:
       - uses: actions/checkout@v4
@@ -25,9 +23,6 @@ jobs:
           filters: |
             kmp:
               - 'kmp/**'
-            charts:
-              - 'pipeline/04-fastbreak-charts/**'
-              - 'server/src/Fastbreak.Daily/**'
             infra:
               - 'pipeline/04-fastbreak-charts/aws/**'
 
@@ -103,45 +98,12 @@ jobs:
         if: steps.plan.outputs.exitcode == '0'
         run: echo "Infrastructure already matches the configuration; nothing applied."
 
-  deploy-charts:
+  deploy-android:
     needs: [detect-changes, deploy-infra]
     if: |
       always() &&
-      needs.detect-changes.outputs.charts == 'true' &&
-      (needs.deploy-infra.result == 'success' || needs.deploy-infra.result == 'skipped')
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: pipeline/04-fastbreak-charts
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: '9.0.x'
-
-      - name: Build Fastbreak.Daily executable
-        run: |
-          dotnet publish -c Release -r linux-x64 --self-contained true -p:PublishSingleFile=true -o ../../../pipeline/04-fastbreak-charts
-        working-directory: server/src/Fastbreak.Daily
-
-      - uses: superfly/flyctl-actions/setup-flyctl@master
-
-      - name: Verify Fastbreak.Daily exists
-        run: ls -la Fastbreak.Daily
-
-      - run: flyctl deploy --remote-only
-        env:
-          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
-
-  deploy-android:
-    needs: [detect-changes, deploy-charts]
-    if: |
-      always() &&
       needs.detect-changes.outputs.kmp == 'true' &&
-      (needs.deploy-charts.result == 'success' || needs.deploy-charts.result == 'skipped')
+      (needs.deploy-infra.result == 'success' || needs.deploy-infra.result == 'skipped')
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -214,11 +176,11 @@ jobs:
           status: draft
 
   deploy-ios:
-    needs: [detect-changes, deploy-charts]
+    needs: [detect-changes, deploy-infra]
     if: |
       always() &&
       needs.detect-changes.outputs.kmp == 'true' &&
-      (needs.deploy-charts.result == 'success' || needs.deploy-charts.result == 'skipped')
+      (needs.deploy-infra.result == 'success' || needs.deploy-infra.result == 'skipped')
     runs-on: macos-26
     defaults:
       run:

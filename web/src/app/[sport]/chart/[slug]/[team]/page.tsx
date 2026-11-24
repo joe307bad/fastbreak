@@ -3,7 +3,7 @@ import { fetchAllCharts, fetchChartData, slugToKey, keyToSlug } from '@/lib/api'
 import { pageMetadata } from '@/lib/og';
 import { REPORT_CARD_TYPES } from '@/lib/charts';
 import type { ReportCardTeam, TeamReportCardData } from '@/types/chart';
-import { ChartPageBody } from '../ChartPageBody';
+import { ReportCardHandoff } from '@/components/charts/ReportCardHandoff';
 
 interface Props {
   params: Promise<{ sport: string; slug: string; team: string }>;
@@ -55,10 +55,19 @@ export async function generateMetadata({ params }: Props) {
 }
 
 export default async function ChartTeamPage({ params }: Props) {
-  const { slug, team: teamParam } = await params;
+  const { sport, slug, team: teamParam } = await params;
   const key = slugToKey(slug);
   const data = await fetchChartData(key);
   const team = isReportCard(data) ? findTeam(data, teamParam) : undefined;
   if (!team) notFound();
-  return <ChartPageBody chartKey={key} data={data} initialTeamCode={team.teamCode} />;
+
+  // Only the team's code and name cross into the page; `data` was read for the
+  // metadata above and stays on the build machine. See ReportCardHandoff for
+  // why this route no longer renders the card itself.
+  return (
+    <ReportCardHandoff
+      href={`/${sport}/chart/${slug}/#${encodeURIComponent(team.teamCode.toUpperCase())}`}
+      teamName={team.teamName}
+    />
+  );
 }

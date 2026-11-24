@@ -1,14 +1,6 @@
 import { fetchChartRegistry, fetchChartData } from '@/lib/api';
 import { MLBMatchupData } from '@/types/chart';
 import { MLBMatchupsClientRedirect } from '@/components/charts/MLBMatchupsClientRedirect';
-import { getDefaultMLBMatchupGame } from '@/lib/mlbMatchups';
-import {
-  getPinnedTeamCodesForSport,
-  getPinnedTeamsFromCookieValue,
-  PINNED_TEAMS_COOKIE_KEY,
-} from '@/lib/pinnedTeamsStorage';
-import { cookies } from 'next/headers';
-import { redirect } from 'next/navigation';
 
 async function getMLBMatchupData(): Promise<MLBMatchupData | null> {
   const registry = await fetchChartRegistry();
@@ -37,18 +29,9 @@ export default async function MLBMatchupsPage() {
     );
   }
 
-  const cookieStore = await cookies();
-  const pinnedTeamsCookie = cookieStore.get(PINNED_TEAMS_COOKIE_KEY);
-
-  if (pinnedTeamsCookie) {
-    const pinnedTeams = getPinnedTeamsFromCookieValue(pinnedTeamsCookie.value);
-    const pinnedMlbTeamCodes = getPinnedTeamCodesForSport(pinnedTeams, 'mlb');
-    const targetGame = getDefaultMLBMatchupGame(matchupData.dataPoints, pinnedMlbTeamCodes);
-
-    if (targetGame) {
-      redirect(`/mlb/matchups/${targetGame.gameId}`);
-    }
-  }
-
+  // Pinned teams used to be read here from the cookie the settings page writes,
+  // so the redirect could happen server-side. A static export has no request to
+  // read a cookie from, and the client component already does the same pick off
+  // localStorage - falling back to today's game when nothing is pinned.
   return <MLBMatchupsClientRedirect games={matchupData.dataPoints} />;
 }

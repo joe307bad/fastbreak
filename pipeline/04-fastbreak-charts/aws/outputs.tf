@@ -53,3 +53,18 @@ output "og_image_url" {
   description = "URL for the OG image renderer (via CloudFront); takes ?title= and ?subtitle="
   value       = "https://${aws_cloudfront_distribution.fastbreak.domain_name}/og"
 }
+
+output "site_bucket_name" {
+  description = "Name of the S3 bucket holding the static site"
+  value       = aws_s3_bucket.site.id
+}
+
+output "site_cloudfront_distribution_id" {
+  description = "CloudFront distribution ID for the static site (for cache invalidation)"
+  value       = aws_cloudfront_distribution.site.id
+}
+
+output "site_url" {
+  description = "URL the static site is served at"
+  value       = "https://${var.site_domain}"
+}

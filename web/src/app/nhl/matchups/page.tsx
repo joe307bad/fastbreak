@@ -1,6 +1,6 @@
 import { fetchChartRegistry, fetchChartData } from '@/lib/api';
 import { NHLMatchupData } from '@/types/chart';
-import { redirect } from 'next/navigation';
+import { MatchupsClientRedirect } from '@/components/charts/MatchupsClientRedirect';
 
 async function getNHLMatchupData(): Promise<NHLMatchupData | null> {
   const registry = await fetchChartRegistry();
@@ -16,21 +16,6 @@ async function getNHLMatchupData(): Promise<NHLMatchupData | null> {
   return null;
 }
 
-function getTodayKey(): string {
-  const today = new Date();
-  const year = today.getFullYear();
-  const month = String(today.getMonth() + 1).padStart(2, '0');
-  const day = String(today.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
-
-function getDateKey(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
-
 export default async function NHLMatchupsPage() {
   const matchupData = await getNHLMatchupData();
 
@@ -44,21 +29,17 @@ export default async function NHLMatchupsPage() {
     );
   }
 
-  const todayKey = getTodayKey();
+  // Which game to open is decided in the browser, not here: this page is
+  // exported once a day, and "today" has to mean the visitor's today.
+  //
+  // Only the id and the date cross into the client component. Handing it
+  // `dataPoints` instead would serialize every game's players, box score and
+  // league splits into this page to choose between two fields of them - 3 MB
+  // of payload for a page whose entire job is to redirect.
+  const schedule = matchupData.dataPoints.map(game => ({
+    gameId: game.gameId,
+    gameDate: game.gameDate,
+  }));
 
-  const sortedGames = [...matchupData.dataPoints].sort(
-    (a, b) => new Date(a.gameDate).getTime() - new Date(b.gameDate).getTime()
-  );
-
-  let targetGame = sortedGames.find(g => getDateKey(new Date(g.gameDate)) === todayKey);
-
-  if (!targetGame) {
-    targetGame = sortedGames.find(g => getDateKey(new Date(g.gameDate)) > todayKey);
-  }
-
-  if (!targetGame) {
-    targetGame = sortedGames[sortedGames.length - 1];
-  }
-
-  redirect(`/nhl/matchups/${targetGame.gameId}`);
+  return <MatchupsClientRedirect sport="nhl" games={schedule} />;
 }

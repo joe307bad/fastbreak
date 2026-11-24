@@ -1,0 +1,124 @@
+# Rebuild the site from what is in S3 and publish it back to S3 as files.
+#
+# The site is a static export: every page is a function of the chart JSON the
+# pipeline writes to the chart bucket, read at build time through `fs` (see
+# web/src/lib/data.ts), so there is nothing for a server to decide at request
+# time and nothing to keep running between deploys. The cron is what makes it a
+# live site -- the charts change daily, so the build runs daily.
+#
+# The infrastructure it publishes to lives in
+# pipeline/04-fastbreak-charts/aws/site.tf and is applied by deploy.yml. A run
+# of this workflow against a stack that has not been applied yet will fail on
+# the sync; re-run it once terraform has finished.
+name: Deploy Web to S3
+
+on:
+  workflow_dispatch:
+  # 17:00 UTC, which is 12:00 EST or 13:00 EDT -- after jbhs has run the 9:00 ET
+  # daily scripts and Fastbreak.Daily, and Sunday's 10:00 ET weekly ones, and
+  # written their JSON to the bucket this build reads.
+  #
+  # The schedule is the whole correctness question for this workflow, because
+  # the charts are baked in at build time: build before the pipeline and the
+  # site serves yesterday. The Fly workflow this replaces ran at 8:00 UTC, which
+  # is 3:00 ET -- ahead of every script -- so it was always a day behind.
+  # Expressed in UTC because that is all GitHub Actions accepts; 17:00 is after
+  # noon Eastern on either side of the DST change.
+  schedule:
+    - cron: '0 17 * * *'
+  push:
+    branches:
+      - main
+    paths:
+      - 'web/**'
+
+concurrency:
+  group: deploy-web
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_DEFAULT_REGION: us-east-1
+      SITE_BUCKET: fastbreak-joebad-com-site
+      SITE_DOMAIN: fastbreak.joebad.com
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - run: npm ci
+
+      # `prebuild` pulls the registry and every chart out of the CDN in front of
+      # the chart bucket, then `next build` writes out/ from them.
+      - name: Build the export
+        run: npm run build
+        env:
+          FASTBREAK_ENV: prod
+
+      # A build that produced nothing must not be allowed to empty the site
+      # already on S3, and `--delete` would do exactly that.
+      - name: Check the export
+        run: |
+          test -f out/index.html
+          test -f out/404.html
+          echo "Export is $(du -sh out | cut -f1) across $(find out -type f | wc -l) files"
+
+      # Hashed assets first, so no HTML is ever live while the JS it asks for is
+      # still missing. These URLs can never change meaning, hence the year.
+      - name: Sync hashed assets
+        run: |
+          aws s3 sync out/_next/static/ "s3://$SITE_BUCKET/_next/static/" \
+            --delete \
+            --cache-control 'public,max-age=31536000,immutable'
+
+      # Then everything else. `max-age=0,must-revalidate` because a page is only
+      # true until tomorrow's build; CloudFront still caches it for 300s at the
+      # edge (see site.tf), which is what absorbs traffic.
+      - name: Sync pages
+        run: |
+          aws s3 sync out/ "s3://$SITE_BUCKET/" \
+            --delete \
+            --exclude '_next/static/*' \
+            --cache-control 'public,max-age=0,must-revalidate'
+
+      # Looked up rather than hardcoded: the distribution is created by
+      # terraform, and its ID is not knowable when this file is written.
+      - name: Invalidate the edge cache
+        run: |
+          DIST_ID=$(aws cloudfront list-distributions \
+            --query "DistributionList.Items[?contains(Aliases.Items, '$SITE_DOMAIN')].Id | [0]" \
+            --output text)
+
+          if [ -z "$DIST_ID" ] || [ "$DIST_ID" = "None" ]; then
+            echo "No CloudFront distribution is aliased to $SITE_DOMAIN." >&2
+            echo "Apply pipeline/04-fastbreak-charts/aws/site.tf first." >&2
+            exit 1
+          fi
+
+          echo "Invalidating $DIST_ID"
+          aws cloudfront create-invalidation \
+            --distribution-id "$DIST_ID" \
+            --paths '/*' \
+            --query 'Invalidation.Id' --output text
+
+      - name: Summary
+        run: |
+          {
+            echo "## Deployed"
+            echo
+            echo "- https://$SITE_DOMAIN"
+            echo "- Export: $(du -sh out | cut -f1), $(find out -type f | wc -l) files"
+            echo "- Charts: \`$(cat data/manifest.json)\`"
+          } >> "$GITHUB_STEP_SUMMARY"

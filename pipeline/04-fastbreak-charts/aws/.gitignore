@@ -1,2 +1,5 @@
 # terraform archive_file output, regenerated on every plan
 lambda/*.zip
+# saved plan files (`terraform plan -out=tfplan`); they hold resolved values
+tfplan
+*.tfplan

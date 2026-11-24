@@ -2,6 +2,7 @@ import { fetchChartRegistry, fetchChartData } from '@/lib/api';
 import { NHLMatchupData, NHLMatchupDataPoint, NHLMatchupResults, NHLBoxScore, VsSeasonAvgStat } from '@/types/chart';
 import { SportTabs } from '@/components/ui/SportTabs';
 import { NHLMatchupNav } from '@/components/ui/NHLMatchupNav';
+import { toMatchupNavGames } from '@/lib/matchupNav';
 import { MatchupComparisons } from '@/components/charts/MatchupComparisons';
 import { CumXgChart } from '@/components/charts/CumXgChart';
 import { XgVsPointsChart } from '@/components/charts/XgVsPointsChart';
@@ -335,7 +336,7 @@ export default async function NHLMatchupPage({ params }: Props) {
       <SportTabs orderedSports={orderedSports} />
 
       <div className="px-1 md:px-0">
-        <NHLMatchupNav games={matchupData.dataPoints} selectedGameId={gameId} />
+        <NHLMatchupNav games={toMatchupNavGames(matchupData.dataPoints)} selectedGameId={gameId} />
 
         {/* 50/50 split layout */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-2">

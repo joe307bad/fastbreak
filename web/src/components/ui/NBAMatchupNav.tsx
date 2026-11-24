@@ -1,10 +1,10 @@
 import Link from 'next/link';
-import { NBAMatchupDataPoint } from '@/types/chart';
+import type { MatchupNavGame } from '@/lib/matchupNav';
 
 interface DayGroup {
   dateKey: string;
   label: string;
-  games: NBAMatchupDataPoint[];
+  games: MatchupNavGame[];
 }
 
 function getDateKey(date: Date): string {
@@ -29,7 +29,7 @@ function formatDayLabel(date: Date): string {
   return date.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
 }
 
-function groupGamesByDay(games: NBAMatchupDataPoint[]): DayGroup[] {
+function groupGamesByDay(games: MatchupNavGame[]): DayGroup[] {
   const groups: Map<string, DayGroup> = new Map();
 
   const sortedGames = [...games].sort(
@@ -55,7 +55,7 @@ function groupGamesByDay(games: NBAMatchupDataPoint[]): DayGroup[] {
 }
 
 interface NBAMatchupNavProps {
-  games: NBAMatchupDataPoint[];
+  games: MatchupNavGame[];
   selectedGameId: string;
 }
 

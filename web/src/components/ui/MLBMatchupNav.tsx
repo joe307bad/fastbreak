@@ -2,14 +2,14 @@
 
 import Link from 'next/link';
 import { useMemo } from 'react';
-import { MLBMatchupDataPoint } from '@/types/chart';
+import type { MatchupNavGame } from '@/lib/matchupNav';
 import { getPreferredGameForDay } from '@/lib/mlbMatchups';
 import { usePinnedTeams } from '@/lib/usePinnedTeams';
 
 interface DayGroup {
   dateKey: string;
   label: string;
-  games: MLBMatchupDataPoint[];
+  games: MatchupNavGame[];
 }
 
 function getDateKey(date: Date): string {
@@ -34,7 +34,7 @@ function formatDayLabel(date: Date): string {
   return date.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
 }
 
-function groupGamesByDay(games: MLBMatchupDataPoint[]): DayGroup[] {
+function groupGamesByDay(games: MatchupNavGame[]): DayGroup[] {
   const groups: Map<string, DayGroup> = new Map();
 
   const sortedGames = [...games].sort(
@@ -60,7 +60,7 @@ function groupGamesByDay(games: MLBMatchupDataPoint[]): DayGroup[] {
 }
 
 interface MLBMatchupNavProps {
-  games: MLBMatchupDataPoint[];
+  games: MatchupNavGame[];
   selectedGameId: string;
 }
 

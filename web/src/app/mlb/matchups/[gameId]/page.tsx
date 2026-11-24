@@ -2,6 +2,7 @@ import { fetchChartRegistry, fetchChartData, fetchOrderedSportsWithCharts } from
 import { MLBMatchupData, MLBMatchupDataPoint } from '@/types/chart';
 import { SportTabs } from '@/components/ui/SportTabs';
 import { MLBMatchupNav } from '@/components/ui/MLBMatchupNav';
+import { toMatchupNavGames } from '@/lib/matchupNav';
 import { MatchupComparisons } from '@/components/charts/MatchupComparisons';
 import { CumRunDiffChart } from '@/components/charts/CumRunDiffChart';
 import { WeeklyRunsChart } from '@/components/charts/WeeklyRunsChart';
@@ -151,7 +152,7 @@ export default async function MLBMatchupPage({ params }: Props) {
       <div className="px-1 md:px-0">
         <div className="sticky top-10 z-30 mb-4 flex items-start gap-1 bg-[var(--background)] py-1">
           <div className="flex-1 min-w-0">
-            <MLBMatchupNav games={matchupData.dataPoints} selectedGameId={gameId} />
+            <MLBMatchupNav games={toMatchupNavGames(matchupData.dataPoints)} selectedGameId={gameId} />
           </div>
           <MLBMatchupInfoButton title="MLB Matchup Stats" source={matchupData.source} />
         </div>

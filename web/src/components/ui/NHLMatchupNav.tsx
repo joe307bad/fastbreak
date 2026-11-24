@@ -2,12 +2,12 @@
 
 import { useEffect, useRef } from 'react';
 import Link from 'next/link';
-import { NHLMatchupDataPoint } from '@/types/chart';
+import type { MatchupNavGame } from '@/lib/matchupNav';
 
 interface DayGroup {
   dateKey: string;
   label: string;
-  games: NHLMatchupDataPoint[];
+  games: MatchupNavGame[];
 }
 
 function getDateKey(date: Date): string {
@@ -32,7 +32,7 @@ function formatDayLabel(date: Date): string {
   return date.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
 }
 
-function groupGamesByDay(games: NHLMatchupDataPoint[]): DayGroup[] {
+function groupGamesByDay(games: MatchupNavGame[]): DayGroup[] {
   const groups: Map<string, DayGroup> = new Map();
 
   const sortedGames = [...games].sort(
@@ -58,7 +58,7 @@ function groupGamesByDay(games: NHLMatchupDataPoint[]): DayGroup[] {
 }
 
 interface NHLMatchupNavProps {
-  games: NHLMatchupDataPoint[];
+  games: MatchupNavGame[];
   selectedGameId: string;
 }
 

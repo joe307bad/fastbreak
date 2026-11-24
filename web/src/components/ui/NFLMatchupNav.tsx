@@ -2,31 +2,31 @@
 
 import Link from 'next/link';
 import { useMemo } from 'react';
-import { NFLMatchupDataPoint } from '@/types/chart';
+import type { NFLMatchupNavGame } from '@/lib/matchupNav';
 import { usePinnedTeams } from '@/lib/usePinnedTeams';
 
 interface WeekGroup {
   key: string;
   label: string;
-  games: NFLMatchupDataPoint[];
+  games: NFLMatchupNavGame[];
 }
 
 // Football is played in weeks, not days, so the top row is the week and the
 // row beneath it the games inside it - a Thursday night game and the Sunday
 // slate belong together.
-function getWeekKey(game: NFLMatchupDataPoint): string {
+function getWeekKey(game: NFLMatchupNavGame): string {
   const type = game.seasonType ?? 'REG';
   return `${game.season ?? ''}-${type}-${game.week ?? 0}`;
 }
 
-function formatWeekLabel(game: NFLMatchupDataPoint): string {
+function formatWeekLabel(game: NFLMatchupNavGame): string {
   if (game.seasonType && game.seasonType !== 'REG') {
     return game.seasonTypeLabel ?? game.seasonType;
   }
   return game.week != null ? `Week ${game.week}` : 'Week';
 }
 
-function groupGamesByWeek(games: NFLMatchupDataPoint[]): WeekGroup[] {
+function groupGamesByWeek(games: NFLMatchupNavGame[]): WeekGroup[] {
   const groups = new Map<string, WeekGroup>();
 
   const sortedGames = [...games].sort(
@@ -44,7 +44,7 @@ function groupGamesByWeek(games: NFLMatchupDataPoint[]): WeekGroup[] {
   return Array.from(groups.values());
 }
 
-function gameIncludesTeam(game: NFLMatchupDataPoint, teamCode: string): boolean {
+function gameIncludesTeam(game: NFLMatchupNavGame, teamCode: string): boolean {
   const code = teamCode.toUpperCase();
   return (
     game.awayTeam.abbreviation.toUpperCase() === code ||
@@ -55,7 +55,7 @@ function gameIncludesTeam(game: NFLMatchupDataPoint, teamCode: string): boolean 
 function preferredGameForWeek(
   group: WeekGroup,
   pinnedTeamCodes: string[]
-): NFLMatchupDataPoint | undefined {
+): NFLMatchupNavGame | undefined {
   for (const teamCode of pinnedTeamCodes) {
     const match = group.games.find(game => gameIncludesTeam(game, teamCode));
     if (match) return match;
@@ -64,7 +64,7 @@ function preferredGameForWeek(
 }
 
 interface NFLMatchupNavProps {
-  games: NFLMatchupDataPoint[];
+  games: NFLMatchupNavGame[];
   selectedGameId: string;
 }
 

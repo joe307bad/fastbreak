@@ -1,4 +1,12 @@
-import { MLBMatchupDataPoint } from '@/types/chart';
+import type { MatchupNavGame } from '@/lib/matchupNav';
+
+/**
+ * These helpers only ever read a game's date and its two abbreviations, so they
+ * are generic over anything with that shape rather than tied to a full data
+ * point. That lets the nav call them with the slim list it is handed (see
+ * `matchupNav.ts`) while a caller holding real data points still gets a real
+ * data point back.
+ */
 
 export function getTodayKey(): string {
   const today = new Date();
@@ -15,7 +23,7 @@ export function getDateKey(date: Date): string {
   return `${year}-${month}-${day}`;
 }
 
-function gameIncludesTeam(game: MLBMatchupDataPoint, teamCode: string): boolean {
+function gameIncludesTeam(game: MatchupNavGame, teamCode: string): boolean {
   const code = teamCode.toUpperCase();
   return (
     game.awayTeam.abbreviation.toUpperCase() === code ||
@@ -23,11 +31,11 @@ function gameIncludesTeam(game: MLBMatchupDataPoint, teamCode: string): boolean 
   );
 }
 
-export function findPinnedTeamGameForDay(
-  games: MLBMatchupDataPoint[],
+export function findPinnedTeamGameForDay<T extends MatchupNavGame>(
+  games: T[],
   dateKey: string,
   pinnedMlbTeamCodes: string[]
-): MLBMatchupDataPoint | undefined {
+): T | undefined {
   if (pinnedMlbTeamCodes.length === 0) return undefined;
 
   const dayGames = games.filter(game => getDateKey(new Date(game.gameDate)) === dateKey);
@@ -39,12 +47,12 @@ export function findPinnedTeamGameForDay(
   return undefined;
 }
 
-export function getPreferredGameForDay(
-  games: MLBMatchupDataPoint[],
+export function getPreferredGameForDay<T extends MatchupNavGame>(
+  games: T[],
   dateKey: string,
   pinnedMlbTeamCodes: string[],
-  fallbackGame?: MLBMatchupDataPoint
-): MLBMatchupDataPoint | undefined {
+  fallbackGame?: T
+): T | undefined {
   return (
     findPinnedTeamGameForDay(games, dateKey, pinnedMlbTeamCodes) ??
     fallbackGame ??
@@ -52,11 +60,11 @@ export function getPreferredGameForDay(
   );
 }
 
-export function findNextMatchupForTeam(
-  sortedGames: MLBMatchupDataPoint[],
+export function findNextMatchupForTeam<T extends MatchupNavGame>(
+  sortedGames: T[],
   teamCode: string,
   todayKey = getTodayKey()
-): MLBMatchupDataPoint | undefined {
+): T | undefined {
   const teamGames = sortedGames.filter(game => gameIncludesTeam(game, teamCode));
 
   const futureGame = teamGames.find(
@@ -74,10 +82,10 @@ export function findNextMatchupForTeam(
   return undefined;
 }
 
-export function getDefaultMLBMatchupGame(
-  games: MLBMatchupDataPoint[],
+export function getDefaultMLBMatchupGame<T extends MatchupNavGame>(
+  games: T[],
   pinnedMlbTeamCodes: string[] = []
-): MLBMatchupDataPoint | undefined {
+): T | undefined {
   if (games.length === 0) return undefined;
 
   const sortedGames = [...games].sort(

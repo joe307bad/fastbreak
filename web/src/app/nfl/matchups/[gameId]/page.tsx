@@ -2,6 +2,7 @@ import { fetchChartRegistry, fetchChartData, fetchOrderedSportsWithCharts } from
 import { NFLMatchupData, NFLMatchupDataPoint, NFLGameResults, NFLTeamBoxScore } from '@/types/chart';
 import { SportTabs } from '@/components/ui/SportTabs';
 import { NFLMatchupNav } from '@/components/ui/NFLMatchupNav';
+import { toNFLMatchupNavGames } from '@/lib/matchupNav';
 import { MatchupComparisons } from '@/components/charts/MatchupComparisons';
 import { CumPointDiffChart } from '@/components/charts/CumPointDiffChart';
 import { WeeklyPointsChart } from '@/components/charts/WeeklyPointsChart';
@@ -322,7 +323,7 @@ export default async function NFLMatchupPage({ params }: Props) {
 
       <div className="px-1 md:px-0">
         <div className="sticky top-10 z-30 mb-4 bg-[var(--background)] py-1">
-          <NFLMatchupNav games={matchupData.dataPoints} selectedGameId={gameId} />
+          <NFLMatchupNav games={toNFLMatchupNavGames(matchupData.dataPoints)} selectedGameId={gameId} />
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-2">

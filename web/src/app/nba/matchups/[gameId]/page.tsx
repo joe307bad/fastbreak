@@ -2,6 +2,7 @@ import { fetchChartRegistry, fetchChartData } from '@/lib/api';
 import { NBAMatchupData, NBAMatchupDataPoint, NBAMatchupResults } from '@/types/chart';
 import { SportTabs } from '@/components/ui/SportTabs';
 import { NBAMatchupNav } from '@/components/ui/NBAMatchupNav';
+import { toMatchupNavGames } from '@/lib/matchupNav';
 import { MatchupComparisons } from '@/components/charts/MatchupComparisons';
 import { CumNetRatingChart } from '@/components/charts/CumNetRatingChart';
 import { WeeklyEfficiencyChart } from '@/components/charts/WeeklyEfficiencyChart';
@@ -375,7 +376,7 @@ export default async function NBAMatchupPage({ params }: Props) {
       <SportTabs orderedSports={orderedSports} />
 
       <div className="px-1 md:px-0">
-        <NBAMatchupNav games={matchupData.dataPoints} selectedGameId={gameId} />
+        <NBAMatchupNav games={toMatchupNavGames(matchupData.dataPoints)} selectedGameId={gameId} />
 
         {/* 50/50 split layout */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-2">

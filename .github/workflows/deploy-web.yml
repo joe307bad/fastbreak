@@ -95,10 +95,16 @@ jobs:
 
       # Looked up rather than hardcoded: the distribution is created by
       # terraform, and its ID is not knowable when this file is written.
+      #
+      # `Aliases.Items || ['_none_']` is not decoration. A distribution with no
+      # alias -- the chart CDN is one -- reports `Aliases.Items` as null rather
+      # than as an empty list, and `contains(null, ...)` is a JMESPath type
+      # error that fails the whole query, not a false. The `||` substitutes a
+      # list that matches nothing so the comparison can proceed.
       - name: Invalidate the edge cache
         run: |
           DIST_ID=$(aws cloudfront list-distributions \
-            --query "DistributionList.Items[?contains(Aliases.Items, '$SITE_DOMAIN')].Id | [0]" \
+            --query "DistributionList.Items[?contains(Aliases.Items || ['_none_'], '$SITE_DOMAIN')].Id | [0]" \
             --output text)
 
           if [ -z "$DIST_ID" ] || [ "$DIST_ID" = "None" ]; then

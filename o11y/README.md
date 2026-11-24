@@ -1,5 +1,13 @@
 # Fastbreak Observability (o11y)
 
+> **This describes the Fly.io deployment, which is gone.** Since 2026-11-21 the
+> o11y stack runs on `fides`, deployed by `roles/fastbreak` in `jbhs-scripts`
+> (`ansible-playbook playbooks/services.yml --tags fastbreak`). QuestDB still
+> runs there; Grafana and this stack's Caddy are switched off
+> (`fastbreak_grafana_enabled`, `fastbreak_o11y_caddy_enabled`). The `fly`
+> commands below will not work -- the app no longer exists. Build contexts
+> `questdb/` and `grafana/` are still the ones jbhs builds from.
+
 QuestDB + Caddy on Fly.io for mobile app telemetry.
 
 ## Architecture

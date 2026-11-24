@@ -7,6 +7,9 @@ on:
       - main
     paths:
       - 'kmp/**'
+      # Only the terraform under aws/ is deployed from here. The chart pipeline
+      # and Fastbreak.Daily are built and run by jbhs (roles/fastbreak in
+      # jbhs-scripts), so a change to either triggers nothing in this repo.
       - 'pipeline/04-fastbreak-charts/aws/**'
 
 jobs:
